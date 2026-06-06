@@ -1055,7 +1055,12 @@ window.__dataReady.then(data => {
   function DamageDetailTab(){
     const [view,setView]   = useState('summary');
     const [filterCode,setFilterCode] = useState('ALL');
-    const [filterYear,setFilterYear] = useState('ALL');
+    const [filterYear,setFilterYear] = useState(()=>{
+      const ys=[...new Set((D.damageItems||[]).map(r=>r.year))].sort((a,b)=>a-b);
+      return ys.length ? ys[ys.length-1] : 'ALL';
+    });
+    const [selMonths,setSelMonths] = useState(new Set()); // เดือนที่เลือก (empty = ทุกเดือน)
+    const [showMonthPicker,setShowMonthPicker] = useState(false);
     const [selCust,setSelCust] = useState(null);
 
     const rawItems = D.damageItems || [];
@@ -1085,17 +1090,23 @@ window.__dataReady.then(data => {
       (dmgMonth==='ALL' || r.month===Number(dmgMonth))
     );
 
-    // กรองตาม year + code (ไม่รวม รับคืนสินค้าใช้ได้) สำหรับ view อื่น
+    // เดือนที่มีในปีที่เลือก (สำหรับ month picker)
+    const monthsAvail = filterYear==='ALL' ? [] :
+      [...new Set(allValid.filter(r=>r.year===Number(filterYear)).map(r=>r.month))].sort((a,b)=>a-b);
+
+    // กรองตาม year + เดือน + code สำหรับ view อื่น
     const items = rawItems.filter(r =>
       notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear)) &&
+      (selMonths.size===0 || selMonths.has(r.month)) &&
       (filterCode==='ALL' || r.code_type===filterCode)
     );
 
     // รวมยอดรายเดือน (ใช้ทุก code สำหรับ sales %)
     const allFiltered = rawItems.filter(r =>
       notReturnOk(r) &&
-      (filterYear==='ALL' || r.year===Number(filterYear))
+      (filterYear==='ALL' || r.year===Number(filterYear)) &&
+      (selMonths.size===0 || selMonths.has(r.month))
     );
 
     // unique months ที่มีข้อมูล (เรียงตาม year-month)
@@ -1161,16 +1172,49 @@ window.__dataReady.then(data => {
               {monthsInYear.map(m=><option key={m} value={m}>{MONTHS_TH_SHORT[m-1]}</option>)}
             </select>
           </> : <>
-            <select value={filterYear} onChange={e=>setFilterYear(e.target.value)}
+            <select value={filterYear} onChange={e=>{setFilterYear(e.target.value);setSelMonths(new Set());}}
               style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
-              <option value="ALL">ทุกปี</option>
               {years.map(y=><option key={y} value={y}>ปี {y}</option>)}
             </select>
-            <select value={filterCode} onChange={e=>setFilterCode(e.target.value)}
-              style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
-              <option value="ALL">ทุกรหัส</option>
-              {Object.entries(CODE_LABEL).map(([k,l])=><option key={k} value={k}>{l}</option>)}
-            </select>
+
+            {/* Month multi-picker */}
+            <div style={{position:'relative'}}>
+              <button onClick={()=>setShowMonthPicker(p=>!p)}
+                style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 12px',fontFamily:'var(--font)',fontSize:'13px',
+                  color:'var(--ink)',background:'#fff',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
+                {selMonths.size===0 ? 'ทุกเดือน' : [...selMonths].sort((a,b)=>a-b).map(m=>MONTHS_TH_SHORT[m-1]).join(', ')}
+                <span style={{fontSize:'10px'}}>▼</span>
+              </button>
+              {showMonthPicker && (
+                <div style={{position:'absolute',top:'110%',right:0,background:'#fff',borderRadius:10,
+                  border:'1.5px solid var(--line-strong)',boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
+                  padding:'12px',zIndex:100,minWidth:200}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                    <span style={{fontSize:'12px',fontWeight:700,color:'var(--ink)'}}>เลือกเดือน</span>
+                    <button onClick={()=>{setSelMonths(new Set());setShowMonthPicker(false);}}
+                      style={{fontSize:'11px',color:'#2f5fd0',background:'none',border:'none',cursor:'pointer'}}>ล้างทั้งหมด</button>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                    {monthsAvail.map(m=>(
+                      <label key={m} style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',
+                        padding:'4px 8px',borderRadius:6,background:selMonths.has(m)?'#eef3fc':'transparent',
+                        border:`1px solid ${selMonths.has(m)?'#2f5fd0':'transparent'}`}}>
+                        <input type="checkbox" checked={selMonths.has(m)}
+                          onChange={e=>{
+                            const s=new Set(selMonths);
+                            e.target.checked?s.add(m):s.delete(m);
+                            setSelMonths(s);
+                          }} style={{accentColor:'#2f5fd0'}}/>
+                        <span style={{fontSize:'13px'}}>{MONTHS_TH_SHORT[m-1]}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button onClick={()=>setShowMonthPicker(false)}
+                    style={{marginTop:10,width:'100%',padding:'6px',borderRadius:8,background:'#2f5fd0',color:'#fff',
+                      border:'none',cursor:'pointer',fontSize:'13px',fontWeight:600}}>ตกลง</button>
+                </div>
+              )}
+            </div>
           </>}
         </div>
       </div>
