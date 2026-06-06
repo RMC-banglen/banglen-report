@@ -1154,14 +1154,16 @@ window.__dataReady.then(data => {
         const pctDiff      = (dmgPct!=null&&prevPct!=null) ? dmgPct-prevPct : null;
         const prevLabel    = prevMNum ? `${MONTHS_TH_SHORT[prevMNum-1]}-${String(prevYearNum).slice(-2)}` : '–';
 
-        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
           <KpiCard label={`เสียหายรวม ${dmgLabel}`} value={bahtFmt(dmgTotal)} unit=" ฿"
             sub={`ยอดขาย: ${dmgSales?bahtFmt(dmgSales)+' ฿':'ไม่มีข้อมูล'}`} accent={PALETTE.cancel}/>
           <KpiCard label={`% เสียหาย ${dmgLabel}`} value={dmgPct!=null?dmgPct.toFixed(3):'–'} unit="%"
             sub="มูลค่าเสียหาย ÷ ยอดขาย" accent={dmgPct!=null&&dmgPct<=0.7?'#5a8f3c':PALETTE.cancel}/>
-          <KpiCard label={`เทียบ ${prevLabel}`}
+          <KpiCard label={`มูลค่าเสียหาย ${prevLabel}`} value={prevTotal?bahtFmt(prevTotal):'–'} unit=" ฿"
+            sub={`ยอดขาย: ${prevSales?bahtFmt(prevSales)+' ฿':'ไม่มีข้อมูล'}`} accent='#e67e22'/>
+          <KpiCard label={`เทียบ ${prevLabel} (±%)`}
             value={pctDiff!=null?(pctDiff>=0?'+':'')+pctDiff.toFixed(3):'–'} unit="%"
-            sub={prevTotal?`มูลค่า ${prevLabel}: ${bahtFmt(prevTotal)} ฿`:'ไม่มีข้อมูลเดือนก่อน'}
+            sub={prevPct!=null?`% เสียหาย ${prevLabel}: ${prevPct.toFixed(3)}%`:'ไม่มีข้อมูลเดือนก่อน'}
             accent={pctDiff==null?'var(--muted-text)':pctDiff<=0?'#5a8f3c':'#c0392b'}
             delta={pctDiff!=null?{dir:pctDiff<=0?-1:1,text:''}:null}/>
           <KpiCard label="รายการเสียหาย" value={dmgItems.length} unit=" รายการ"
