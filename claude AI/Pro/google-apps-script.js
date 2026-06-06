@@ -572,6 +572,7 @@ function syncDamageItems(ss) {
         customer_name: lastCustomer,
         cause:         lastType || lastCause,
         amount:        amount,
+        bill_no:       lastBillNo,
       });
     }
     Logger.log(`REB-ROB: อ่านได้ ${records.length} แถว`);
@@ -626,6 +627,7 @@ function syncDamageItems(ss) {
         customer_name: null,
         cause:         typeVal || cause,
         amount:        amount,
+        bill_no:       bill || null,
       });
     }
     Logger.log(`ID: อ่านได้ ${records.length - countBefore} แถว`);

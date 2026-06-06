@@ -924,10 +924,368 @@ window.__dataReady.then(data => {
       ]},
   ];
 
+  const BAR_COLORS = ['#c0392b','#e67e22','#f39c12','#27ae60','#2980b9','#8e44ad','#16a085','#2c3e50','#d35400','#7f8c8d'];
+
+  function CustomerView({items, totalAll}){
+    const [selCust, setSelCust] = useState(null);
+
+    const custRanked = Object.entries(
+      items.filter(r=>r.customer_name)
+        .reduce((acc,r)=>{ acc[r.customer_name]=(acc[r.customer_name]||0)+(r.amount||0); return acc; },{})
+    ).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value).slice(0,20);
+    const maxC = custRanked[0]?.value||1;
+
+    // รายละเอียดของลูกค้าที่เลือก — จัดกลุ่มตาม damage_group หรือ cause
+    const custDetail = selCust ? items.filter(r=>r.customer_name===selCust) : [];
+    const custTotal  = custDetail.reduce((a,r)=>a+(r.amount||0),0);
+
+    // จัดกลุ่มตามหน่วยงาน (damage_group) แล้วภายในแต่ละกลุ่มเรียงตาม cause
+    const grouped = custDetail.reduce((acc,r)=>{
+      const g = r.damage_group||'ไม่ระบุหน่วยงาน';
+      if(!acc[g]) acc[g]=[];
+      acc[g].push(r);
+      return acc;
+    },{});
+
+    return <>
+      <ChartCard title="มูลค่าเสียหายแยกตามลูกค้า" subtitle="คลิกชื่อลูกค้าเพื่อดูรายละเอียดหน่วยงาน/ความเสียหาย" span="full">
+        <div style={{display:'flex',gap:'24px',flexWrap:'wrap',alignItems:'flex-start'}}>
+
+          {/* แถบลูกค้า */}
+          <div style={{flex:'1 1 400px',display:'flex',flexDirection:'column',gap:'7px'}}>
+            {custRanked.map((c,i)=>(
+              <div key={i} onClick={()=>setSelCust(selCust===c.name?null:c.name)}
+                style={{display:'grid',gridTemplateColumns:'200px 1fr 160px 55px',gap:'10px',alignItems:'center',
+                  cursor:'pointer',borderRadius:8,padding:'5px 8px',
+                  background:selCust===c.name?'#eef3fc':'transparent',
+                  border:`1.5px solid ${selCust===c.name?'#2f5fd0':'transparent'}`}}>
+                <div style={{fontSize:'13px',fontWeight:600,color:selCust===c.name?'#2f5fd0':'var(--ink)',
+                  whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={c.name}>
+                  {i+1}. {c.name}
+                </div>
+                <div style={{background:'#f0f0f0',borderRadius:6,height:20,overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:6,background:BAR_COLORS[i%BAR_COLORS.length],width:`${(c.value/maxC)*100}%`}}/>
+                </div>
+                <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right',whiteSpace:'nowrap'}}>
+                  {Number(c.value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                </div>
+                <div style={{fontSize:'12px',color:'var(--muted-text)',textAlign:'right'}}>
+                  {totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':'–'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Panel รายละเอียด */}
+          {selCust && (
+            <div style={{flex:'1 1 320px',background:'#f8f9fc',borderRadius:14,border:'1.5px solid #c6d3f5',padding:'16px 18px',minWidth:300}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:'15px',color:'#2f5fd0',marginBottom:2}}>{selCust}</div>
+                  <div style={{fontSize:'12px',color:'var(--muted-text)'}}>
+                    รวมเสียหาย: <b style={{color:'#c0392b'}}>{Number(custTotal).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿</b>
+                    {' • '}{custDetail.length} รายการ
+                  </div>
+                </div>
+                <button onClick={()=>setSelCust(null)} style={{background:'none',border:'none',fontSize:'20px',cursor:'pointer',color:'#999',lineHeight:1}}>✕</button>
+              </div>
+
+              <div style={{display:'flex',flexDirection:'column',gap:'12px',maxHeight:480,overflowY:'auto'}}>
+                {(()=>{
+                  const rebRob = custDetail.filter(r=>r.code_type==='REB'||r.code_type==='ROB');
+                  const idItems = custDetail.filter(r=>r.code_type==='ID');
+
+                  // จัดกลุ่ม REB/ROB ตามเลขบิล (หน่วยงาน/โปรเจกต์)
+                  const rebRobGroups = rebRob.reduce((acc,r)=>{
+                    const g=r.bill_no||'ไม่ระบุหน่วยงาน';
+                    if(!acc[g]) acc[g]=[];
+                    acc[g].push(r); return acc;
+                  },{});
+
+                  const itemCard = (r,ri) => (
+                    <div key={ri} style={{background:'#fff',borderRadius:8,border:'1px solid #e0e7ff',
+                      padding:'8px 12px',marginBottom:4}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                        <span style={{padding:'2px 7px',borderRadius:8,fontSize:'11px',fontWeight:700,
+                          background:(CODE_COLOR[r.code_type]||'#888')+'22',color:CODE_COLOR[r.code_type]||'#888'}}>
+                          {r.code_type}
+                        </span>
+                        <span style={{fontFamily:'var(--num)',fontWeight:700,color:'#c0392b',fontSize:'14px'}}>
+                          {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                        </span>
+                      </div>
+                      <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>{r.cause||'ไม่ระบุสาเหตุ'}</div>
+                      <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
+                    </div>
+                  );
+
+                  return <>
+                    {/* REB/ROB — แยกตามหน่วยงาน */}
+                    {Object.keys(rebRobGroups).length>0 && Object.entries(rebRobGroups).map(([grp,rows],gi)=>{
+                      const grpTotal=rows.reduce((a,r)=>a+(r.amount||0),0);
+                      return <div key={gi}>
+                        <div style={{background:'#dbeafe',borderRadius:8,padding:'6px 10px',marginBottom:6,
+                          display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                          <span style={{fontSize:'12px',fontWeight:700,color:'#1d4ed8'}}>📁 {grp}</span>
+                          <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
+                            {Number(grpTotal).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                          </span>
+                        </div>
+                        {rows.map((r,ri)=>itemCard(r,ri))}
+                      </div>;
+                    })}
+
+                    {/* ID — ไม่มีหน่วยงาน */}
+                    {idItems.length>0 && <div>
+                      <div style={{background:'#fce7f3',borderRadius:8,padding:'6px 10px',marginBottom:6,
+                        display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:'12px',fontWeight:700,color:'#9d174d'}}>🏭 เสียหายในโรงงาน (ID)</span>
+                        <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
+                          {Number(idItems.reduce((a,r)=>a+(r.amount||0),0)).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                        </span>
+                      </div>
+                      {idItems.map((r,ri)=>itemCard(r,ri))}
+                    </div>}
+                  </>;
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
+      </ChartCard>
+    </>;
+  }
+
+  function CauseView({items, totalAll}){
+    const [selCause, setSelCause] = useState(null);
+
+    const causeSorted = Object.entries(
+      items.reduce((acc,r)=>{ const k=r.cause||'ไม่ระบุ'; acc[k]=(acc[k]||0)+(r.amount||0); return acc; },{})
+    ).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+    const maxC = causeSorted[0]?.value||1;
+
+    // ลูกค้าในสาเหตุที่เลือก
+    const causeCustomers = selCause ? Object.entries(
+      items.filter(r=>(r.cause||'ไม่ระบุ')===selCause&&r.customer_name)
+        .reduce((acc,r)=>{ acc[r.customer_name]=(acc[r.customer_name]||0)+(r.amount||0); return acc; },{})
+    ).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value) : [];
+
+    return <>
+      {/* แถบสาเหตุ + panel ลูกค้า */}
+      <ChartCard title="มูลค่าเสียหายแยกตามสาเหตุ" subtitle="คลิกที่สาเหตุเพื่อดูรายชื่อบริษัท/ลูกค้า" span="full">
+        <div style={{display:'flex',gap:'24px',flexWrap:'wrap',alignItems:'flex-start'}}>
+          <div style={{flex:'1 1 420px',display:'flex',flexDirection:'column',gap:'8px'}}>
+            {causeSorted.map((c,i)=>(
+              <div key={i} onClick={()=>setSelCause(selCause===c.label?null:c.label)}
+                style={{display:'grid',gridTemplateColumns:'190px 1fr 140px 60px',gap:'10px',alignItems:'center',
+                  cursor:'pointer',borderRadius:8,padding:'5px 8px',
+                  background:selCause===c.label?'#eef3fc':'transparent',
+                  border:`1.5px solid ${selCause===c.label?'#2f5fd0':'transparent'}`}}>
+                <div style={{fontSize:'13px',fontWeight:600,color:selCause===c.label?'#2f5fd0':'var(--ink)',
+                  whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={c.label}>
+                  {i+1}. {c.label}
+                </div>
+                <div style={{background:'#f0f0f0',borderRadius:6,height:22,overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:6,background:BAR_COLORS[i%BAR_COLORS.length],width:`${(c.value/maxC)*100}%`}}/>
+                </div>
+                <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right',whiteSpace:'nowrap'}}>
+                  {Number(c.value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                </div>
+                <div style={{fontSize:'12px',color:'var(--muted-text)',textAlign:'right'}}>
+                  {totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':'–'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {selCause && (
+            <div style={{flex:'1 1 280px',background:'#f8f9fc',borderRadius:14,border:'1.5px solid #c6d3f5',padding:'16px 18px',minWidth:260}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:'14px',color:'#2f5fd0',marginBottom:2}}>{selCause}</div>
+                  <div style={{fontSize:'12px',color:'var(--muted-text)'}}>{causeCustomers.length} บริษัท/ลูกค้า</div>
+                </div>
+                <button onClick={()=>setSelCause(null)} style={{background:'none',border:'none',fontSize:'18px',cursor:'pointer',color:'#999'}}>✕</button>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:'6px',maxHeight:360,overflowY:'auto'}}>
+                {causeCustomers.length===0
+                  ? <div style={{color:'var(--muted-text)',fontSize:'13px'}}>ไม่มีข้อมูลลูกค้า</div>
+                  : causeCustomers.map((c,i)=>(
+                    <div key={i} style={{background:'#fff',borderRadius:8,border:'1px solid #e0e7ff',
+                      padding:'8px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div style={{fontSize:'13px',fontWeight:600}}>{i+1}. {c.name}</div>
+                      <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b',whiteSpace:'nowrap'}}>
+                        {Number(c.value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          )}
+        </div>
+      </ChartCard>
+
+      {/* Donut สัดส่วน */}
+      <ChartCard title="สัดส่วนมูลค่าเสียหายตามสาเหตุ" subtitle="" span="full">
+        <div style={{display:'flex',gap:'32px',alignItems:'center',flexWrap:'wrap'}}>
+          <DonutChart segments={causeSorted.slice(0,8).map((c,i)=>({label:c.label,value:c.value,color:BAR_COLORS[i]}))}
+            size={220} thickness={36} centerValue={Number(totalAll).toLocaleString('th-TH',{maximumFractionDigits:0})} centerLabel="รวม ฿"/>
+          <div style={{display:'flex',flexDirection:'column',gap:'10px',flex:1,minWidth:240}}>
+            {causeSorted.slice(0,8).map((c,i)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <span style={{width:12,height:12,borderRadius:3,background:BAR_COLORS[i],flexShrink:0}}/>
+                <div style={{flex:1,fontSize:'13px'}}>{c.label}</div>
+                <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,whiteSpace:'nowrap'}}>
+                  {Number(c.value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                </div>
+                <div style={{fontSize:'12px',color:'var(--muted-text)',width:40,textAlign:'right'}}>
+                  {totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':''}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </ChartCard>
+    </>;
+  }
+
+  function DamageRankView({items, totalAll, selCust, setSelCust}){
+    const [selCause, setSelCause] = useState(null);
+
+    const causeRanked = Object.entries(
+      items.reduce((acc,r)=>{ const k=r.cause||'ไม่ระบุ'; acc[k]=(acc[k]||0)+(r.amount||0); return acc; },{})
+    ).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+    const maxC = causeRanked[0]?.value||1;
+
+    // ลูกค้าในสาเหตุที่เลือก
+    const causeCustomers = selCause ? (() => {
+      const map = {};
+      items.filter(r=>(r.cause||'ไม่ระบุ')===selCause).forEach(r=>{
+        const k = r.customer_name||'ไม่ระบุลูกค้า';
+        if(!map[k]) map[k]={name:k,amount:0,rows:[]};
+        map[k].amount += r.amount||0;
+        map[k].rows.push(r);
+      });
+      return Object.values(map).sort((a,b)=>b.amount-a.amount);
+    })() : [];
+
+    const custRanked = Object.entries(
+      items.filter(r=>r.customer_name).reduce((acc,r)=>{ acc[r.customer_name]=(acc[r.customer_name]||0)+(r.amount||0); return acc; },{})
+    ).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+
+    const custDetail = selCust ? items.filter(r=>r.customer_name===selCust) : [];
+    const custTotal  = custDetail.reduce((a,r)=>a+(r.amount||0),0);
+
+    return <>
+      <ChartCard title="มูลค่าเสียหายแยกตามสาเหตุ" subtitle="คลิกที่สาเหตุเพื่อดูรายชื่อลูกค้า" span="full">
+        <div style={{display:'flex',gap:'24px',flexWrap:'wrap',alignItems:'flex-start'}}>
+          {/* แถบสาเหตุ */}
+          <div style={{flex:'1 1 400px',display:'flex',flexDirection:'column',gap:'10px',padding:'4px 0'}}>
+            {causeRanked.map((c,i)=>(
+              <div key={i} onClick={()=>setSelCause(selCause===c.label?null:c.label)}
+                style={{display:'grid',gridTemplateColumns:'180px 1fr 110px 60px',gap:'10px',alignItems:'center',
+                  cursor:'pointer',borderRadius:8,padding:'4px 6px',
+                  background:selCause===c.label?'#eef3fc':'transparent',
+                  border:`1.5px solid ${selCause===c.label?'#2f5fd0':'transparent'}`}}>
+                <div style={{fontSize:'13px',fontWeight:600,color:selCause===c.label?'#2f5fd0':'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={c.label}>
+                  {i+1}. {c.label}
+                </div>
+                <div style={{background:'#f0f0f0',borderRadius:6,height:20,overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:6,background:BAR_COLORS[i%BAR_COLORS.length],width:`${(c.value/maxC)*100}%`}}/>
+                </div>
+                <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right'}}>{bahtFmt(c.value)} ฿</div>
+                <div style={{fontSize:'12px',color:'var(--muted-text)',textAlign:'right'}}>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':'–'}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* รายชื่อลูกค้าในสาเหตุที่เลือก */}
+          {selCause && (
+            <div style={{flex:'1 1 300px',background:'#f8f9fc',borderRadius:14,border:'1.5px solid #c6d3f5',padding:'16px 18px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:'14px',color:'#2f5fd0'}}>📋 {selCause}</div>
+                  <div style={{fontSize:'12px',color:'var(--muted-text)'}}>{causeCustomers.length} ลูกค้า</div>
+                </div>
+                <button onClick={()=>setSelCause(null)} style={{background:'none',border:'none',fontSize:'18px',cursor:'pointer',color:'#999'}}>✕</button>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:'6px',maxHeight:380,overflowY:'auto'}}>
+                {causeCustomers.map((c,i)=>(
+                  <div key={i} style={{background:'#fff',borderRadius:8,border:'1px solid #e0e7ff',padding:'8px 12px',
+                    display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div style={{fontSize:'13px',fontWeight:600}}>{i+1}. {c.name}</div>
+                    <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(c.amount)} ฿</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </ChartCard>
+
+      <ChartCard title="ลูกค้าที่มียอดเสียหาย" subtitle="คลิกชื่อลูกค้าเพื่อดูรายละเอียด" span="full">
+        <div style={{display:'flex',gap:'24px',flexWrap:'wrap',alignItems:'flex-start'}}>
+          <div style={{flex:'1 1 320px',display:'flex',flexDirection:'column',gap:'8px'}}>
+            {custRanked.map((c,i)=>(
+              <div key={i} onClick={()=>setSelCust(selCust===c.name?null:c.name)}
+                style={{display:'grid',gridTemplateColumns:'1fr 120px 55px',gap:'8px',alignItems:'center',
+                  padding:'8px 12px',borderRadius:10,cursor:'pointer',
+                  background:selCust===c.name?'#eef3fc':'#fafafa',
+                  border:`1.5px solid ${selCust===c.name?'#2f5fd0':'#e8ebf1'}`}}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                  <span style={{width:8,height:8,borderRadius:'50%',background:BAR_COLORS[i%BAR_COLORS.length],flexShrink:0}}/>
+                  <span style={{fontSize:'13px',fontWeight:600}}>{i+1}. {c.name}</span>
+                </div>
+                <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right',color:'#c0392b'}}>{bahtFmt(c.value)} ฿</div>
+                <div style={{fontSize:'11px',color:'var(--muted-text)',textAlign:'right'}}>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':''}</div>
+              </div>
+            ))}
+          </div>
+          {selCust && (
+            <div style={{flex:'1 1 360px',background:'#f8f9fc',borderRadius:14,border:'1.5px solid #c6d3f5',padding:'18px 20px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:'15px',color:'#2f5fd0'}}>{selCust}</div>
+                  <div style={{fontSize:'12px',color:'var(--muted-text)'}}>รวมเสียหาย: <b style={{color:'#c0392b'}}>{bahtFmt(custTotal)} ฿</b> • {custDetail.length} รายการ</div>
+                </div>
+                <button onClick={()=>setSelCust(null)} style={{background:'none',border:'none',fontSize:'20px',cursor:'pointer',color:'#999'}}>✕</button>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:'8px',maxHeight:420,overflowY:'auto'}}>
+                {custDetail.map((r,i)=>(
+                  <div key={i} style={{background:'#fff',borderRadius:10,border:'1px solid #e0e7ff',padding:'10px 14px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                      <span style={{padding:'2px 8px',borderRadius:10,fontSize:'11px',fontWeight:700,
+                        background:(CODE_COLOR[r.code_type]||'#888')+'22',color:CODE_COLOR[r.code_type]||'#888'}}>
+                        {r.code_type}
+                      </span>
+                      <span style={{fontFamily:'var(--num)',fontWeight:700,color:'#c0392b',fontSize:'14px'}}>{bahtFmt(r.amount)} ฿</span>
+                    </div>
+                    <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>สาเหตุ: {r.cause||'ไม่ระบุ'}</div>
+                    <div style={{fontSize:'12px',color:'var(--muted-text)'}}>
+                      เดือน: {MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}
+                      {r.damage_group ? <span style={{marginLeft:10}}>กลุ่ม: {r.damage_group}</span> : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </ChartCard>
+    </>;
+  }
+
   function DamageDetailTab(){
     const [view,setView]   = useState('summary');
     const [filterCode,setFilterCode] = useState('ALL');
-    const [filterYear,setFilterYear] = useState('ALL');
+    const [filterYear,setFilterYear] = useState(()=>{
+      const ys=[...new Set((D.damageItems||[]).map(r=>r.year))].sort((a,b)=>a-b);
+      return ys.length ? ys[ys.length-1] : 'ALL';
+    });
+    const [selMonths,setSelMonths] = useState(new Set()); // เดือนที่เลือก (empty = ทุกเดือน)
+    const [showMonthPicker,setShowMonthPicker] = useState(false);
+    const [selCust,setSelCust] = useState(null);
 
     const rawItems = D.damageItems || [];
     const sales    = D.damageSales || {};
@@ -935,18 +1293,44 @@ window.__dataReady.then(data => {
     // ปีที่มีข้อมูล
     const years = [...new Set(rawItems.map(r=>r.year))].sort((a,b)=>a-b);
 
-    // กรองตาม year + code (ไม่รวม รับคืนสินค้าใช้ได้)
+    // หา เดือน/ปี ล่าสุดจากข้อมูล
     const notReturnOk = r => !/รับคืนสินค้าใช้ได้/i.test(r.cause||'');
+    const allValid = rawItems.filter(notReturnOk);
+    const latestKey = allValid.length ? [...new Set(allValid.map(r=>`${r.year}-${String(r.month).padStart(2,'0')}`))]
+      .sort().slice(-1)[0] : null;
+    const latestYear  = latestKey ? Number(latestKey.split('-')[0]) : (years[years.length-1]||null);
+    const latestMonth = latestKey ? Number(latestKey.split('-')[1]) : null;
+
+    const [dmgYear,  setDmgYear]  = useState(()=> latestYear  || 'ALL');
+    const [dmgMonth, setDmgMonth] = useState(()=> latestMonth || 'ALL');
+
+    // เดือนที่มีในปีที่เลือก (สำหรับ damage view)
+    const monthsInYear = dmgYear==='ALL' ? [] :
+      [...new Set(allValid.filter(r=>r.year===Number(dmgYear)).map(r=>r.month))].sort((a,b)=>a-b);
+
+    // items สำหรับ damage view (กรองปี+เดือน)
+    const dmgItems = allValid.filter(r =>
+      (dmgYear==='ALL' || r.year===Number(dmgYear)) &&
+      (dmgMonth==='ALL' || r.month===Number(dmgMonth))
+    );
+
+    // เดือนที่มีในปีที่เลือก (สำหรับ month picker)
+    const monthsAvail = filterYear==='ALL' ? [] :
+      [...new Set(allValid.filter(r=>r.year===Number(filterYear)).map(r=>r.month))].sort((a,b)=>a-b);
+
+    // กรองตาม year + เดือน + code สำหรับ view อื่น
     const items = rawItems.filter(r =>
       notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear)) &&
+      (selMonths.size===0 || selMonths.has(r.month)) &&
       (filterCode==='ALL' || r.code_type===filterCode)
     );
 
     // รวมยอดรายเดือน (ใช้ทุก code สำหรับ sales %)
     const allFiltered = rawItems.filter(r =>
       notReturnOk(r) &&
-      (filterYear==='ALL' || r.year===Number(filterYear))
+      (filterYear==='ALL' || r.year===Number(filterYear)) &&
+      (selMonths.size===0 || selMonths.has(r.month))
     );
 
     // unique months ที่มีข้อมูล (เรียงตาม year-month)
@@ -1001,71 +1385,202 @@ window.__dataReady.then(data => {
           {value:'detail',label:'ตารางรายการ'}
         ]}/>
         <div style={{display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'center'}}>
-          <select value={filterYear} onChange={e=>setFilterYear(e.target.value)}
-            style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
-            <option value="ALL">ทุกปี</option>
-            {years.map(y=><option key={y} value={y}>ปี {y}</option>)}
-          </select>
-          <select value={filterCode} onChange={e=>setFilterCode(e.target.value)}
-            style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
-            <option value="ALL">ทุกรหัส</option>
-            {Object.entries(CODE_LABEL).map(([k,l])=><option key={k} value={k}>{l}</option>)}
-          </select>
+          {view==='damage' ? <>
+            <select value={dmgYear} onChange={e=>{setDmgYear(e.target.value);setDmgMonth('ALL');}}
+              style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
+              {years.map(y=><option key={y} value={y}>ปี {y}</option>)}
+            </select>
+            <select value={dmgMonth} onChange={e=>setDmgMonth(e.target.value)}
+              style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
+              <option value="ALL">ทุกเดือน</option>
+              {monthsInYear.map(m=><option key={m} value={m}>{MONTHS_TH_SHORT[m-1]}</option>)}
+            </select>
+          </> : <>
+            <select value={filterYear} onChange={e=>{setFilterYear(e.target.value);setSelMonths(new Set());}}
+              style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
+              {years.map(y=><option key={y} value={y}>ปี {y}</option>)}
+            </select>
+
+            {/* Month multi-picker */}
+            <div style={{position:'relative'}}>
+              <button onClick={()=>setShowMonthPicker(p=>!p)}
+                style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 12px',fontFamily:'var(--font)',fontSize:'13px',
+                  color:'var(--ink)',background:'#fff',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
+                {selMonths.size===0 ? 'ทุกเดือน' : [...selMonths].sort((a,b)=>a-b).map(m=>MONTHS_TH_SHORT[m-1]).join(', ')}
+                <span style={{fontSize:'10px'}}>▼</span>
+              </button>
+              {showMonthPicker && (
+                <div style={{position:'absolute',top:'110%',right:0,background:'#fff',borderRadius:10,
+                  border:'1.5px solid var(--line-strong)',boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
+                  padding:'12px',zIndex:100,minWidth:200}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                    <span style={{fontSize:'12px',fontWeight:700,color:'var(--ink)'}}>เลือกเดือน</span>
+                    <button onClick={()=>{setSelMonths(new Set());setShowMonthPicker(false);}}
+                      style={{fontSize:'11px',color:'#2f5fd0',background:'none',border:'none',cursor:'pointer'}}>ล้างทั้งหมด</button>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                    {monthsAvail.map(m=>(
+                      <label key={m} style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',
+                        padding:'4px 8px',borderRadius:6,background:selMonths.has(m)?'#eef3fc':'transparent',
+                        border:`1px solid ${selMonths.has(m)?'#2f5fd0':'transparent'}`}}>
+                        <input type="checkbox" checked={selMonths.has(m)}
+                          onChange={e=>{
+                            const s=new Set(selMonths);
+                            e.target.checked?s.add(m):s.delete(m);
+                            setSelMonths(s);
+                          }} style={{accentColor:'#2f5fd0'}}/>
+                        <span style={{fontSize:'13px'}}>{MONTHS_TH_SHORT[m-1]}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button onClick={()=>setShowMonthPicker(false)}
+                    style={{marginTop:10,width:'100%',padding:'6px',borderRadius:8,background:'#2f5fd0',color:'#fff',
+                      border:'none',cursor:'pointer',fontSize:'13px',fontWeight:600}}>ตกลง</button>
+                </div>
+              )}
+            </div>
+          </>}
         </div>
       </div>
 
       {/* KPI row */}
-      <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
-        <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
-          sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
-        <KpiCard label="% เสียหายเฉลี่ย" value={avgPct!=null?avgPct.toFixed(3):'–'} unit="%"
-          sub="มูลค่าเสียหาย ÷ ยอดขาย" accent={avgPct!=null&&avgPct<=0.7?'#5a8f3c':PALETTE.cancel}/>
-        <KpiCard label={`% เสียหาย ${latestM?latestM.label:'–'}`}
-          value={latestM?.pct!=null?latestM.pct.toFixed(3):'–'} unit="%"
-          sub={latestM?`เสียหาย ${bahtFmt(latestM.total)} ฿`:'ไม่มีข้อมูล'}
-          accent={latestM?.pct!=null&&latestM.pct<=0.7?'#5a8f3c':PALETTE.cancel}/>
-        <KpiCard label="เทียบเดือนก่อน (±%)"
-          value={pctDelta!=null?(pctDelta>=0?'+':'')+pctDelta.toFixed(3):'–'} unit="%"
-          sub={prevM?`vs ${prevM.label} (${prevM.pct!=null?prevM.pct.toFixed(3)+'%':'–'})`:''}
-          accent={pctDelta==null?'var(--muted-text)':pctDelta<=0?'#5a8f3c':'#c0392b'}
-          delta={pctDelta!=null?{dir:pctDelta<=0?-1:1,text:''}:null}/>
-        <KpiCard label="รายการเสียหาย" value={items.length} unit=" รายการ"
-          sub={`${[...new Set(items.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
-          accent='#7b61c4'/>
-      </div>
+      {view==='damage' ? (()=>{
+        // KPI เฉพาะหน้ามูลค่าเสียหาย
+        const dmgTotal = dmgItems.reduce((a,r)=>a+(r.amount||0),0);
+        const dmgSalesKey = `${dmgYear}-${dmgMonth}`;
+        const dmgSales = (dmgMonth!=='ALL'&&dmgYear!=='ALL') ? (sales[dmgSalesKey]||0) : 0;
+        const dmgPct = dmgSales>0 ? dmgTotal/dmgSales*100 : null;
+        const dmgLabel = (dmgMonth!=='ALL'&&dmgYear!=='ALL')
+          ? `${MONTHS_TH_SHORT[Number(dmgMonth)-1]}-${String(dmgYear).slice(-2)}` : 'ที่เลือก';
+
+        // หาเดือนก่อนหน้า
+        const prevMonthNum = dmgMonth!=='ALL' ? Number(dmgMonth)-1 : null;
+        const prevYearNum  = prevMonthNum===0 ? Number(dmgYear)-1 : Number(dmgYear);
+        const prevMNum     = prevMonthNum===0 ? 12 : prevMonthNum;
+        const prevKey      = prevMonthNum ? `${prevYearNum}-${prevMNum}` : null;
+        const prevItems    = prevKey ? allValid.filter(r=>r.year===prevYearNum&&r.month===prevMNum) : [];
+        const prevTotal    = prevItems.reduce((a,r)=>a+(r.amount||0),0);
+        const prevSales    = prevKey ? (sales[prevKey]||0) : 0;
+        const prevPct      = prevSales>0 ? prevTotal/prevSales*100 : null;
+        const pctDiff      = (dmgPct!=null&&prevPct!=null) ? dmgPct-prevPct : null;
+        const prevLabel    = prevMNum ? `${MONTHS_TH_SHORT[prevMNum-1]}-${String(prevYearNum).slice(-2)}` : '–';
+
+        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+          <KpiCard label={`เสียหายรวม ${dmgLabel}`} value={bahtFmt(dmgTotal)} unit=" ฿"
+            sub={`ยอดขาย: ${dmgSales?bahtFmt(dmgSales)+' ฿':'ไม่มีข้อมูล'}`} accent={PALETTE.cancel}/>
+          <KpiCard label={`% เสียหาย ${dmgLabel}`} value={dmgPct!=null?dmgPct.toFixed(3):'–'} unit="%"
+            sub="มูลค่าเสียหาย ÷ ยอดขาย" accent={dmgPct!=null&&dmgPct<=0.7?'#5a8f3c':PALETTE.cancel}/>
+          {(()=>{
+            const diff = prevTotal ? dmgTotal - prevTotal : null;
+            const diffSign = diff!=null ? (diff>=0?'+':'') : '';
+            const diffText = diff==null ? 'ไม่มีข้อมูลเดือนก่อน'
+              : diff>0 ? `มากกว่า ${prevLabel} (${bahtFmt(prevTotal)} ฿)`
+              : diff<0 ? `น้อยกว่า ${prevLabel} (${bahtFmt(prevTotal)} ฿)`
+              : `เท่ากับ ${prevLabel}`;
+            return <KpiCard label={`เทียบ ${prevLabel} (±฿)`}
+              value={diff!=null ? diffSign+bahtFmt(Math.abs(diff)) : '–'} unit=" ฿"
+              sub={diffText}
+              accent={diff==null?'var(--muted-text)':diff<=0?'#5a8f3c':'#c0392b'}
+              delta={diff!=null?{dir:diff<=0?-1:1,text:''}:null}/>;
+          })()}
+          <KpiCard label={`เทียบ ${prevLabel} (±%)`}
+            value={pctDiff!=null?(pctDiff>=0?'+':'')+pctDiff.toFixed(3):'–'} unit="%"
+            sub={pctDiff==null?'ไม่มีข้อมูลเดือนก่อน'
+              :pctDiff>0?`% เสียหายเพิ่มขึ้น (${prevLabel}: ${prevPct!=null?prevPct.toFixed(3)+'%':'–'})`
+              :pctDiff<0?`% เสียหายลดลง (${prevLabel}: ${prevPct!=null?prevPct.toFixed(3)+'%':'–'})`
+              :`% เสียหายเท่ากับ ${prevLabel}`}
+            accent={pctDiff==null?'var(--muted-text)':pctDiff<=0?'#5a8f3c':'#c0392b'}
+            delta={pctDiff!=null?{dir:pctDiff<=0?-1:1,text:''}:null}/>
+          <KpiCard label="รายการเสียหาย" value={dmgItems.length} unit=" รายการ"
+            sub={`${[...new Set(dmgItems.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
+            accent='#7b61c4'/>
+        </div>;
+      })() : view==='summary'
+        ? (()=>{
+            const valDiff  = (latestM&&prevM) ? latestM.total - prevM.total : null;
+            const valText  = valDiff==null ? 'ไม่มีข้อมูลเดือนก่อน'
+              : valDiff>0  ? `มากกว่า ${prevM.label} (${bahtFmt(prevM.total)} ฿)`
+              : valDiff<0  ? `น้อยกว่า ${prevM.label} (${bahtFmt(prevM.total)} ฿)`
+              : `เท่ากับ ${prevM.label}`;
+            const pctText  = pctDelta==null ? 'ไม่มีข้อมูลเดือนก่อน'
+              : pctDelta>0 ? `% เสียหายเพิ่มขึ้น (${prevM.label}: ${prevM.pct!=null?prevM.pct.toFixed(3)+'%':'–'})`
+              : pctDelta<0 ? `% เสียหายลดลง (${prevM.label}: ${prevM.pct!=null?prevM.pct.toFixed(3)+'%':'–'})`
+              : `% เสียหายเท่ากับ ${prevM.label}`;
+            return <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+              <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
+                sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
+              <KpiCard label="% เสียหายเฉลี่ย" value={avgPct!=null?avgPct.toFixed(3):'–'} unit="%"
+                sub="มูลค่าเสียหาย ÷ ยอดขาย" accent={avgPct!=null&&avgPct<=0.7?'#5a8f3c':PALETTE.cancel}/>
+              <KpiCard label={`มูลค่าเสียหาย ${latestM?latestM.label:'–'}`}
+                value={latestM?bahtFmt(latestM.total):'–'} unit=" ฿"
+                sub={valText}
+                accent={valDiff==null?'var(--muted-text)':valDiff<=0?'#5a8f3c':PALETTE.cancel}
+                delta={valDiff!=null?{dir:valDiff<=0?-1:1,text:''}:null}/>
+              <KpiCard label={`% เสียหาย ${latestM?latestM.label:'–'}`}
+                value={latestM?.pct!=null?latestM.pct.toFixed(3):'–'} unit="%"
+                sub={pctText}
+                accent={pctDelta==null?'var(--muted-text)':pctDelta<=0?'#5a8f3c':PALETTE.cancel}
+                delta={pctDelta!=null?{dir:pctDelta<=0?-1:1,text:''}:null}/>
+              <KpiCard label="เทียบเดือนก่อน (±%)"
+                value={pctDelta!=null?(pctDelta>=0?'+':'')+pctDelta.toFixed(3):'–'} unit="%"
+                sub={prevM?`vs ${prevM.label} (${prevM.pct!=null?prevM.pct.toFixed(3)+'%':'–'})`:''}
+                accent={pctDelta==null?'var(--muted-text)':pctDelta<=0?'#5a8f3c':'#c0392b'}
+                delta={pctDelta!=null?{dir:pctDelta<=0?-1:1,text:''}:null}/>
+            </div>;
+          })()
+        : <div className="kpi-row" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+            <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
+              sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
+            <KpiCard label="% เสียหายเฉลี่ย" value={avgPct!=null?avgPct.toFixed(3):'–'} unit="%"
+              sub="มูลค่าเสียหาย ÷ ยอดขาย" accent={avgPct!=null&&avgPct<=0.7?'#5a8f3c':PALETTE.cancel}/>
+            <KpiCard label="รายการเสียหาย" value={items.length} unit=" รายการ"
+              sub={`${[...new Set(items.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
+              accent='#7b61c4'/>
+          </div>
+      }
 
       {/* ===== ตารางสรุป ===== */}
       {view==='summary' && (()=>{
-        // "รับคืนสินค้าใช้ได้" = ไม่นับในยอดเสียหาย แต่แสดงแยก
-        const allItems = rawItems.filter(r => filterYear==='ALL' || r.year===Number(filterYear))
-                                 .filter(r => !/รับคืนสินค้าใช้ได้/i.test(r.cause||''));
-        const monthKeys = [...new Set(allItems.map(r=>`${r.year}-${r.month}`))].sort((a,b)=>{
-          const[ay,am]=a.split('-').map(Number),[by,bm]=b.split('-').map(Number);
-          return ay!==by?ay-by:am-bm;
-        });
-        const yearSet = [...new Set(allItems.map(r=>r.year))].sort((a,b)=>a-b);
+        const curYear = filterYear==='ALL' ? null : Number(filterYear);
+        const prevYear = curYear ? curYear-1 : null;
 
-        // คอลัมน์ทั้งหมด: [{type:'year',year:2569,label:'รวมปี 2569'}, {type:'month',key:'2569-4',label:'เม.ย.-69'}, ...]
+        // ข้อมูลทุกปี (ไม่กรองเดือน) สำหรับ รวมปี
+        const allItemsYear = rawItems.filter(r => !/รับคืนสินค้าใช้ได้/i.test(r.cause||''));
+        // ข้อมูลปีปัจจุบัน (ทุกเดือน)
+        const allItemsCur  = allItemsYear.filter(r => !curYear || r.year===curYear);
+        // ข้อมูลปีก่อน (ทุกเดือน)
+        const allItemsPrev = prevYear ? allItemsYear.filter(r=>r.year===prevYear) : [];
+
+        // เดือนของปีปัจจุบัน
+        const allMonthsCur = [...new Set(allItemsCur.map(r=>r.month))].sort((a,b)=>a-b);
+        // เดือนที่จะแสดง (ถ้าเลือก selMonths ให้กรอง)
+        const showMonths = selMonths.size>0 ? allMonthsCur.filter(m=>selMonths.has(m)) : allMonthsCur;
+
+        // สร้าง cols: [รวมปีก่อน, รวมปีปัจจุบัน, เดือนที่เลือก...]
         const cols = [];
-        yearSet.forEach(y => {
-          cols.push({type:'year', year:y, label:`รวมปี ${y}`});
-          monthKeys.filter(k=>k.startsWith(y+'-')).forEach(k=>{
-            const[,m]=k.split('-').map(Number);
-            cols.push({type:'month', key:k, year:y, month:m, label:`${MONTHS_TH_SHORT[m-1]}-${String(y).slice(-2)}`});
-          });
+        if(prevYear) cols.push({type:'prevYear', year:prevYear, label:`รวมปี ${prevYear}`});
+        if(curYear)  cols.push({type:'year', year:curYear, label:`รวมปี ${curYear}`});
+        showMonths.forEach(m=>{
+          const key=`${curYear||''}-${m}`;
+          cols.push({type:'month', key, year:curYear, month:m, label:`${MONTHS_TH_SHORT[m-1]}-${String(curYear||'').slice(-2)}`});
         });
+
+        // เดือน keys ทั้งหมดของปีปัจจุบัน (สำหรับ colSales รวมปี)
+        const monthKeysCur = allMonthsCur.map(m=>`${curYear}-${m}`);
+        const monthKeysPrev = prevYear ? [...new Set(allItemsPrev.map(r=>r.month))].sort((a,b)=>a-b).map(m=>`${prevYear}-${m}`) : [];
 
         // helper: ยอดขายตามคอลัมน์
         const colSales = col => {
-          if(col.type==='year') return monthKeys.filter(k=>k.startsWith(col.year+'-')).reduce((a,k)=>a+(sales[k]||0),0);
+          if(col.type==='year')     return monthKeysCur.reduce((a,k)=>a+(sales[k]||0),0);
+          if(col.type==='prevYear') return monthKeysPrev.reduce((a,k)=>a+(sales[k]||0),0);
           return sales[col.key]||0;
         };
-        // helper: ยอดเสียหายของ rows ที่ match ตามคอลัมน์
+        // helper: ยอดเสียหายตามคอลัมน์
         const colAmt = (matchFn, col) => {
-          const base = allItems.filter(r => matchFn(r.cause));
-          if(col.type==='year') return base.filter(r=>r.year===col.year).reduce((a,r)=>a+(r.amount||0),0);
+          if(col.type==='year')     return allItemsCur.filter(r=>matchFn(r.cause)).reduce((a,r)=>a+(r.amount||0),0);
+          if(col.type==='prevYear') return allItemsPrev.filter(r=>matchFn(r.cause)).reduce((a,r)=>a+(r.amount||0),0);
           const[y,m]=col.key.split('-').map(Number);
-          return base.filter(r=>r.year===y&&r.month===m).reduce((a,r)=>a+(r.amount||0),0);
+          return allItemsYear.filter(r=>r.year===y&&r.month===m&&matchFn(r.cause)).reduce((a,r)=>a+(r.amount||0),0);
         };
         const groupAmt = (grp, col) => grp.rows.reduce((a,row)=>a+colAmt(row.fn,col),0);
         const totalAmt = col => DAMAGE_GROUPS.reduce((a,g)=>a+groupAmt(g,col),0);
@@ -1088,7 +1603,10 @@ window.__dataReady.then(data => {
             <thead>
               <tr style={{background:'#f5f5f5'}}>
                 <th className="ta-l" style={{minWidth:'180px',position:'sticky',left:0,background:'#f5f5f5',zIndex:2}}>รายการ</th>
-                {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',background:c.type==='year'?'#d9ead3':'#f5f5f5',borderLeft:'1px solid #ddd',minWidth:'100px'}}>{c.label}</th>)}
+                {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',
+                  background:c.type==='year'?'#d9ead3':c.type==='prevYear'?'#fce5cd':'#f5f5f5',
+                  color:c.type==='prevYear'?'#b45f06':'inherit',
+                  borderLeft:'1px solid #ddd',minWidth:'100px'}}>{c.label}</th>)}
               </tr>
               <tr style={{background:'#fafafa',fontSize:'10px',color:'var(--muted-text)'}}>
                 <th style={{position:'sticky',left:0,background:'#fafafa',zIndex:2}}></th>
@@ -1138,174 +1656,13 @@ window.__dataReady.then(data => {
       })()}
 
       {/* Damage view — มูลค่าเสียหาย จากมาก→น้อย + ลูกค้า คลิกดูรายละเอียด */}
-      {view==='damage' && (()=>{
-        const [selCust, setSelCust] = React.useState(null);
-
-        // สาเหตุ เรียงมาก→น้อย
-        const causeRanked = Object.entries(
-          items.reduce((acc,r)=>{ const k=r.cause||'ไม่ระบุ'; acc[k]=(acc[k]||0)+(r.amount||0); return acc; },{})
-        ).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
-        const maxC = causeRanked[0]?.value||1;
-
-        // ลูกค้า เรียงมาก→น้อย
-        const custRanked = Object.entries(
-          items.filter(r=>r.customer_name).reduce((acc,r)=>{ acc[r.customer_name]=(acc[r.customer_name]||0)+(r.amount||0); return acc; },{})
-        ).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
-        const maxCu = custRanked[0]?.value||1;
-
-        // รายละเอียดลูกค้าที่เลือก
-        const custDetail = selCust ? items.filter(r=>r.customer_name===selCust) : [];
-        const custTotal  = custDetail.reduce((a,r)=>a+(r.amount||0),0);
-
-        const BAR_COLORS = ['#c0392b','#e67e22','#f39c12','#27ae60','#2980b9','#8e44ad','#16a085','#2c3e50','#d35400','#7f8c8d'];
-
-        return <>
-          {/* สาเหตุ */}
-          <ChartCard title="มูลค่าเสียหายแยกตามสาเหตุ" subtitle="เรียงจากมากสุด → น้อยสุด" span="full">
-            <div style={{display:'flex',flexDirection:'column',gap:'10px',padding:'4px 0'}}>
-              {causeRanked.map((c,i)=>(
-                <div key={i} style={{display:'grid',gridTemplateColumns:'180px 1fr 110px 60px',gap:'10px',alignItems:'center'}}>
-                  <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={c.label}>
-                    {i+1}. {c.label}
-                  </div>
-                  <div style={{background:'#f0f0f0',borderRadius:6,height:20,overflow:'hidden'}}>
-                    <div style={{height:'100%',borderRadius:6,background:BAR_COLORS[i%BAR_COLORS.length],width:`${(c.value/maxC)*100}%`,transition:'width .4s'}}/>
-                  </div>
-                  <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right'}}>{bahtFmt(c.value)} ฿</div>
-                  <div style={{fontSize:'12px',color:'var(--muted-text)',textAlign:'right'}}>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':'–'}</div>
-                </div>
-              ))}
-            </div>
-          </ChartCard>
-
-          {/* ลูกค้า + popup รายละเอียด */}
-          <ChartCard title="ลูกค้าที่มียอดเสียหาย" subtitle="คลิกชื่อลูกค้าเพื่อดูรายละเอียด" span="full">
-            <div style={{display:'flex',gap:'24px',flexWrap:'wrap',alignItems:'flex-start'}}>
-              {/* รายชื่อลูกค้า */}
-              <div style={{flex:'1 1 340px',display:'flex',flexDirection:'column',gap:'8px'}}>
-                {custRanked.map((c,i)=>(
-                  <div key={i} onClick={()=>setSelCust(selCust===c.name?null:c.name)}
-                    style={{display:'grid',gridTemplateColumns:'1fr 120px 55px',gap:'8px',alignItems:'center',
-                      padding:'8px 12px',borderRadius:10,cursor:'pointer',
-                      background:selCust===c.name?'#eef3fc':'#fafafa',
-                      border:`1.5px solid ${selCust===c.name?'#2f5fd0':'#e8ebf1'}`,
-                      transition:'all .18s'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                      <span style={{width:8,height:8,borderRadius:'50%',background:BAR_COLORS[i%BAR_COLORS.length],flexShrink:0}}/>
-                      <span style={{fontSize:'13px',fontWeight:600}}>{i+1}. {c.name}</span>
-                    </div>
-                    <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right',color:'#c0392b'}}>{bahtFmt(c.value)} ฿</div>
-                    <div style={{fontSize:'11px',color:'var(--muted-text)',textAlign:'right'}}>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':''}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* รายละเอียดลูกค้าที่เลือก */}
-              {selCust && (
-                <div style={{flex:'1 1 380px',background:'#f8f9fc',borderRadius:14,border:'1.5px solid #c6d3f5',padding:'18px 20px'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-                    <div>
-                      <div style={{fontWeight:700,fontSize:'15px',color:'#2f5fd0'}}>{selCust}</div>
-                      <div style={{fontSize:'12px',color:'var(--muted-text)'}}>รวมเสียหาย: <b style={{color:'#c0392b'}}>{bahtFmt(custTotal)} ฿</b> • {custDetail.length} รายการ</div>
-                    </div>
-                    <button onClick={()=>setSelCust(null)}
-                      style={{background:'none',border:'none',fontSize:'18px',cursor:'pointer',color:'var(--muted-text)',lineHeight:1}}>✕</button>
-                  </div>
-                  <div style={{display:'flex',flexDirection:'column',gap:'8px',maxHeight:400,overflowY:'auto'}}>
-                    {custDetail.map((r,i)=>(
-                      <div key={i} style={{background:'#fff',borderRadius:10,border:'1px solid #e0e7ff',padding:'10px 14px'}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-                          <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:'11px',fontWeight:700,
-                            background:(CODE_COLOR[r.code_type]||'#888')+'22',color:CODE_COLOR[r.code_type]||'#888'}}>
-                            {r.code_type}
-                          </span>
-                          <span style={{fontFamily:'var(--num)',fontWeight:700,color:'#c0392b',fontSize:'14px'}}>{bahtFmt(r.amount)} ฿</span>
-                        </div>
-                        <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>
-                          🔴 {r.cause||'ไม่ระบุสาเหตุ'}
-                        </div>
-                        <div style={{fontSize:'12px',color:'var(--muted-text)'}}>
-                          📅 {MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}
-                          {r.damage_group ? <span style={{marginLeft:10}}>📁 {r.damage_group}</span> : ''}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </ChartCard>
-        </>;
-      })()}
+      {view==='damage' && <DamageRankView items={dmgItems} totalAll={dmgItems.reduce((a,r)=>a+(r.amount||0),0)} selCust={selCust} setSelCust={setSelCust}/>}
 
       {/* Cause view */}
-      {view==='cause' && <>
-        <ChartCard title="มูลค่าเสียหายแยกตามสาเหตุ" subtitle="เรียงจากมาก→น้อย" span="wide">
-          <div className="hbar">
-            {causeSorted.map((c,i)=><div className="hbar__row" key={i}>
-              <div className="hbar__lbl" title={c.label}>{c.label}</div>
-              <div className="hbar__track"><div className="hbar__fill" style={{width:`${(c.value/maxCause)*100}%`,background:PALETTE.cancel}}/></div>
-              <div className="hbar__val">{bahtFmt(c.value)}</div>
-            </div>)}
-          </div>
-        </ChartCard>
-        <ChartCard title="สัดส่วนตามสาเหตุ" subtitle="คลิก Donut เพื่อดูรายละเอียด">
-          <DonutChart segments={causeSorted.slice(0,7).map((c,i)=>({label:c.label,value:c.value,color:CAUSE_COLORS[i]}))}
-            size={200} thickness={32} centerValue={bahtFmt(totalAll)} centerLabel="รวม (฿)"/>
-        </ChartCard>
-        <ChartCard title="สัดส่วนตามรหัส (REB/ROB/ID)" subtitle="เปรียบเทียบประเภทเสียหาย" span="full">
-          {(()=>{
-            const byCode=[{label:'REB',value:items.filter(r=>r.code_type==='REB').reduce((a,r)=>a+(r.amount||0),0),color:CODE_COLOR.REB},
-              {label:'ROB',value:items.filter(r=>r.code_type==='ROB').reduce((a,r)=>a+(r.amount||0),0),color:CODE_COLOR.ROB},
-              {label:'ID',value:items.filter(r=>r.code_type==='ID').reduce((a,r)=>a+(r.amount||0),0),color:CODE_COLOR.ID}].filter(x=>x.value>0);
-            return <div style={{display:'flex',gap:'32px',alignItems:'center',flexWrap:'wrap',padding:'8px 0'}}>
-              <DonutChart segments={byCode} size={160} thickness={28} centerValue="" centerLabel=""/>
-              <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-                {byCode.map(b=><div key={b.label} style={{display:'flex',alignItems:'center',gap:'12px'}}>
-                  <span style={{width:14,height:14,borderRadius:4,background:b.color,display:'inline-block'}}/>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:'13px'}}>{CODE_LABEL[b.label]}</div>
-                    <div style={{fontFamily:'var(--num)',fontSize:'17px',fontWeight:700,color:b.color}}>{bahtFmt(b.value)} <span style={{fontSize:'12px',color:'var(--muted-text)'}}>฿ ({(b.value/totalAll*100).toFixed(1)}%)</span></div>
-                  </div>
-                </div>)}
-              </div>
-            </div>;
-          })()}
-        </ChartCard>
-      </>}
+      {view==='cause' && <CauseView items={items} totalAll={totalAll}/>}
 
       {/* Customer view */}
-      {view==='customer' && <>
-        <ChartCard title="มูลค่าเสียหายแยกตามลูกค้า (Top 15)" subtitle="เรียงจากมาก→น้อย" span="full">
-          <div className="hbar">
-            {custSorted.map((c,i)=><div className="hbar__row" key={i}>
-              <div className="hbar__lbl" title={c.label}>{i+1}. {c.label}</div>
-              <div className="hbar__track"><div className="hbar__fill" style={{width:`${(c.value/maxCust)*100}%`,background:PALETTE.stock}}/></div>
-              <div className="hbar__val">{bahtFmt(c.value)}</div>
-            </div>)}
-          </div>
-        </ChartCard>
-        <ChartCard title="สรุปลูกค้า" subtitle="" span="full">
-          <div className="table-wrap"><table className="dt">
-            <thead><tr><th className="ta-l">#</th><th className="ta-l">ลูกค้า</th>
-              <th style={{color:CODE_COLOR.REB}}>REB</th><th style={{color:CODE_COLOR.ROB}}>ROB</th><th style={{color:CODE_COLOR.ID}}>ID</th>
-              <th>รวม (฿)</th><th>% ของรวมเสียหาย</th></tr></thead>
-            <tbody>{custSorted.map((c,i)=>{
-              const cItems=items.filter(r=>r.customer_name===c.label);
-              const g=t=>cItems.filter(r=>r.code_type===t).reduce((a,r)=>a+(r.amount||0),0);
-              return <tr key={i}>
-                <td className="muted-cell">{i+1}</td>
-                <td className="ta-l strong">{c.label}</td>
-                <td>{g('REB')?bahtFmt(g('REB')):'–'}</td>
-                <td>{g('ROB')?bahtFmt(g('ROB')):'–'}</td>
-                <td>{g('ID')?bahtFmt(g('ID')):'–'}</td>
-                <td className="strong">{bahtFmt(c.value)}</td>
-                <td>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':'–'}</td>
-              </tr>;
-            })}</tbody>
-          </table></div>
-        </ChartCard>
-      </>}
+      {view==='customer' && <CustomerView items={items} totalAll={totalAll}/>}
 
       {/* Detail table */}
       {view==='detail' && <>
