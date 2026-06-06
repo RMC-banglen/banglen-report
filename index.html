@@ -935,14 +935,17 @@ window.__dataReady.then(data => {
     // ปีที่มีข้อมูล
     const years = [...new Set(rawItems.map(r=>r.year))].sort((a,b)=>a-b);
 
-    // กรองตาม year + code
+    // กรองตาม year + code (ไม่รวม รับคืนสินค้าใช้ได้)
+    const notReturnOk = r => !/รับคืนสินค้าใช้ได้/i.test(r.cause||'');
     const items = rawItems.filter(r =>
+      notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear)) &&
       (filterCode==='ALL' || r.code_type===filterCode)
     );
 
     // รวมยอดรายเดือน (ใช้ทุก code สำหรับ sales %)
     const allFiltered = rawItems.filter(r =>
+      notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear))
     );
 
@@ -993,7 +996,7 @@ window.__dataReady.then(data => {
       {/* Filter bar */}
       <div className="yc-head">
         <Segmented value={view} onChange={setView} options={[
-          {value:'summary',label:'ตารางสรุป'},{value:'monthly',label:'รายเดือน'},
+          {value:'summary',label:'ตารางสรุป'},{value:'damage',label:'มูลค่าเสียหาย'},
           {value:'cause',label:'แยกสาเหตุ'},{value:'customer',label:'แยกลูกค้า'},
           {value:'detail',label:'ตารางรายการ'}
         ]}/>
@@ -1134,56 +1137,106 @@ window.__dataReady.then(data => {
         </ChartCard>;
       })()}
 
-      {/* Monthly view */}
-      {view==='monthly' && <>
-        <ChartCard title="มูลค่าเสียหายรายเดือน แยกตามรหัส" subtitle="หน่วย: บาท • REB=รับคืน / ROB=เสียหายหน้างาน / ID=เสียหายในโรงงาน"
-          span="full" right={<Legend items={Object.entries(CODE_COLOR).map(([k,c])=>({label:CODE_LABEL[k],color:c}))}/>}>
-          <GroupedBarChart categories={monthSummary.map(m=>m.label)}
-            series={['REB','ROB','ID'].map(c=>({key:c,label:c,color:CODE_COLOR[c],data:monthSummary.map(m=>m.byCode[c]||0)}))}
-            height={320} unit="฿" decimals={0}/>
-        </ChartCard>
-        <ChartCard title="% ความเสียหาย ÷ ยอดขาย รายเดือน" subtitle="ยิ่งต่ำยิ่งดี • เส้นประ = เกณฑ์ 0.7%" span="full">
-          <LineChart categories={monthSummary.map(m=>m.label)} unit="%" decimals={3} showValues
-            series={[{label:'% เสียหาย',color:PALETTE.cancel,data:monthSummary.map(m=>m.pct)}]}
-            targets={[{value:0.7,color:'#d98a2b',label:'เกณฑ์'}]} height={280}/>
-        </ChartCard>
-        <ChartCard title="ตารางสรุปรายเดือน" subtitle="มูลค่า (บาท)" span="full">
-          <div className="table-wrap"><table className="dt">
-            <thead><tr>
-              <th className="ta-l">เดือน</th>
-              <th style={{color:CODE_COLOR.REB}}>REB</th>
-              <th style={{color:CODE_COLOR.ROB}}>ROB</th>
-              <th style={{color:CODE_COLOR.ID}}>ID</th>
-              <th>รวมเสียหาย</th><th>ยอดขาย</th><th>% เสียหาย</th>
-              <th>±จากเดือนก่อน</th>
-            </tr></thead>
-            <tbody>{monthSummary.map((m,i)=>{
-              const prev=i>0?monthSummary[i-1]:null;
-              const delta=prev&&m.pct!=null&&prev.pct!=null?m.pct-prev.pct:null;
-              return <tr key={m.key}>
-                <td className="ta-l strong">{m.label}</td>
-                <td>{m.byCode.REB?bahtFmt(m.byCode.REB):'–'}</td>
-                <td>{m.byCode.ROB?bahtFmt(m.byCode.ROB):'–'}</td>
-                <td>{m.byCode.ID?bahtFmt(m.byCode.ID):'–'}</td>
-                <td className="strong">{bahtFmt(m.total)}</td>
-                <td>{m.sales?bahtFmt(m.sales):'–'}</td>
-                <td><span className={`pill ${m.pct!=null&&m.pct<=0.7?'pill--ok':'pill--warn'}`}>{m.pct!=null?m.pct.toFixed(3)+'%':'–'}</span></td>
-                <td style={{color:delta==null?'var(--muted-text)':delta<=0?'#3f7d2b':'#c0392b',fontWeight:600}}>
-                  {delta==null?'–':(delta>=0?'+':'')+delta.toFixed(3)+'%'}
-                </td>
-              </tr>;
-            })}</tbody>
-            <tfoot><tr>
-              <td className="ta-l">รวม</td>
-              {['REB','ROB','ID'].map(c=><td key={c}>{bahtFmt(items.filter(r=>r.code_type===c).reduce((a,r)=>a+(r.amount||0),0))}</td>)}
-              <td className="strong">{bahtFmt(totalAll)}</td>
-              <td>{bahtFmt(totalSales)}</td>
-              <td>{avgPct!=null?avgPct.toFixed(3)+'%':'–'}</td>
-              <td>–</td>
-            </tr></tfoot>
-          </table></div>
-        </ChartCard>
-      </>}
+      {/* Damage view — มูลค่าเสียหาย จากมาก→น้อย + ลูกค้า คลิกดูรายละเอียด */}
+      {view==='damage' && (()=>{
+        const [selCust, setSelCust] = React.useState(null);
+
+        // สาเหตุ เรียงมาก→น้อย
+        const causeRanked = Object.entries(
+          items.reduce((acc,r)=>{ const k=r.cause||'ไม่ระบุ'; acc[k]=(acc[k]||0)+(r.amount||0); return acc; },{})
+        ).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+        const maxC = causeRanked[0]?.value||1;
+
+        // ลูกค้า เรียงมาก→น้อย
+        const custRanked = Object.entries(
+          items.filter(r=>r.customer_name).reduce((acc,r)=>{ acc[r.customer_name]=(acc[r.customer_name]||0)+(r.amount||0); return acc; },{})
+        ).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+        const maxCu = custRanked[0]?.value||1;
+
+        // รายละเอียดลูกค้าที่เลือก
+        const custDetail = selCust ? items.filter(r=>r.customer_name===selCust) : [];
+        const custTotal  = custDetail.reduce((a,r)=>a+(r.amount||0),0);
+
+        const BAR_COLORS = ['#c0392b','#e67e22','#f39c12','#27ae60','#2980b9','#8e44ad','#16a085','#2c3e50','#d35400','#7f8c8d'];
+
+        return <>
+          {/* สาเหตุ */}
+          <ChartCard title="มูลค่าเสียหายแยกตามสาเหตุ" subtitle="เรียงจากมากสุด → น้อยสุด" span="full">
+            <div style={{display:'flex',flexDirection:'column',gap:'10px',padding:'4px 0'}}>
+              {causeRanked.map((c,i)=>(
+                <div key={i} style={{display:'grid',gridTemplateColumns:'180px 1fr 110px 60px',gap:'10px',alignItems:'center'}}>
+                  <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={c.label}>
+                    {i+1}. {c.label}
+                  </div>
+                  <div style={{background:'#f0f0f0',borderRadius:6,height:20,overflow:'hidden'}}>
+                    <div style={{height:'100%',borderRadius:6,background:BAR_COLORS[i%BAR_COLORS.length],width:`${(c.value/maxC)*100}%`,transition:'width .4s'}}/>
+                  </div>
+                  <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right'}}>{bahtFmt(c.value)} ฿</div>
+                  <div style={{fontSize:'12px',color:'var(--muted-text)',textAlign:'right'}}>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':'–'}</div>
+                </div>
+              ))}
+            </div>
+          </ChartCard>
+
+          {/* ลูกค้า + popup รายละเอียด */}
+          <ChartCard title="ลูกค้าที่มียอดเสียหาย" subtitle="คลิกชื่อลูกค้าเพื่อดูรายละเอียด" span="full">
+            <div style={{display:'flex',gap:'24px',flexWrap:'wrap',alignItems:'flex-start'}}>
+              {/* รายชื่อลูกค้า */}
+              <div style={{flex:'1 1 340px',display:'flex',flexDirection:'column',gap:'8px'}}>
+                {custRanked.map((c,i)=>(
+                  <div key={i} onClick={()=>setSelCust(selCust===c.name?null:c.name)}
+                    style={{display:'grid',gridTemplateColumns:'1fr 120px 55px',gap:'8px',alignItems:'center',
+                      padding:'8px 12px',borderRadius:10,cursor:'pointer',
+                      background:selCust===c.name?'#eef3fc':'#fafafa',
+                      border:`1.5px solid ${selCust===c.name?'#2f5fd0':'#e8ebf1'}`,
+                      transition:'all .18s'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{width:8,height:8,borderRadius:'50%',background:BAR_COLORS[i%BAR_COLORS.length],flexShrink:0}}/>
+                      <span style={{fontSize:'13px',fontWeight:600}}>{i+1}. {c.name}</span>
+                    </div>
+                    <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,textAlign:'right',color:'#c0392b'}}>{bahtFmt(c.value)} ฿</div>
+                    <div style={{fontSize:'11px',color:'var(--muted-text)',textAlign:'right'}}>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':''}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* รายละเอียดลูกค้าที่เลือก */}
+              {selCust && (
+                <div style={{flex:'1 1 380px',background:'#f8f9fc',borderRadius:14,border:'1.5px solid #c6d3f5',padding:'18px 20px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:'15px',color:'#2f5fd0'}}>{selCust}</div>
+                      <div style={{fontSize:'12px',color:'var(--muted-text)'}}>รวมเสียหาย: <b style={{color:'#c0392b'}}>{bahtFmt(custTotal)} ฿</b> • {custDetail.length} รายการ</div>
+                    </div>
+                    <button onClick={()=>setSelCust(null)}
+                      style={{background:'none',border:'none',fontSize:'18px',cursor:'pointer',color:'var(--muted-text)',lineHeight:1}}>✕</button>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',gap:'8px',maxHeight:400,overflowY:'auto'}}>
+                    {custDetail.map((r,i)=>(
+                      <div key={i} style={{background:'#fff',borderRadius:10,border:'1px solid #e0e7ff',padding:'10px 14px'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                          <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:'11px',fontWeight:700,
+                            background:(CODE_COLOR[r.code_type]||'#888')+'22',color:CODE_COLOR[r.code_type]||'#888'}}>
+                            {r.code_type}
+                          </span>
+                          <span style={{fontFamily:'var(--num)',fontWeight:700,color:'#c0392b',fontSize:'14px'}}>{bahtFmt(r.amount)} ฿</span>
+                        </div>
+                        <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>
+                          🔴 {r.cause||'ไม่ระบุสาเหตุ'}
+                        </div>
+                        <div style={{fontSize:'12px',color:'var(--muted-text)'}}>
+                          📅 {MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}
+                          {r.damage_group ? <span style={{marginLeft:10}}>📁 {r.damage_group}</span> : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </ChartCard>
+        </>;
+      })()}
 
       {/* Cause view */}
       {view==='cause' && <>
