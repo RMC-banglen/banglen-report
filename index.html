@@ -1174,7 +1174,10 @@ window.__dataReady.then(data => {
           })()}
           <KpiCard label={`เทียบ ${prevLabel} (±%)`}
             value={pctDiff!=null?(pctDiff>=0?'+':'')+pctDiff.toFixed(3):'–'} unit="%"
-            sub={prevPct!=null?`% เสียหาย ${prevLabel}: ${prevPct.toFixed(3)}%`:'ไม่มีข้อมูลเดือนก่อน'}
+            sub={pctDiff==null?'ไม่มีข้อมูลเดือนก่อน'
+              :pctDiff>0?`% เสียหายเพิ่มขึ้น (${prevLabel}: ${prevPct!=null?prevPct.toFixed(3)+'%':'–'})`
+              :pctDiff<0?`% เสียหายลดลง (${prevLabel}: ${prevPct!=null?prevPct.toFixed(3)+'%':'–'})`
+              :`% เสียหายเท่ากับ ${prevLabel}`}
             accent={pctDiff==null?'var(--muted-text)':pctDiff<=0?'#5a8f3c':'#c0392b'}
             delta={pctDiff!=null?{dir:pctDiff<=0?-1:1,text:''}:null}/>
           <KpiCard label="รายการเสียหาย" value={dmgItems.length} unit=" รายการ"
