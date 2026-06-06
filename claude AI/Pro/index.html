@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>รายงานการผลิตเสาเข็มคอนกรีตอัดแรง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f4f6f9; --surface: #ffffff; --line: #e8ebf1; --line-strong: #dce1ea;
+    --ink: #1f2733; --ink-soft: #46505f; --muted: #79839280; --muted-text: #6a7382;
+    --primary: #2f5fd0; --primary-dark: #244c9b; --primary-wash: #eef3fc;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(22,34,51,0.04), 0 4px 14px rgba(22,34,51,0.05);
+    --font: 'IBM Plex Sans Thai', 'IBM Plex Sans', system-ui, sans-serif;
+    --num: 'IBM Plex Sans', 'IBM Plex Sans Thai', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .app { max-width: 1320px; margin: 0 auto; padding: 0 24px 56px; }
+
+  /* loading */
+  .loading-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 18px; z-index: 200; transition: opacity .4s;
+  }
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .spinner {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 3px solid var(--line-strong); border-top-color: var(--primary);
+    animation: spin .75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--muted-text); }
+  .error-box {
+    background: #fff3f3; border: 1px solid #f0b0b0; border-radius: 12px;
+    padding: 28px 36px; max-width: 480px; text-align: center;
+  }
+  .error-box h2 { margin: 0 0 10px; font-size: 16px; color: #c0392b; }
+  .error-box p { margin: 0; font-size: 13px; color: var(--muted-text); line-height: 1.7; }
+  .error-box code { background: #fbe9e9; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+  /* topbar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 4px 18px; }
+  .topbar__brand { display: flex; align-items: center; gap: 14px; }
+  .topbar__mark { width: 46px; height: 46px; border-radius: 11px; background: linear-gradient(150deg,#3a6ad8,#244c9b); display: grid; place-items: center; box-shadow: 0 4px 12px rgba(36,76,155,0.28); }
+  .topbar__logo { height: 54px; width: auto; object-fit: contain; border-radius: 6px; }
+  .topbar__company { font-size: 20px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; line-height: 1.3; }
+  .topbar__company-en { display: none; }
+  .topbar__title { font-size: 18px; font-weight: 700; margin: 4px 0 0; letter-spacing: -0.01em; color: var(--primary); }
+  .topbar__sub { margin: 2px 0 0; font-size: 11.5px; color: var(--muted-text); font-family: var(--num); letter-spacing: 0.02em; }
+  .topbar__actions { display: flex; align-items: center; gap: 14px; }
+  .yearpick { display: flex; align-items: center; gap: 10px; }
+  .yearpick__lbl { font-size: 13px; color: var(--muted-text); font-weight: 500; }
+  .badge-sample { font-size: 11.5px; font-weight: 600; color: #9a6b1f; background: #fbf1dd; border: 1px solid #f0dcb0; padding: 3px 9px; border-radius: 20px; }
+
+  /* segmented */
+  .seg { display: inline-flex; background: #eef0f4; border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg__btn { border: 0; background: transparent; font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--muted-text); padding: 6px 14px; border-radius: 7px; cursor: pointer; transition: all .15s; }
+  .seg__btn:hover { color: var(--ink); }
+  .seg__btn.is-active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(22,34,51,0.12); }
+
+  /* tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1.5px solid var(--line); margin-bottom: 24px; }
+  .tabs__btn { border: 0; background: transparent; font-family: var(--font); font-size: 15px; font-weight: 600; color: var(--muted-text); padding: 12px 18px; cursor: pointer; position: relative; transition: color .15s; }
+  .tabs__btn:hover { color: var(--ink); }
+  .tabs__btn.is-active { color: var(--primary); }
+  .tabs__btn.is-active::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: -1.5px; height: 2.5px; background: var(--primary); border-radius: 3px 3px 0 0; }
+
+  /* grid */
+  .grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 18px; }
+  .kpi-row { grid-column: 1/-1; display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; }
+  .kpi-row--3 { grid-template-columns: repeat(3,1fr); }
+  .kpi-row--5 { grid-template-columns: repeat(5,1fr); }
+  .card--wide { grid-column: 1/-1; }
+  .card--full { grid-column: 1/-1; }
+
+  /* kpi */
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 2px; }
+  .kpi__label { font-size: 12.5px; color: var(--muted-text); font-weight: 500; }
+  .kpi__value { font-family: var(--num); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin-top: 4px; }
+  .kpi__unit { font-size: 13px; font-weight: 500; color: var(--muted-text); margin-left: 2px; }
+  .kpi__sub { font-size: 11.5px; color: var(--muted-text); margin-top: 3px; line-height: 1.35; }
+  .kpi__delta { font-size: 12px; font-weight: 600; margin-top: 5px; color: var(--muted-text); }
+  .kpi__delta.up { color: #4f8a32; } .kpi__delta.down { color: #c44; }
+
+  /* card */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+  .card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 20px 12px; flex-wrap: wrap; }
+  .card__head > div:first-child { flex: 1 1 auto; min-width: 0; }
+  .card__title { font-size: 15.5px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  .card__sub { font-size: 12px; color: var(--muted-text); margin: 3px 0 0; }
+  .card__right { flex-shrink: 0; }
+  .card__body { padding: 4px 16px 18px; }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .legend__item { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-soft); font-weight: 500; }
+  .legend__sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* chart */
+  .chart svg text.ax-lbl { font-size: 11px; fill: var(--muted-text); font-family: var(--num); }
+  .chart svg text.bar-val { font-size: 10.5px; fill: var(--ink-soft); font-family: var(--num); font-weight: 600; }
+  .chart svg text.target-lbl { font-size: 10.5px; font-family: var(--num); font-weight: 600; }
+  .donut-val { font-size: 22px; font-weight: 700; fill: var(--ink); font-family: var(--num); }
+  .donut-lbl { font-size: 11px; fill: var(--muted-text); }
+
+  /* tooltip */
+  .chart-tip { position: absolute; pointer-events: none; z-index: 20; background: #1f2733; color: #fff; border-radius: 8px; padding: 8px 11px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.22); min-width: 110px; max-width: 220px; }
+  .chart-tip__title { font-weight: 700; margin-bottom: 5px; font-size: 12px; }
+  .chart-tip__row { display: flex; align-items: center; gap: 7px; line-height: 1.7; }
+  .chart-tip__dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+  .chart-tip__lbl { color: #c9d0db; }
+  .chart-tip__val { margin-left: auto; font-weight: 700; font-family: var(--num); }
+
+  /* hbar */
+  .cause-split { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: center; }
+  .cause-split__donut { display: grid; place-items: center; }
+  .hbar { display: flex; flex-direction: column; gap: 9px; padding: 6px 0; }
+  .hbar__row { display: grid; grid-template-columns: 150px 1fr 38px; align-items: center; gap: 10px; }
+  .hbar__lbl { font-size: 12.5px; color: var(--ink-soft); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar__track { height: 16px; background: #f0f2f6; border-radius: 5px; overflow: hidden; }
+  .hbar__fill { height: 100%; border-radius: 5px; transition: width .4s ease; }
+  .hbar__val { font-size: 12.5px; font-weight: 700; font-family: var(--num); color: var(--ink); text-align: left; }
+
+  /* table */
+  .table-wrap { overflow-x: auto; margin: 0 4px; }
+  .dt { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--num); }
+  .dt th,.dt td { padding: 9px 10px; text-align: right; white-space: nowrap; }
+  .dt thead th { font-size: 11.5px; color: var(--muted-text); font-weight: 600; border-bottom: 1.5px solid var(--line-strong); font-family: var(--font); }
+  .dt tbody td { border-bottom: 1px solid var(--line); color: var(--ink-soft); }
+  .dt tbody tr:hover td { background: var(--primary-wash); }
+  .dt .ta-l { text-align: left; }
+  .dt .strong { font-weight: 700; color: var(--ink); font-family: var(--font); }
+  .dt td.strong { font-family: var(--num); }
+  .dt tfoot td { padding: 10px; font-weight: 700; color: var(--ink); border-top: 1.5px solid var(--line-strong); background: #fafbfc; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
+  .pill--ok { background: #e8f3e0; color: #4f8a32; }
+  .pill--warn { background: #fdeede; color: #b87412; }
+  .basis-tag { display: block; font-size: 10px; color: var(--muted-text); margin-top: 3px; font-family: var(--font); }
+  .note { font-size: 11.5px; color: var(--muted-text); margin: 12px 4px 2px; }
+  .empty { padding: 40px; text-align: center; color: var(--muted-text); font-size: 13.5px; }
+
+  /* latest compare */
+  .verdict { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; padding: 8px 15px; border-radius: 24px; white-space: nowrap; }
+  .verdict__arrow { font-size: 11px; }
+  .verdict--prod { color: #3f7d2b; background: #e9f4e1; }
+  .verdict--trans { color: #b06a14; background: #fbf1dd; }
+  .latest__body { display: grid; grid-template-columns: 1fr 1.5fr 1fr; align-items: center; gap: 28px; padding: 12px 22px 22px; }
+  .latest__stat { display: flex; align-items: center; gap: 13px; }
+  .latest__stat--r { justify-content: flex-end; text-align: right; }
+  .latest__dot { width: 13px; height: 13px; border-radius: 4px; flex-shrink: 0; }
+  .latest__lbl { font-size: 12.5px; color: var(--muted-text); font-weight: 500; }
+  .latest__num { font-family: var(--num); font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-top: 2px; }
+  .latest__num span { font-size: 14px; font-weight: 500; color: var(--muted-text); margin-left: 3px; }
+  .latest__bars { display: flex; flex-direction: column; gap: 9px; }
+  .latest__bar { height: 18px; background: #f0f2f6; border-radius: 6px; overflow: hidden; }
+  .latest__fill { height: 100%; border-radius: 6px; transition: width .5s ease; }
+  .latest__ratio { font-size: 11.5px; color: var(--muted-text); text-align: center; margin-top: 2px; }
+
+  /* stock status */
+  .stockcard { border-width: 1px; }
+  .stockcard--high { border-left: 5px solid #d65b5b; }
+  .stockcard--ok   { border-left: 5px solid #5a9a3c; }
+  .stockcard--low  { border-left: 5px solid var(--primary); }
+  .stockcard__body { display: flex; align-items: center; gap: 36px; flex-wrap: wrap; padding: 20px 22px 6px; }
+  .stockcard__main { flex-shrink: 0; }
+  .stockcard__label { font-size: 13px; color: var(--muted-text); font-weight: 500; }
+  .stockcard__num { font-family: var(--num); font-size: 46px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.05; color: var(--ink); margin-top: 2px; white-space: nowrap; }
+  .stockcard--high .stockcard__num { color: #c0392b; }
+  .stockcard--ok .stockcard__num   { color: #3f7d2b; }
+  .stockcard--low .stockcard__num  { color: var(--primary); }
+  .stockcard__unit { font-size: 18px; font-weight: 500; color: var(--muted-text); margin-left: 3px; }
+  .stockcard__when { font-size: 12px; color: var(--muted-text); margin-top: 2px; }
+  .stockcard__delta { display: flex; align-items: center; gap: 9px; padding-left: 4px; flex-shrink: 0; white-space: nowrap; }
+  .stockcard__arrow { font-size: 16px; }
+  .stockcard__delta.up { color: #3f7d2b; } .stockcard__delta.down { color: #c0392b; }
+  .stockcard__deltanum { font-family: var(--num); font-size: 19px; font-weight: 700; }
+  .stockcard__deltalbl { font-size: 11.5px; color: var(--muted-text); font-weight: 500; }
+  .stockcard__status { margin-left: auto; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+  .stockbadge { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; padding: 9px 18px; border-radius: 26px; white-space: nowrap; }
+  .stockbadge__emoji { font-size: 17px; }
+  .stockbadge--high { background: #fbe9e9; color: #c0392b; }
+  .stockbadge--ok   { background: #e9f4e1; color: #3f7d2b; }
+  .stockbadge--low  { background: var(--primary-wash); color: var(--primary); }
+  .stockcard__hint { font-size: 12px; color: var(--muted-text); white-space: nowrap; }
+  .stockcard__scale { display: flex; gap: 8px; padding: 8px 22px 16px; flex-wrap: wrap; }
+  .stockcard__seg { font-size: 11.5px; font-weight: 600; padding: 4px 11px; border-radius: 7px; white-space: nowrap; }
+  .stockcard__seg--low  { background: var(--primary-wash); color: var(--primary); }
+  .stockcard__seg--ok   { background: #ecf5e5; color: #4f8a32; }
+  .stockcard__seg--high { background: #fbeaea; color: #c0392b; }
+
+  /* year compare */
+  .yc-head { grid-column: 1/-1; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .yearchips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .yearchips__lbl { font-size: 13px; color: var(--muted-text); font-weight: 500; margin-right: 2px; }
+  .yearchip { display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid var(--line-strong); background: #fff; color: var(--muted-text); font-family: var(--num); font-weight: 600; font-size: 13.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer; transition: all .15s; opacity: 0.5; }
+  .yearchip:hover { border-color: #b9c1cd; opacity: 0.8; }
+  .yearchip.is-on { opacity: 1; background: #f1f4f9; border-color: #aeb7c4; color: var(--ink); box-shadow: 0 1px 3px rgba(22,34,51,0.07); }
+  .yearchip__sw { width: 11px; height: 11px; border-radius: 3px; transition: background .15s; }
+  .td-sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: middle; }
+
+  .foot { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted-text); text-align: center; font-family: var(--num); }
+
+  @media (max-width: 920px) {
+    .grid { grid-template-columns: 1fr; }
+    .card--wide,.card--full { grid-column: auto; }
+    .kpi-row,.kpi-row--5 { grid-template-columns: repeat(2,1fr); }
+    .kpi-row--3 { grid-template-columns: 1fr; }
+    .cause-split { grid-template-columns: 1fr; }
+    .latest__body { grid-template-columns: 1fr; gap: 14px; }
+    .latest__stat--r { justify-content: flex-start; text-align: left; }
+    .stockcard__status { margin-left: 0; align-items: flex-start; text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">กำลังโหลดข้อมูล...</div>
+</div>
+
+<div id="root"></div>
+
+<!-- CDN: Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- CDN: React + Babel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- ============================================================
+     CONFIG — แก้ 2 บรรทัดนี้หลังสมัคร Supabase
+     ============================================================ -->
+<script>
+const SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
+
+// ============================================================
+// Fallback data (ใช้เมื่อยังไม่ได้ตั้งค่า Supabase)
+// ============================================================
+const MONTHS_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function buildFallbackData() {
+  const months2569 = [
+    {m:1,order:4453.59,produced:4291.81,cancel:161.78,days:27,perDay:158.96,transport:4024.69,stock:4257.81,raftOrder:293,raftProduced:283,raftCancel:10},
+    {m:2,order:3722.51,produced:3657.43,cancel:65.08,days:25,perDay:146.30,transport:4402.10,stock:3530.86,raftOrder:221,raftProduced:219,raftCancel:2},
+    {m:3,order:4614.79,produced:4350.12,cancel:264.67,days:31,perDay:140.33,transport:4691.94,stock:3210.50,raftOrder:308,raftProduced:295,raftCancel:10},
+    {m:4,order:3453.09,produced:3268.36,cancel:184.73,days:21,perDay:155.64,transport:2634.03,stock:3851.02,raftOrder:231.5,raftProduced:218.5,raftCancel:13},
+  ];
+  const months2568 = [
+    {m:1,order:4120,produced:3902.4,cancel:217.6,days:26,perDay:150.1,transport:3760.5,stock:3990.2,raftOrder:268,raftProduced:255,raftCancel:13},
+    {m:2,order:3580,produced:3401,cancel:179,days:24,perDay:141.7,transport:3520.8,stock:3870.4,raftOrder:214,raftProduced:206,raftCancel:8},
+    {m:3,order:4380,produced:4029.6,cancel:350.4,days:30,perDay:134.3,transport:4210,stock:3690,raftOrder:295,raftProduced:276,raftCancel:19},
+    {m:4,order:3260,produced:3064.4,cancel:195.6,days:22,perDay:139.3,transport:3180,stock:3574.4,raftOrder:220,raftProduced:210,raftCancel:10},
+    {m:5,order:3980,produced:3741.2,cancel:238.8,days:27,perDay:138.6,transport:3890,stock:3425.6,raftOrder:262,raftProduced:248,raftCancel:14},
+    {m:6,order:3710,produced:3450.3,cancel:259.7,days:25,perDay:138,transport:3600,stock:3275.9,raftOrder:244,raftProduced:230,raftCancel:14},
+    {m:7,order:4250,produced:4037.5,cancel:212.5,days:29,perDay:139.2,transport:4120,stock:3193.4,raftOrder:281,raftProduced:268,raftCancel:13},
+    {m:8,order:4410,produced:4145.4,cancel:264.6,days:30,perDay:138.2,transport:4300,stock:3038.8,raftOrder:292,raftProduced:274,raftCancel:18},
+    {m:9,order:3890,produced:3617.7,cancel:272.3,days:26,perDay:139.1,transport:3780,stock:2876.5,raftOrder:256,raftProduced:240,raftCancel:16},
+    {m:10,order:4060,produced:3856,cancel:204,days:28,perDay:137.7,transport:3960,stock:2772.5,raftOrder:270,raftProduced:257,raftCancel:13},
+    {m:11,order:4180,produced:3929.2,cancel:250.8,days:27,perDay:145.5,transport:4050,stock:2651.7,raftOrder:278,raftProduced:262,raftCancel:16},
+    {m:12,order:4530,produced:4258.2,cancel:271.8,days:30,perDay:141.9,transport:4400,stock:2509.9,raftOrder:301,raftProduced:283,raftCancel:18},
+  ];
+  const causeLabels = ['แพล้นเสีย','ที่ดึงหินทรายเสีย','เครนเสีย','รถไฟขนเสาเข็มเสีย','รถไฟขนคอนกรีตเสีย','รถขนส่งเข้าเยอะ','ผู้รับเหมาผลิตไม่ได้','สต็อคเต็ม','ซ่อมแพผลิต','ฝ่ายผลิตยกเลิกเอง'];
+  const causes2569 = {1:[3,0,0,0,1,0,3,2,1,0],2:[1,0,0,0,0,1,0,0,0,0],3:[9,5,0,1,0,1,0,0,0,1],4:[6,4,0,2,0,1,0,1,0,0]};
+  const decades2569 = [
+    {label:'1–10 ม.ค.',strength:473,cementTotal:328.45,cementBig:331.41,cementI18:279.91,rock34:920.67,rock1:324.71,sand:807.12},
+    {label:'11–20 ม.ค.',strength:478,cementTotal:326.95,cementBig:330.77,cementI18:279.14,rock34:924.30,rock1:329.19,sand:810.17},
+    {label:'21–31 ม.ค.',strength:505,cementTotal:336.48,cementBig:337.74,cementI18:279.17,rock34:948.53,rock1:339.59,sand:829.70},
+    {label:'1–10 ก.พ.',strength:438,cementTotal:329.49,cementBig:329.63,cementI18:280.21,rock34:933.34,rock1:326.21,sand:814.59},
+    {label:'11–20 ก.พ.',strength:467,cementTotal:332.54,cementBig:332.54,cementI18:null,rock34:963.25,rock1:293.28,sand:815.80},
+    {label:'21–28 ก.พ.',strength:454.47,cementTotal:333.17,cementBig:333.17,cementI18:null,rock34:938.86,rock1:319.82,sand:810.29},
+    {label:'1–10 มี.ค.',strength:482.37,cementTotal:330.96,cementBig:333.43,cementI18:279.44,rock34:916.65,rock1:326.89,sand:801.61},
+    {label:'11–20 มี.ค.',strength:541.05,cementTotal:330.08,cementBig:333.03,cementI18:280.12,rock34:931.94,rock1:330.99,sand:813.39},
+    {label:'21–31 มี.ค.',strength:483.36,cementTotal:328.02,cementBig:329.97,cementI18:279.66,rock34:924.22,rock1:327.87,sand:809.42},
+    {label:'1–11 เม.ย.',strength:475.39,cementTotal:326.79,cementBig:328.62,cementI18:279.15,rock34:953.18,rock1:337.04,sand:832.20},
+    {label:'20–30 เม.ย.',strength:null,cementTotal:355.41,cementBig:null,cementI18:null,rock34:null,rock1:null,sand:null},
+  ];
+  return {
+    MONTHS_TH, unit:'m³',
+    capacity:{queuePerDay:170,raftPerDay:12},
+    years:{
+      2569:{months:months2569,real:true,causes:causes2569,decades:decades2569},
+      2568:{months:months2568,real:false,causes:null,decades:null},
+    },
+    causeLabels,
+    mixTarget:{rock34:940,rock1:330,sand:822},
+    damageItems: [
+      {year:2569,month:1,code_type:'REB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บจก.วิทวี',cause:'เสาเข็ม Fail',amount:45200},
+      {year:2569,month:1,code_type:'ROB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บจก.เคพีวาย',cause:'เสาร้าวในกอง/ขนส่ง/ปีกแตก',amount:31500},
+      {year:2569,month:1,code_type:'ID',damage_group:'เสียหายในโรงงาน',customer_name:'',cause:'เสาเสียในสต็อค',amount:22034.79},
+      {year:2569,month:2,code_type:'REB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'คุณนงลักษณ์',cause:'เสาเข็ม Fail',amount:38500},
+      {year:2569,month:2,code_type:'ID',damage_group:'เสียหายในโรงงาน',customer_name:'',cause:'พนักงานบริษัท',amount:24810.30},
+      {year:2569,month:2,code_type:'ROB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บจก.กาญจนเควต',cause:'เสาเข็มหัวแตก',amount:24000},
+      {year:2569,month:3,code_type:'REB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บ.ดับบลิวเฮ้าส์',cause:'เสาเข็ม Fail',amount:62300},
+      {year:2569,month:3,code_type:'ID',damage_group:'เสียหายในโรงงาน',customer_name:'',cause:'เสาเสียในสต็อค',amount:34270},
+      {year:2569,month:3,code_type:'ROB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บจก.อาร์ตคอนกรีต',cause:'เสาร้าวในกอง/ขนส่ง/ปีกแตก',amount:37975.11},
+      {year:2569,month:4,code_type:'REB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บจก.วิทวี',cause:'เสาเข็ม Fail',amount:25675.72},
+      {year:2569,month:4,code_type:'ID',damage_group:'เสียหายในโรงงาน',customer_name:'',cause:'เสาเข็มหัวแตก',amount:11015.20},
+      {year:2569,month:4,code_type:'ROB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บจก.กาญจนเควต',cause:'เสาร้าวในกอง/ขนส่ง/ปีกแตก',amount:16103.50},
+      {year:2569,month:4,code_type:'ID',damage_group:'เสียหายในโรงงาน',customer_name:'',cause:'ผู้รับเหมา',amount:14524.70},
+      {year:2569,month:5,code_type:'REB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'คุณนงลักษณ์',cause:'เสาเข็ม Fail',amount:99855.78},
+      {year:2569,month:5,code_type:'ID',damage_group:'เสียหายในโรงงาน',customer_name:'',cause:'พนักงานบริษัท',amount:12573.00},
+      {year:2569,month:5,code_type:'ROB',damage_group:'รับคืน-เสียหายหน้างาน',customer_name:'บจก.ไทยร็อคเฟอร์เทค',cause:'ตอกเอียง/เทสต์ไม่ผ่าน/ผิดหมุด',amount:36400},
+      {year:2569,month:5,code_type:'ID',damage_group:'เสียหายในโรงงาน',customer_name:'',cause:'เสาเสียในสต็อค',amount:33357.68},
+    ],
+    damageSales: {
+      '2569-1':17345153.30,'2569-2':19459745.47,'2569-3':21730581.59,
+      '2569-4':11730756.37,'2569-5':17601538.50,
+    },
+  };
+}
+
+
+// ============================================================
+// โหลดข้อมูลจาก Supabase (หรือใช้ fallback ถ้ายังไม่ตั้งค่า)
+// ============================================================
+window.__dataReady = (async function loadData() {
+  const isConfigured = !SUPABASE_URL.startsWith('PASTE') && !SUPABASE_KEY.startsWith('PASTE');
+
+  if (!isConfigured) {
+    console.info('[Dashboard] Supabase ยังไม่ตั้งค่า — ใช้ข้อมูล fallback');
+    document.getElementById('loading-text').textContent = 'กำลังโหลดข้อมูลตัวอย่าง...';
+    return buildFallbackData();
+  }
+
+  try {
+    document.getElementById('loading-text').textContent = 'กำลังเชื่อมต่อ Supabase...';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const [mRes, dRes, cRes, tRes, capRes] = await Promise.all([
+      db.from('production_monthly').select('*').order('year').order('month'),
+      db.from('quality_decade').select('*').order('year').order('sort_order'),
+      db.from('cancel_causes').select('*').order('year').order('month').order('cause_index'),
+      db.from('mix_targets').select('*'),
+      db.from('capacity_config').select('*').limit(1).single(),
+    ]);
+
+    if (mRes.error) throw mRes.error;
+
+    const monthly  = mRes.data  || [];
+    const decades  = dRes.data  || [];
+    const causes   = cRes.data  || [];
+    const targets  = tRes.data  || [];
+    const capRow   = capRes.data || {};
+
+    // group monthly by year
+    const yearGroups = {};
+    monthly.forEach(r => {
+      const y = r.year;
+      if (!yearGroups[y]) yearGroups[y] = { months:[], real:!r.is_sample, causes:null, decades:null };
+      yearGroups[y].months.push({
+        m:r.month, order:+r.order_qty, produced:+r.produced, cancel:+r.cancel,
+        days:r.days, perDay:+r.per_day, transport:+r.transport, stock:+r.stock,
+        raftOrder:+r.raft_order, raftProduced:+r.raft_produced, raftCancel:+r.raft_cancel,
+
+      });
+    });
+
+    // causes
+    causes.forEach(r => {
+      const y = r.year;
+      if (!yearGroups[y]) return;
+      if (!yearGroups[y].causes) yearGroups[y].causes = {};
+      if (!yearGroups[y].causes[r.month]) yearGroups[y].causes[r.month] = new Array(10).fill(0);
+      yearGroups[y].causes[r.month][r.cause_index] = r.count;
+    });
+
+    // decades
+    decades.forEach(r => {
+      const y = r.year;
+      if (!yearGroups[y]) return;
+      if (!yearGroups[y].decades) yearGroups[y].decades = [];
+      yearGroups[y].decades.push({
+        label:r.label, strength:r.strength,
+        cementTotal:r.cement_total, cementBig:r.cement_big, cementI18:r.cement_i18,
+        rock34:r.rock34, rock1:r.rock1, sand:r.sand,
+      });
+    });
+
+    // mix targets
+    const mixTarget = {};
+    targets.forEach(t => { mixTarget[t.name] = +t.value; });
+
+    // capacity
+    const capacity = { queuePerDay: capRow.queue_per_day || 170, raftPerDay: capRow.raft_per_day || 12 };
+
+    // cause labels (unique, ordered by index)
+    const clMap = {};
+    causes.forEach(r => { clMap[r.cause_index] = r.cause_label; });
+    const causeLabels = Object.keys(clMap).sort((a,b)=>+a-+b).map(k=>clMap[k]);
+
+    // ---- damage items + sales ----
+    const [diRes, dsRes] = await Promise.all([
+      db.from('damage_items').select('*').order('year').order('month'),
+      db.from('damage_sales').select('*').order('year').order('month'),
+    ]);
+    const damageItems = diRes.data || [];
+    const damageSales = {};
+    (dsRes.data || []).forEach(r => { damageSales[`${r.year}-${r.month}`] = +r.sales; });
+
+    return { MONTHS_TH, unit:'m³', capacity, years:yearGroups, causeLabels, mixTarget, damageItems, damageSales };
+
+  } catch (err) {
+    console.error('[Dashboard] Supabase error:', err);
+    // แสดง error แต่ยังให้ดูได้ด้วย fallback
+    document.getElementById('loading-text').textContent = 'เชื่อมต่อไม่ได้ — ใช้ข้อมูลตัวอย่าง';
+    return buildFallbackData();
+  }
+})();
+</script>
+
+<!-- ============================================================
+     Charts — SVG primitives
+     ============================================================ -->
+<script type="text/babel">
+const { useState, useRef, useEffect, useLayoutEffect } = React;
+
+const PALETTE = {
+  produced:'#2f5fd0', order:'#9fb4dd', transport:'#15a39b', stock:'#d98a2b',
+  cancel:'#d65b5b', strength:'#2f5fd0', prev:'#c3cad6', grid:'#e8ebf1', axis:'#9aa3b2', ink:'#1f2733',
+};
+
+function fmt(n, d=0) {
+  if (n===null||n===undefined||isNaN(n)) return '–';
+  return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+}
+function compactNum(n, d=0) {
+  if (n===null||n===undefined||isNaN(n)) return '';
+  if (d===0 && n>=10000) return (n/1000).toFixed(1).replace(/\.0$/,'')+'k';
+  return fmt(n,d);
+}
+function useMeasure() {
+  const ref=useRef(null); const [w,setW]=useState(640);
+  useLayoutEffect(()=>{
+    if(!ref.current) return;
+    const el=ref.current; const u=()=>setW(el.clientWidth||640); u();
+    const ro=new ResizeObserver(u); ro.observe(el); return ()=>ro.disconnect();
+  },[]);
+  return [ref,w];
+}
+function niceMax(max,ticks=4){
+  if(max<=0)return 10;
+  const raw=max/ticks,mag=Math.pow(10,Math.floor(Math.log10(raw))),norm=raw/mag;
+  let s; if(norm<=1)s=1;else if(norm<=2)s=2;else if(norm<=2.5)s=2.5;else if(norm<=5)s=5;else s=10;
+  return Math.ceil(max/(s*mag))*(s*mag);
+}
+function axisTicks(min,max,count=4){const a=[];for(let i=0;i<=count;i++)a.push(min+((max-min)*i)/count);return a;}
+
+function Tooltip({tip}){
+  if(!tip)return null;
+  return <div className="chart-tip" style={{left:tip.x,top:tip.y}}>
+    {tip.title&&<div className="chart-tip__title">{tip.title}</div>}
+    {tip.rows.map((r,i)=><div className="chart-tip__row" key={i}>
+      {r.color&&<span className="chart-tip__dot" style={{background:r.color}}/>}
+      <span className="chart-tip__lbl">{r.label}</span>
+      <span className="chart-tip__val">{r.value}</span>
+    </div>)}
+  </div>;
+}
+
+function GroupedBarChart({categories,series,height=300,unit='',decimals=0}){
+  const [ref,W]=useMeasure(); const [tip,setTip]=useState(null);
+  const pad={t:18,r:14,b:40,l:52},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
+  const maxV=niceMax(Math.max(1,...series.flatMap(s=>s.data.map(v=>v||0))));
+  const ticks=axisTicks(0,maxV,4),gW=iW/categories.length,ip=gW*0.18,baW=gW-ip*2,bW=baW/series.length;
+  const y=v=>pad.t+iH-(v/maxV)*iH;
+  return <div className="chart" ref={ref} style={{position:'relative'}}>
+    <svg width={W} height={H}>
+      {ticks.map((t,i)=><g key={i}>
+        <line x1={pad.l} x2={W-pad.r} y1={y(t)} y2={y(t)} stroke={PALETTE.grid}/>
+        <text x={pad.l-8} y={y(t)+4} textAnchor="end" className="ax-lbl">{fmt(t)}</text>
+      </g>)}
+      {categories.map((cat,ci)=>{
+        const gx=pad.l+ci*gW+ip;
+        return <g key={ci}>
+          {series.map((s,si)=>{
+            const v=s.data[ci]||0,bx=gx+si*bW,bh=(v/maxV)*iH;
+            return <g key={si}>
+              <rect x={bx+1} y={pad.t+iH-bh} width={Math.max(0,bW-2)} height={bh} fill={s.color} rx="2"
+                onMouseMove={e=>{const r=ref.current.getBoundingClientRect();setTip({x:e.clientX-r.left+12,y:e.clientY-r.top-10,title:cat,rows:series.map(ss=>({color:ss.color,label:ss.label,value:fmt(ss.data[ci],decimals)+(unit?' '+unit:'')}))});}}
+                onMouseLeave={()=>setTip(null)}/>
+              {v>0&&bW>=16&&<text x={bx+bW/2} y={pad.t+iH-bh-5} textAnchor="middle" className="bar-val" fill={s.color} style={{fontSize:bW<30?'9px':'10.5px'}}>{compactNum(v,decimals)}</text>}
+            </g>;
+          })}
+          <text x={gx+baW/2} y={H-pad.b+18} textAnchor="middle" className="ax-lbl">{cat}</text>
+        </g>;
+      })}
+    </svg>
+    <Tooltip tip={tip}/>
+  </div>;
+}
+
+function BarChart({categories,values,color=PALETTE.produced,target=null,targetLabel='เป้าหมาย',height=280,unit='',decimals=0,yMaxOverride=null}){
+  const [ref,W]=useMeasure(); const [tip,setTip]=useState(null);
+  const pad={t:18,r:14,b:40,l:52},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
+  const maxV=yMaxOverride||niceMax(Math.max(1,...values.map(v=>v||0),target||0));
+  const ticks=axisTicks(0,maxV,4),bndW=iW/categories.length,bW=bndW*0.56;
+  const y=v=>pad.t+iH-(v/maxV)*iH;
+  return <div className="chart" ref={ref} style={{position:'relative'}}>
+    <svg width={W} height={H}>
+      {ticks.map((t,i)=><g key={i}><line x1={pad.l} x2={W-pad.r} y1={y(t)} y2={y(t)} stroke={PALETTE.grid}/><text x={pad.l-8} y={y(t)+4} textAnchor="end" className="ax-lbl">{fmt(t)}</text></g>)}
+      {target!=null&&<g><line x1={pad.l} x2={W-pad.r} y1={y(target)} y2={y(target)} stroke={PALETTE.cancel} strokeWidth="1.5" strokeDasharray="5 4"/><text x={W-pad.r} y={y(target)-6} textAnchor="end" className="target-lbl" fill={PALETTE.cancel}>{targetLabel} {fmt(target,decimals)}</text></g>}
+      {categories.map((cat,ci)=>{
+        const v=values[ci]||0,bx=pad.l+ci*bndW+(bndW-bW)/2,bh=(v/maxV)*iH;
+        return <g key={ci}>
+          <rect x={bx} y={pad.t+iH-bh} width={bW} height={bh} fill={color} rx="3"
+            onMouseMove={e=>{const r=ref.current.getBoundingClientRect();setTip({x:e.clientX-r.left+12,y:e.clientY-r.top-10,title:cat,rows:[{color,label:'ค่า',value:fmt(v,decimals)+(unit?' '+unit:'')}]});}}
+            onMouseLeave={()=>setTip(null)}/>
+          <text x={bx+bW/2} y={pad.t+iH-bh-6} textAnchor="middle" className="bar-val">{v?fmt(v,decimals):''}</text>
+          <text x={pad.l+ci*bndW+bndW/2} y={H-pad.b+18} textAnchor="middle" className="ax-lbl">{cat}</text>
+        </g>;
+      })}
+    </svg>
+    <Tooltip tip={tip}/>
+  </div>;
+}
+
+function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null}){
+  const [ref,W]=useMeasure(); const [hover,setHover]=useState(null);
+  const pad={t:20,r:16,b:40,l:52},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
+  const allV=series.flatMap(s=>s.data.filter(v=>v!=null)).concat(targets.map(t=>t.value));
+  let lo=yMin!=null?yMin:Math.min(...allV),hi=yMax!=null?yMax:Math.max(...allV);
+  if(yMin==null)lo=Math.floor(lo*0.96); if(yMax==null)hi=Math.ceil(hi*1.04);
+  if(hi===lo)hi=lo+1;
+  const ticks=axisTicks(lo,hi,4);
+  const x=i=>pad.l+(categories.length===1?iW/2:(i/(categories.length-1))*iW);
+  const y=v=>pad.t+iH-((v-lo)/(hi-lo))*iH;
+  const lp=data=>data.map((v,i)=>v==null?null:`${i===0||data[i-1]==null?'M':'L'}${x(i)},${y(v)}`).filter(Boolean).join(' ');
+  return <div className="chart" ref={ref} style={{position:'relative'}} onMouseLeave={()=>setHover(null)}
+    onMouseMove={e=>{const r=ref.current.getBoundingClientRect();let idx=Math.round(((e.clientX-r.left-pad.l)/iW)*(categories.length-1));setHover(Math.max(0,Math.min(categories.length-1,idx)));}}>
+    <svg width={W} height={H}>
+      {ticks.map((t,i)=><g key={i}><line x1={pad.l} x2={W-pad.r} y1={y(t)} y2={y(t)} stroke={PALETTE.grid}/><text x={pad.l-8} y={y(t)+4} textAnchor="end" className="ax-lbl">{fmt(t,decimals)}</text></g>)}
+      {targets.map((t,i)=><g key={'t'+i}><line x1={pad.l} x2={W-pad.r} y1={y(t.value)} y2={y(t.value)} stroke={t.color} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.8"/><text x={W-pad.r} y={y(t.value)-5} textAnchor="end" className="target-lbl" fill={t.color}>{t.label} {fmt(t.value,decimals)}</text></g>)}
+      {area&&series.length===1&&<path d={`${lp(series[0].data)} L${x(categories.length-1)},${pad.t+iH} L${x(0)},${pad.t+iH} Z`} fill={series[0].color} opacity="0.10"/>}
+      {series.map((s,si)=><g key={si}>
+        <path d={lp(s.data)} fill="none" stroke={s.color} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round"/>
+        {showValues&&s.data.map((v,i)=>v==null?null:<text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>)}
+        {s.data.map((v,i)=>v==null?null:<circle key={i} cx={x(i)} cy={y(v)} r={hover===i?5:(dangerBelow!=null&&v<dangerBelow?4:3)} fill="#fff" stroke={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color} strokeWidth="2"/>)}
+      </g>)}
+      {hover!=null&&<line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t+iH} stroke={PALETTE.axis} strokeDasharray="3 3" opacity="0.5"/>}
+      {categories.map((cat,ci)=><text key={ci} x={x(ci)} y={H-pad.b+18} textAnchor="middle" className="ax-lbl">{cat}</text>)}
+    </svg>
+    {hover!=null&&<Tooltip tip={{x:Math.min(x(hover)+12,W-150),y:pad.t+4,title:categories[hover],rows:series.map(s=>({color:s.color,label:s.label,value:s.data[hover]==null?'–':fmt(s.data[hover],decimals)+(unit?' '+unit:'')}))}}/>}
+  </div>;
+}
+
+function DonutChart({segments,size=180,thickness=30,centerLabel='',centerValue=''}){
+  const [tip,setTip]=useState(null); const ref=useRef(null);
+  const total=segments.reduce((a,s)=>a+s.value,0)||1,r=size/2,ir=r-thickness;
+  let acc=-Math.PI/2;
+  const arcs=segments.map(s=>{
+    const ang=(s.value/total)*Math.PI*2,a0=acc,a1=acc+ang; acc=a1;
+    const large=ang>Math.PI?1:0,p=(rad,a)=>[r+rad*Math.cos(a),r+rad*Math.sin(a)];
+    const [x0,y0]=p(r,a0),[x1,y1]=p(r,a1),[xi1,yi1]=p(ir,a1),[xi0,yi0]=p(ir,a0);
+    return {...s,d:`M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} L${xi1},${yi1} A${ir},${ir} 0 ${large} 0 ${xi0},${yi0} Z`};
+  });
+  return <div className="donut" ref={ref} style={{position:'relative',width:size,height:size}}>
+    <svg width={size} height={size}>
+      {arcs.map((a,i)=><path key={i} d={a.d} fill={a.color} stroke="#fff" strokeWidth="1.5"
+        onMouseMove={e=>{const rr=ref.current.getBoundingClientRect();setTip({x:e.clientX-rr.left+10,y:e.clientY-rr.top,rows:[{color:a.color,label:a.label,value:fmt(a.value)+' ('+((a.value/total)*100).toFixed(0)+'%)'}]});}}
+        onMouseLeave={()=>setTip(null)}/>)}
+      <text x={r} y={r-4} textAnchor="middle" className="donut-val">{centerValue}</text>
+      <text x={r} y={r+16} textAnchor="middle" className="donut-lbl">{centerLabel}</text>
+    </svg>
+    <Tooltip tip={tip}/>
+  </div>;
+}
+
+function HBarChart({items,color=PALETTE.cancel}){
+  const max=Math.max(1,...items.map(i=>i.value));
+  return <div className="hbar">
+    {items.map((it,i)=><div className="hbar__row" key={i}>
+      <div className="hbar__lbl" title={it.label}>{it.label}</div>
+      <div className="hbar__track"><div className="hbar__fill" style={{width:`${(it.value/max)*100}%`,background:color}}/></div>
+      <div className="hbar__val">{it.value?fmt(it.value):'–'}</div>
+    </div>)}
+  </div>;
+}
+Object.assign(window,{PALETTE,fmt,compactNum,useMeasure,Tooltip,GroupedBarChart,BarChart,LineChart,DonutChart,HBarChart});
+</script>
+
+<!-- ============================================================
+     App — Dashboard React components
+     ============================================================ -->
+<script type="text/babel">
+// App จะ mount หลัง __dataReady resolve เท่านั้น
+window.__dataReady.then(data => {
+  window.REPORT_DATA = data;
+  const D=window.REPORT_DATA, M=D.MONTHS_TH, CAP=D.capacity;
+  const CAUSE_COLORS=['#2f5fd0','#d65b5b','#d98a2b','#15a39b','#7b61c4','#5a8f3c','#c44d8f','#4a6b8a','#b07b3a','#8a8f9a'];
+  const YEAR_COLORS=['#c3cad6','#2f5fd0','#15a39b','#d98a2b','#7b61c4','#d65b5b'];
+  const AVAILABLE_YEARS=Object.keys(D.years).map(Number).sort((a,b)=>a-b);
+  const yearColor=y=>YEAR_COLORS[AVAILABLE_YEARS.indexOf(y)%YEAR_COLORS.length];
+
+  function computePct(mo){
+    const days=mo.days||1;
+    const pctQ=(mo.produced/(CAP.queuePerDay*days))*100;
+    const pctR=(mo.raftProduced/(CAP.raftPerDay*days))*100;
+    return pctQ>=pctR?{pct:pctQ,basis:'คิว'}:{pct:pctR,basis:'แพ'};
+  }
+  const yearData=y=>D.years[y];
+  const byMonth=(y,field)=>{const arr=new Array(12).fill(null);yearData(y).months.forEach(mo=>{arr[mo.m-1]=field==='pct'?computePct(mo).pct:mo[field];});return arr;};
+  const sum=a=>a.reduce((x,v)=>x+(v||0),0);
+  const avg=a=>{const f=a.filter(v=>v!=null);return f.length?f.reduce((x,v)=>x+v,0)/f.length:0;};
+  const monthsPresent=y=>yearData(y).months.map(mo=>mo.m);
+
+  function Legend({items}){
+    return <div className="legend">{items.map((it,i)=><span className="legend__item" key={i}>
+      <span className="legend__sw" style={{background:it.color,...(it.dash?{background:'none',borderTop:`2.5px dashed ${it.color}`,height:0,width:16,borderRadius:0}:{})}}/>
+      {it.label}
+    </span>)}</div>;
+  }
+  function KpiCard({label,value,unit,sub,accent,delta}){
+    return <div className="kpi">
+      <div className="kpi__label">{label}</div>
+      <div className="kpi__value" style={accent?{color:accent}:{}}>{value}<span className="kpi__unit">{unit}</span></div>
+      {sub&&<div className="kpi__sub">{sub}</div>}
+      {delta&&<div className={`kpi__delta ${delta.dir>0?'up':delta.dir<0?'down':''}`}>{delta.dir>0?'▲':delta.dir<0?'▼':'–'} {delta.text}</div>}
+    </div>;
+  }
+  function ChartCard({title,subtitle,right,children,span}){
+    return <section className={`card ${span?'card--'+span:''}`}>
+      <header className="card__head">
+        <div><h3 className="card__title">{title}</h3>{subtitle&&<p className="card__sub">{subtitle}</p>}</div>
+        {right&&<div className="card__right">{right}</div>}
+      </header>
+      <div className="card__body">{children}</div>
+    </section>;
+  }
+  function Segmented({options,value,onChange}){
+    return <div className="seg">{options.map(o=><button key={o.value} className={`seg__btn ${value===o.value?'is-active':''}`} onClick={()=>onChange(o.value)}>{o.label}</button>)}</div>;
+  }
+
+  function stockStatus(v){
+    if(v>=4000)return{text:'สต็อคควรลด',emoji:'🚨',cls:'high',hint:'สต็อคสูง — ควรเร่งระบาย/ลดการผลิต'};
+    if(v<3500)return{text:'ควรสต็อคสินค้าเพิ่ม',emoji:'📥',cls:'low',hint:'สต็อคต่ำ — ควรเพิ่มการผลิตเข้าสต็อค'};
+    return{text:'สต็อคปกติ',emoji:'✅',cls:'ok',hint:'อยู่ในเกณฑ์ที่เหมาะสม'};
+  }
+  function StockStatusCard({current,prev,label,year,stockDiff,stockDiffMonths}){
+    const st=stockStatus(current),delta=prev!=null?current-prev:null;
+    return <section className={`card card--full stockcard stockcard--${st.cls}`}>
+      <div className="stockcard__body">
+        <div className="stockcard__main">
+          <div className="stockcard__label">สต็อคคิวคงเหลือปัจจุบัน</div>
+          <div className="stockcard__num">{fmt(current,0)}<span className="stockcard__unit"> m³</span></div>
+          <div className="stockcard__when">ณ เดือน{label} {year}</div>
+        </div>
+        {delta!=null&&<div className={`stockcard__delta ${delta>=0?'up':'down'}`}>
+          <span className="stockcard__arrow">{delta>=0?'▲':'▼'}</span>
+          <div><div className="stockcard__deltanum">{(delta>=0?'+':'')+fmt(delta,0)} m³</div><div className="stockcard__deltalbl">เทียบเดือนก่อน</div></div>
+        </div>}
+        {stockDiff!=null&&<div style={{display:'flex',flexDirection:'column',gap:'3px',paddingLeft:'4px',borderLeft:'3px solid',borderColor:stockDiff>=0?'#5a8f3c':'#c0392b'}}>
+          <div style={{fontSize:'12px',color:'var(--muted-text)',fontWeight:500}}>ส่วนต่างสต็อค (จริง−คำนวณ)</div>
+          <div style={{fontFamily:'var(--num)',fontSize:'22px',fontWeight:700,color:stockDiff>=0?'#3f7d2b':'#c0392b',letterSpacing:'-0.02em'}}>
+            {(stockDiff>=0?'+':'')+fmt(stockDiff,0)} <span style={{fontSize:'13px',fontWeight:500,color:'var(--muted-text)'}}>m³</span>
+          </div>
+          <div style={{fontSize:'11.5px',color:'var(--muted-text)'}}>
+            {stockDiff<0?`ขาดหาย — อาจมีเสาเสียหาย/ตกหล่น`:`สต็อคจริงมากกว่าคำนวณ`}
+            {stockDiffMonths>0&&` • เทียบ ${stockDiffMonths} เดือน`}
+          </div>
+        </div>}
+        <div className="stockcard__status">
+          <div className={`stockbadge stockbadge--${st.cls}`}><span className="stockbadge__emoji">{st.emoji}</span><span>{st.text}</span></div>
+          <div className="stockcard__hint">{st.hint}</div>
+        </div>
+      </div>
+      <div className="stockcard__scale">
+        <span className="stockcard__seg stockcard__seg--low">{'< 3,500 ควรเพิ่ม'}</span>
+        <span className="stockcard__seg stockcard__seg--ok">3,500–3,999 ปกติ</span>
+        <span className="stockcard__seg stockcard__seg--high">{'≥ 4,000 ควรลด'}</span>
+      </div>
+    </section>;
+  }
+  function LatestCompareCard({month,label,year}){
+    const prod=month.produced,trans=month.transport,diff=prod-trans,prodMore=diff>=0;
+    const max=Math.max(prod,trans)||1,ratio=(trans/(prod||1))*100;
+    return <section className="card card--full latest">
+      <header className="card__head">
+        <div><h3 className="card__title">คิวผลิต–ขนส่ง เดือนล่าสุด</h3><p className="card__sub">ข้อมูลเดือน{label} {year}</p></div>
+        <div className={`verdict ${prodMore?'verdict--prod':'verdict--trans'}`}>
+          <span className="verdict__arrow">{prodMore?'▲':'▼'}</span>
+          <span>{prodMore?'ผลิตมากกว่าขนส่ง':'ขนส่งมากกว่าผลิต'} {fmt(Math.abs(diff),0)} m³</span>
+        </div>
+      </header>
+      <div className="card__body latest__body">
+        <div className="latest__stat">
+          <span className="latest__dot" style={{background:PALETTE.produced}}/>
+          <div><div className="latest__lbl">คิวผลิตจริง</div><div className="latest__num" style={{color:PALETTE.produced}}>{fmt(prod,0)}<span> m³</span></div></div>
+        </div>
+        <div className="latest__bars">
+          <div className="latest__bar"><div className="latest__fill" style={{width:(prod/max*100)+'%',background:PALETTE.produced}}/></div>
+          <div className="latest__bar"><div className="latest__fill" style={{width:(trans/max*100)+'%',background:PALETTE.transport}}/></div>
+          <div className="latest__ratio">ขนส่งคิดเป็น {fmt(ratio,0)}% ของที่ผลิต</div>
+        </div>
+        <div className="latest__stat latest__stat--r">
+          <div><div className="latest__lbl">คิวขนส่ง</div><div className="latest__num" style={{color:PALETTE.transport}}>{fmt(trans,0)}<span> m³</span></div></div>
+          <span className="latest__dot" style={{background:PALETTE.transport}}/>
+        </div>
+      </div>
+    </section>;
+  }
+
+  function OverviewTab({year}){
+    const yd=yearData(year),cats=monthsPresent(year).map(m=>M[m-1]);
+    const produced=yd.months.map(mo=>mo.produced),transport=yd.months.map(mo=>mo.transport);
+    const stock=yd.months.map(mo=>mo.stock),pctInfo=yd.months.map(mo=>computePct(mo)),pct=pctInfo.map(p=>p.pct);
+    const raftCancel=yd.months.map(mo=>mo.raftCancel);
+    const totalProduced=sum(produced),totalTransport=sum(transport),latestStock=stock[stock.length-1];
+    const avgPct=avg(pct),totalRaftCancel=sum(raftCancel),net=totalProduced-totalTransport;
+    // คำนวณสต็อคตามสูตร: คงเหลือก่อน + ผลิต - ขนส่ง
+    const stockCalc=yd.months.map((mo,i)=>{
+      if(i===0) return null;
+      return stock[i-1]+mo.produced-mo.transport;
+    });
+    const stockDiff=yd.months.map((mo,i)=>stockCalc[i]!=null?mo.stock-stockCalc[i]:null);
+    const totalStockDiff=stockDiff.reduce((a,v)=>a+(v!=null?v:0),0);
+    let causeSegments=null,causeItems=null,totalCauses=0;
+    if(yd.causes){
+      const totals=D.causeLabels.map((_,i)=>monthsPresent(year).reduce((a,m)=>a+(yd.causes[m]?yd.causes[m][i]:0),0));
+      totalCauses=sum(totals);
+      const paired=D.causeLabels.map((l,i)=>({label:l,value:totals[i],color:CAUSE_COLORS[i]})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);
+      causeItems=paired; causeSegments=paired;
+    }
+    return <div className="grid">
+      <div className="kpi-row" style={{gridTemplateColumns:'repeat(6,1fr)'}}>
+        <KpiCard label="คิวผลิตจริงรวม" value={fmt(totalProduced)} unit=" m³" sub={`เฉลี่ย ${fmt(totalProduced/yd.months[yd.months.length-1].m)} m³/เดือน`} accent={PALETTE.produced}/>
+        <KpiCard label="คิวขนส่งรวม" value={fmt(totalTransport)} unit=" m³" sub={`เฉลี่ย ${fmt(avg(transport))} m³/เดือน`} accent={PALETTE.transport}/>
+        <KpiCard label="ผลิต − ขนส่ง (สุทธิ)" value={(net>=0?'+':'')+fmt(net)} unit=" m³" sub={net>=0?'ผลิตมากกว่าขนส่ง':'ขนส่งมากกว่าผลิต'} accent={net>=0?PALETTE.produced:PALETTE.cancel}/>
+        <KpiCard label="สต็อคคงเหลือล่าสุด" value={fmt(latestStock)} unit=" m³" sub={`ณ เดือน${cats[cats.length-1]}`} accent={PALETTE.stock}/>
+        <KpiCard label="% ผลิตได้จริงเฉลี่ย" value={fmt(avgPct,1)} unit="%" sub={`ค่าเฉลี่ย ${cats[0]}–${cats[cats.length-1]} ${String(year).slice(-2)}`} accent={avgPct>=90?'#5a8f3c':PALETTE.cancel}/>
+        {(()=>{
+          const lm=yd.months[yd.months.length-1];
+          const apd=lm.days>0?lm.produced/lm.days:0;
+          return <KpiCard label="เฉลี่ยคิว/วัน (เดือนล่าสุด)" value={fmt(apd,1)} unit=" m³" sub={`${cats[cats.length-1]} ${year} • ${lm.days} วันผลิต`} accent='#7b61c4'/>;
+        })()}
+      </div>
+      <LatestCompareCard month={yd.months[yd.months.length-1]} label={cats[cats.length-1]} year={year}/>
+      <ChartCard title="เทียบคิวผลิตจริงกับคิวขนส่งรายเดือน" subtitle="หน่วย: ลูกบาศก์เมตร (m³)" right={<Legend items={[{label:'คิวผลิตจริง',color:PALETTE.produced},{label:'คิวขนส่ง',color:PALETTE.transport}]}/>} span="wide">
+        <GroupedBarChart categories={cats} unit="m³" series={[{key:'p',label:'คิวผลิตจริง',color:PALETTE.produced,data:produced},{key:'t',label:'คิวขนส่ง',color:PALETTE.transport,data:transport}]} height={320}/>
+      </ChartCard>
+      <StockStatusCard current={latestStock} prev={stock.length>1?stock[stock.length-2]:null} label={cats[cats.length-1]} year={year} stockDiff={stockDiff[stockDiff.length-1]} stockDiffMonths={null}/>
+      <ChartCard title="สต็อคคิวคงเหลือรายเดือน" subtitle="ปริมาณคงเหลือปลายเดือน (m³)">
+        <LineChart categories={cats} unit="m³" area showValues series={[{label:'สต็อคคงเหลือ',color:PALETTE.stock,data:stock}]} height={260}/>
+      </ChartCard>
+      <ChartCard title="เปอร์เซ็นต์การผลิตได้จริงรายเดือน" subtitle={`100% = ${CAP.queuePerDay} คิว/วัน หรือ ${CAP.raftPerDay} แพ/วัน (เกณฑ์ที่มากกว่า)`}>
+        <BarChart categories={cats} values={pct} color={PALETTE.produced} target={90} targetLabel="เป้า" unit="%" decimals={1} yMaxOverride={110} height={260}/>
+      </ChartCard>
+      {causeSegments?(()=>{
+        const remaining = totalRaftCancel - totalCauses;
+        return <ChartCard title="สาเหตุจำนวนแพ ค้าง-ยกเลิก"
+          subtitle={`แพค้าง-ยกเลิกจริง ${fmt(totalRaftCancel)} แพ • ระบุสาเหตุแล้ว ${fmt(totalCauses)} แพ`}
+          span="wide" right={<Legend items={[{label:'จำนวนแพ',color:PALETTE.cancel}]}/>}>
+          <div className="cause-split">
+            <div className="cause-split__bars"><HBarChart items={causeItems} color={PALETTE.cancel}/></div>
+            <div className="cause-split__donut">
+              <DonutChart segments={causeSegments} size={170} thickness={28} centerValue={fmt(totalCauses)} centerLabel="แพรวม"/>
+            </div>
+          </div>
+          <div style={{margin:'4px 16px 12px',padding:'10px 16px',borderRadius:'8px',
+            background: remaining===0?'#e9f4e1':'#fff8ec',
+            border: `1px solid ${remaining===0?'#b5d9a0':'#f0dcb0'}`,
+            display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+            <span style={{fontSize:'18px'}}>{remaining===0?'✅':'⚠️'}</span>
+            <span style={{fontSize:'13px',fontWeight:600,color:remaining===0?'#3f7d2b':'#9a6b1f'}}>
+              {remaining===0
+                ? `ข้อมูลตรงกัน — แพค้าง-ยกเลิก ${fmt(totalRaftCancel)} แพ ตรงกับสาเหตุที่ระบุ`
+                : `ใส่สาเหตุไม่ครบ — ระบุสาเหตุแล้ว ${fmt(totalCauses)} แพ แต่แพค้างจริง ${fmt(totalRaftCancel)} แพ (ยังขาดอีก ${fmt(Math.abs(remaining))} แพ)`}
+            </span>
+          </div>
+        </ChartCard>;
+      })():<ChartCard title="สาเหตุจำนวนแพ ค้าง-ยกเลิก" subtitle={`ปี ${year}`} span="wide"><div className="empty">ยังไม่มีข้อมูลสาเหตุสำหรับปีนี้</div></ChartCard>}
+      <ChartCard title="ตารางสรุปการผลิตรายเดือน" subtitle={`ปี ${year}`} span="full">
+        <div className="table-wrap"><table className="dt">
+          <thead><tr><th className="ta-l">เดือน</th><th>คิวผลิตจริง</th><th>% ผลิต</th><th>วันผลิต</th><th>เฉลี่ยคิว/วัน</th><th>คิวขนส่ง</th><th>สต็อคจริง</th><th>สต็อคคำนวณ</th><th>ส่วนต่าง</th><th>แพสั่ง</th><th>แพผลิต</th><th>แพค้าง</th></tr></thead>
+          <tbody>{yd.months.map((mo,i)=>{
+            const diff=stockDiff[i];
+            return <tr key={mo.m}>
+              <td className="ta-l strong">{M[mo.m-1]} {year}</td>
+              <td className="strong">{fmt(mo.produced,0)}</td>
+              <td><span className={`pill ${computePct(mo).pct>=90?'pill--ok':'pill--warn'}`}>{fmt(computePct(mo).pct,1)}%</span><span className="basis-tag">เกณฑ์{computePct(mo).basis}</span></td>
+              <td>{mo.days}</td><td>{fmt(mo.perDay,1)}</td><td>{fmt(mo.transport,0)}</td>
+              <td className="strong">{fmt(mo.stock,0)}</td>
+              <td className="muted-cell">{stockCalc[i]!=null?fmt(stockCalc[i],0):'–'}</td>
+              <td style={{color:diff==null?'var(--muted-text)':diff>=0?'#3f7d2b':'#c0392b',fontWeight:600}}>
+                {diff==null?'–':(diff>=0?'+':'')+fmt(diff,0)}
+              </td>
+              <td>{fmt(mo.raftOrder,0)}</td><td>{fmt(mo.raftProduced,0)}</td><td>{fmt(mo.raftCancel,0)}</td>
+            </tr>;
+          })}</tbody>
+          <tfoot><tr>
+            <td className="ta-l">รวม / เฉลี่ย</td><td className="strong">{fmt(totalProduced)}</td><td>{fmt(avgPct,1)}%</td>
+            <td>{sum(yd.months.map(m=>m.days))}</td><td>{fmt(avg(yd.months.map(m=>m.perDay)),1)}</td>
+            <td>{fmt(totalTransport)}</td><td>{fmt(latestStock)}</td>
+            <td className="muted-cell">–</td>
+            <td style={{fontWeight:700,color:totalStockDiff>=0?'#3f7d2b':'#c0392b'}}>{(totalStockDiff>=0?'+':'')+fmt(totalStockDiff,0)}</td>
+            <td>{fmt(sum(yd.months.map(m=>m.raftOrder)))}</td><td>{fmt(sum(yd.months.map(m=>m.raftProduced)))}</td><td>{fmt(totalRaftCancel)}</td>
+          </tr></tfoot>
+        </table></div>
+      </ChartCard>
+    </div>;
+  }
+
+  function YearCompareTab(){
+    const [metric,setMetric]=useState('produced');
+    const [selected,setSelected]=useState(AVAILABLE_YEARS);
+    const toggle=y=>setSelected(prev=>prev.includes(y)?(prev.length===1?prev:prev.filter(x=>x!==y)):[...prev,y]);
+    const metricMap={produced:{label:'คิวผลิตจริง',unit:'m³',dec:0},transport:{label:'คิวขนส่ง',unit:'m³',dec:0},pct:{label:'% ผลิตได้จริง',unit:'%',dec:1}};
+    const cfg=metricMap[metric],sel=[...selected].sort((a,b)=>a-b);
+    const seriesData=sel.map(y=>{
+      const arr=byMonth(y,metric),total=metric==='pct'?avg(arr.filter(v=>v!=null)):sum(arr);
+      return{year:y,color:yearColor(y),data:arr,total,real:yearData(y).real};
+    });
+    let yoy=null;
+    if(sel.length===2){
+      const [ya,yb]=sel,aArr=byMonth(ya,metric),bArr=byMonth(yb,metric),span=monthsPresent(yb);
+      const aSpan=metric==='pct'?avg(span.map(m=>aArr[m-1])):sum(span.map(m=>aArr[m-1]));
+      const bSpan=metric==='pct'?avg(span.map(m=>bArr[m-1]).filter(v=>v!=null)):sum(span.map(m=>bArr[m-1]));
+      const d=bSpan-aSpan;
+      yoy={ya,yb,d,pct:aSpan?(d/aSpan)*100:0,spanLen:span.length};
+    }
+    const cardCount=Math.min(seriesData.length+(yoy?1:0),5);
+    return <div className="grid">
+      <div className="yc-head">
+        <Segmented value={metric} onChange={setMetric} options={[{value:'produced',label:'คิวผลิต'},{value:'transport',label:'คิวขนส่ง'},{value:'pct',label:'% ผลิต'}]}/>
+        <div className="yearchips">
+          <span className="yearchips__lbl">เลือกปีที่เทียบ</span>
+          {AVAILABLE_YEARS.map(y=>{const on=selected.includes(y);return<button key={y} className={`yearchip ${on?'is-on':''}`} onClick={()=>toggle(y)}>
+            <span className="yearchip__sw" style={{background:on?yearColor(y):'#cdd3dc'}}/>{y}{!yearData(y).real?' *':''}
+          </button>;})}
+        </div>
+      </div>
+      <div className="kpi-row" style={{gridTemplateColumns:`repeat(${cardCount},1fr)`}}>
+        {seriesData.map(s=><KpiCard key={s.year} label={`${cfg.label} • ปี ${s.year}`} value={fmt(s.total,cfg.dec)} unit={' '+cfg.unit} sub={s.real?`${monthsPresent(s.year).length} เดือนที่มีข้อมูล`:'ทั้งปี (ข้อมูลตัวอย่าง)'} accent={s.color==='#c3cad6'?'#8a93a3':s.color}/>)}
+        {yoy&&<KpiCard label={`เทียบ ${yoy.ya} → ${yoy.yb} (YoY)`} value={(yoy.d>=0?'+':'')+fmt(yoy.d,cfg.dec)} unit={' '+cfg.unit} sub={`เทียบ ${yoy.spanLen} เดือนแรกที่ตรงกัน`} delta={{dir:Math.sign(yoy.d),text:`${yoy.pct>=0?'+':''}${yoy.pct.toFixed(1)}%`}} accent={yoy.d>=0?'#5a8f3c':PALETTE.cancel}/>}
+      </div>
+      <ChartCard title={`เทียบ${cfg.label}ประจำเดือนของแต่ละปี`} subtitle={`${sel.map(y=>'ปี '+y).join(' · ')} • หน่วย: ${cfg.unit}`} span="full" right={<Legend items={seriesData.map(s=>({label:`ปี ${s.year}`,color:s.color}))}/>}>
+        <GroupedBarChart categories={M} unit={cfg.unit} decimals={cfg.dec} series={seriesData.map(s=>({key:String(s.year),label:`ปี ${s.year}`,color:s.color,data:s.data.map(v=>v||0)}))} height={360}/>
+      </ChartCard>
+      <ChartCard title="ตารางเทียบรายเดือน" subtitle={`${cfg.label} (${cfg.unit})`} span="full">
+        <div className="table-wrap"><table className="dt">
+          <thead><tr><th className="ta-l">ปี \ เดือน</th>{M.map((m,i)=><th key={i}>{m}</th>)}<th>รวม/เฉลี่ย</th></tr></thead>
+          <tbody>{seriesData.map(s=><tr key={s.year}><td className="ta-l strong"><span className="td-sw" style={{background:s.color}}/>ปี {s.year}</td>{s.data.map((v,i)=><td key={i}>{v==null?'–':fmt(v,cfg.dec)}</td>)}<td className="strong">{fmt(s.total,cfg.dec)}</td></tr>)}</tbody>
+        </table></div>
+        {seriesData.some(s=>!s.real)&&<p className="note">* ปีที่มีเครื่องหมาย * เป็นข้อมูลตัวอย่าง</p>}
+      </ChartCard>
+    </div>;
+  }
+
+  function QualityTab({year}){
+    const yd=yearData(year);
+    if(!yd.decades)return<div className="grid"><ChartCard title="ค่าเฉลี่ยทุก 10 วัน" subtitle={`ปี ${year}`} span="full"><div className="empty">ยังไม่มีข้อมูลราย 10 วันสำหรับปีนี้ — เลือกปี 2569 เพื่อดูข้อมูลจริง</div></ChartCard></div>;
+    const dec=yd.decades,labels=dec.map(d=>d.label);
+    const strength=dec.map(d=>d.strength),cementTotal=dec.map(d=>d.cementTotal),cementBig=dec.map(d=>d.cementBig),cementI18=dec.map(d=>d.cementI18);
+    const rock34=dec.map(d=>d.rock34),rock1=dec.map(d=>d.rock1),sand=dec.map(d=>d.sand),T=D.mixTarget;
+    return <div className="grid">
+      <div className="kpi-row kpi-row--5">
+        <KpiCard label="Strength เฉลี่ย" value={fmt(avg(strength),0)} unit=" ksc" sub={`ต่ำกว่าเกณฑ์ 450 จำนวน ${strength.filter(v=>v!=null&&v<450).length} ช่วง`} accent={strength.some(v=>v!=null&&v<450)?PALETTE.cancel:PALETTE.strength}/>
+        <KpiCard label="ปูนเฉลี่ย (ทั้งหมด)" value={fmt(avg(cementTotal),1)} unit=" kg/m³" sub="ค่าเฉลี่ยใช้ปูนรวม" accent={PALETTE.produced}/>
+        <KpiCard label="หิน 3/4″ เฉลี่ย" value={fmt(avg(rock34),0)} unit=" kg/m³" sub={`สูตร ${T.rock34}`} accent={PALETTE.transport}/>
+        <KpiCard label="หิน 1″ เฉลี่ย" value={fmt(avg(rock1),0)} unit=" kg/m³" sub={`สูตร ${T.rock1}`} accent="#7b61c4"/>
+        <KpiCard label="ทรายเฉลี่ย" value={fmt(avg(sand),0)} unit=" kg/m³" sub={`สูตร ${T.sand}`} accent={PALETTE.stock}/>
+      </div>
+      <ChartCard title="ค่าเฉลี่ย Strength ทุก 10 วัน" subtitle={`หน่วย: ksc • เส้นประแดง = ขั้นต่ำ 450 • เส้นประเขียว = ค่าเฉลี่ย ${fmt(avg(strength),0)}`} span="full" right={<Legend items={[{label:'Strength',color:PALETTE.strength},{label:'ขั้นต่ำ 450',color:PALETTE.cancel,dash:true},{label:'ค่าเฉลี่ย',color:'#3f9a4f',dash:true}]}/>}>
+        <LineChart categories={labels} unit="ksc" decimals={0} showValues yMin={420} dangerBelow={450} series={[{label:'Strength',color:PALETTE.strength,data:strength}]} targets={[{value:450,color:PALETTE.cancel,label:'ขั้นต่ำ'},{value:Math.round(avg(strength)),color:'#3f9a4f',label:'เฉลี่ย'}]} height={300}/>
+      </ChartCard>
+      <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide" right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
+        <LineChart categories={labels} unit="kg/m³" decimals={1} series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,data:cementBig},{label:'I18',color:'#7b61c4',data:cementI18}]} height={300}/>
+      </ChartCard>
+      <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide" right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
+        <LineChart categories={labels} unit="kg/m³" decimals={0} yMin={250} yMax={1000} series={[{label:'หิน 3/4″',color:PALETTE.transport,data:rock34},{label:'หิน 1″',color:'#7b61c4',data:rock1},{label:'ทราย',color:PALETTE.stock,data:sand}]} targets={[{value:T.rock34,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1,color:'#7b61c4',label:'สูตรหิน1″'}]} height={320}/>
+      </ChartCard>
+      <ChartCard title="ตารางค่าเฉลี่ยทุก 10 วัน" subtitle={`ปี ${year}`} span="full">
+        <div className="table-wrap"><table className="dt">
+          <thead><tr><th className="ta-l">ช่วง 10 วัน</th><th>Strength (ksc)</th><th>ปูนทั้งหมด</th><th>ปูนเสาใหญ่</th><th>ปูน I18</th><th>หิน 3/4″</th><th>หิน 1″</th><th>ทราย</th></tr></thead>
+          <tbody>{dec.map((d,i)=><tr key={i}><td className="ta-l strong">{d.label}</td><td>{fmt(d.strength,0)}</td><td>{fmt(d.cementTotal,1)}</td><td>{fmt(d.cementBig,1)}</td><td>{fmt(d.cementI18,1)}</td><td>{fmt(d.rock34,0)}</td><td>{fmt(d.rock1,0)}</td><td>{fmt(d.sand,0)}</td></tr>)}</tbody>
+          <tfoot><tr><td className="ta-l">ค่าเฉลี่ย</td><td>{fmt(avg(strength),0)}</td><td>{fmt(avg(cementTotal),1)}</td><td>{fmt(avg(cementBig),1)}</td><td>{fmt(avg(cementI18),1)}</td><td>{fmt(avg(rock34),0)}</td><td>{fmt(avg(rock1),0)}</td><td>{fmt(avg(sand),0)}</td></tr></tfoot>
+        </table></div>
+      </ChartCard>
+    </div>;
+  }
+
+
+  /* ============================================================
+     TAB 4 — เสียหาย-รายการ (REB / ROB / ID)
+     ============================================================ */
+  const MONTHS_TH_SHORT = D.MONTHS_TH;
+  const CODE_COLOR = { REB:'#2f5fd0', ROB:'#d98a2b', ID:'#d65b5b' };
+  const CODE_LABEL = { REB:'REB รับคืนสินค้า', ROB:'ROB เสียหายหน้างาน', ID:'ID เสียหายในโรงงาน' };
+  const bahtFmt = n => n==null?'–':Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pctFmt  = n => n==null?'–':Number(n).toFixed(3)+'%';
+  const pct2    = (a,b) => b>0 ? (a/b*100).toFixed(3)+'%' : '–';
+
+  // กลุ่มสาเหตุความเสียหาย สำหรับ ตารางสรุป
+  const DAMAGE_GROUPS = [
+    { key:'factory', label:'เสียหายในโรงงาน', bg:'#fce5cd', hd:'#b45f06',
+      rows:[
+        { label:'เสาเสียในสต็อค',    fn: c=> /สต็อค|สต้อค|สต๊อค/i.test(c||'') },
+        { label:'พนักงานบริษัท',      fn: c=> /พนักงาน/i.test(c||'') },
+        { label:'ผู้รับเหมา',          fn: c=> /รับเหมา/i.test(c||'') },
+        { label:'อื่นๆ',              fn: c=> /^อื่น/i.test(c||'') },
+      ]},
+    { key:'site', label:'เสาเข็มบกพร่อง (หน้างาน)', bg:'#dae8fc', hd:'#1155cc',
+      rows:[
+        { label:'เสาเข็ม Fail',              fn: c=> /fail/i.test(c||'') },
+        { label:'ตอกสไลด์',                  fn: c=> /สไลด์/i.test(c||'') },
+        { label:'เสาเข็มหัวแตก',             fn: c=> /หัวแตก/i.test(c||'') },
+        { label:'เสาร้าวในกอง/ขนส่ง/ปีกแตก', fn: c=> /ร้าว|ปีกแตก/i.test(c||'') },
+      ]},
+    { key:'ops', label:'ความเสียหายจากการดำเนินงาน', bg:'#d9ead3', hd:'#38761d',
+      rows:[
+        { label:'ปั้นจั่นลากหัก/ชน',            fn: c=> /ปั้นจั่น|ลากหัก/i.test(c||'') },
+        { label:'ตอกเอียง/เทสต์ไม่ผ่าน/ผิดหมุด', fn: c=> /เอียง|เทสต์|หมุด/i.test(c||'') },
+        { label:'เสาเข็มบริษัทอื่น',             fn: c=> /บริษัทอื่น/i.test(c||'') },
+        { label:'สั่งผลิตผิด/ส่งผิด/ปรับปรุง',   fn: c=> /ผลิตผิด|ส่งผิด|ปรับปรุง/i.test(c||'') },
+        { label:'เสาเข็มหายจากนับสต็อค',         fn: c=> /หาย.*สต|นับสต/i.test(c||'') },
+      ]},
+  ];
+
+  function DamageDetailTab(){
+    const [view,setView]   = useState('summary');
+    const [filterCode,setFilterCode] = useState('ALL');
+    const [filterYear,setFilterYear] = useState('ALL');
+
+    const rawItems = D.damageItems || [];
+    const sales    = D.damageSales || {};
+
+    // ปีที่มีข้อมูล
+    const years = [...new Set(rawItems.map(r=>r.year))].sort((a,b)=>a-b);
+
+    // กรองตาม year + code
+    const items = rawItems.filter(r =>
+      (filterYear==='ALL' || r.year===Number(filterYear)) &&
+      (filterCode==='ALL' || r.code_type===filterCode)
+    );
+
+    // รวมยอดรายเดือน (ใช้ทุก code สำหรับ sales %)
+    const allFiltered = rawItems.filter(r =>
+      (filterYear==='ALL' || r.year===Number(filterYear))
+    );
+
+    // unique months ที่มีข้อมูล (เรียงตาม year-month)
+    const monthKeys = [...new Set(allFiltered.map(r=>`${r.year}-${r.month}`))]
+      .sort((a,b)=>{
+        const [ay,am]=a.split('-').map(Number);
+        const [by,bm]=b.split('-').map(Number);
+        return ay!==by?ay-by:am-bm;
+      });
+
+    // สรุปรายเดือน (ทุก code)
+    const monthSummary = monthKeys.map(k => {
+      const [y,m] = k.split('-').map(Number);
+      const monthItems = allFiltered.filter(r=>r.year===y&&r.month===m);
+      const total   = monthItems.reduce((a,r)=>a+(r.amount||0),0);
+      const byCode  = {};
+      ['REB','ROB','ID'].forEach(c => { byCode[c] = monthItems.filter(r=>r.code_type===c).reduce((a,r)=>a+(r.amount||0),0); });
+      const s = sales[k] || 0;
+      const pct = s>0 ? total/s*100 : null;
+      return { key:k, year:y, month:m, label:`${MONTHS_TH_SHORT[m-1]}-${String(y).slice(-2)}`, total, byCode, sales:s, pct };
+    });
+
+    // เดือนล่าสุด vs เดือนก่อน
+    const latestM  = monthSummary[monthSummary.length-1];
+    const prevM    = monthSummary.length>1 ? monthSummary[monthSummary.length-2] : null;
+    const pctDelta = (latestM&&prevM&&latestM.pct!=null&&prevM.pct!=null) ? latestM.pct-prevM.pct : null;
+
+    // รวมทั้งหมด
+    const totalAll   = items.reduce((a,r)=>a+(r.amount||0),0);
+    const totalSales = [...new Set(items.map(r=>`${r.year}-${r.month}`))].reduce((a,k)=>a+(sales[k]||0),0);
+    const avgPct     = totalSales>0 ? totalAll/totalSales*100 : null;
+
+    // แยกตามสาเหตุ
+    const causeMap = {};
+    items.forEach(r => { causeMap[r.cause||'ไม่ระบุ'] = (causeMap[r.cause||'ไม่ระบุ']||0) + (r.amount||0); });
+    const causeSorted = Object.entries(causeMap).map(([l,v])=>({label:l,value:v})).sort((a,b)=>b.value-a.value);
+
+    // แยกตามลูกค้า
+    const custMap = {};
+    items.filter(r=>r.customer_name).forEach(r => { custMap[r.customer_name] = (custMap[r.customer_name]||0) + (r.amount||0); });
+    const custSorted = Object.entries(custMap).map(([l,v])=>({label:l,value:v})).sort((a,b)=>b.value-a.value).slice(0,15);
+
+    const maxCause = causeSorted[0]?.value||1;
+    const maxCust  = custSorted[0]?.value||1;
+
+    return <div className="grid">
+      {/* Filter bar */}
+      <div className="yc-head">
+        <Segmented value={view} onChange={setView} options={[
+          {value:'summary',label:'ตารางสรุป'},{value:'monthly',label:'รายเดือน'},
+          {value:'cause',label:'แยกสาเหตุ'},{value:'customer',label:'แยกลูกค้า'},
+          {value:'detail',label:'ตารางรายการ'}
+        ]}/>
+        <div style={{display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'center'}}>
+          <select value={filterYear} onChange={e=>setFilterYear(e.target.value)}
+            style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
+            <option value="ALL">ทุกปี</option>
+            {years.map(y=><option key={y} value={y}>ปี {y}</option>)}
+          </select>
+          <select value={filterCode} onChange={e=>setFilterCode(e.target.value)}
+            style={{border:'1.5px solid var(--line-strong)',borderRadius:'8px',padding:'6px 10px',fontFamily:'var(--font)',fontSize:'13px',color:'var(--ink)',background:'#fff'}}>
+            <option value="ALL">ทุกรหัส</option>
+            {Object.entries(CODE_LABEL).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+        <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
+          sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
+        <KpiCard label="% เสียหายเฉลี่ย" value={avgPct!=null?avgPct.toFixed(3):'–'} unit="%"
+          sub="มูลค่าเสียหาย ÷ ยอดขาย" accent={avgPct!=null&&avgPct<=0.7?'#5a8f3c':PALETTE.cancel}/>
+        <KpiCard label={`% เสียหาย ${latestM?latestM.label:'–'}`}
+          value={latestM?.pct!=null?latestM.pct.toFixed(3):'–'} unit="%"
+          sub={latestM?`เสียหาย ${bahtFmt(latestM.total)} ฿`:'ไม่มีข้อมูล'}
+          accent={latestM?.pct!=null&&latestM.pct<=0.7?'#5a8f3c':PALETTE.cancel}/>
+        <KpiCard label="เทียบเดือนก่อน (±%)"
+          value={pctDelta!=null?(pctDelta>=0?'+':'')+pctDelta.toFixed(3):'–'} unit="%"
+          sub={prevM?`vs ${prevM.label} (${prevM.pct!=null?prevM.pct.toFixed(3)+'%':'–'})`:''}
+          accent={pctDelta==null?'var(--muted-text)':pctDelta<=0?'#5a8f3c':'#c0392b'}
+          delta={pctDelta!=null?{dir:pctDelta<=0?-1:1,text:''}:null}/>
+        <KpiCard label="รายการเสียหาย" value={items.length} unit=" รายการ"
+          sub={`${[...new Set(items.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
+          accent='#7b61c4'/>
+      </div>
+
+      {/* ===== ตารางสรุป ===== */}
+      {view==='summary' && (()=>{
+        // "รับคืนสินค้าใช้ได้" = ไม่นับในยอดเสียหาย แต่แสดงแยก
+        const isReturnOk = r => /รับคืนสินค้าใช้ได้/i.test(r.cause||'');
+        const allItemsRaw = rawItems.filter(r => filterYear==='ALL' || r.year===Number(filterYear));
+        const allItems    = allItemsRaw.filter(r => !isReturnOk(r));   // ไม่รวม รับคืนใช้ได้
+        const returnOkItems = allItemsRaw.filter(r => isReturnOk(r));  // แสดงแยก
+        const monthKeys = [...new Set(allItems.map(r=>`${r.year}-${r.month}`))].sort((a,b)=>{
+          const[ay,am]=a.split('-').map(Number),[by,bm]=b.split('-').map(Number);
+          return ay!==by?ay-by:am-bm;
+        });
+        const yearSet = [...new Set(allItems.map(r=>r.year))].sort((a,b)=>a-b);
+
+        // คอลัมน์ทั้งหมด: [{type:'year',year:2569,label:'รวมปี 2569'}, {type:'month',key:'2569-4',label:'เม.ย.-69'}, ...]
+        const cols = [];
+        yearSet.forEach(y => {
+          cols.push({type:'year', year:y, label:`รวมปี ${y}`});
+          monthKeys.filter(k=>k.startsWith(y+'-')).forEach(k=>{
+            const[,m]=k.split('-').map(Number);
+            cols.push({type:'month', key:k, year:y, month:m, label:`${MONTHS_TH_SHORT[m-1]}-${String(y).slice(-2)}`});
+          });
+        });
+
+        // helper: ยอดขายตามคอลัมน์
+        const colSales = col => {
+          if(col.type==='year') return monthKeys.filter(k=>k.startsWith(col.year+'-')).reduce((a,k)=>a+(sales[k]||0),0);
+          return sales[col.key]||0;
+        };
+        // helper: ยอดเสียหายของ rows ที่ match ตามคอลัมน์
+        const colAmt = (matchFn, col) => {
+          const base = allItems.filter(r => matchFn(r.cause));
+          if(col.type==='year') return base.filter(r=>r.year===col.year).reduce((a,r)=>a+(r.amount||0),0);
+          const[y,m]=col.key.split('-').map(Number);
+          return base.filter(r=>r.year===y&&r.month===m).reduce((a,r)=>a+(r.amount||0),0);
+        };
+        const groupAmt = (grp, col) => grp.rows.reduce((a,row)=>a+colAmt(row.fn,col),0);
+        const totalAmt = col => DAMAGE_GROUPS.reduce((a,g)=>a+groupAmt(g,col),0);
+
+        const tdNum = (v,sale,bold,bg) => {
+          const pct = sale>0?(v/sale*100).toFixed(3)+'%':'–';
+          return <>
+            <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:bold?700:400,background:bg||'',padding:'3px 6px',whiteSpace:'nowrap'}}>
+              {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:2}):'–'}
+            </td>
+            <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'11px',color:'var(--muted-text)',background:bg||'',padding:'3px 4px',whiteSpace:'nowrap'}}>
+              {sale>0&&v>0?pct:''}
+            </td>
+          </>;
+        };
+
+        return <ChartCard title="ตารางสรุปความเสียหายรายเดือน" subtitle="มูลค่า (บาท) และ % เทียบยอดขาย" span="full">
+          <div className="table-wrap" style={{overflowX:'auto'}}>
+          <table className="dt" style={{fontSize:'12px',minWidth:'800px',borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{background:'#f5f5f5'}}>
+                <th className="ta-l" style={{minWidth:'180px',position:'sticky',left:0,background:'#f5f5f5',zIndex:2}}>รายการ</th>
+                {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',background:c.type==='year'?'#d9ead3':'#f5f5f5',borderLeft:'1px solid #ddd',minWidth:'100px'}}>{c.label}</th>)}
+              </tr>
+              <tr style={{background:'#fafafa',fontSize:'10px',color:'var(--muted-text)'}}>
+                <th style={{position:'sticky',left:0,background:'#fafafa',zIndex:2}}></th>
+                {cols.map((c,i)=><React.Fragment key={i}><th style={{textAlign:'right',borderLeft:'1px solid #ddd'}}>บาท</th><th style={{textAlign:'right'}}>%</th></React.Fragment>)}
+              </tr>
+            </thead>
+            <tbody>
+              {/* แถวยอดขาย */}
+              <tr style={{background:'#e6f4ea'}}>
+                <td className="ta-l strong" style={{position:'sticky',left:0,background:'#e6f4ea',zIndex:1,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
+                {cols.map((c,i)=>{const s=colSales(c);return <React.Fragment key={i}>
+                  <td colSpan={2} style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea'}}>
+                    {s?Number(s).toLocaleString('th-TH',{maximumFractionDigits:2}):'–'}
+                  </td>
+                </React.Fragment>;})}
+              </tr>
+
+              {/* กลุ่ม */}
+              {DAMAGE_GROUPS.map(grp=><React.Fragment key={grp.key}>
+                {/* header กลุ่ม */}
+                <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:'11px',padding:'3px 8px',position:'sticky',left:0}}>{grp.label}</td></tr>
+                {/* แถวรายการ */}
+                {grp.rows.map((row,ri)=><tr key={ri} style={{background: ri%2===0?'#fff':grp.bg+'55'}}>
+                  <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':grp.bg+'55',zIndex:1,padding:'3px 8px 3px 20px'}}>{row.label}</td>
+                  {cols.map((c,ci)=>{const v=colAmt(row.fn,c),s=colSales(c);
+                    return <React.Fragment key={ci}>{tdNum(v,s,false,ri%2===0?'':grp.bg+'33')}</React.Fragment>;})}
+                </tr>)}
+                {/* แถวรวมกลุ่ม */}
+                <tr style={{background:grp.bg,fontWeight:700}}>
+                  <td className="ta-l strong" style={{position:'sticky',left:0,background:grp.bg,zIndex:1,padding:'4px 8px',color:grp.hd}}>รวม{grp.label}</td>
+                  {cols.map((c,ci)=>{const v=groupAmt(grp,c),s=colSales(c);
+                    return <React.Fragment key={ci}>{tdNum(v,s,true,grp.bg)}</React.Fragment>;})}
+                </tr>
+              </React.Fragment>)}
+
+              {/* รับคืนสินค้าใช้ได้ — แสดงข้อมูล แต่ไม่นับในยอดรวม */}
+              <tr><td colSpan={1+cols.length*2} style={{background:'#e0e0e0',color:'#555',fontWeight:700,fontSize:'11px',padding:'3px 8px',fontStyle:'italic'}}>
+                รับคืนสินค้าใช้ได้ (ไม่นับในยอดเสียหาย)
+              </td></tr>
+              {(()=>{
+                const colRetAmt = col => {
+                  const base = returnOkItems;
+                  if(col.type==='year') return base.filter(r=>r.year===col.year).reduce((a,r)=>a+(r.amount||0),0);
+                  const[y,m]=col.key.split('-').map(Number);
+                  return base.filter(r=>r.year===y&&r.month===m).reduce((a,r)=>a+(r.amount||0),0);
+                };
+                return <tr style={{background:'#f5f5f5',color:'#777',fontStyle:'italic'}}>
+                  <td className="ta-l" style={{position:'sticky',left:0,background:'#f5f5f5',zIndex:1,padding:'3px 8px 3px 20px',color:'#555'}}>รับคืนสินค้าใช้ได้</td>
+                  {cols.map((c,ci)=>{const v=colRetAmt(c),s=colSales(c);
+                    return <React.Fragment key={ci}>
+                      <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',color:'#777',borderLeft:'1px solid #ddd',padding:'3px 6px'}}>
+                        {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:2}):'–'}
+                      </td>
+                      <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'11px',color:'#aaa',padding:'3px 4px'}}>
+                        {s>0&&v>0?(v/s*100).toFixed(3)+'%':''}
+                      </td>
+                    </React.Fragment>;})}
+                </tr>;
+              })()}
+
+              {/* รวมทั้งหมด */}
+              <tr style={{background:'#fff2cc',borderTop:'2px solid #e6ac00'}}>
+                <td className="ta-l strong" style={{position:'sticky',left:0,background:'#fff2cc',zIndex:1,padding:'5px 8px',fontSize:'13px'}}>รวมทั้งหมด</td>
+                {cols.map((c,ci)=>{const v=totalAmt(c),s=colSales(c);
+                  return <React.Fragment key={ci}>{tdNum(v,s,true,'#fff2cc')}</React.Fragment>;})}
+              </tr>
+            </tbody>
+          </table>
+          </div>
+        </ChartCard>;
+      })()}
+
+      {/* Monthly view */}
+      {view==='monthly' && <>
+        <ChartCard title="มูลค่าเสียหายรายเดือน แยกตามรหัส" subtitle="หน่วย: บาท • REB=รับคืน / ROB=เสียหายหน้างาน / ID=เสียหายในโรงงาน"
+          span="full" right={<Legend items={Object.entries(CODE_COLOR).map(([k,c])=>({label:CODE_LABEL[k],color:c}))}/>}>
+          <GroupedBarChart categories={monthSummary.map(m=>m.label)}
+            series={['REB','ROB','ID'].map(c=>({key:c,label:c,color:CODE_COLOR[c],data:monthSummary.map(m=>m.byCode[c]||0)}))}
+            height={320} unit="฿" decimals={0}/>
+        </ChartCard>
+        <ChartCard title="% ความเสียหาย ÷ ยอดขาย รายเดือน" subtitle="ยิ่งต่ำยิ่งดี • เส้นประ = เกณฑ์ 0.7%" span="full">
+          <LineChart categories={monthSummary.map(m=>m.label)} unit="%" decimals={3} showValues
+            series={[{label:'% เสียหาย',color:PALETTE.cancel,data:monthSummary.map(m=>m.pct)}]}
+            targets={[{value:0.7,color:'#d98a2b',label:'เกณฑ์'}]} height={280}/>
+        </ChartCard>
+        <ChartCard title="ตารางสรุปรายเดือน" subtitle="มูลค่า (บาท)" span="full">
+          <div className="table-wrap"><table className="dt">
+            <thead><tr>
+              <th className="ta-l">เดือน</th>
+              <th style={{color:CODE_COLOR.REB}}>REB</th>
+              <th style={{color:CODE_COLOR.ROB}}>ROB</th>
+              <th style={{color:CODE_COLOR.ID}}>ID</th>
+              <th>รวมเสียหาย</th><th>ยอดขาย</th><th>% เสียหาย</th>
+              <th>±จากเดือนก่อน</th>
+            </tr></thead>
+            <tbody>{monthSummary.map((m,i)=>{
+              const prev=i>0?monthSummary[i-1]:null;
+              const delta=prev&&m.pct!=null&&prev.pct!=null?m.pct-prev.pct:null;
+              return <tr key={m.key}>
+                <td className="ta-l strong">{m.label}</td>
+                <td>{m.byCode.REB?bahtFmt(m.byCode.REB):'–'}</td>
+                <td>{m.byCode.ROB?bahtFmt(m.byCode.ROB):'–'}</td>
+                <td>{m.byCode.ID?bahtFmt(m.byCode.ID):'–'}</td>
+                <td className="strong">{bahtFmt(m.total)}</td>
+                <td>{m.sales?bahtFmt(m.sales):'–'}</td>
+                <td><span className={`pill ${m.pct!=null&&m.pct<=0.7?'pill--ok':'pill--warn'}`}>{m.pct!=null?m.pct.toFixed(3)+'%':'–'}</span></td>
+                <td style={{color:delta==null?'var(--muted-text)':delta<=0?'#3f7d2b':'#c0392b',fontWeight:600}}>
+                  {delta==null?'–':(delta>=0?'+':'')+delta.toFixed(3)+'%'}
+                </td>
+              </tr>;
+            })}</tbody>
+            <tfoot><tr>
+              <td className="ta-l">รวม</td>
+              {['REB','ROB','ID'].map(c=><td key={c}>{bahtFmt(items.filter(r=>r.code_type===c).reduce((a,r)=>a+(r.amount||0),0))}</td>)}
+              <td className="strong">{bahtFmt(totalAll)}</td>
+              <td>{bahtFmt(totalSales)}</td>
+              <td>{avgPct!=null?avgPct.toFixed(3)+'%':'–'}</td>
+              <td>–</td>
+            </tr></tfoot>
+          </table></div>
+        </ChartCard>
+      </>}
+
+      {/* Cause view */}
+      {view==='cause' && <>
+        <ChartCard title="มูลค่าเสียหายแยกตามสาเหตุ" subtitle="เรียงจากมาก→น้อย" span="wide">
+          <div className="hbar">
+            {causeSorted.map((c,i)=><div className="hbar__row" key={i}>
+              <div className="hbar__lbl" title={c.label}>{c.label}</div>
+              <div className="hbar__track"><div className="hbar__fill" style={{width:`${(c.value/maxCause)*100}%`,background:PALETTE.cancel}}/></div>
+              <div className="hbar__val">{bahtFmt(c.value)}</div>
+            </div>)}
+          </div>
+        </ChartCard>
+        <ChartCard title="สัดส่วนตามสาเหตุ" subtitle="คลิก Donut เพื่อดูรายละเอียด">
+          <DonutChart segments={causeSorted.slice(0,7).map((c,i)=>({label:c.label,value:c.value,color:CAUSE_COLORS[i]}))}
+            size={200} thickness={32} centerValue={bahtFmt(totalAll)} centerLabel="รวม (฿)"/>
+        </ChartCard>
+        <ChartCard title="สัดส่วนตามรหัส (REB/ROB/ID)" subtitle="เปรียบเทียบประเภทเสียหาย" span="full">
+          {(()=>{
+            const byCode=[{label:'REB',value:items.filter(r=>r.code_type==='REB').reduce((a,r)=>a+(r.amount||0),0),color:CODE_COLOR.REB},
+              {label:'ROB',value:items.filter(r=>r.code_type==='ROB').reduce((a,r)=>a+(r.amount||0),0),color:CODE_COLOR.ROB},
+              {label:'ID',value:items.filter(r=>r.code_type==='ID').reduce((a,r)=>a+(r.amount||0),0),color:CODE_COLOR.ID}].filter(x=>x.value>0);
+            return <div style={{display:'flex',gap:'32px',alignItems:'center',flexWrap:'wrap',padding:'8px 0'}}>
+              <DonutChart segments={byCode} size={160} thickness={28} centerValue="" centerLabel=""/>
+              <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                {byCode.map(b=><div key={b.label} style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                  <span style={{width:14,height:14,borderRadius:4,background:b.color,display:'inline-block'}}/>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:'13px'}}>{CODE_LABEL[b.label]}</div>
+                    <div style={{fontFamily:'var(--num)',fontSize:'17px',fontWeight:700,color:b.color}}>{bahtFmt(b.value)} <span style={{fontSize:'12px',color:'var(--muted-text)'}}>฿ ({(b.value/totalAll*100).toFixed(1)}%)</span></div>
+                  </div>
+                </div>)}
+              </div>
+            </div>;
+          })()}
+        </ChartCard>
+      </>}
+
+      {/* Customer view */}
+      {view==='customer' && <>
+        <ChartCard title="มูลค่าเสียหายแยกตามลูกค้า (Top 15)" subtitle="เรียงจากมาก→น้อย" span="full">
+          <div className="hbar">
+            {custSorted.map((c,i)=><div className="hbar__row" key={i}>
+              <div className="hbar__lbl" title={c.label}>{i+1}. {c.label}</div>
+              <div className="hbar__track"><div className="hbar__fill" style={{width:`${(c.value/maxCust)*100}%`,background:PALETTE.stock}}/></div>
+              <div className="hbar__val">{bahtFmt(c.value)}</div>
+            </div>)}
+          </div>
+        </ChartCard>
+        <ChartCard title="สรุปลูกค้า" subtitle="" span="full">
+          <div className="table-wrap"><table className="dt">
+            <thead><tr><th className="ta-l">#</th><th className="ta-l">ลูกค้า</th>
+              <th style={{color:CODE_COLOR.REB}}>REB</th><th style={{color:CODE_COLOR.ROB}}>ROB</th><th style={{color:CODE_COLOR.ID}}>ID</th>
+              <th>รวม (฿)</th><th>% ของรวมเสียหาย</th></tr></thead>
+            <tbody>{custSorted.map((c,i)=>{
+              const cItems=items.filter(r=>r.customer_name===c.label);
+              const g=t=>cItems.filter(r=>r.code_type===t).reduce((a,r)=>a+(r.amount||0),0);
+              return <tr key={i}>
+                <td className="muted-cell">{i+1}</td>
+                <td className="ta-l strong">{c.label}</td>
+                <td>{g('REB')?bahtFmt(g('REB')):'–'}</td>
+                <td>{g('ROB')?bahtFmt(g('ROB')):'–'}</td>
+                <td>{g('ID')?bahtFmt(g('ID')):'–'}</td>
+                <td className="strong">{bahtFmt(c.value)}</td>
+                <td>{totalAll>0?(c.value/totalAll*100).toFixed(1)+'%':'–'}</td>
+              </tr>;
+            })}</tbody>
+          </table></div>
+        </ChartCard>
+      </>}
+
+      {/* Detail table */}
+      {view==='detail' && <>
+        <ChartCard title="รายการเสียหายทั้งหมด" subtitle={`${items.length} รายการ • กรองได้จาก Dropdown ด้านบน`} span="full">
+          <div className="table-wrap"><table className="dt">
+            <thead><tr>
+              <th className="ta-l">เดือน</th><th className="ta-l">รหัส</th>
+              <th className="ta-l">ลูกค้า</th><th className="ta-l">สาเหตุ</th>
+              <th>มูลค่า (฿)</th>
+            </tr></thead>
+            <tbody>{[...items].sort((a,b)=>a.year!==b.year?a.year-b.year:a.month!==b.month?a.month-b.month:0).map((r,i)=><tr key={i}>
+              <td className="ta-l">{MONTHS_TH_SHORT[r.month-1]}-{String(r.year).slice(-2)}</td>
+              <td className="ta-l">
+                <span style={{display:'inline-block',padding:'2px 8px',borderRadius:12,fontSize:'11.5px',fontWeight:700,
+                  background:CODE_COLOR[r.code_type]+'22',color:CODE_COLOR[r.code_type]}}>
+                  {r.code_type}
+                </span>
+              </td>
+              <td className="ta-l">{r.customer_name||<span className="muted-cell">—</span>}</td>
+              <td className="ta-l">{r.cause||'ไม่ระบุ'}</td>
+              <td className="strong">{bahtFmt(r.amount)}</td>
+            </tr>)}</tbody>
+            <tfoot><tr>
+              <td className="ta-l" colSpan={4}>รวม ({items.length} รายการ)</td>
+              <td className="strong">{bahtFmt(totalAll)}</td>
+            </tr></tfoot>
+          </table></div>
+        </ChartCard>
+      </>}
+    </div>;
+  }
+
+  function App(){
+    const [tab,setTab]=useState('overview');
+    const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
+    const tabs=[{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'quality',label:'คุณภาพ & วัตถุดิบ'},{id:'damage',label:'เสียหาย REB/ROB/ID'}];
+    return <div className="app">
+      <header className="topbar">
+        <div className="topbar__brand">
+          <img src="logo.png" alt="RMC Logo" className="topbar__logo" />
+          <div>
+            <div className="topbar__company">บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด</div>
+            <h1 className="topbar__title">รายงานการผลิตเสาเข็มคอนกรีตอัดแรง</h1>
+          </div>
+        </div>
+        <div className="topbar__actions">
+          {tab!=='compare'&&tab!=='damage'&&<div className="yearpick">
+            <span className="yearpick__lbl">ปี</span>
+            <Segmented value={year} onChange={setYear} options={Object.keys(D.years).map(Number).sort((a,b)=>a-b).map(y=>({value:y,label:String(y)}))}/>
+            {!yearData(year).real&&<span className="badge-sample">ข้อมูลตัวอย่าง</span>}
+          </div>}
+        </div>
+      </header>
+      <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}</nav>
+      <main>
+        {tab==='overview'&&<OverviewTab year={year}/>}
+        {tab==='compare'&&<YearCompareTab/>}
+        {tab==='quality'&&<QualityTab year={year}/>}
+        {tab==='damage'&&<DamageDetailTab/>}
+
+      </main>
+      <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
+    </div>;
+  }
+
+  // Hide loading overlay and mount app
+  const overlay=document.getElementById('loading-overlay');
+  overlay.classList.add('hidden');
+  setTimeout(()=>overlay.remove(), 500);
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body>
+</html>
