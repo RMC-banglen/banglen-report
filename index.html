@@ -1015,6 +1015,7 @@ window.__dataReady.then(data => {
                         </span>
                       </div>
                       <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>{r.cause||'ไม่ระบุสาเหตุ'}</div>
+                      {r.reason && <div style={{fontSize:'11px',color:'#374151',marginBottom:2,fontStyle:'italic'}}>{r.reason}</div>}
                       <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
                     </div>
                   );
