@@ -1066,11 +1066,16 @@ window.__dataReady.then(data => {
     ).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
     const maxC = causeSorted[0]?.value||1;
 
-    // ลูกค้าในสาเหตุที่เลือก
-    const causeCustomers = selCause ? Object.entries(
-      items.filter(r=>(r.cause||'ไม่ระบุ')===selCause&&r.customer_name)
-        .reduce((acc,r)=>{ acc[r.customer_name]=(acc[r.customer_name]||0)+(r.amount||0); return acc; },{})
-    ).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value) : [];
+    // ลูกค้าในสาเหตุที่เลือก (พร้อม rows สำหรับขยายดูรายละเอียด)
+    const causeCustomers = selCause ? (() => {
+      const map = {};
+      items.filter(r=>(r.cause||'ไม่ระบุ')===selCause&&r.customer_name).forEach(r=>{
+        if(!map[r.customer_name]) map[r.customer_name]={name:r.customer_name,value:0,rows:[]};
+        map[r.customer_name].value += r.amount||0;
+        map[r.customer_name].rows.push(r);
+      });
+      return Object.values(map).sort((a,b)=>b.value-a.value);
+    })() : [];
 
     return <>
       {/* แถบสาเหตุ + panel ลูกค้า */}
@@ -1240,10 +1245,10 @@ window.__dataReady.then(data => {
                 <button onClick={()=>setSelCause(null)} style={{background:'none',border:'none',fontSize:'18px',cursor:'pointer',color:'#999'}}>✕</button>
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:'6px',maxHeight:380,overflowY:'auto'}}>
-                {causeCustomers.map((c,i)=>(
+                {causeCustomers.flatMap((c,i)=>(
                   c.name==='ไม่ระบุลูกค้า'
                   ? c.rows.map((r,ri)=>(
-                    <div key={`id-${ri}`} style={{background:'#fff4f4',borderRadius:8,border:'1px solid #fcd5d5',padding:'8px 12px'}}>
+                    <div key={`id-${i}-${ri}`} style={{background:'#fff4f4',borderRadius:8,border:'1px solid #fcd5d5',padding:'8px 12px'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
                         <span style={{padding:'2px 7px',borderRadius:8,fontSize:'11px',fontWeight:700,
                           background:r.code_type==='ID'?'#fce7f3':'#dbeafe',
@@ -1255,11 +1260,11 @@ window.__dataReady.then(data => {
                       <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
                     </div>
                   ))
-                  : <div key={i} style={{background:'#fff',borderRadius:8,border:'1px solid #e0e7ff',padding:'8px 12px',
+                  : [<div key={`cust-${i}`} style={{background:'#fff',borderRadius:8,border:'1px solid #e0e7ff',padding:'8px 12px',
                     display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                     <div style={{fontSize:'13px',fontWeight:600}}>{i+1}. {c.name}</div>
                     <div style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(c.amount)} ฿</div>
-                  </div>
+                  </div>]
                 ))}
               </div>
             </div>
