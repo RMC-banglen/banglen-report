@@ -399,7 +399,7 @@ window.__dataReady = (async function loadData() {
 
     // ---- damage items + sales ----
     const [diRes, dsRes] = await Promise.all([
-      db.from('damage_items').select('*').order('year').order('month'),
+      db.from('damage_items').select('*').order('year').order('month').limit(5000),
       db.from('damage_sales').select('*').order('year').order('month'),
     ]);
     const damageItems = diRes.data || [];
