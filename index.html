@@ -335,12 +335,13 @@ window.__dataReady = (async function loadData() {
     document.getElementById('loading-text').textContent = 'กำลังเชื่อมต่อ Supabase...';
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const [mRes, dRes, cRes, tRes, capRes] = await Promise.all([
+    const [mRes, dRes, cRes, tRes, capRes, slumpRes] = await Promise.all([
       db.from('production_monthly').select('*').order('year').order('month'),
       db.from('quality_decade').select('*').order('year').order('sort_order'),
       db.from('cancel_causes').select('*').order('year').order('month').order('cause_index'),
       db.from('mix_targets').select('*'),
       db.from('capacity_config').select('*').limit(1).single(),
+      db.from('slump_tests').select('*').order('test_date').range(0,4999),
     ]);
 
     if (mRes.error) throw mRes.error;
@@ -350,6 +351,7 @@ window.__dataReady = (async function loadData() {
     const causes   = cRes.data  || [];
     const targets  = tRes.data  || [];
     const capRow   = capRes.data || {};
+    const slumps   = slumpRes.data || [];
 
     // group monthly by year
     const yearGroups = {};
@@ -406,7 +408,7 @@ window.__dataReady = (async function loadData() {
     const damageSales = {};
     (dsRes.data || []).forEach(r => { damageSales[`${r.year}-${r.month}`] = +r.sales; });
 
-    return { MONTHS_TH, unit:'m³', capacity, years:yearGroups, causeLabels, mixTarget, damageItems, damageSales };
+    return { MONTHS_TH, unit:'m³', capacity, years:yearGroups, causeLabels, mixTarget, damageItems, damageSales, slumps };
 
   } catch (err) {
     console.error('[Dashboard] Supabase error:', err);
@@ -854,6 +856,117 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  function SlumpChart(){
+    const allData = D.slumps || [];
+    const [selFormula, setSelFormula] = useState('ALL');
+    const [selAge,     setSelAge]     = useState('ALL');
+    const [period,     setPeriod]     = useState('90');
+
+    if (!allData.length) return (
+      <ChartCard title="กำลังอัดลูกปูน (สเต้งคอนกรีต)" subtitle="ยังไม่มีข้อมูล — กรุณา sync ข้อมูลก่อน" span="full">
+        <div className="empty">ยังไม่มีข้อมูลกำลังอัดลูกปูน</div>
+      </ChartCard>
+    );
+
+    // กรองตามช่วงเวลา
+    const now = new Date();
+    const cutoff = period === 'ALL' ? null : new Date(now - Number(period)*24*60*60*1000);
+    let filtered = allData.filter(r => {
+      if (!r.test_date) return false;
+      if (cutoff && new Date(r.test_date) < cutoff) return false;
+      if (selFormula !== 'ALL' && r.formula !== selFormula) return false;
+      if (selAge !== 'ALL' && Number(r.age_days) !== Number(selAge)) return false;
+      return true;
+    });
+
+    // หา series แบบ formula+age
+    const formulas = [...new Set(allData.map(r=>r.formula).filter(Boolean))].sort();
+    const ages     = [...new Set(allData.map(r=>r.age_days).filter(v=>v!=null))].sort((a,b)=>a-b);
+
+    // กลุ่ม series ที่จะแสดง
+    const seriesDefs = [];
+    const fmls = selFormula === 'ALL' ? formulas : [selFormula];
+    const ageList = selAge === 'ALL' ? ages : [Number(selAge)];
+    const seriesColors = ['#2980b9','#e67e22','#27ae60','#8e44ad','#c0392b','#16a085'];
+    let ci = 0;
+    fmls.forEach(f => ageList.forEach(a => {
+      seriesDefs.push({ label: `${f} (${a} วัน)`, formula: f, age: a, color: seriesColors[ci++ % seriesColors.length] });
+    }));
+
+    // รวม dates ทั้งหมด
+    const dateSet = [...new Set(filtered.map(r=>r.test_date))].sort();
+
+    // สร้าง series data — ค่าเฉลี่ย KSC ต่อวันต่อ formula+age
+    const series = seriesDefs.map(sd => ({
+      label: sd.label,
+      color: sd.color,
+      data: dateSet.map(d => {
+        const rows = filtered.filter(r => r.test_date === d && r.formula === sd.formula && Number(r.age_days) === sd.age && r.strength_ksc != null);
+        return rows.length ? rows.reduce((s,r)=>s+Number(r.strength_ksc),0)/rows.length : null;
+      })
+    }));
+
+    // KPI
+    const allKsc = filtered.filter(r=>r.strength_ksc!=null).map(r=>Number(r.strength_ksc));
+    const avgKsc = allKsc.length ? allKsc.reduce((s,v)=>s+v,0)/allKsc.length : null;
+
+    const btnStyle = (active) => ({
+      padding:'4px 12px', borderRadius:6, border:'1px solid #ccc', cursor:'pointer',
+      background: active ? '#1155cc' : '#fff', color: active ? '#fff' : '#333',
+      fontWeight: active ? 'bold' : 'normal', fontSize:13
+    });
+
+    return <div style={{gridColumn:'1/-1'}}>
+      {/* KPI */}
+      <div className="kpi-row kpi-row--5" style={{marginBottom:12}}>
+        <KpiCard label="กำลังอัดเฉลี่ย" value={avgKsc!=null?fmt(avgKsc,0):'–'} unit=" KSC" sub={`จาก ${allKsc.length} ตัวอย่าง`} accent="#2980b9"/>
+        <KpiCard label="ต่ำกว่าเกณฑ์ (<315 KSC, 1วัน)" value={filtered.filter(r=>Number(r.age_days)===1&&r.strength_ksc!=null&&Number(r.strength_ksc)<315).length} unit=" ตัวอย่าง" sub="อายุ 1 วัน" accent="#c0392b"/>
+        <KpiCard label="ต่ำกว่าเกณฑ์ (<450 KSC, 7วัน)" value={filtered.filter(r=>Number(r.age_days)===7&&r.strength_ksc!=null&&Number(r.strength_ksc)<450).length} unit=" ตัวอย่าง" sub="อายุ 7 วัน" accent="#e67e22"/>
+      </div>
+
+      <ChartCard title="กำลังอัดลูกปูน (สเต้งคอนกรีต)" subtitle="ค่าเฉลี่ย KSC ต่อวัน • เทียบตามสูตรและอายุคอนกรีต" span="full"
+        right={<Legend items={series.map(s=>({label:s.label,color:s.color}))}/>}>
+        {/* Filters */}
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12,alignItems:'center'}}>
+          <span style={{fontSize:13,color:'#666'}}>ช่วงเวลา:</span>
+          {[['7','7 วัน'],['30','30 วัน'],['90','90 วัน'],['ALL','ทั้งหมด']].map(([v,l])=>
+            <button key={v} style={btnStyle(period===v)} onClick={()=>setPeriod(v)}>{l}</button>
+          )}
+          <span style={{fontSize:13,color:'#666',marginLeft:8}}>สูตร:</span>
+          {[['ALL','ทั้งหมด'],...formulas.map(f=>[f,f])].map(([v,l])=>
+            <button key={v} style={btnStyle(selFormula===v)} onClick={()=>setSelFormula(v)}>{l}</button>
+          )}
+          <span style={{fontSize:13,color:'#666',marginLeft:8}}>อายุ:</span>
+          {[['ALL','ทั้งหมด'],...ages.map(a=>[String(a),a+' วัน'])].map(([v,l])=>
+            <button key={v} style={btnStyle(selAge===v)} onClick={()=>setSelAge(v)}>{l}</button>
+          )}
+        </div>
+        {dateSet.length
+          ? <LineChart categories={dateSet} unit="KSC" decimals={0} series={series}
+              targets={selAge==='1'?[{value:315,color:'#c0392b',label:'เกณฑ์ 315'}]:selAge==='7'?[{value:450,color:'#e67e22',label:'เกณฑ์ 450'}]:[]}
+              height={320}/>
+          : <div className="empty">ไม่มีข้อมูลในช่วงเวลาที่เลือก</div>
+        }
+      </ChartCard>
+
+      {/* ตาราง */}
+      <ChartCard title="ตารางข้อมูลกำลังอัดลูกปูน" subtitle={`แสดง ${Math.min(filtered.length,200)} แถวล่าสุด`} span="full">
+        <div className="table-wrap"><table className="dt">
+          <thead><tr><th>วันที่</th><th>สูตร</th><th>ชุดที่</th><th>อายุ(วัน)</th><th>กำลังอัด(KSC)</th><th>แกว่ง(%)</th><th>หมายเหตุ</th></tr></thead>
+          <tbody>{[...filtered].reverse().slice(0,200).map((r,i)=><tr key={i}>
+            <td>{r.test_date}</td>
+            <td>{r.formula}</td>
+            <td>{r.set_no}</td>
+            <td>{r.age_days}</td>
+            <td style={{color:Number(r.age_days)===1&&Number(r.strength_ksc)<315?'#c0392b':Number(r.age_days)===7&&Number(r.strength_ksc)<450?'#e67e22':'inherit',fontWeight:'bold'}}>{r.strength_ksc!=null?fmt(r.strength_ksc,2):'–'}</td>
+            <td>{r.deviation_pct!=null?fmt(r.deviation_pct,1)+'%':'–'}</td>
+            <td>{r.note||'–'}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </ChartCard>
+    </div>;
+  }
+
   function QualityTab({year}){
     const yd=yearData(year);
     if(!yd.decades)return<div className="grid"><ChartCard title="ค่าเฉลี่ยทุก 10 วัน" subtitle={`ปี ${year}`} span="full"><div className="empty">ยังไม่มีข้อมูลราย 10 วันสำหรับปีนี้ — เลือกปี 2569 เพื่อดูข้อมูลจริง</div></ChartCard></div>;
@@ -884,6 +997,7 @@ window.__dataReady.then(data => {
           <tfoot><tr><td className="ta-l">ค่าเฉลี่ย</td><td>{fmt(avg(strength),0)}</td><td>{fmt(avg(cementTotal),1)}</td><td>{fmt(avg(cementBig),1)}</td><td>{fmt(avg(cementI18),1)}</td><td>{fmt(avg(rock34),0)}</td><td>{fmt(avg(rock1),0)}</td><td>{fmt(avg(sand),0)}</td></tr></tfoot>
         </table></div>
       </ChartCard>
+      <SlumpChart/>
     </div>;
   }
 
