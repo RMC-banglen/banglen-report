@@ -974,6 +974,7 @@ window.__dataReady.then(data => {
     const strength=dec.map(d=>d.strength),cementTotal=dec.map(d=>d.cementTotal),cementBig=dec.map(d=>d.cementBig),cementI18=dec.map(d=>d.cementI18);
     const rock34=dec.map(d=>d.rock34),rock1=dec.map(d=>d.rock1),sand=dec.map(d=>d.sand),T=D.mixTarget;
     return <div className="grid">
+      <SlumpChart/>
       <div className="kpi-row kpi-row--5">
         <KpiCard label="Strength เฉลี่ย" value={fmt(avg(strength),0)} unit=" ksc" sub={`ต่ำกว่าเกณฑ์ 450 จำนวน ${strength.filter(v=>v!=null&&v<450).length} ช่วง`} accent={strength.some(v=>v!=null&&v<450)?PALETTE.cancel:PALETTE.strength}/>
         <KpiCard label="ปูนเฉลี่ย (ทั้งหมด)" value={fmt(avg(cementTotal),1)} unit=" kg/m³" sub="ค่าเฉลี่ยใช้ปูนรวม" accent={PALETTE.produced}/>
