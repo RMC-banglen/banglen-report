@@ -950,17 +950,16 @@ window.__dataReady.then(data => {
       </ChartCard>
 
       {/* ตาราง */}
-      <ChartCard title="ตารางข้อมูลกำลังอัดลูกปูน" subtitle={`แสดง ${Math.min(filtered.length,200)} แถวล่าสุด`} span="full">
+      <ChartCard title="ตารางข้อมูลกำลังอัดลูกปูน" subtitle={`ช่วงเวลาที่เลือก • มีข้อมูล KSC ${filtered.filter(r=>r.strength_ksc!=null).length} แถว`} span="full">
         <div className="table-wrap"><table className="dt">
-          <thead><tr><th>วันที่</th><th>สูตร</th><th>ชุดที่</th><th>อายุ(วัน)</th><th>กำลังอัด(KSC)</th><th>แกว่ง(%)</th><th>หมายเหตุ</th></tr></thead>
-          <tbody>{[...filtered].reverse().slice(0,200).map((r,i)=><tr key={i}>
+          <thead><tr><th>วันที่</th><th>สูตร</th><th>ชุดที่</th><th>อายุ(วัน)</th><th>กำลังอัด(KSC)</th><th>แกว่ง(%)</th></tr></thead>
+          <tbody>{[...filtered].filter(r=>r.strength_ksc!=null).reverse().slice(0,50).map((r,i)=><tr key={i}>
             <td>{r.test_date}</td>
             <td>{r.formula}</td>
             <td>{r.set_no}</td>
             <td>{r.age_days}</td>
-            <td style={{color:Number(r.age_days)===1&&Number(r.strength_ksc)<315?'#c0392b':Number(r.age_days)===7&&Number(r.strength_ksc)<450?'#e67e22':'inherit',fontWeight:'bold'}}>{r.strength_ksc!=null?fmt(r.strength_ksc,2):'–'}</td>
+            <td style={{color:Number(r.age_days)===1&&Number(r.strength_ksc)<315?'#c0392b':Number(r.age_days)===7&&Number(r.strength_ksc)<450?'#e67e22':'inherit',fontWeight:'bold'}}>{fmt(r.strength_ksc,2)}</td>
             <td>{r.deviation_pct!=null?fmt(r.deviation_pct,1)+'%':'–'}</td>
-            <td>{r.note||'–'}</td>
           </tr>)}</tbody>
         </table></div>
       </ChartCard>
