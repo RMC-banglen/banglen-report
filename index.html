@@ -2097,7 +2097,7 @@ window.__dataReady.then(data => {
       decadeMap[key].vals.push(ks(r));
     });
     const dKeys=Object.keys(decadeMap).sort();
-    const dLabels=dKeys.map(k=>{const {yr,mo,bk}=decadeMap[k];const last=new Date(yr,mo,0).getDate();return bk===1?`1–10 ${M[mo-1]}`:bk===2?`11–20 ${M[mo-1]}`:`21–${last} ${M[mo-1]}`;});
+    const dLabels=dKeys.map(k=>{const {yr,mo,bk}=decadeMap[k];const last=new Date(yr,mo,0).getDate();const yy=String(yr+543).slice(-2);return bk===1?`1–10 ${M[mo-1]} ${yy}`:bk===2?`11–20 ${M[mo-1]} ${yy}`:`21–${last} ${M[mo-1]} ${yy}`;});
     const dVals=dKeys.map(k=>{const v=decadeMap[k].vals;return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null;});
     const dValid=dVals.filter(v=>v!=null);
     const dAvg=dValid.length?Math.round(dValid.reduce((a,b)=>a+b,0)/dValid.length*10)/10:null;
