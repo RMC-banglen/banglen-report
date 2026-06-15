@@ -2173,12 +2173,22 @@ window.__dataReady.then(data => {
           ?<div style={{textAlign:'center',color:'#aaa',padding:40}}>เลือกวันที่เก็บตัวอย่างเพื่อดูกราฟ Strength Curve</div>
           :<>
             <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:8}}>
-              {c2Series.filter(s=>s.data.some(v=>v!=null)).map(s=><span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
-                {s.dashed
-                  ?<span style={{width:22,height:0,borderTop:`2.5px dashed ${s.color}`,display:'inline-block'}}></span>
-                  :<span style={{width:18,height:3,background:s.color,display:'inline-block',borderRadius:2}}></span>}
-                {s.label}
-              </span>)}
+              {c2Series.filter(s=>s.data.some(v=>v!=null)).map((s,si)=>{
+                const base=c2DataSeries.find(b=>s.label===b.label||(s.label.startsWith(b.label+' ')));
+                const sh=base?base.shape:s.shape;
+                return <span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
+                  {s.dashed
+                    ?<span style={{width:22,height:0,borderTop:`2.5px dashed ${s.color}`,display:'inline-block'}}></span>
+                    :<svg width="14" height="14" style={{flexShrink:0}}>
+                      {sh==='square'&&<rect x="1" y="1" width="12" height="12" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                      {sh==='triangle'&&<polygon points="7,1 13,13 1,13" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                      {sh==='diamond'&&<polygon points="7,1 13,7 7,13 1,7" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                      {sh==='star'&&<polygon points="7,1 8.5,5.5 13,5.5 9.5,8.5 11,13 7,10 3,13 4.5,8.5 1,5.5 5.5,5.5" fill={s.color} stroke={s.color} strokeWidth="1"/>}
+                      {(!sh||sh==='circle')&&<circle cx="7" cy="7" r="5" fill="#fff" stroke={s.color} strokeWidth="2"/>}
+                    </svg>}
+                  {s.label}
+                </span>;
+              })}
             </div>
             <LineChart categories={curveAges.map(a=>`Day ${a}`)} unit="KSC" decimals={0} showValues boxedLabels series={c2Series.filter(s=>s.data.some(v=>v!=null))} height={280}/>
           </>
