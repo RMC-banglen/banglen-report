@@ -1862,12 +1862,14 @@ window.__dataReady.then(data => {
     const COLORS=['#2f5fd0','#d65b5b','#d98a2b','#15a39b','#7b61c4','#5a8f3c','#c44d8f','#4a6b8a','#b07b3a','#8a8f9a'];
     const SHAPES=['circle','square','triangle','diamond','star','circle','square','triangle','diamond','star'];
 
+    const [materials,setMaterials]=useState([]);
+
     useEffect(()=>{
       fetch(CONCRETE_URL).then(r=>r.json()).then(res=>{
         if(res.success){
           const data=res.data||[];
           setRows(data);
-          // default: 10 วันล่าสุด
+          setMaterials(res.materials||[]);
           const dates=data.map(r=>String(r['วันที่เก็บตัวอย่าง']||'').slice(0,10)).filter(Boolean).sort();
           if(dates.length){
             const last=dates[dates.length-1];
@@ -1987,12 +1989,12 @@ window.__dataReady.then(data => {
     const btnStyle={padding:'4px 10px',borderRadius:5,border:'1px solid #ccd',background:'#f5f6fa',cursor:'pointer',fontSize:13,color:'#444'};
 
     // ── KPI + 10-day chart ──────────────────────────────────────
-    const yd=D.years[year]; const decades=yd&&yd.decades?yd.decades:[];
     const avgOf=arr=>arr.filter(v=>v!=null&&v>0).reduce((a,b,_,s)=>a+b/s.length,0)||0;
-    const cementAvg=Math.round(avgOf(decades.map(d=>d.cementTotal))*10)/10;
-    const rock34Avg=Math.round(avgOf(decades.map(d=>d.rock34)));
-    const rock1Avg=Math.round(avgOf(decades.map(d=>d.rock1)));
-    const sandAvg=Math.round(avgOf(decades.map(d=>d.sand)));
+    const matNum=k=>materials.map(r=>Number(r[k])||null);
+    const cementAvg=Math.round(avgOf(matNum('ปูนรวม'))*10)/10;
+    const rock34Avg=Math.round(avgOf(matNum('หิน3/4')));
+    const rock1Avg=Math.round(avgOf(matNum('หิน1')));
+    const sandAvg=Math.round(avgOf(matNum('ทราย')));
 
     // 10-day avg KSC: Day7, non-NP280 only
     const d7rows=rows.filter(r=>ag(r)===7&&!isNP280(fm(r)));
@@ -2114,29 +2116,33 @@ window.__dataReady.then(data => {
         }
       </div>
 
-      {/* ปูน + หิน-ทราย จาก decade data */}
-      {decades.length>0&&<>
-        <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide"
-          right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
-          <LineChart categories={decades.map(d=>d.label)} unit="kg/m³" decimals={1}
-            series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:decades.map(d=>d.cementTotal)},{label:'เสาใหญ่',color:PALETTE.transport,data:decades.map(d=>d.cementBig)},{label:'I18',color:'#7b61c4',data:decades.map(d=>d.cementI18)}]}
-            height={300}/>
-        </ChartCard>
-        <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide"
-          right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
-          {(()=>{const T=D.mixTarget||{};return<LineChart categories={decades.map(d=>d.label)} unit="kg/m³" decimals={0} yMin={250} yMax={1000}
-            series={[{label:'หิน 3/4″',color:PALETTE.transport,data:decades.map(d=>d.rock34)},{label:'หิน 1″',color:'#7b61c4',data:decades.map(d=>d.rock1)},{label:'ทราย',color:PALETTE.stock,data:decades.map(d=>d.sand)}]}
-            targets={[{value:T.rock34||940,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand||822,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1||330,color:'#7b61c4',label:'สูตรหิน1″'}]}
-            height={320}/>;})()}
-        </ChartCard>
-      </>}
+      {/* ปูน + หิน-ทราย จาก sheet วัตถุดิบ */}
+      {materials.length>0&&(()=>{
+        const matLabels=materials.map(r=>String(r['ช่วง']||''));
+        const T=D.mixTarget||{};
+        return <>
+          <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide"
+            right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
+            <LineChart categories={matLabels} unit="kg/m³" decimals={1}
+              series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:matNum('ปูนรวม')},{label:'เสาใหญ่',color:PALETTE.transport,data:matNum('ปูนเสาใหญ่')},{label:'I18',color:'#7b61c4',data:matNum('ปูนI18')}]}
+              height={300}/>
+          </ChartCard>
+          <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide"
+            right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
+            <LineChart categories={matLabels} unit="kg/m³" decimals={0} yMin={250} yMax={1000}
+              series={[{label:'หิน 3/4″',color:PALETTE.transport,data:matNum('หิน3/4')},{label:'หิน 1″',color:'#7b61c4',data:matNum('หิน1')},{label:'ทราย',color:PALETTE.stock,data:matNum('ทราย')}]}
+              targets={[{value:T.rock34||940,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand||822,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1||330,color:'#7b61c4',label:'สูตรหิน1″'}]}
+              height={320}/>
+          </ChartCard>
+        </>;
+      })()}
     </div>;
   }
 
   function App(){
     const [tab,setTab]=useState('overview');
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
-    const tabs=[{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'quality',label:'คุณภาพ & วัตถุดิบ'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'Concrete Strength'}];
+    const tabs=[{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'Concrete Strength'}];
     return <div className="app">
       <header className="topbar">
         <div className="topbar__brand">
@@ -2158,7 +2164,6 @@ window.__dataReady.then(data => {
       <main>
         {tab==='overview'&&<OverviewTab year={year}/>}
         {tab==='compare'&&<YearCompareTab/>}
-        {tab==='quality'&&<QualityTab year={year}/>}
         {tab==='damage'&&<DamageDetailTab/>}
         {tab==='concrete'&&<ConcreteView year={year}/>}
       </main>
