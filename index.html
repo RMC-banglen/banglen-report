@@ -1932,9 +1932,10 @@ window.__dataReady.then(data => {
           if(dates.length){
             const last=dates[dates.length-1];
             const day7dates=data.filter(r=>Number(r['อายุ(วัน)']||r['อายุ (วัน)']||0)===7).map(r=>String(r['วันที่เก็บตัวอย่าง']||'').slice(0,10)).filter(Boolean).sort();
-            setSelSample(day7dates.length?day7dates[day7dates.length-1]:last);
-            const d=new Date(last); d.setDate(d.getDate()-9);
-            setDateTo(last);
+            const lastDay7=day7dates.length?day7dates[day7dates.length-1]:last;
+            setSelSample(lastDay7);
+            const d=new Date(lastDay7); d.setDate(d.getDate()-9);
+            setDateTo(lastDay7);
             setDateFrom(d.toISOString().slice(0,10));
           }
         } else setErr('โหลดข้อมูลไม่สำเร็จ');
