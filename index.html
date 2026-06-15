@@ -1860,6 +1860,8 @@ window.__dataReady.then(data => {
     const [selFormulas2,setSelFormulas2]=useState([]);
 
     const COLORS=['#1a56db','#e02020','#f59e0b','#059669','#7c3aed','#ea580c','#0891b2','#be185d','#65a30d','#374151'];
+    const FORMULA_COLORS={'NP335':'#059669','NP360':'#1a56db'};
+    const fColor=(name,idx)=>FORMULA_COLORS[name]||COLORS[idx%COLORS.length];
     const SHAPES=['circle','square','triangle','diamond','star','circle','square','triangle','diamond','star'];
 
     const [materials,setMaterials]=useState([]);
@@ -1925,7 +1927,7 @@ window.__dataReady.then(data => {
         const ci=(fi*activeAges.length+ai)%COLORS.length;
         const label=activeAges.length>1?`${f} Day${a}`:f;
         c1Series.push({
-          label, color:COLORS[ci], shape:SHAPES[ci],
+          label, color:fColor(f,ci), shape:SHAPES[ci],
           data:c1Dates.map(d=>{
             const rs=filt.filter(r=>sd(r)===d&&fm(r)===f&&ag(r)===a);
             if(!rs.length) return null;
@@ -1941,7 +1943,7 @@ window.__dataReady.then(data => {
     );
     const c2Forms=selFormulas2.length?selFormulas2:allFormulas;
     const c2DataSeries=selSample?c2Forms.map((f,fi)=>({
-      label:f, color:COLORS[fi%COLORS.length], shape:SHAPES[fi%SHAPES.length],
+      label:f, color:fColor(f,fi), shape:SHAPES[fi%SHAPES.length],
       data:CURVE_AGES.map(a=>{
         const rs=rows.filter(r=>sd(r)===selSample&&fm(r)===f&&ag(r)===a);
         if(!rs.length) return null;
