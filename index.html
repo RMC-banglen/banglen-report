@@ -2113,6 +2113,23 @@ window.__dataReady.then(data => {
           </>
         }
       </div>
+
+      {/* ปูน + หิน-ทราย จาก decade data */}
+      {decades.length>0&&<>
+        <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide"
+          right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
+          <LineChart categories={decades.map(d=>d.label)} unit="kg/m³" decimals={1}
+            series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:decades.map(d=>d.cementTotal)},{label:'เสาใหญ่',color:PALETTE.transport,data:decades.map(d=>d.cementBig)},{label:'I18',color:'#7b61c4',data:decades.map(d=>d.cementI18)}]}
+            height={300}/>
+        </ChartCard>
+        <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide"
+          right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
+          {(()=>{const T=D.mixTarget||{};return<LineChart categories={decades.map(d=>d.label)} unit="kg/m³" decimals={0} yMin={250} yMax={1000}
+            series={[{label:'หิน 3/4″',color:PALETTE.transport,data:decades.map(d=>d.rock34)},{label:'หิน 1″',color:'#7b61c4',data:decades.map(d=>d.rock1)},{label:'ทราย',color:PALETTE.stock,data:decades.map(d=>d.sand)}]}
+            targets={[{value:T.rock34||940,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand||822,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1||330,color:'#7b61c4',label:'สูตรหิน1″'}]}
+            height={320}/>;})()}
+        </ChartCard>
+      </>}
     </div>;
   }
 
