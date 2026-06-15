@@ -525,7 +525,7 @@ function BarChart({categories,values,color=PALETTE.produced,target=null,targetLa
 
 function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,boxedLabels=false}){
   const [ref,W]=useMeasure(); const [hover,setHover]=useState(null);
-  const tMaxLen=targets.reduce((mx,t)=>{const s=`${t.label} ${fmt(t.value,decimals)}`;return Math.max(mx,s.length);},0);
+  const tMaxLen=targets.reduce((mx,t)=>{if(!t.label)return mx;const s=`${t.label} ${fmt(t.value,decimals)}`;return Math.max(mx,s.length);},0);
   const rPad=boxedLabels?(targets.length?Math.max(130,tMaxLen*7+18):52):24;
   const pad={t:boxedLabels?44:20,r:rPad,b:40,l:62},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
   const allV=series.flatMap(s=>s.data.filter(v=>v!=null)).concat(targets.map(t=>t.value));
@@ -590,7 +590,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
         }
         return tSorted.map((t,i)=><g key={'t'+i}>
           <line x1={pad.l} x2={W-pad.r} y1={y(t.value)} y2={y(t.value)} stroke={t.color} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.8"/>
-          <text x={W-pad.r+6} y={t.ly} textAnchor="start" className="target-lbl" fill={t.color}>{t.label} {fmt(t.value,decimals)}</text>
+          {t.label&&<text x={W-pad.r+6} y={t.ly} textAnchor="start" className="target-lbl" fill={t.color}>{t.label} {fmt(t.value,decimals)}</text>}
         </g>);
       })()}
       {area&&series.length===1&&<path d={`${lp(series[0].data)} L${x(categories.length-1)},${pad.t+iH} L${x(0)},${pad.t+iH} Z`} fill={series[0].color} opacity="0.10"/>}
@@ -2050,7 +2050,7 @@ window.__dataReady.then(data => {
       </div>
 
       {/* 10-day chart */}
-      {dKeys.length>0&&<div className="card" style={{marginBottom:24}}>
+      {dKeys.length>0&&<div className="card" style={{marginBottom:24,overflow:'visible'}}>
         <div className="card__head">
           <div><h3 className="card__title">ค่าเฉลี่ย Strength ทุก 10 วัน</h3>
           <p className="card__sub">หน่วย: ksc • เฉพาะอายุ 7 วัน • ยกเว้นสูตร NP280</p></div>
@@ -2060,11 +2060,12 @@ window.__dataReady.then(data => {
             <span style={{fontSize:12,display:'flex',alignItems:'center',gap:5,fontWeight:600,color:'#5a8f3c'}}><span style={{width:14,height:0,borderTop:'2px dashed #5a8f3c',display:'inline-block'}}></span>ค่าเฉลี่ย {dAvg!=null?fmt(dAvg,1):'–'}</span>
           </div>
         </div>
-        <div className="card__body">
+        <div className="card__body" style={{overflow:'visible'}}>
           <LineChart
             categories={dLabels}
             series={[{label:'Strength',color:'#2f5fd0',data:dVals}]}
-            targets={[{value:450,label:'ขั้นต่ำ',color:'#e74c3c'},...(dAvg!=null?[{value:dAvg,label:'ค่าเฉลี่ย',color:'#5a8f3c'}]:[])]}
+            targets={[{value:450,label:'',color:'#e74c3c'},...(dAvg!=null?[{value:dAvg,label:'',color:'#5a8f3c'}]:[])]}
+
             dangerBelow={450}
             showValues
             height={300}
