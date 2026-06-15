@@ -539,7 +539,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
   let boxEls=null;
   if(showValues&&boxedLabels&&W>0){
     const lbls=[];
-    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||s.dashed)return;const danger=dangerBelow!=null&&v<dangerBelow;const pass=dangerBelow!=null&&v>=dangerBelow;const lcolor=danger?PALETTE.cancel:pass?'#4f8a32':s.color;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:lcolor,text:fmt(v,decimals),danger,pass});});});
+    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||s.dashed)return;const danger=dangerBelow!=null&&v<dangerBelow;const pass=dangerBelow!=null&&v>=dangerBelow;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger,pass});});});
     const byXi={};
     lbls.forEach((l,idx)=>{if(!byXi[l.xi])byXi[l.xi]=[];byXi[l.xi].push({...l,idx});});
     const GAP=21;
