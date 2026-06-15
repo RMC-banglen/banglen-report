@@ -560,9 +560,11 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
     });
     boxEls=lbls.map((l,idx)=>{
       const tw=l.text.length*6.8+10;
+      const rx=Math.max(pad.l, Math.min(l.cx-tw/2, W-pad.r-tw));
+      const tx=rx+tw/2;
       return <g key={'bl'+idx}>
-        <rect x={l.cx-tw/2} y={l.cy-14} width={tw} height={17} rx="3" fill={l.danger?'#fff3f3':'white'} stroke={l.color} strokeWidth="1.8"/>
-        <text x={l.cx} y={l.cy} textAnchor="middle" fill={l.danger?PALETTE.cancel:'#111'} style={{fontSize:'10px',fontWeight:700,fontFamily:'var(--num)'}}>{l.text}</text>
+        <rect x={rx} y={l.cy-14} width={tw} height={17} rx="3" fill={l.danger?'#fff3f3':'white'} stroke={l.color} strokeWidth="1.8"/>
+        <text x={tx} y={l.cy} textAnchor="middle" fill={l.danger?PALETTE.cancel:'#111'} style={{fontSize:'10px',fontWeight:700,fontFamily:'var(--num)'}}>{l.text}</text>
       </g>;
     });
   }
