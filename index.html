@@ -1878,6 +1878,7 @@ window.__dataReady.then(data => {
           const dates=data.map(r=>String(r['วันที่เก็บตัวอย่าง']||'').slice(0,10)).filter(Boolean).sort();
           if(dates.length){
             const last=dates[dates.length-1];
+            setSelSample(last);
             const d=new Date(last); d.setDate(d.getDate()-9);
             setDateTo(last);
             setDateFrom(d.toISOString().slice(0,10));
