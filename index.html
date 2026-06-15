@@ -2054,9 +2054,14 @@ window.__dataReady.then(data => {
       const predict=powerFit(knownPts);
       if(!predict) return null;
       const realMap=Object.fromEntries(curveAges.map((a,i)=>[a,s.data[i]]).filter(p=>p[1]!=null));
-      return {label:`${s.label} (แนวโน้ม)`,color:s.color,dashed:true,showLabel:true,
-        data:trendAges.map(a=>realMap[a]!=null?realMap[a]:predict(a))};
-    }).filter(Boolean):[];
+      // trend line: all ages for continuous curve; labels only at predicted (non-real) ages
+      const trendData=trendAges.map(a=>realMap[a]!=null?realMap[a]:predict(a));
+      const labelData=trendAges.map(a=>realMap[a]!=null?null:predict(a));
+      return [
+        {label:`${s.label} (แนวโน้ม)`,color:s.color,dashed:true,showLabel:false,data:trendData},
+        {label:`${s.label} (แนวโน้ม)`,color:s.color,dashed:true,showLabel:true,noLegend:true,data:labelData}
+      ];
+    }).flat().filter(Boolean):[];
     const c2DisplayAges=showTrend&&c2TrendSeries.length?trendAges:curveAges;
     const c2Series=[
       ...c2DataSeries.map(s=>({...s,data:c2DisplayAges.map(a=>{const i=curveAges.indexOf(a);return i>=0?s.data[i]:null;})})),
@@ -2180,7 +2185,7 @@ window.__dataReady.then(data => {
           ?<div style={{textAlign:'center',color:'#aaa',padding:40}}>เลือกวันที่เก็บตัวอย่างเพื่อดูกราฟ Strength Curve</div>
           :<>
             <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:8}}>
-              {c2Series.filter(s=>s.data.some(v=>v!=null)).map((s,si)=>{
+              {c2Series.filter(s=>!s.noLegend&&s.data.some(v=>v!=null)).map((s,si)=>{
                 const base=c2DataSeries.find(b=>s.label===b.label||(s.label.startsWith(b.label+' ')));
                 const sh=base?base.shape:s.shape;
                 return <span key={s.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
