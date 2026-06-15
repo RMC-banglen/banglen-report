@@ -1859,7 +1859,7 @@ window.__dataReady.then(data => {
     const [selSample,setSelSample]=useState(null);
     const [selFormulas2,setSelFormulas2]=useState([]);
 
-    const COLORS=['#2f5fd0','#d65b5b','#d98a2b','#15a39b','#7b61c4','#5a8f3c','#c44d8f','#4a6b8a','#b07b3a','#8a8f9a'];
+    const COLORS=['#1a56db','#e02020','#f59e0b','#059669','#7c3aed','#ea580c','#0891b2','#be185d','#65a30d','#374151'];
     const SHAPES=['circle','square','triangle','diamond','star','circle','square','triangle','diamond','star'];
 
     const [materials,setMaterials]=useState([]);
@@ -1968,7 +1968,7 @@ window.__dataReady.then(data => {
     });
     const c1AllVals=c1Series.flatMap(s=>s.data.filter(v=>v!=null));
     const c1Avg=c1AllVals.length?Math.round(c1AllVals.reduce((a,b)=>a+b,0)/c1AllVals.length*10)/10:null;
-    if(c1Avg!=null) c1Targets.push({value:c1Avg,label:'เฉลี่ย',color:'#e67e22'});
+    if(c1Avg!=null) c1Targets.push({value:c1Avg,label:'เฉลี่ย',color:'#059669'});
     const c1DangerBelow=c1Targets.filter(t=>t.label.startsWith('เกณฑ์')).reduce((mn,t)=>Math.min(mn,t.value),Infinity);
     const c1Danger=isFinite(c1DangerBelow)?c1DangerBelow:null;
 
