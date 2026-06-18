@@ -2274,6 +2274,7 @@ window.__dataReady.then(data => {
     const [showForm,setShowForm]=useState(false);
     const [editId,setEditId]=useState(null);
     const [saving,setSaving]=useState(false);
+    const [subTab,setSubTab]=useState('monthly');
     const [pendingFiles,setPendingFiles]=useState([]);
     const [previewUrls,setPreviewUrls]=useState([]);
     const [form,setForm]=useState({title:'',report_date:'',type:'คุณภาพผลิตภัณฑ์',description:'',status:'open',fix_note:''});
@@ -2400,15 +2401,40 @@ window.__dataReady.then(data => {
 
     if(loading)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
 
+    // KPI by type data
+    const typeList=TYPES;
+    const typeKpi=typeList.map(t=>({
+      type:t,
+      thisYear:yearReps.filter(r=>r.type===t).length,
+      lastYear:reports.filter(r=>new Date(r.report_date).getFullYear()===ceYear-1&&r.type===t).length,
+      open:yearReps.filter(r=>r.type===t&&r.status==='open').length,
+      in_progress:yearReps.filter(r=>r.type===t&&r.status==='in_progress').length,
+      done:yearReps.filter(r=>r.type===t&&r.status==='done').length,
+    }));
+    const maxTypeCount=Math.max(1,...typeKpi.map(t=>Math.max(t.thisYear,t.lastYear)));
+    // month trend for KPI tab
+    const monthTrend=Array.from({length:12},(_,i)=>({
+      m:i+1,
+      thisYear:yearReps.filter(r=>new Date(r.report_date).getMonth()===i).length,
+      lastYear:reports.filter(r=>new Date(r.report_date).getFullYear()===ceYear-1&&new Date(r.report_date).getMonth()===i).length,
+    }));
+    const maxTrend=Math.max(1,...monthTrend.map(m=>Math.max(m.thisYear,m.lastYear)));
+
     return <div style={{padding:'24px 20px'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:10}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:10}}>
         <div>
           <div style={{fontSize:22,fontWeight:700,color:'#1e293b'}}>รายงานปัญหาคุณภาพและบริการ</div>
           <div style={{fontSize:13,color:'#64748b',marginTop:2}}>บางเลน · ปี {selYear}</div>
         </div>
         <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 18px',background:'#2f5fd0',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer'}}>+ เพิ่มรายงานใหม่</button>
       </div>
+      <div style={{display:'flex',gap:0,marginBottom:20,borderBottom:'2px solid #e2e8f0'}}>
+        {[['monthly','รายงานเดือนล่าสุด'],['kpi','KPI เทียบประเภทปัญหา']].map(([id,label])=>(
+          <button key={id} onClick={()=>setSubTab(id)} style={{padding:'8px 20px',border:'none',borderBottom:subTab===id?'2px solid #2f5fd0':'2px solid transparent',marginBottom:-2,background:'none',fontSize:14,fontWeight:subTab===id?700:400,color:subTab===id?'#2f5fd0':'#94a3b8',cursor:'pointer'}}>{label}</button>
+        ))}
+      </div>
 
+      {subTab==='monthly'&&<div>
       <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 18px',marginBottom:16}}>
         <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:12,textTransform:'uppercase'}}>KPI ทั้งปี {selYear}</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
@@ -2491,6 +2517,58 @@ window.__dataReady.then(data => {
           </div>}
         </div>
       ))}
+
+      </div>}
+
+      {subTab==='kpi'&&<div>
+        <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:14,textTransform:'uppercase'}}>เปรียบเทียบจำนวนเคสตามประเภทปัญหา — ปี {selYear} vs {selYear-1}</div>
+        {typeKpi.map(tk=>(
+          <div key={tk.type} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'14px 16px',marginBottom:10}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <span style={{fontSize:14,fontWeight:600,color:'#1e293b'}}>{tk.type}</span>
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <span style={{fontSize:12,padding:'2px 8px',borderRadius:4,background:SB.open,color:SC.open,fontWeight:500}}>{SL.open}: {tk.open}</span>
+                <span style={{fontSize:12,padding:'2px 8px',borderRadius:4,background:SB.in_progress,color:SC.in_progress,fontWeight:500}}>{SL.in_progress}: {tk.in_progress}</span>
+                <span style={{fontSize:12,padding:'2px 8px',borderRadius:4,background:SB.done,color:SC.done,fontWeight:500}}>{SL.done}: {tk.done}</span>
+              </div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              {[[selYear,tk.thisYear,'#185FA5'],[selYear-1,tk.lastYear,'#94a3b8']].map(([yr,cnt,clr])=>(
+                <div key={yr}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
+                    <span style={{color:'#64748b'}}>ปี {yr}</span>
+                    <span style={{fontWeight:700,color:clr}}>{cnt} เคส</span>
+                  </div>
+                  <div style={{height:8,borderRadius:4,background:'#f1f5f9',overflow:'hidden'}}>
+                    <div style={{height:'100%',borderRadius:4,background:clr,width:(cnt/maxTypeCount*100)+'%',transition:'width .5s'}}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',margin:'20px 0 14px',textTransform:'uppercase'}}>จำนวนเคสรายเดือน — ปี {selYear} vs {selYear-1}</div>
+        <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'16px'}}>
+          {monthTrend.map(mt=>(
+            <div key={mt.m} style={{display:'grid',gridTemplateColumns:'36px 1fr 1fr',gap:6,alignItems:'center',marginBottom:8}}>
+              <span style={{fontSize:12,color:'#94a3b8',fontWeight:500}}>{THAI_M[mt.m-1]}</span>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{height:16,borderRadius:3,background:'#185FA5',width:Math.max(4,mt.thisYear/maxTrend*180)+'px',transition:'width .4s'}}></div>
+                {mt.thisYear>0&&<span style={{fontSize:11,fontWeight:600,color:'#185FA5'}}>{mt.thisYear}</span>}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{height:16,borderRadius:3,background:'#cbd5e1',width:Math.max(mt.lastYear>0?4:0,mt.lastYear/maxTrend*180)+'px',transition:'width .4s'}}></div>
+                {mt.lastYear>0&&<span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>{mt.lastYear}</span>}
+              </div>
+            </div>
+          ))}
+          <div style={{display:'flex',gap:16,marginTop:10,paddingTop:10,borderTop:'1px solid #f1f5f9'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:14,height:10,borderRadius:2,background:'#185FA5'}}></div><span style={{fontSize:12,color:'#64748b'}}>ปี {selYear}</span></div>
+            <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:14,height:10,borderRadius:2,background:'#cbd5e1'}}></div><span style={{fontSize:12,color:'#64748b'}}>ปี {selYear-1}</span></div>
+          </div>
+        </div>
+      </div>}
 
       {showForm&&<div onClick={e=>{if(e.target===e.currentTarget)closeForm();}} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:520,maxHeight:'90vh',overflowY:'auto'}}>
