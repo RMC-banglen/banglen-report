@@ -2259,6 +2259,12 @@ window.__dataReady.then(data => {
   function HeadOfficeMeetingTab(){
     const THAI_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const THAI_M_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    const [pending,setPending]=useState(null);
+    useEffect(()=>{
+      const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+      db.from('pending_work').select('*').order('updated_date',{ascending:false}).limit(1)
+        .then(({data})=>{ if(data&&data.length>0) setPending(data[0]); });
+    },[]);
     const realYears=Object.keys(D.years).map(Number).filter(y=>yearData(y).real).sort((a,b)=>b-a);
     const thisYear=realYears[0];
     const lastYear=thisYear-1;
@@ -2292,6 +2298,20 @@ window.__dataReady.then(data => {
         {prevLabel&&<span style={{fontSize:15,fontWeight:600,color:'#64748b',background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'4px 12px'}}>
           {`เทียบกับ${THAI_M_FULL[prev.m-1]} ${lastYear}`}
         </span>}
+      </div>
+      <div style={{marginBottom:20}}>
+        <div style={{display:'inline-flex',flexDirection:'column',background:'#fff',border:'2px solid #e2e8f0',borderRadius:14,padding:'16px 28px',minWidth:260,boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
+          <span style={{fontSize:13,fontWeight:600,color:'#64748b',letterSpacing:'0.3px',marginBottom:4}}>งานรอผลิต (บางเลน)</span>
+          {pending
+            ? <>
+                <span style={{fontSize:44,fontWeight:800,color:'#1e293b',lineHeight:1.1,letterSpacing:'-1px'}}>
+                  {fmt(pending.value_m3,0)}<span style={{fontSize:20,fontWeight:600,color:'#64748b',marginLeft:6}}>m³</span>
+                </span>
+                <span style={{fontSize:12,color:'#94a3b8',marginTop:6}}>อัพเดท: {String(pending.updated_date).slice(0,10).split('-').reverse().join('/')}</span>
+              </>
+            : <span style={{fontSize:32,color:'#cbd5e1',fontWeight:700}}>–</span>
+          }
+        </div>
       </div>
       <div className="kpi-row" style={{gridTemplateColumns:'repeat(2,1fr)',marginBottom:20}}>
         {kpis.map((k,i)=>{
