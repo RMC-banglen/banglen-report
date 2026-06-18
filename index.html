@@ -550,8 +550,10 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       grp.sort((a,b)=>a.cy-b.cy); // ascending cy = higher on screen = higher value
       if(grp.length===2){
         // place upper label above its data point, lower label below its data point
+        // cy was initialized as y(v)-16, so y(v) = cy+16
         const yPt0=grp[0].cy+16, yPt1=grp[1].cy+16;
-        grp[0].cy=yPt0-22; grp[1].cy=yPt1+10;
+        grp[0].cy=yPt0-26; // box bottom = yPt0-23 (clears dot+line above)
+        grp[1].cy=yPt1+24; // box top = yPt1+10 (clears dot+line below)
         if(grp[1].cy-grp[0].cy<NEEDED){const mid=(grp[0].cy+grp[1].cy)/2;grp[0].cy=mid-NEEDED/2;grp[1].cy=mid+NEEDED/2;}
       } else {
         for(let iter=0;iter<60;iter++){let ok=true;for(let i=1;i<grp.length;i++){if(grp[i].cy-grp[i-1].cy<NEEDED){const mid=(grp[i].cy+grp[i-1].cy)/2;grp[i-1].cy=mid-NEEDED/2;grp[i].cy=mid+NEEDED/2;ok=false;}}if(ok)break;}
