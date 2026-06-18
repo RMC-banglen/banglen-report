@@ -2307,7 +2307,7 @@ window.__dataReady.then(data => {
                 <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
                   {fmt(pending.value_m3,0)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
                 </span>
-                <span style={{fontSize:16,fontWeight:700,color:'#fff',background:'#2f5fd0',borderRadius:8,padding:'4px 14px',marginTop:12,display:'inline-block'}}>อัพเดท {String(pending.updated_date).slice(0,10).split('-').reverse().join('/')}</span>
+                <span style={{fontSize:16,fontWeight:700,color:'#fff',background:'#2f5fd0',borderRadius:8,padding:'4px 14px',marginTop:12,display:'inline-block'}}>อัพเดท {(()=>{const p=String(pending.updated_date).slice(0,10).split('-');return `${p[2]}/${p[1]}/${Number(p[0])+543}`;})()}</span>
               </>
             : <span style={{fontSize:48,color:'#cbd5e1',fontWeight:700}}>–</span>
           }
