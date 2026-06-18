@@ -1932,7 +1932,7 @@ window.__dataReady.then(data => {
       const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
       Promise.all([
         db.from('concrete_results').select('*').order('sample_date'),
-        db.from('materials_daily').select('*').order('mat_date')
+        db.from('materials_daily').select('*').order('id')
       ]).then(([cr,mr])=>{
         const data=cr.data||[];
         const mats=mr.data||[];
