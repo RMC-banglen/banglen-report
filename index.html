@@ -2435,45 +2435,12 @@ window.__dataReady.then(data => {
       </div>
 
       {subTab==='monthly'&&<div>
-      <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 18px',marginBottom:16}}>
-        <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:12,textTransform:'uppercase'}}>KPI ทั้งปี {selYear}</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
-          {[['ทั้งหมด',null,'#1e293b'],[SL.open,'open',SC.open],[SL.in_progress,'in_progress',SC.in_progress],[SL.done,'done',SC.done]].map(([lbl,st,clr])=>(
-            <div key={lbl} style={{background:'#fff',border:'0.5px solid #e2e8f0',borderRadius:10,padding:'10px 16px',flex:1,minWidth:90}}>
-              <div style={{fontSize:24,fontWeight:700,color:clr}}>{cntBy(yearReps,st)}</div>
-              <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{lbl}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{borderTop:'1px solid #e2e8f0',paddingTop:12}}>
-          <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:10,textTransform:'uppercase'}}>เทียบเดือนต่อเดือน — {THAI_M_FULL[selMonth-1]}</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-            {[[selYear,monthReps.length,'#185FA5'],[selYear-1,prevMonthReps.length,'#94a3b8']].map(([yr,cnt,clr])=>(
-              <div key={yr}>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
-                  <span>ปี {yr}</span>
-                  <span style={{fontWeight:600,color:clr}}>{cnt} เคส</span>
-                </div>
-                <div style={{height:7,borderRadius:3.5,background:'#e2e8f0',overflow:'hidden'}}>
-                  <div style={{height:'100%',borderRadius:3.5,background:clr,width:(cnt/maxCmp*100)+'%',transition:'width .4s'}}></div>
-                </div>
-              </div>
-            ))}
-          </div>
-          {prevMonthReps.length>0&&<div style={{fontSize:12,marginTop:8,color:diff<=0?'#3B6D11':'#993C1D',fontWeight:500}}>
-            {diff<0?'▼ ลดลง '+Math.abs(diff)+' เคส เทียบเดือนเดียวกันปีก่อน':diff>0?'▲ เพิ่มขึ้น '+diff+' เคส เทียบเดือนเดียวกันปีก่อน':'เท่ากับปีก่อน'}
-          </div>}
-        </div>
-      </div>
-
-      <div style={{marginBottom:12}}>
-        <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:8,textTransform:'uppercase'}}>เลือกเดือน</div>
-        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {THAI_M.map((m,i)=>{
-            const mn=i+1,active=selMonth===mn,hasDat=activeMs.has(mn);
-            return <button key={mn} onClick={()=>setSelMonth(mn)} style={{padding:'4px 10px',border:'1px solid '+(active?'#2f5fd0':'#e2e8f0'),borderRadius:6,background:active?'#2f5fd0':'#fff',color:active?'#fff':hasDat?'#1e293b':'#94a3b8',fontSize:12,cursor:'pointer',fontWeight:hasDat?600:400}}>{m}</button>;
-          })}
-        </div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
+        <label style={{fontSize:13,color:'#64748b',fontWeight:500,whiteSpace:'nowrap'}}>เลือกเดือน:</label>
+        <select value={selMonth} onChange={e=>setSelMonth(Number(e.target.value))} style={{padding:'7px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,background:'#fff',outline:'none',fontFamily:'inherit',cursor:'pointer',color:'#1e293b',fontWeight:600}}>
+          {THAI_M.map((m,i)=><option key={i+1} value={i+1}>{m} {selYear}{activeMs.has(i+1)?' ●':''}</option>)}
+        </select>
+        <span style={{fontSize:12,color:'#94a3b8'}}>มีข้อมูล {monthReps.length} เคส</span>
       </div>
 
       <div style={{display:'flex',gap:8,marginBottom:16}}>
@@ -2521,6 +2488,35 @@ window.__dataReady.then(data => {
       </div>}
 
       {subTab==='kpi'&&<div>
+        <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 18px',marginBottom:20}}>
+          <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:12,textTransform:'uppercase'}}>KPI ทั้งปี {selYear}</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+            {[['ทั้งหมด',null,'#1e293b'],[SL.open,'open',SC.open],[SL.in_progress,'in_progress',SC.in_progress],[SL.done,'done',SC.done]].map(([lbl,st,clr])=>(
+              <div key={lbl} style={{background:'#fff',border:'0.5px solid #e2e8f0',borderRadius:10,padding:'10px 16px',flex:1,minWidth:90}}>
+                <div style={{fontSize:24,fontWeight:700,color:clr}}>{cntBy(yearReps,st)}</div>
+                <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{lbl}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{borderTop:'1px solid #e2e8f0',paddingTop:12}}>
+            <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:10,textTransform:'uppercase'}}>เทียบเดือนต่อเดือน — {THAI_M_FULL[selMonth-1]}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {[[selYear,monthReps.length,'#185FA5'],[selYear-1,prevMonthReps.length,'#94a3b8']].map(([yr,cnt,clr])=>(
+                <div key={yr}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+                    <span>ปี {yr}</span><span style={{fontWeight:600,color:clr}}>{cnt} เคส</span>
+                  </div>
+                  <div style={{height:7,borderRadius:3.5,background:'#e2e8f0',overflow:'hidden'}}>
+                    <div style={{height:'100%',borderRadius:3.5,background:clr,width:(cnt/maxCmp*100)+'%',transition:'width .4s'}}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {prevMonthReps.length>0&&<div style={{fontSize:12,marginTop:8,color:diff<=0?'#3B6D11':'#993C1D',fontWeight:500}}>
+              {diff<0?'▼ ลดลง '+Math.abs(diff)+' เคส เทียบเดือนเดียวกันปีก่อน':diff>0?'▲ เพิ่มขึ้น '+diff+' เคส เทียบเดือนเดียวกันปีก่อน':'เท่ากับปีก่อน'}
+            </div>}
+          </div>
+        </div>
         <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:14,textTransform:'uppercase'}}>เปรียบเทียบจำนวนเคสตามประเภทปัญหา — ปี {selYear} vs {selYear-1}</div>
         {typeKpi.map(tk=>(
           <div key={tk.type} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'14px 16px',marginBottom:10}}>
