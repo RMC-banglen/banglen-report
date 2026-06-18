@@ -530,7 +530,8 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
   const pad={t:boxedLabels?44:20,r:rPad,b:40,l:62},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
   const allV=series.flatMap(s=>s.data.filter(v=>v!=null)).concat(targets.map(t=>t.value));
   let lo=yMin!=null?yMin:Math.min(...allV),hi=yMax!=null?yMax:Math.max(...allV);
-  if(yMin==null)lo=Math.floor(lo*0.96); if(yMax==null)hi=Math.ceil(hi*1.04);
+  if(yMin==null){const mag=Math.pow(10,Math.floor(Math.log10(hi-lo)));lo=Math.floor(lo*0.97/mag)*mag;}
+  if(yMax==null)hi=Math.ceil(hi*1.04);
   if(hi===lo)hi=lo+1;
   const ticks=axisTicks(lo,hi,4);
   const x=i=>pad.l+(categories.length===1?iW/2:(i/(categories.length-1))*iW);
