@@ -179,9 +179,13 @@ function importFromOldSheet() {
 }
 
 function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('📤 Sync ข้อมูล')
+    .addItem('Sync ผลทดสอบ + วัตถุดิบ → Supabase', 'syncConcrete')
+    .addToUi();
+
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sh = ss.getSheetByName(SHEET_NAME);
-  var ui = SpreadsheetApp.getUi();
   var menu = ui.createMenu('เลือกเดือน');
 
   if (sh && sh.getLastRow() > 1) {
@@ -403,9 +407,9 @@ function syncConcrete() {
       var o = {};
       matH.forEach(function(h, i){ o[h] = r[i]; });
       return {
-        mat_date:     fmtDate(o['วันที่']),
+        mat_label:    String(o['ช่วง'] || o['วันที่'] || '').trim() || null,
         cement_total: Number(o['ปูนรวม'] || 0) || null,
-        cement_big:   Number(o['ปูนเสาเหล็ก'] || o['ปูนเสาใหญ่'] || 0) || null,
+        cement_big:   Number(o['ปูนเสาใหญ่'] || o['ปูนเสาเหล็ก'] || 0) || null,
         cement_i18:   Number(o['ปูนI18'] || 0) || null,
         rock34:       Number(o['หิน3/4'] || 0) || null,
         rock1:        Number(o['หิน1'] || 0) || null,

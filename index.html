@@ -2082,29 +2082,13 @@ window.__dataReady.then(data => {
 
     // ── KPI + 10-day chart ──────────────────────────────────────
     const avgOf=arr=>arr.filter(v=>v!=null&&v>0).reduce((a,b,_,s)=>a+b/s.length,0)||0;
-    // Aggregate materials by decade
-    const matDecadeMap={};
-    materials.forEach(r=>{
-      const d=String(r.mat_date||'').slice(0,10); if(!d) return;
-      const [yr,mo,dy]=[+d.slice(0,4),+d.slice(5,7),+d.slice(8,10)];
-      const bk=dy<=10?1:dy<=20?2:3;
-      const key=`${yr}-${String(mo).padStart(2,'0')}-${bk}`;
-      if(!matDecadeMap[key]){
-        const lastDay=new Date(yr,mo,0).getDate();
-        const lbl=bk===1?`1–10 ${M[mo-1]}`:bk===2?`11–20 ${M[mo-1]}`:`21–${lastDay} ${M[mo-1]}`;
-        matDecadeMap[key]={label:lbl,vals:{cement_total:[],cement_big:[],cement_i18:[],rock34:[],rock1:[],sand:[]}};
-      }
-      ['cement_total','cement_big','cement_i18','rock34','rock1','sand'].forEach(k=>{
-        const v=Number(r[k]); if(v>0) matDecadeMap[key].vals[k].push(v);
-      });
-    });
-    const matDKeys=Object.keys(matDecadeMap).sort();
-    const matLabels2=matDKeys.map(k=>matDecadeMap[k].label);
-    const matAvg=k=>matDKeys.map(dk=>{const v=matDecadeMap[dk].vals[k];return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null;});
-    const cementAvg=Math.round(avgOf(materials.map(r=>Number(r.cement_total)||null))*10)/10;
-    const rock34Avg=Math.round(avgOf(materials.map(r=>Number(r.rock34)||null)));
-    const rock1Avg=Math.round(avgOf(materials.map(r=>Number(r.rock1)||null)));
-    const sandAvg=Math.round(avgOf(materials.map(r=>Number(r.sand)||null)));
+    const matLabels2=materials.map(r=>String(r.mat_label||''));
+    const matAvg=k=>materials.map(r=>Number(r[k])||null);
+    const cementAvg=Math.round(avgOf(matAvg('cement_total'))*10)/10;
+    const rock34Avg=Math.round(avgOf(matAvg('rock34')));
+    const rock1Avg=Math.round(avgOf(matAvg('rock1')));
+    const sandAvg=Math.round(avgOf(matAvg('sand')));
+    const matDKeys=matLabels2;
 
     // 10-day avg KSC: Day7, non-NP280 only
     const d7rows=rows.filter(r=>ag(r)===7&&!isNP280(fm(r)));
