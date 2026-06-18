@@ -2304,13 +2304,19 @@ window.__dataReady.then(data => {
         <ChartCard title="คิวผลิตจริง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
           <GroupedBarChart
             categories={barCats}
-            series={[{label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]}]}
+            series={[
+              {label:`ปี ${thisYear}`,color:PALETTE.produced,data:[cur.produced]},
+              ...(prev?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:[prev.produced]}]:[]),
+            ]}
             height={240} unit="m³" decimals={0}/>
         </ChartCard>
         <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)">
           <GroupedBarChart
             categories={barCats}
-            series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[cp(cur),cp(prev)]:[cp(cur)]}]}
+            series={[
+              {label:`ปี ${thisYear}`,color:'#5a8f3c',data:[cp(cur)]},
+              ...(prev?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:[cp(prev)]}]:[]),
+            ]}
             height={240} unit="%" decimals={1}/>
         </ChartCard>
       </div>
@@ -2322,17 +2328,51 @@ window.__dataReady.then(data => {
               {label:`ปี ${thisYear}`,color:PALETTE.produced,data:thisProd},
               ...(lastProd.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastProd,dashed:true,showLabel:true}]:[]),
             ]}
-            height={380} unit="m³" decimals={0} showValues={true} boxedLabels={true}/>
+            height={300} unit="m³" decimals={0} showValues={true} boxedLabels={true}/>
         </ChartCard>
       </div>
-      <ChartCard title={`เปอร์เซ็นต์ผลิตรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)" span="full">
-        <LineChart
-          categories={lineCats}
-          series={[
-            {label:`ปี ${thisYear}`,color:'#5a8f3c',data:thisPct},
-            ...(lastPct.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastPct,dashed:true,showLabel:true}]:[]),
-          ]}
-          height={380} unit="%" decimals={1} showValues={true} boxedLabels={true}/>
+      <div style={{marginBottom:20}}>
+        <ChartCard title={`เปอร์เซ็นต์ผลิตรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)" span="full">
+          <LineChart
+            categories={lineCats}
+            series={[
+              {label:`ปี ${thisYear}`,color:'#5a8f3c',data:thisPct},
+              ...(lastPct.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastPct,dashed:true,showLabel:true}]:[]),
+            ]}
+            height={300} unit="%" decimals={1} showValues={true} boxedLabels={true}/>
+        </ChartCard>
+      </div>
+      <ChartCard title="ตารางข้อมูลรายเดือน" subtitle={`ปี ${thisYear} เทียบ ปี ${lastYear}`} span="full">
+        <div style={{overflowX:'auto'}}>
+          <table className="tbl" style={{width:'100%',fontSize:13}}>
+            <thead><tr>
+              <th className="ta-l">เดือน</th>
+              <th>คิวผลิต {thisYear}</th>
+              <th>คิวผลิต {lastYear}</th>
+              <th>±คิว</th>
+              <th>%ผลิต {thisYear}</th>
+              <th>%ผลิต {lastYear}</th>
+              <th>±%</th>
+            </tr></thead>
+            <tbody>
+              {lineMonthNums.map((m,i)=>{
+                const tR=thisMonths.find(x=>x.m===m);
+                const lR=lastMonths.find(x=>x.m===m);
+                const dProd=tR&&lR?tR.produced-lR.produced:null;
+                const dPct=tR&&lR?cp(tR)-cp(lR):null;
+                return <tr key={m}>
+                  <td className="ta-l" style={{fontWeight:600}}>{THAI_M[m-1]}</td>
+                  <td style={{color:PALETTE.produced,fontWeight:600}}>{tR?fmt(tR.produced,0):'–'}</td>
+                  <td style={{color:'#94a3b8'}}>{lR?fmt(lR.produced,0):'–'}</td>
+                  <td style={{color:dProd!=null?(dProd>=0?'#3f7d2b':'#c0392b'):'#999',fontWeight:600}}>{dProd!=null?(dProd>=0?'+':'')+fmt(dProd,0):'–'}</td>
+                  <td style={{color:'#5a8f3c',fontWeight:600}}>{tR?fmt(cp(tR),1)+'%':'–'}</td>
+                  <td style={{color:'#94a3b8'}}>{lR?fmt(cp(lR),1)+'%':'–'}</td>
+                  <td style={{color:dPct!=null?(dPct>=0?'#3f7d2b':'#c0392b'):'#999',fontWeight:600}}>{dPct!=null?(dPct>=0?'+':'')+fmt(dPct,1)+'%':'–'}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
       </ChartCard>
     </div>;
   }
