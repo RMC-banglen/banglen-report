@@ -2258,6 +2258,7 @@ window.__dataReady.then(data => {
 
   function HeadOfficeMeetingTab(){
     const THAI_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const THAI_M_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
     const realYears=Object.keys(D.years).map(Number).filter(y=>yearData(y).real).sort((a,b)=>b-a);
     const thisYear=realYears[0];
     const lastYear=thisYear-1;
@@ -2284,9 +2285,13 @@ window.__dataReady.then(data => {
     ];
     const barCats=prev?[curLabel,prevLabel]:[curLabel];
     return <div style={{padding:'24px 20px'}}>
-      <div style={{marginBottom:18}}>
-        <h2 style={{fontSize:17,fontWeight:700,color:'#1e293b',margin:0}}>ข้อมูลประชุมสำนักงานใหญ่</h2>
-        <p style={{color:'#64748b',fontSize:13,margin:'4px 0 0'}}>เดือนล่าสุด: <strong>{curLabel}</strong>{prevLabel?` • เทียบกับ ${prevLabel}`:''}</p>
+      <div style={{marginBottom:20,display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap'}}>
+        <span style={{fontSize:28,fontWeight:800,color:PALETTE.produced,letterSpacing:'-0.5px'}}>
+          {`ข้อมูลเดือน${THAI_M_FULL[cur.m-1]} ${thisYear}`}
+        </span>
+        {prevLabel&&<span style={{fontSize:16,fontWeight:500,color:'#94a3b8'}}>
+          {`เทียบกับ${THAI_M_FULL[prev.m-1]} ${lastYear}`}
+        </span>}
       </div>
       <div className="kpi-row" style={{gridTemplateColumns:'repeat(2,1fr)',marginBottom:20}}>
         {kpis.map((k,i)=>{
