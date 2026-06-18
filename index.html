@@ -2309,7 +2309,7 @@ window.__dataReady.then(data => {
             categories={lineCats}
             series={[
               {label:`ปี ${thisYear}`,color:PALETTE.produced,data:thisProd},
-              ...(lastProd.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastProd,dashed:true}]:[]),
+              ...(lastProd.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastProd,dashed:true,showLabel:true}]:[]),
             ]}
             height={300} unit="m³" decimals={0} showValues={true} boxedLabels={true}/>
         </ChartCard>
@@ -2319,7 +2319,7 @@ window.__dataReady.then(data => {
           categories={lineCats}
           series={[
             {label:`ปี ${thisYear}`,color:'#5a8f3c',data:thisPct},
-            ...(lastPct.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastPct,dashed:true}]:[]),
+            ...(lastPct.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastPct,dashed:true,showLabel:true}]:[]),
           ]}
           height={300} unit="%" decimals={1} showValues={true} boxedLabels={true}/>
       </ChartCard>
