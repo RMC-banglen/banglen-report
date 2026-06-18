@@ -2299,32 +2299,39 @@ window.__dataReady.then(data => {
           {`เทียบกับ${THAI_M_FULL[prev.m-1]} ${lastYear}`}
         </span>}
       </div>
-      <div style={{marginBottom:24}}>
-        <div style={{display:'inline-flex',flexDirection:'column',background:'#fff',border:'3px solid #2f5fd0',borderRadius:18,padding:'20px 40px 18px',minWidth:320,boxShadow:'0 4px 20px rgba(47,95,208,0.12)'}}>
+      <div style={{display:'flex',gap:16,marginBottom:24,flexWrap:'wrap'}}>
+        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid '+PALETTE.produced,borderRadius:18,padding:'20px 40px 18px',flex:1,boxShadow:'0 4px 20px rgba(47,150,80,0.12)'}}>
+          <span style={{fontSize:16,fontWeight:700,color:PALETTE.produced,letterSpacing:'0.5px',marginBottom:8}}>คิวผลิตจริง</span>
+          <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
+            {fmt(kpis[0].val,0)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
+          </span>
+          {kpis[0].prev!=null&&<div style={{marginTop:10,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:14,color:'#94a3b8'}}>ปีก่อน: {fmt(kpis[0].prev,0)} m³</span>
+            <span style={{fontSize:15,fontWeight:700,color:(kpis[0].val-kpis[0].prev)>=0?'#3f7d2b':'#c0392b'}}>{(kpis[0].val-kpis[0].prev)>=0?'▲':'▼'} {fmt(Math.abs(kpis[0].val-kpis[0].prev),0)} m³</span>
+          </div>}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid #5a8f3c',borderRadius:18,padding:'20px 40px 18px',flex:1,boxShadow:'0 4px 20px rgba(90,143,60,0.12)'}}>
+          <span style={{fontSize:16,fontWeight:700,color:'#5a8f3c',letterSpacing:'0.5px',marginBottom:8}}>เปอร์เซ็นต์ผลิต</span>
+          <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
+            {fmt(kpis[1].val,1)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>%</span>
+          </span>
+          {kpis[1].prev!=null&&<div style={{marginTop:10,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:14,color:'#94a3b8'}}>ปีก่อน: {fmt(kpis[1].prev,1)}%</span>
+            <span style={{fontSize:15,fontWeight:700,color:(kpis[1].val-kpis[1].prev)>=0?'#3f7d2b':'#c0392b'}}>{(kpis[1].val-kpis[1].prev)>=0?'▲':'▼'} {fmt(Math.abs(kpis[1].val-kpis[1].prev),1)}%</span>
+          </div>}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid #2f5fd0',borderRadius:18,padding:'20px 40px 18px',flex:1,boxShadow:'0 4px 20px rgba(47,95,208,0.12)'}}>
           <span style={{fontSize:16,fontWeight:700,color:'#2f5fd0',letterSpacing:'0.5px',marginBottom:8}}>งานรอผลิต (บางเลน)</span>
           {pending
             ? <>
                 <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
                   {fmt(pending.value_m3,0)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
                 </span>
-                <span style={{fontSize:16,fontWeight:700,color:'#fff',background:'#2f5fd0',borderRadius:8,padding:'4px 14px',marginTop:12,display:'inline-block'}}>อัพเดท {(()=>{const p=String(pending.updated_date).slice(0,10).split('-');return `${p[2]}/${p[1]}/${Number(p[0])+543}`;})()}</span>
+                <span style={{fontSize:15,fontWeight:700,color:'#fff',background:'#2f5fd0',borderRadius:8,padding:'4px 14px',marginTop:12,display:'inline-block'}}>อัพเดท {(()=>{const p=String(pending.updated_date).slice(0,10).split('-');return p[2]+'/'+p[1]+'/'+(Number(p[0])+543);})()}</span>
               </>
             : <span style={{fontSize:48,color:'#cbd5e1',fontWeight:700}}>–</span>
           }
         </div>
-      </div>
-      <div className="kpi-row" style={{gridTemplateColumns:'repeat(2,1fr)',marginBottom:20}}>
-        {kpis.map((k,i)=>{
-          const d=k.prev!=null?k.val-k.prev:null;
-          return <KpiCard key={i}
-            label={k.label}
-            value={fmt(k.val,k.dec||0)}
-            unit={' '+k.unit}
-            accent={k.accent}
-            sub={k.prev!=null?`ปีก่อน: ${fmt(k.prev,k.dec||0)} ${k.unit}`:'ไม่มีข้อมูลปีก่อน'}
-            delta={d!=null?{dir:Math.sign(d),text:`${d>=0?'+':''}${fmt(Math.abs(d),k.dec||0)} ${k.unit}`}:undefined}
-          />;
-        })}
       </div>
       <div className="grid" style={{marginBottom:20}}>
         <ChartCard title="คิวผลิตจริง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
