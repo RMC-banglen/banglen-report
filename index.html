@@ -544,21 +544,19 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
     series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||(s.dashed&&!s.showLabel))return;const danger=dangerBelow!=null&&v<dangerBelow;const pass=dangerBelow!=null&&v>=dangerBelow;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger,pass});});});
     const byXi={};
     lbls.forEach((l,idx)=>{if(!byXi[l.xi])byXi[l.xi]=[];byXi[l.xi].push({...l,idx});});
-    const GAP=21;
+    const NEEDED=28; // box height(17) + gap(11)
     Object.values(byXi).forEach(grp=>{
       if(grp.length<=1)return;
-      grp.sort((a,b)=>a.cy-b.cy);
-      for(let iter=0;iter<40;iter++){
-        let ok=true;
-        for(let i=1;i<grp.length;i++){
-          if(grp[i].cy-grp[i-1].cy<GAP){
-            const mid=(grp[i].cy+grp[i-1].cy)/2;
-            grp[i-1].cy=mid-GAP/2; grp[i].cy=mid+GAP/2; ok=false;
-          }
-        }
-        if(ok)break;
+      grp.sort((a,b)=>a.cy-b.cy); // ascending cy = higher on screen = higher value
+      if(grp.length===2){
+        // place upper label above its data point, lower label below its data point
+        const yPt0=grp[0].cy+16, yPt1=grp[1].cy+16;
+        grp[0].cy=yPt0-22; grp[1].cy=yPt1+10;
+        if(grp[1].cy-grp[0].cy<NEEDED){const mid=(grp[0].cy+grp[1].cy)/2;grp[0].cy=mid-NEEDED/2;grp[1].cy=mid+NEEDED/2;}
+      } else {
+        for(let iter=0;iter<60;iter++){let ok=true;for(let i=1;i<grp.length;i++){if(grp[i].cy-grp[i-1].cy<NEEDED){const mid=(grp[i].cy+grp[i-1].cy)/2;grp[i-1].cy=mid-NEEDED/2;grp[i].cy=mid+NEEDED/2;ok=false;}}if(ok)break;}
       }
-      grp.forEach(l=>{lbls[l.idx]={...lbls[l.idx],cy:Math.max(pad.t+6,l.cy)};});
+      grp.forEach(l=>{lbls[l.idx]={...lbls[l.idx],cy:Math.max(pad.t+10,l.cy)};});
     });
     boxEls=lbls.map((l,idx)=>{
       const tw=l.text.length*6.8+10;
