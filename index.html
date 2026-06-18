@@ -2257,10 +2257,18 @@ window.__dataReady.then(data => {
     const pct=r=>r&&r.order>0?Math.round(r.produced/r.order*1000)/10:0;
     const curLabel=`${THAI_M[cur.m-1]} ${thisYear}`;
     const prevLabel=prev?`${THAI_M[prev.m-1]} ${lastYear}`:null;
+
+    // เดือนที่มีข้อมูลปีนี้ (สำหรับกราฟเส้น)
+    const lineMonthNums=thisMonths.map(r=>r.m);
+    const lineCats=lineMonthNums.map(m=>THAI_M[m-1]);
+    const thisProd=lineMonthNums.map(m=>{const r=thisMonths.find(x=>x.m===m);return r?r.produced:null;});
+    const lastProd=lineMonthNums.map(m=>{const r=lastMonths.find(x=>x.m===m);return r?r.produced:null;});
+    const thisPct=lineMonthNums.map(m=>{const r=thisMonths.find(x=>x.m===m);return r?pct(r):null;});
+    const lastPct=lineMonthNums.map(m=>{const r=lastMonths.find(x=>x.m===m);return r?pct(r):null;});
+
     const kpis=[
       {label:'คิวผลิตจริง',val:cur.produced,prev:prev?.produced,unit:'m³',accent:PALETTE.produced},
       {label:'%ผลิต',val:pct(cur),prev:prev?pct(prev):null,unit:'%',dec:1,accent:'#3f7d2b'},
-      {label:'เฉลี่ยคิว/วัน',val:cur.perDay,prev:prev?.perDay,unit:'m³',dec:1,accent:'#7b61c4'},
     ];
     const barCats=prev?[curLabel,prevLabel]:[curLabel];
     return <div style={{padding:'24px 20px'}}>
@@ -2268,7 +2276,7 @@ window.__dataReady.then(data => {
         <h2 style={{fontSize:17,fontWeight:700,color:'#1e293b',margin:0}}>ข้อมูลประชุมสำนักงานใหญ่</h2>
         <p style={{color:'#64748b',fontSize:13,margin:'4px 0 0'}}>เดือนล่าสุด: <strong>{curLabel}</strong>{prevLabel?` • เทียบกับ ${prevLabel}`:''}</p>
       </div>
-      <div className="kpi-row" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
+      <div className="kpi-row" style={{gridTemplateColumns:'repeat(2,1fr)',marginBottom:20}}>
         {kpis.map((k,i)=>{
           const d=k.prev!=null?k.val-k.prev:null;
           return <KpiCard key={i}
@@ -2281,22 +2289,29 @@ window.__dataReady.then(data => {
           />;
         })}
       </div>
-      <div className="grid">
+      <div className="grid" style={{marginBottom:20}}>
         <ChartCard title="คิวผลิตจริง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
           <GroupedBarChart
             categories={barCats}
-            series={[
-              {label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]},
-            ]}
-            height={260} unit="m³" decimals={0}/>
+            series={[{label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]}]}
+            height={240} unit="m³" decimals={0}/>
         </ChartCard>
         <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="คิวผลิตจริง / คิวสั่งผลิต × 100">
           <GroupedBarChart
             categories={barCats}
             series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[pct(cur),pct(prev)]:[pct(cur)]}]}
-            height={260} unit="%" decimals={1}/>
+            height={240} unit="%" decimals={1}/>
         </ChartCard>
       </div>
+      <ChartCard title={`กราฟคิวผลิตจริงรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle={`เฉพาะเดือนที่มีข้อมูลปี ${thisYear} • หน่วย: m³`} span="full">
+        <LineChart
+          categories={lineCats}
+          series={[
+            {label:`ปี ${thisYear}`,color:PALETTE.produced,data:thisProd},
+            ...(lastProd.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastProd,dashed:true}]:[]),
+          ]}
+          height={300} unit="m³" decimals={0} showValues={false}/>
+      </ChartCard>
     </div>;
   }
 
