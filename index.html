@@ -2244,10 +2244,68 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  function HeadOfficeMeetingTab(){
+    const THAI_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const realYears=Object.keys(D.years).map(Number).filter(y=>yearData(y).real).sort((a,b)=>b-a);
+    const thisYear=realYears[0];
+    const lastYear=thisYear-1;
+    const thisMonths=thisYear?yearData(thisYear).months:[];
+    const lastMonths=D.years[lastYear]?yearData(lastYear).months:[];
+    const cur=thisMonths.length?thisMonths[thisMonths.length-1]:null;
+    const prev=cur?lastMonths.find(r=>r.m===cur.m):null;
+    if(!cur)return <div style={{padding:40,textAlign:'center',color:'#888'}}>ยังไม่มีข้อมูล</div>;
+    const pct=r=>r&&r.order>0?Math.round(r.produced/r.order*1000)/10:0;
+    const curLabel=`${THAI_M[cur.m-1]} ${thisYear}`;
+    const prevLabel=prev?`${THAI_M[prev.m-1]} ${lastYear}`:null;
+    const kpis=[
+      {label:'คิวสั่งผลิต',val:cur.order,prev:prev?.order,unit:'m³',accent:PALETTE.order},
+      {label:'คิวผลิตจริง',val:cur.produced,prev:prev?.produced,unit:'m³',accent:PALETTE.produced},
+      {label:'%ผลิต',val:pct(cur),prev:prev?pct(prev):null,unit:'%',dec:1,accent:'#3f7d2b'},
+      {label:'เฉลี่ยคิว/วัน',val:cur.perDay,prev:prev?.perDay,unit:'m³',dec:1,accent:'#7b61c4'},
+    ];
+    const barCats=prev?[curLabel,prevLabel]:[curLabel];
+    return <div style={{padding:'24px 20px'}}>
+      <div style={{marginBottom:18}}>
+        <h2 style={{fontSize:17,fontWeight:700,color:'#1e293b',margin:0}}>ข้อมูลประชุมสำนักงานใหญ่</h2>
+        <p style={{color:'#64748b',fontSize:13,margin:'4px 0 0'}}>เดือนล่าสุด: <strong>{curLabel}</strong>{prevLabel?` • เทียบกับ ${prevLabel}`:''}</p>
+      </div>
+      <div className="kpi-row" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
+        {kpis.map((k,i)=>{
+          const d=k.prev!=null?k.val-k.prev:null;
+          return <KpiCard key={i}
+            label={k.label}
+            value={fmt(k.val,k.dec||0)}
+            unit={' '+k.unit}
+            accent={k.accent}
+            sub={k.prev!=null?`ปีก่อน: ${fmt(k.prev,k.dec||0)} ${k.unit}`:'ไม่มีข้อมูลปีก่อน'}
+            delta={d!=null?{dir:Math.sign(d),text:`${d>=0?'+':''}${fmt(Math.abs(d),k.dec||0)} ${k.unit}`}:undefined}
+          />;
+        })}
+      </div>
+      <div className="grid">
+        <ChartCard title="คิวผลิตจริง vs คิวสั่ง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
+          <GroupedBarChart
+            categories={barCats}
+            series={[
+              {label:'คิวสั่ง',color:PALETTE.order,data:prev?[cur.order,prev.order]:[cur.order]},
+              {label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]},
+            ]}
+            height={260} unit="m³" decimals={0}/>
+        </ChartCard>
+        <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="คิวผลิตจริง / คิวสั่งผลิต × 100">
+          <GroupedBarChart
+            categories={barCats}
+            series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[pct(cur),pct(prev)]:[pct(cur)]}]}
+            height={260} unit="%" decimals={1}/>
+        </ChartCard>
+      </div>
+    </div>;
+  }
+
   function App(){
-    const [tab,setTab]=useState('overview');
+    const [tab,setTab]=useState('meeting');
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
-    const tabs=[{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'}];
+    const tabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'}];
     return <div className="app">
       <header className="topbar">
         <div className="topbar__brand">
@@ -2258,7 +2316,7 @@ window.__dataReady.then(data => {
           </div>
         </div>
         <div className="topbar__actions">
-          {tab!=='compare'&&tab!=='damage'&&tab!=='concrete'&&<div className="yearpick">
+          {tab!=='compare'&&tab!=='damage'&&tab!=='concrete'&&tab!=='meeting'&&<div className="yearpick">
             <span className="yearpick__lbl">ปี</span>
             <Segmented value={year} onChange={setYear} options={Object.keys(D.years).map(Number).sort((a,b)=>a-b).map(y=>({value:y,label:String(y)}))}/>
             {!yearData(year).real&&<span className="badge-sample">ข้อมูลตัวอย่าง</span>}
@@ -2267,6 +2325,7 @@ window.__dataReady.then(data => {
       </header>
       <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}</nav>
       <main>
+        {tab==='meeting'&&<HeadOfficeMeetingTab/>}
         {tab==='overview'&&<OverviewTab year={year}/>}
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='damage'&&<DamageDetailTab/>}
