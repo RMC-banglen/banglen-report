@@ -477,7 +477,7 @@ function Tooltip({tip}){
   </div>;
 }
 
-function GroupedBarChart({categories,series,height=300,unit='',decimals=0}){
+function GroupedBarChart({categories,series,height=300,unit='',decimals=0,barColors=null}){
   const [ref,W]=useMeasure(); const [tip,setTip]=useState(null);
   const pad={t:18,r:14,b:40,l:52},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
   const maxV=niceMax(Math.max(1,...series.flatMap(s=>s.data.map(v=>v||0))));
@@ -494,11 +494,12 @@ function GroupedBarChart({categories,series,height=300,unit='',decimals=0}){
         return <g key={ci}>
           {series.map((s,si)=>{
             const v=s.data[ci]||0,bx=gx+si*bW,bh=(v/maxV)*iH;
+            const fill=barColors?.(ci)??s.color;
             return <g key={si}>
-              <rect x={bx+1} y={pad.t+iH-bh} width={Math.max(0,bW-2)} height={bh} fill={s.color} rx="2"
+              <rect x={bx+1} y={pad.t+iH-bh} width={Math.max(0,bW-2)} height={bh} fill={fill} rx="2"
                 onMouseMove={e=>{const r=ref.current.getBoundingClientRect();setTip({x:e.clientX-r.left+12,y:e.clientY-r.top-10,title:cat,rows:series.map(ss=>({color:ss.color,label:ss.label,value:fmt(ss.data[ci],decimals)+(unit?' '+unit:'')}))});}}
                 onMouseLeave={()=>setTip(null)}/>
-              {v>0&&bW>=16&&<text x={bx+bW/2} y={pad.t+iH-bh-5} textAnchor="middle" className="bar-val" fill={s.color} style={{fontSize:bW<30?'9px':'10.5px'}}>{compactNum(v,decimals)}</text>}
+              {v>0&&bW>=16&&<text x={bx+bW/2} y={pad.t+iH-bh-5} textAnchor="middle" className="bar-val" fill={fill} style={{fontSize:bW<30?'9px':'10.5px'}}>{compactNum(v,decimals)}</text>}
             </g>;
           })}
           <text x={gx+baW/2} y={H-pad.b+18} textAnchor="middle" className="ax-lbl">{cat}</text>
@@ -2304,19 +2305,15 @@ window.__dataReady.then(data => {
         <ChartCard title="คิวผลิตจริง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
           <GroupedBarChart
             categories={barCats}
-            series={[
-              {label:`ปี ${thisYear}`,color:PALETTE.produced,data:[cur.produced]},
-              ...(prev?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:[prev.produced]}]:[]),
-            ]}
+            series={[{label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]}]}
+            barColors={ci=>ci===0?PALETTE.produced:PALETTE.prev}
             height={240} unit="m³" decimals={0}/>
         </ChartCard>
         <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)">
           <GroupedBarChart
             categories={barCats}
-            series={[
-              {label:`ปี ${thisYear}`,color:'#5a8f3c',data:[cp(cur)]},
-              ...(prev?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:[cp(prev)]}]:[]),
-            ]}
+            series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[cp(cur),cp(prev)]:[cp(cur)]}]}
+            barColors={ci=>ci===0?'#5a8f3c':PALETTE.prev}
             height={240} unit="%" decimals={1}/>
         </ChartCard>
       </div>
