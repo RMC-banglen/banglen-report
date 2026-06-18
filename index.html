@@ -2299,17 +2299,17 @@ window.__dataReady.then(data => {
           {`เทียบกับ${THAI_M_FULL[prev.m-1]} ${lastYear}`}
         </span>}
       </div>
-      <div style={{marginBottom:20}}>
-        <div style={{display:'inline-flex',flexDirection:'column',background:'#fff',border:'2px solid #e2e8f0',borderRadius:14,padding:'16px 28px',minWidth:260,boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
-          <span style={{fontSize:13,fontWeight:600,color:'#64748b',letterSpacing:'0.3px',marginBottom:4}}>งานรอผลิต (บางเลน)</span>
+      <div style={{marginBottom:24}}>
+        <div style={{display:'inline-flex',flexDirection:'column',background:'#fff',border:'3px solid #2f5fd0',borderRadius:18,padding:'20px 40px 18px',minWidth:320,boxShadow:'0 4px 20px rgba(47,95,208,0.12)'}}>
+          <span style={{fontSize:16,fontWeight:700,color:'#2f5fd0',letterSpacing:'0.5px',marginBottom:8}}>งานรอผลิต (บางเลน)</span>
           {pending
             ? <>
-                <span style={{fontSize:44,fontWeight:800,color:'#1e293b',lineHeight:1.1,letterSpacing:'-1px'}}>
-                  {fmt(pending.value_m3,0)}<span style={{fontSize:20,fontWeight:600,color:'#64748b',marginLeft:6}}>m³</span>
+                <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
+                  {fmt(pending.value_m3,0)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
                 </span>
-                <span style={{fontSize:12,color:'#94a3b8',marginTop:6}}>อัพเดท: {String(pending.updated_date).slice(0,10).split('-').reverse().join('/')}</span>
+                <span style={{fontSize:16,fontWeight:600,color:'#64748b',marginTop:10}}>อัพเดท {String(pending.updated_date).slice(0,10).split('-').reverse().join('/')}</span>
               </>
-            : <span style={{fontSize:32,color:'#cbd5e1',fontWeight:700}}>–</span>
+            : <span style={{fontSize:48,color:'#cbd5e1',fontWeight:700}}>–</span>
           }
         </div>
       </div>
