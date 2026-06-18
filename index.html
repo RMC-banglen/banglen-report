@@ -2254,7 +2254,7 @@ window.__dataReady.then(data => {
     const cur=thisMonths.length?thisMonths[thisMonths.length-1]:null;
     const prev=cur?lastMonths.find(r=>r.m===cur.m):null;
     if(!cur)return <div style={{padding:40,textAlign:'center',color:'#888'}}>ยังไม่มีข้อมูล</div>;
-    const pct=r=>r&&r.order>0?Math.round(r.produced/r.order*1000)/10:0;
+    const cp=r=>r?computePct(r).pct:null;
     const curLabel=`${THAI_M[cur.m-1]} ${thisYear}`;
     const prevLabel=prev?`${THAI_M[prev.m-1]} ${lastYear}`:null;
 
@@ -2263,12 +2263,12 @@ window.__dataReady.then(data => {
     const lineCats=lineMonthNums.map(m=>THAI_M[m-1]);
     const thisProd=lineMonthNums.map(m=>{const r=thisMonths.find(x=>x.m===m);return r?r.produced:null;});
     const lastProd=lineMonthNums.map(m=>{const r=lastMonths.find(x=>x.m===m);return r?r.produced:null;});
-    const thisPct=lineMonthNums.map(m=>{const r=thisMonths.find(x=>x.m===m);return r?pct(r):null;});
-    const lastPct=lineMonthNums.map(m=>{const r=lastMonths.find(x=>x.m===m);return r?pct(r):null;});
+    const thisPct=lineMonthNums.map(m=>{const r=thisMonths.find(x=>x.m===m);return r?cp(r):null;});
+    const lastPct=lineMonthNums.map(m=>{const r=lastMonths.find(x=>x.m===m);return r?cp(r):null;});
 
     const kpis=[
       {label:'คิวผลิตจริง',val:cur.produced,prev:prev?.produced,unit:'m³',accent:PALETTE.produced},
-      {label:'%ผลิต',val:pct(cur),prev:prev?pct(prev):null,unit:'%',dec:1,accent:'#3f7d2b'},
+      {label:'%ผลิต',val:cp(cur),prev:prev?cp(prev):null,unit:'%',dec:1,accent:'#3f7d2b'},
     ];
     const barCats=prev?[curLabel,prevLabel]:[curLabel];
     return <div style={{padding:'24px 20px'}}>
@@ -2296,21 +2296,32 @@ window.__dataReady.then(data => {
             series={[{label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]}]}
             height={240} unit="m³" decimals={0}/>
         </ChartCard>
-        <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="คิวผลิตจริง / คิวสั่งผลิต × 100">
+        <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)">
           <GroupedBarChart
             categories={barCats}
-            series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[pct(cur),pct(prev)]:[pct(cur)]}]}
+            series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[cp(cur),cp(prev)]:[cp(cur)]}]}
             height={240} unit="%" decimals={1}/>
         </ChartCard>
       </div>
-      <ChartCard title={`กราฟคิวผลิตจริงรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle={`เฉพาะเดือนที่มีข้อมูลปี ${thisYear} • หน่วย: m³`} span="full">
+      <div style={{marginBottom:20}}>
+        <ChartCard title={`คิวผลิตจริงรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle={`เฉพาะเดือนที่มีข้อมูลปี ${thisYear} • หน่วย: m³`} span="full">
+          <LineChart
+            categories={lineCats}
+            series={[
+              {label:`ปี ${thisYear}`,color:PALETTE.produced,data:thisProd},
+              ...(lastProd.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastProd,dashed:true}]:[]),
+            ]}
+            height={300} unit="m³" decimals={0} showValues={true} boxedLabels={true}/>
+        </ChartCard>
+      </div>
+      <ChartCard title={`เปอร์เซ็นต์ผลิตรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)" span="full">
         <LineChart
           categories={lineCats}
           series={[
-            {label:`ปี ${thisYear}`,color:PALETTE.produced,data:thisProd},
-            ...(lastProd.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastProd,dashed:true}]:[]),
+            {label:`ปี ${thisYear}`,color:'#5a8f3c',data:thisPct},
+            ...(lastPct.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastPct,dashed:true}]:[]),
           ]}
-          height={300} unit="m³" decimals={0} showValues={false}/>
+          height={300} unit="%" decimals={1} showValues={true} boxedLabels={true}/>
       </ChartCard>
     </div>;
   }
