@@ -12,6 +12,9 @@
 const SHEET_NAME = 'ผลทดสอบคอนกรีต';
 const SPREADSHEET_ID = '1ZYGnV8AqyR3a0uTNRftkguEdBPrQOjLQbWU6ZhpiFyk';
 
+const SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
@@ -329,4 +332,95 @@ function respond(success, message) {
   return ContentService
     .createTextOutput(JSON.stringify({ success: success, message: message }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── Supabase helpers ────────────────────────────────────────
+
+function sbRequest(method, table, payload, query) {
+  var url = SUPABASE_URL + '/rest/v1/' + table + (query ? '?' + query : '');
+  var opts = {
+    method: method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'post' ? 'return=minimal' : ''
+    },
+    muteHttpExceptions: true
+  };
+  if (payload) opts.payload = JSON.stringify(payload);
+  return UrlFetchApp.fetch(url, opts);
+}
+
+function fmtDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Bangkok', 'yyyy-MM-dd');
+  return String(v).slice(0, 10) || null;
+}
+
+// ── syncConcrete: sync ผลทดสอบคอนกรีต + วัตถุดิบ → Supabase ──
+
+function syncConcrete() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  // 1. ผลทดสอบคอนกรีต
+  var sh = ss.getSheetByName(SHEET_NAME);
+  var rows = sh ? sh.getDataRange().getValues() : [];
+  var headers = rows[0] || [];
+  var concreteData = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+    var o = {};
+    headers.forEach(function(h, i){ o[h] = r[i]; });
+    return {
+      sample_date:  fmtDate(o['วันที่เก็บตัวอย่าง']),
+      test_date:    fmtDate(o['วันที่ทดสอบ']),
+      age_days:     Number(o['อายุ(วัน)'] || o['อายุ (วัน)'] || 0) || null,
+      formula_name: String(o['ชื่อสูตร'] || '').trim() || null,
+      cube_size:    String(o['ขนาด cube'] || '').trim() || null,
+      result1_kn:   Number(o['ลูก1(kN)'] || 0) || null,
+      result2_kn:   Number(o['ลูก2(kN)'] || 0) || null,
+      result3_kn:   Number(o['ลูก3(kN)'] || 0) || null,
+      avg_kn:       Number(o['เฉลี่ย kN'] || 0) || null,
+      avg_mpa:      Number(o['เฉลี่ย MPa'] || 0) || null,
+      avg_ksc:      Number(o['เฉลี่ย KSC'] || 0) || null
+    };
+  });
+
+  sbRequest('delete', 'concrete_results', null, 'id=gte.1');
+  if (concreteData.length > 0) {
+    var CHUNK = 200;
+    for (var i = 0; i < concreteData.length; i += CHUNK) {
+      sbRequest('post', 'concrete_results', concreteData.slice(i, i + CHUNK));
+    }
+  }
+
+  // 2. วัตถุดิบ
+  var matSh = ss.getSheetByName('วัตถุดิบ');
+  var matData = [];
+  if (matSh) {
+    var matRows = matSh.getDataRange().getValues();
+    var matH = matRows[0] || [];
+    matData = matRows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+      var o = {};
+      matH.forEach(function(h, i){ o[h] = r[i]; });
+      return {
+        mat_date:     fmtDate(o['วันที่']),
+        cement_total: Number(o['ปูนรวม'] || 0) || null,
+        cement_big:   Number(o['ปูนเสาเหล็ก'] || o['ปูนเสาใหญ่'] || 0) || null,
+        cement_i18:   Number(o['ปูนI18'] || 0) || null,
+        rock34:       Number(o['หิน3/4'] || 0) || null,
+        rock1:        Number(o['หิน1'] || 0) || null,
+        sand:         Number(o['ทราย'] || 0) || null
+      };
+    });
+    sbRequest('delete', 'materials_daily', null, 'id=gte.1');
+    if (matData.length > 0) sbRequest('post', 'materials_daily', matData);
+  }
+
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Sync สำเร็จ!\nผลทดสอบ: ' + concreteData.length + ' แถว\nวัตถุดิบ: ' + matData.length + ' แถว'
+    );
+  } catch(e) {
+    Logger.log('Sync done: concrete=' + concreteData.length + ' materials=' + matData.length);
+  }
 }
