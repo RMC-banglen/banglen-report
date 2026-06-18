@@ -832,7 +832,7 @@ function syncPendingWork(ss) {
     return { updated_date: dateStr, value_m3: Number(r[1]) || null };
   });
 
-  sbRequest('DELETE', 'pending_work', null, 'id=gte.1');
-  if (data.length > 0) sbRequest('POST', 'pending_work', data);
+  deleteFromSupabase('pending_work', 'id=gte.1');
+  if (data.length > 0) insertInBatches('pending_work', data, 200);
   Logger.log('✅ pending_work: ' + data.length + ' แถว');
 }
