@@ -2517,7 +2517,7 @@ window.__dataReady.then(data => {
         return <div>
         {/* KPI ทั้งปี */}
         <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
-          <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:14,textTransform:'uppercase'}}>KPI ทั้งปี {selYear} เทียบกับ ปี {selYear-1}</div>
+          <div style={{fontSize:16,fontWeight:700,color:'#475569',marginBottom:14}}>KPI ทั้งปี {selYear} เทียบกับ ปี {selYear-1}</div>
           <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
             {[['ทั้งหมด',null,'#1e293b','#f1f5f9'],[SL.open,'open',SC.open,SB.open],[SL.in_progress,'in_progress',SC.in_progress,SB.in_progress],[SL.done,'done',SC.done,SB.done]].map(([lbl,st,clr,bg])=>{
               const a=cntBy(yearReps,st),b=cntBy(lastYearReps,st);
@@ -2535,7 +2535,7 @@ window.__dataReady.then(data => {
         </div>
 
         {/* เปรียบเทียบตามประเภทปัญหา */}
-        <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:14,textTransform:'uppercase'}}>เปรียบเทียบจำนวนเคสตามประเภทปัญหา — ปี {selYear} vs {selYear-1}</div>
+        <div style={{fontSize:16,fontWeight:700,color:'#475569',marginBottom:14}}>เปรียบเทียบจำนวนเคสตามประเภทปัญหา — ปี {selYear} vs {selYear-1}</div>
         {typeKpi.map(tk=>{
           const d=tk.thisYear-tk.lastYear;
           return<div key={tk.type} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'16px 18px',marginBottom:10}}>
