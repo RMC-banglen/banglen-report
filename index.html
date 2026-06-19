@@ -2556,19 +2556,16 @@ window.__dataReady.then(data => {
               <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:10,textTransform:'uppercase'}}>แยกตามลักษณะปัญหา</div>
               {subKpi.map(sk=>{
                 const sd=sk.thisYear-sk.lastYear;
-                return<div key={sk.sub} style={{display:'grid',gridTemplateColumns:'180px 1fr auto',gap:10,alignItems:'center',marginBottom:8}}>
-                  <span style={{fontSize:13,color:'#334155',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{sk.sub}</span>
+                return<div key={sk.sub} style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
                   <div>
-                    <div style={{display:'flex',gap:4,marginBottom:4,alignItems:'center'}}>
-                      <div style={{height:10,borderRadius:3,background:'#185FA5',width:Math.max(sk.thisYear>0?8:0,sk.thisYear/maxSubCount*160)+'px',transition:'width .4s'}}></div>
-                      {sk.thisYear>0&&<span style={{fontSize:11,fontWeight:600,color:'#185FA5'}}>{sk.thisYear}</span>}
-                    </div>
-                    <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                      <div style={{height:10,borderRadius:3,background:'#cbd5e1',width:Math.max(sk.lastYear>0?8:0,sk.lastYear/maxSubCount*160)+'px',transition:'width .4s'}}></div>
-                      {sk.lastYear>0&&<span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>{sk.lastYear}</span>}
+                    <div style={{fontSize:13,fontWeight:600,color:'#334155',marginBottom:4}}>{sk.sub}</div>
+                    <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                      <span style={{fontSize:28,fontWeight:800,color:'#1e293b',lineHeight:1}}>{sk.thisYear}</span>
+                      <span style={{fontSize:12,color:'#94a3b8'}}>ปีนี้</span>
+                      <span style={{fontSize:12,color:'#64748b',marginLeft:4}}>ปีก่อน: {sk.lastYear}</span>
                     </div>
                   </div>
-                  <span style={{fontSize:12,fontWeight:600,minWidth:60,textAlign:'right',color:sd>0?'#993C1D':sd<0?'#3B6D11':'#94a3b8'}}>{sd>0?'▲ +'+sd:sd<0?'▼ '+sd:'—'}</span>
+                  <span style={{fontSize:14,fontWeight:700,color:sd>0?'#993C1D':sd<0?'#3B6D11':'#94a3b8',minWidth:52,textAlign:'right'}}>{sd>0?'▲ +'+sd:sd<0?'▼ '+sd:'—'}</span>
                 </div>;
               })}
               <div style={{display:'flex',gap:14,marginTop:8,paddingTop:8,borderTop:'1px solid #f8fafc'}}>
