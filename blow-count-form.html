@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>บันทึกค่า Blow Count 30 ฟุต</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 24px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .logo-row .icon { font-size: 32px; }
+    .logo-row h1 { font-size: 18px; font-weight: 700; color: #1a202c; }
+    .logo-row p { font-size: 13px; color: #718096; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #1a202c;
+      transition: border-color 0.2s;
+      outline: none;
+      font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #4299e1; }
+    input[type="number"] { font-size: 22px; font-weight: 700; text-align: center; color: #2b6cb0; }
+    .soil-preview {
+      margin-top: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      transition: all 0.3s;
+      display: none;
+    }
+    .soil-soft    { background: #fefcbf; color: #744210; border: 2px solid #f6e05e; }
+    .soil-medium  { background: #feebc8; color: #7b341e; border: 2px solid #f6ad55; }
+    .soil-hard    { background: #fed7d7; color: #742a2a; border: 2px solid #fc8181; }
+    .btn {
+      width: 100%;
+      margin-top: 24px;
+      padding: 14px;
+      background: linear-gradient(135deg, #3182ce, #2c5282);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      display: none;
+    }
+    .result.ok { background: #c6f6d5; color: #22543d; }
+    .result.err { background: #fed7d7; color: #742a2a; }
+    .legend {
+      margin-top: 20px;
+      background: #f7fafc;
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+    .legend h3 { font-size: 12px; color: #718096; margin-bottom: 8px; font-weight: 600; }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .dot-soft   { background: #ecc94b; }
+    .dot-medium { background: #ed8936; }
+    .dot-hard   { background: #fc8181; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-row">
+    <div class="icon">🔨</div>
+    <div>
+      <h1>Blow Count 30 ฟุต</h1>
+      <p>บันทึกผลการตอก &amp; แจ้งเตือน LINE</p>
+    </div>
+  </div>
+
+  <label>วันที่ตอก</label>
+  <input type="date" id="date" />
+
+  <label>เลขเสา / รหัสงาน</label>
+  <input type="text" id="pile_id" placeholder="เช่น P-001, ตำแหน่ง A3" />
+
+  <label>ชื่อพนักงาน</label>
+  <input type="text" id="worker" placeholder="ชื่อ-นามสกุล" />
+
+  <label>ค่า Blow Count (ครั้ง/30 ฟุต)</label>
+  <input type="number" id="blow" min="0" max="9999" placeholder="0" oninput="updatePreview()" />
+
+  <div class="soil-preview" id="soil_preview"></div>
+
+  <label>หมายเหตุ (ถ้ามี)</label>
+  <textarea id="note" rows="2" placeholder="ระบุข้อสังเกตเพิ่มเติม..."></textarea>
+
+  <button class="btn" onclick="submit()">📤 บันทึก &amp; แจ้งเตือน LINE</button>
+  <div class="result" id="result"></div>
+
+  <div class="legend">
+    <h3>เกณฑ์จำแนกชั้นดิน</h3>
+    <div class="legend-item"><div class="dot dot-soft"></div> ดินอ่อน: ≤ 300 ครั้ง</div>
+    <div class="legend-item"><div class="dot dot-medium"></div> ดินแข็งปานกลาง: 301 – 699 ครั้ง</div>
+    <div class="legend-item"><div class="dot dot-hard"></div> ดินแข็งมาก: ≥ 700 ครั้ง</div>
+  </div>
+</div>
+
+<script>
+  const GAS_URL = 'YOUR_GAS_WEBAPP_URL_HERE'; // <-- ใส่ URL จาก Deploy
+
+  // ตั้งวันที่วันนี้
+  document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+
+  function classifySoil(blow) {
+    if (blow <= 300) return { label: '🟡 ดินอ่อน', cls: 'soil-soft', emoji: '🟡' };
+    if (blow <= 699) return { label: '🟠 ดินแข็งปานกลาง', cls: 'soil-medium', emoji: '🟠' };
+    return { label: '🔴 ดินแข็งมาก', cls: 'soil-hard', emoji: '🔴' };
+  }
+
+  function updatePreview() {
+    const blow = parseInt(document.getElementById('blow').value);
+    const preview = document.getElementById('soil_preview');
+    if (!blow && blow !== 0) { preview.style.display = 'none'; return; }
+    const soil = classifySoil(blow);
+    preview.textContent = soil.label + ' (' + blow + ' ครั้ง)';
+    preview.className = 'soil-preview ' + soil.cls;
+    preview.style.display = 'block';
+  }
+
+  async function submit() {
+    const date    = document.getElementById('date').value;
+    const pile_id = document.getElementById('pile_id').value.trim();
+    const worker  = document.getElementById('worker').value.trim();
+    const blow    = parseInt(document.getElementById('blow').value);
+    const note    = document.getElementById('note').value.trim();
+    const result  = document.getElementById('result');
+
+    if (!date || !pile_id || !worker || isNaN(blow)) {
+      result.textContent = '⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง';
+      result.className = 'result err';
+      result.style.display = 'block';
+      return;
+    }
+
+    const btn = document.querySelector('.btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ กำลังส่ง...';
+    result.style.display = 'none';
+
+    try {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, pile_id, worker, blow, note })
+      });
+      const json = await res.json();
+      if (json.success) {
+        result.textContent = '✅ บันทึกสำเร็จ! แจ้งเตือน LINE แล้ว';
+        result.className = 'result ok';
+        document.getElementById('pile_id').value = '';
+        document.getElementById('blow').value = '';
+        document.getElementById('note').value = '';
+        document.getElementById('soil_preview').style.display = 'none';
+      } else {
+        result.textContent = '❌ เกิดข้อผิดพลาด: ' + json.message;
+        result.className = 'result err';
+      }
+    } catch (e) {
+      result.textContent = '❌ ไม่สามารถเชื่อมต่อได้: ' + e.message;
+      result.className = 'result err';
+    }
+
+    result.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '📤 บันทึก & แจ้งเตือน LINE';
+  }
+</script>
+</body>
+</html>
