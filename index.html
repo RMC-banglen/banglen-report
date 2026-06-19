@@ -2278,7 +2278,7 @@ window.__dataReady.then(data => {
     const [subTab,setSubTab]=useState('monthly');
     const [pendingFiles,setPendingFiles]=useState([]);
     const [previewUrls,setPreviewUrls]=useState([]);
-    const [form,setForm]=useState({title:'',report_date:'',type:'คุณภาพผลิตภัณฑ์',sub_type:'',description:'',status:'open',fix_note:''});
+    const [form,setForm]=useState({title:'',report_date:'',type:'คุณภาพผลิตภัณฑ์',sub_type:'',sub_type_other:'',description:'',status:'open',fix_note:''});
     const fileRef=React.useRef(null);
     const db=React.useMemo(()=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY),[]);
 
@@ -2342,11 +2342,13 @@ window.__dataReady.then(data => {
       try{
         let repId=editId;
         if(!editId){
-          const {data,error}=await db.from('quality_reports').insert({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:form.sub_type||null,description:form.description,status:form.status,fix_note:form.fix_note}).select().single();
+          const finalSubType=form.sub_type==='อื่นๆ'?(form.sub_type_other||'อื่นๆ'):form.sub_type||null;
+          const {data,error}=await db.from('quality_reports').insert({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:finalSubType,description:form.description,status:form.status,fix_note:form.fix_note}).select().single();
           if(error)throw error;
           repId=data.id;
         } else {
-          const {error}=await db.from('quality_reports').update({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:form.sub_type||null,description:form.description,status:form.status,fix_note:form.fix_note}).eq('id',editId);
+          const finalSubType=form.sub_type==='อื่นๆ'?(form.sub_type_other||'อื่นๆ'):form.sub_type||null;
+          const {error}=await db.from('quality_reports').update({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:finalSubType,description:form.description,status:form.status,fix_note:form.fix_note}).eq('id',editId);
           if(error)throw error;
         }
         for(const file of pendingFiles){
@@ -2378,13 +2380,16 @@ window.__dataReady.then(data => {
     function openAdd(){
       setEditId(null);
       const n=new Date();
-      setForm({title:'',customer_name:'',department:'',report_date:n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'),type:'คุณภาพผลิตภัณฑ์',sub_type:'',description:'',status:'open',fix_note:''});
+      setForm({title:'',customer_name:'',department:'',report_date:n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'),type:'คุณภาพผลิตภัณฑ์',sub_type:'',sub_type_other:'',description:'',status:'open',fix_note:''});
       setPendingFiles([]); setPreviewUrls([]); setShowForm(true);
     }
 
     function openEdit(r){
       setEditId(r.id);
-      setForm({title:r.title,customer_name:r.customer_name||'',department:r.department||'',report_date:String(r.report_date).slice(0,10),type:r.type,sub_type:r.sub_type||'',description:r.description||'',status:r.status,fix_note:r.fix_note||''});
+      const storedSub=r.sub_type||'';
+      const knownSubs=SUB_TYPES[r.type]||[];
+      const isKnown=knownSubs.includes(storedSub)||storedSub==='';
+      setForm({title:r.title,customer_name:r.customer_name||'',department:r.department||'',report_date:String(r.report_date).slice(0,10),type:r.type,sub_type:isKnown?storedSub:'อื่นๆ',sub_type_other:isKnown?'':storedSub,description:r.description||'',status:r.status,fix_note:r.fix_note||''});
       setPendingFiles([]); setPreviewUrls([]); setShowForm(true);
     }
 
@@ -2595,11 +2600,12 @@ window.__dataReady.then(data => {
             </select>
           </div>
           {SUB_TYPES[form.type]&&<div style={{marginBottom:12}}>
-            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>หัวข้อย่อย</div>
-            <select value={form.sub_type} onChange={e=>setForm(f=>({...f,sub_type:e.target.value}))} style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,background:'#fff',outline:'none',fontFamily:'inherit'}}>
-              <option value=''>-- เลือกหัวข้อย่อย --</option>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ลักษณะปัญหา</div>
+            <select value={form.sub_type==='อื่นๆ'||(!SUB_TYPES[form.type].includes(form.sub_type)&&form.sub_type)?'อื่นๆ':form.sub_type} onChange={e=>{if(e.target.value==='อื่นๆ'){setForm(f=>({...f,sub_type:'อื่นๆ'}))}else{setForm(f=>({...f,sub_type:e.target.value}))}}} style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,background:'#fff',outline:'none',fontFamily:'inherit'}}>
+              <option value=''>-- เลือกลักษณะปัญหา --</option>
               {SUB_TYPES[form.type].map(s=><option key={s} value={s}>{s}</option>)}
             </select>
+            {form.sub_type==='อื่นๆ'&&<input value={form.sub_type_other||''} onChange={e=>setForm(f=>({...f,sub_type_other:e.target.value}))} placeholder='ระบุลักษณะปัญหา...' style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',marginTop:8,boxSizing:'border-box'}}/>}
           </div>}
           <div style={{marginBottom:12}}>
             <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>รายละเอียด</div>
