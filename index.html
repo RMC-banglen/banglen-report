@@ -2522,12 +2522,12 @@ window.__dataReady.then(data => {
             {[['ทั้งหมด',null,'#1e293b','#f1f5f9'],[SL.open,'open',SC.open,SB.open],[SL.in_progress,'in_progress',SC.in_progress,SB.in_progress],[SL.done,'done',SC.done,SB.done]].map(([lbl,st,clr,bg])=>{
               const a=cntBy(yearReps,st),b=cntBy(lastYearReps,st);
               return<div key={lbl} style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:12,padding:'14px 18px',flex:1,minWidth:130}}>
-                <div style={{fontSize:12,fontWeight:600,color:clr,marginBottom:6}}>{lbl}</div>
-                <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:4}}>
-                  <span style={{fontSize:36,fontWeight:800,color:'#1e293b',lineHeight:1}}>{a}</span>
-                  <span style={{fontSize:13,color:'#94a3b8'}}>ปี {selYear}</span>
+                <div style={{fontSize:16,fontWeight:700,color:clr,marginBottom:8}}>{lbl}</div>
+                <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:6}}>
+                  <span style={{fontSize:52,fontWeight:900,color:'#1e293b',lineHeight:1}}>{a}</span>
+                  <span style={{fontSize:15,color:'#94a3b8'}}>ปี {selYear}</span>
                 </div>
-                <div style={{fontSize:13,color:'#94a3b8',marginBottom:6}}>ปีก่อน: <span style={{fontWeight:600,color:'#64748b'}}>{b}</span> เคส</div>
+                <div style={{fontSize:15,color:'#94a3b8',marginBottom:8}}>ปีก่อน: <span style={{fontWeight:700,color:'#64748b'}}>{b}</span> เคส</div>
                 {diffBadge(a,b)}
               </div>;
             })}
