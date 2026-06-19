@@ -2541,12 +2541,12 @@ window.__dataReady.then(data => {
           return<div key={tk.type} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'16px 18px',marginBottom:10}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12,flexWrap:'wrap',gap:6}}>
               <div>
-                <span style={{fontSize:15,fontWeight:700,color:'#1e293b'}}>{tk.type}</span>
-                <div style={{marginTop:4,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-                  <span style={{fontSize:32,fontWeight:800,color:'#1e293b',lineHeight:1}}>{tk.thisYear}</span>
-                  <span style={{fontSize:12,color:'#94a3b8'}}>ปีนี้</span>
-                  <span style={{fontSize:13,color:'#64748b',marginLeft:4}}>ปีก่อน: {tk.lastYear}</span>
-                  <span style={{marginLeft:4}}>{d===0?<span style={{fontSize:12,color:'#94a3b8'}}>เท่ากับปีก่อน</span>:<span style={{fontSize:13,fontWeight:700,color:d>0?'#993C1D':'#3B6D11'}}>{d>0?'▲ +'+d:'▼ '+d}</span>}</span>
+                <span style={{fontSize:20,fontWeight:700,color:'#1e293b'}}>{tk.type}</span>
+                <div style={{marginTop:6,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                  <span style={{fontSize:40,fontWeight:800,color:'#1e293b',lineHeight:1}}>{tk.thisYear}</span>
+                  <span style={{fontSize:15,color:'#94a3b8'}}>ปีนี้</span>
+                  <span style={{fontSize:16,color:'#64748b',marginLeft:4}}>ปีก่อน: {tk.lastYear}</span>
+                  <span style={{marginLeft:4}}>{d===0?<span style={{fontSize:15,color:'#94a3b8'}}>เท่ากับปีก่อน</span>:<span style={{fontSize:20,fontWeight:800,color:d>0?'#993C1D':'#3B6D11'}}>{d>0?'▲ +'+d:'▼ '+d}</span>}</span>
                 </div>
               </div>
             </div>
@@ -2557,11 +2557,11 @@ window.__dataReady.then(data => {
                 const sd=sk.thisYear-sk.lastYear;
                 return<div key={sk.sub} style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
                   <div>
-                    <div style={{fontSize:13,fontWeight:600,color:'#334155',marginBottom:4}}>{sk.sub}</div>
+                    <div style={{fontSize:17,fontWeight:700,color:'#334155',marginBottom:6}}>{sk.sub}</div>
                     <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-                      <span style={{fontSize:28,fontWeight:800,color:'#1e293b',lineHeight:1}}>{sk.thisYear}</span>
-                      <span style={{fontSize:12,color:'#94a3b8'}}>ปีนี้</span>
-                      <span style={{fontSize:12,color:'#64748b',marginLeft:4}}>ปีก่อน: {sk.lastYear}</span>
+                      <span style={{fontSize:36,fontWeight:800,color:'#1e293b',lineHeight:1}}>{sk.thisYear}</span>
+                      <span style={{fontSize:15,color:'#94a3b8'}}>ปีนี้</span>
+                      <span style={{fontSize:15,color:'#64748b',marginLeft:4}}>ปีก่อน: {sk.lastYear}</span>
                     </div>
                   </div>
                   <span style={{fontSize:22,fontWeight:900,color:sd>0?'#993C1D':sd<0?'#3B6D11':'#94a3b8',minWidth:70,textAlign:'right'}}>{sd>0?'▲ +'+sd:sd<0?'▼ '+sd:'—'}</span>
