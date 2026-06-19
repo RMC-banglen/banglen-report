@@ -2456,35 +2456,41 @@ window.__dataReady.then(data => {
       <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',letterSpacing:'0.5px',marginBottom:10,textTransform:'uppercase'}}>รายการปัญหา — {THAI_M_FULL[selMonth-1]} {selYear}</div>
       {monthReps.length===0&&<div style={{textAlign:'center',padding:'32px 0',color:'#94a3b8',fontSize:14}}>ไม่มีรายงานในเดือนนี้</div>}
       {monthReps.map((r,ri)=>(
-        <div key={r.id} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'14px 16px',marginBottom:10}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6,gap:8}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:17,fontWeight:700,color:'#1e293b'}}>{'#'+String(ri+1).padStart(3,'0')+' · '+r.title}</div>
-              <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap',alignItems:'center'}}>
-                <span style={{fontSize:11,padding:'2px 8px',borderRadius:4,background:TB[r.type]||'#f1f5f9',color:TC[r.type]||'#64748b',fontWeight:500}}>{r.type}</span>
-                {r.customer_name&&<span style={{fontSize:11,padding:'2px 8px',borderRadius:4,background:'#f1f5f9',color:'#475569',fontWeight:500}}>👤 {r.customer_name}</span>}
-                {r.department&&<span style={{fontSize:11,padding:'2px 8px',borderRadius:4,background:'#eef3fc',color:'#2f5fd0',fontWeight:500}}>{r.department}</span>}
-                <span style={{fontSize:11,color:'#94a3b8'}}>{fmtDate(r.report_date)}</span>
-              </div>
+        <div key={r.id} style={{background:'#fff',border:'2px solid #e2e8f0',borderRadius:16,marginBottom:16,overflow:'hidden'}}>
+          {/* header bar */}
+          <div style={{background:'#f8fafc',borderBottom:'1px solid #e2e8f0',padding:'12px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <span style={{fontSize:13,fontWeight:700,color:'#94a3b8'}}>{'#'+String(ri+1).padStart(3,'0')}</span>
+              <span style={{fontSize:17,fontWeight:800,color:'#1e293b'}}>{r.title}</span>
             </div>
-            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
-              <span style={{fontSize:11,padding:'3px 10px',borderRadius:5,background:SB[r.status],color:SC[r.status],fontWeight:600}}>{SL[r.status]}</span>
-              <div style={{display:'flex',gap:4}}>
-                <button onClick={()=>openEdit(r)} style={{fontSize:11,padding:'2px 8px',borderRadius:4,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',color:'#64748b'}}>แก้ไข</button>
-                <button onClick={()=>handleDelete(r.id)} style={{fontSize:11,padding:'2px 8px',borderRadius:4,border:'1px solid #fde8e8',background:'#fff',cursor:'pointer',color:'#993C1D'}}>ลบ</button>
-              </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:13,padding:'4px 14px',borderRadius:8,background:SB[r.status],color:SC[r.status],fontWeight:700}}>{SL[r.status]}</span>
+              <button onClick={()=>openEdit(r)} style={{fontSize:12,padding:'4px 12px',borderRadius:6,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',color:'#64748b',fontWeight:500}}>แก้ไข</button>
+              <button onClick={()=>handleDelete(r.id)} style={{fontSize:12,padding:'4px 12px',borderRadius:6,border:'1px solid #fde8e8',background:'#fff',cursor:'pointer',color:'#993C1D',fontWeight:500}}>ลบ</button>
             </div>
           </div>
-          {r.description&&<div style={{fontSize:15,color:'#334155',marginBottom:10,lineHeight:1.7}}>{r.description}</div>}
-          {r.fix_note&&<div style={{fontSize:14,color:'#3B6D11',background:'#f0fdf4',borderRadius:8,padding:'8px 14px',marginBottom:10,lineHeight:1.6}}>✓ การแก้ไข: {r.fix_note}</div>}
-          {(imgMap[r.id]||[]).length>0&&<div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:8}}>
-            {(imgMap[r.id]||[]).map((url,ii)=>(
-              <div key={ii} style={{position:'relative'}}>
-                <img src={url} alt="รูปประกอบ" style={{width:200,height:150,objectFit:'cover',borderRadius:10,border:'1px solid #e2e8f0',cursor:'pointer',display:'block'}} onClick={()=>window.open(url,'_blank')}/>
-                <button onClick={()=>deleteImage(r.id,url)} style={{position:'absolute',top:-6,right:-6,width:22,height:22,borderRadius:'50%',background:'#ef4444',color:'#fff',border:'none',cursor:'pointer',fontSize:13,lineHeight:'22px',padding:0,textAlign:'center'}}>×</button>
+          {/* body: info left, images right */}
+          <div style={{display:'flex',gap:0}}>
+            <div style={{flex:1,padding:'18px 20px',minWidth:0}}>
+              {/* meta tags */}
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
+                <span style={{fontSize:13,padding:'3px 10px',borderRadius:6,background:TB[r.type]||'#f1f5f9',color:TC[r.type]||'#64748b',fontWeight:600}}>{r.type}</span>
+                {r.customer_name&&<span style={{fontSize:13,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#334155',fontWeight:600}}>👤 {r.customer_name}</span>}
+                {r.department&&<span style={{fontSize:13,padding:'3px 10px',borderRadius:6,background:'#eef3fc',color:'#2f5fd0',fontWeight:600}}>{r.department}</span>}
+                <span style={{fontSize:13,color:'#94a3b8',marginLeft:2}}>{fmtDate(r.report_date)}</span>
               </div>
-            ))}
-          </div>}
+              {r.description&&<div style={{fontSize:15,color:'#334155',lineHeight:1.8,marginBottom:14}}>{r.description}</div>}
+              {r.fix_note&&<div style={{fontSize:14,color:'#3B6D11',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:'10px 16px',lineHeight:1.7}}>✓ <span style={{fontWeight:700}}>การแก้ไข:</span> {r.fix_note}</div>}
+            </div>
+            {(imgMap[r.id]||[]).length>0&&<div style={{borderLeft:'1px solid #e2e8f0',padding:'16px',display:'flex',flexDirection:'column',gap:10,minWidth:260,maxWidth:360,background:'#fafafa'}}>
+              {(imgMap[r.id]||[]).map((url,ii)=>(
+                <div key={ii} style={{position:'relative'}}>
+                  <img src={url} alt="รูปประกอบ" style={{width:'100%',borderRadius:10,border:'1px solid #e2e8f0',cursor:'pointer',display:'block'}} onClick={()=>window.open(url,'_blank')}/>
+                  <button onClick={()=>deleteImage(r.id,url)} style={{position:'absolute',top:-6,right:-6,width:22,height:22,borderRadius:'50%',background:'#ef4444',color:'#fff',border:'none',cursor:'pointer',fontSize:13,lineHeight:'22px',padding:0,textAlign:'center'}}>×</button>
+                </div>
+              ))}
+            </div>}
+          </div>
         </div>
       ))}
 
