@@ -2460,8 +2460,8 @@ window.__dataReady.then(data => {
           {/* header bar */}
           <div style={{background:'#f8fafc',borderBottom:'1px solid #e2e8f0',padding:'12px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <span style={{fontSize:13,fontWeight:700,color:'#94a3b8'}}>{'#'+String(ri+1).padStart(3,'0')}</span>
-              <span style={{fontSize:17,fontWeight:800,color:'#1e293b'}}>{r.title}</span>
+              <span style={{fontSize:15,fontWeight:700,color:'#94a3b8'}}>{'#'+String(ri+1).padStart(3,'0')}</span>
+              <span style={{fontSize:20,fontWeight:800,color:'#1e293b'}}>{r.title}</span>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <span style={{fontSize:13,padding:'4px 14px',borderRadius:8,background:SB[r.status],color:SC[r.status],fontWeight:700}}>{SL[r.status]}</span>
@@ -2474,13 +2474,13 @@ window.__dataReady.then(data => {
             <div style={{flex:1,padding:'18px 20px',minWidth:0}}>
               {/* meta tags */}
               <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
-                <span style={{fontSize:13,padding:'3px 10px',borderRadius:6,background:TB[r.type]||'#f1f5f9',color:TC[r.type]||'#64748b',fontWeight:600}}>{r.type}</span>
-                {r.customer_name&&<span style={{fontSize:13,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#334155',fontWeight:600}}>👤 {r.customer_name}</span>}
-                {r.department&&<span style={{fontSize:13,padding:'3px 10px',borderRadius:6,background:'#eef3fc',color:'#2f5fd0',fontWeight:600}}>{r.department}</span>}
-                <span style={{fontSize:13,color:'#94a3b8',marginLeft:2}}>{fmtDate(r.report_date)}</span>
+                <span style={{fontSize:15,padding:'4px 12px',borderRadius:6,background:TB[r.type]||'#f1f5f9',color:TC[r.type]||'#64748b',fontWeight:600}}>{r.type}</span>
+                {r.customer_name&&<span style={{fontSize:15,padding:'4px 12px',borderRadius:6,background:'#f1f5f9',color:'#334155',fontWeight:600}}>👤 {r.customer_name}</span>}
+                {r.department&&<span style={{fontSize:15,padding:'4px 12px',borderRadius:6,background:'#eef3fc',color:'#2f5fd0',fontWeight:600}}>{r.department}</span>}
+                <span style={{fontSize:15,color:'#94a3b8',marginLeft:2}}>{fmtDate(r.report_date)}</span>
               </div>
-              {r.description&&<div style={{fontSize:15,color:'#334155',lineHeight:1.8,marginBottom:14}}>{r.description}</div>}
-              {r.fix_note&&<div style={{fontSize:14,color:'#3B6D11',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:'10px 16px',lineHeight:1.7}}>✓ <span style={{fontWeight:700}}>การแก้ไข:</span> {r.fix_note}</div>}
+              {r.description&&<div style={{fontSize:17,color:'#334155',lineHeight:1.8,marginBottom:14}}>{r.description}</div>}
+              {r.fix_note&&<div style={{fontSize:16,color:'#3B6D11',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:'12px 18px',lineHeight:1.7}}>✓ <span style={{fontWeight:700}}>การแก้ไข:</span> {r.fix_note}</div>}
             </div>
             {(imgMap[r.id]||[]).length>0&&<div style={{borderLeft:'1px solid #e2e8f0',padding:'16px',display:'flex',flexDirection:'column',gap:10,minWidth:260,maxWidth:360,background:'#fafafa'}}>
               {(imgMap[r.id]||[]).map((url,ii)=>(
