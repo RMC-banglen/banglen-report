@@ -83,7 +83,7 @@ function handleFormSubmit(data) {
   let sh = ss.getSheetByName(BLOW_SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(BLOW_SHEET_NAME);
-    sh.appendRow(['วันที่', 'เสาเข็มขนาด', 'พนักงาน', 'Blow Count (ครั้ง)', 'สถานะดิน', 'หมายเหตุ', 'เวลาบันทึก']);
+    sh.appendRow(['วันที่', 'เสาเข็มขนาด-ยาว', 'พนักงาน', 'Blow Count (ครั้ง)', 'สถานะดิน', 'หมายเหตุ', 'เวลาบันทึก']);
     sh.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#2c5282').setFontColor('white');
   }
 
@@ -111,7 +111,7 @@ function sendLineMessage(date, pile_id, worker, blow, soil, note) {
     '🔨 รายงานค่า Blow Count 30 ฟุต',
     '─────────────────',
     '📅 วันที่: ' + date,
-    '🪧 เสาเข็มขนาด: ' + pile_id,
+    '🪧 เสาเข็มขนาด-ยาว: ' + pile_id,
     '👷 พนักงาน: ' + worker,
     '💥 Blow Count: ' + blow + ' ครั้ง',
     '',
