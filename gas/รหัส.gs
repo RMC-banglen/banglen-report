@@ -1,39 +1,73 @@
 // ============================================================
-// Apps Script Web App — รับข้อมูลผลทดสอบคอนกรีตจาก Cowork
+// Apps Script Web App — รับข้อมูลผลทดสอบคอนกรีต
 // วิธี Deploy:
-//   1. เปิด Sheet "ผลทดสอบคอนกรีต" → Extensions → Apps Script
+//   1. เปิด Sheet → Extensions → Apps Script
 //   2. วางโค้ดนี้ทั้งหมด → Save
 //   3. Deploy → New deployment → Web app
-//      - Execute as: Me
-//      - Who has access: Anyone
-//   4. Copy URL ที่ได้ → แจ้งกลับมาเพื่อใส่ใน Cowork skill
+//      - Execute as: Me  |  Who has access: Anyone
+//   4. Copy URL ที่ได้ → แจ้งกลับมาเพื่อใส่ใน skill
 // ============================================================
 
-const SHEET_NAME = 'ผลทดสอบคอนกรีต';
+var SHEET_NAME  = 'ผลทดสอบคอนกรีต';
+var SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
 
+// ============================================================
+// รับข้อมูลจาก skill → เขียน Sheet + sync Supabase อัตโนมัติ
+// ============================================================
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sh = ss.getSheetByName(SHEET_NAME);
-
-    if (!sh) {
-      return respond(false, 'ไม่พบ Sheet: ' + SHEET_NAME);
-    }
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(SHEET_NAME);
+    if (!sh) return respond(false, 'ไม่พบ Sheet: ' + SHEET_NAME);
 
     sh.appendRow([
-      data.sample_date,   // A: วันที่เก็บตัวอย่าง
-      data.test_date,     // B: วันที่ทดสอบ
-      data.age_days,      // C: อายุ(วัน)
-      data.formula_name,  // D: ชื่อสูตร
-      data.cube_size,     // E: ขนาด cube
-      data.result1_kn,    // F: ลูก1(kN)
-      data.result2_kn,    // G: ลูก2(kN)
-      data.result3_kn,    // H: ลูก3(kN)
-      data.avg_kn,        // I: เฉลี่ย kN
-      data.avg_mpa,       // J: เฉลี่ย MPa
-      data.avg_ksc        // K: เฉลี่ย KSC
+      data.sample_date,
+      data.test_date,
+      data.age_days,
+      data.formula_name,
+      data.cube_size,
+      data.result1_kn,
+      data.result2_kn,
+      data.result3_kn,
+      data.avg_kn,
+      data.avg_mpa,
+      data.avg_ksc
     ]);
+
+    var lastRow = sh.getLastRow();
+    sh.getRange(lastRow, 12).setFormula('=TEXT(A' + lastRow + ',"YYYY-MM")');
+    sh.getRange(2, 1, lastRow - 1, 12).sort({ column: 1, ascending: true });
+
+    // Auto-sync ไป Supabase ทันที
+    try {
+      UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        payload: JSON.stringify([{
+          sample_date:  data.sample_date,
+          test_date:    data.test_date,
+          age_days:     Number(data.age_days) || 0,
+          formula_name: data.formula_name,
+          cube_size:    data.cube_size,
+          result1_kn:   Number(data.result1_kn) || 0,
+          result2_kn:   Number(data.result2_kn) || 0,
+          result3_kn:   Number(data.result3_kn) || 0,
+          avg_kn:       Number(data.avg_kn) || 0,
+          avg_mpa:      Number(data.avg_mpa) || 0,
+          avg_ksc:      Number(data.avg_ksc) || 0
+        }]),
+        muteHttpExceptions: true
+      });
+    } catch(syncErr) {
+      Logger.log('Supabase sync error: ' + syncErr.message);
+    }
 
     Logger.log('บันทึกสำเร็จ: ' + JSON.stringify(data));
     return respond(true, 'บันทึกสำเร็จ');
@@ -44,39 +78,35 @@ function doPost(e) {
   }
 }
 
+// ============================================================
+// ส่งข้อมูลทั้งหมดกลับ (Dashboard อ่าน)
+// ============================================================
 function doGet(e) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sh = ss.getSheetByName(SHEET_NAME);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(SHEET_NAME);
     if (!sh) return respond(false, 'ไม่พบ Sheet');
-    const rows = sh.getDataRange().getValues();
-    const headers = rows[0];
-    const data = rows.slice(1).filter(r => r[0]).map(r => {
-      const obj = {};
-      headers.forEach((h, i) => {
-        const v = r[i];
-        if (v instanceof Date) {
-          obj[h] = Utilities.formatDate(v, 'Asia/Bangkok', 'yyyy-MM-dd');
-        } else {
-          obj[h] = v;
-        }
+    var rows = sh.getDataRange().getValues();
+    var headers = rows[0];
+    var data = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+      var obj = {};
+      headers.forEach(function(h, i) {
+        var v = r[i];
+        obj[h] = v instanceof Date ? Utilities.formatDate(v, 'Asia/Bangkok', 'yyyy-MM-dd') : v;
       });
       return obj;
     });
-
-    // อ่าน tab วัตถุดิบ (ปูน/หิน/ทราย ทุก 10 วัน)
     var materials = [];
     var matSh = ss.getSheetByName('วัตถุดิบ');
     if (matSh) {
       var matRows = matSh.getDataRange().getValues();
       var matH = matRows[0];
-      materials = matRows.slice(1).filter(r => r[0]).map(r => {
+      materials = matRows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
         var obj = {};
-        matH.forEach((h, i) => { obj[h] = r[i] === '' ? null : r[i]; });
+        matH.forEach(function(h, i){ obj[h] = r[i] === '' ? null : r[i]; });
         return obj;
       });
     }
-
     return ContentService
       .createTextOutput(JSON.stringify({ success: true, data: data, materials: materials }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -86,165 +116,44 @@ function doGet(e) {
 }
 
 // ============================================================
-// นำเข้าข้อมูลจาก Sheet "สำเนาของ คำกำลังอัดก้อนปูน"
-// รัน function นี้ครั้งเดียวเพื่อ import ข้อมูลเก่า
+// Sync Sheet ทั้งหมดไป Supabase (กดจากเมนู)
 // ============================================================
-function importFromOldSheet() {
-  var SOURCE_ID = '1Ii0Ocr-PAIp1If2R-wMskzVteHkrGwtVuXXpvqKdKz4';
-  var TARGET_NAME = 'ผลทดสอบคอนกรีต';
-
-  var src = SpreadsheetApp.openById(SOURCE_ID);
-  var srcSheet = src.getSheetByName('ค่ากำอัดอัดทั้งปี69');
-  if (!srcSheet) { Logger.log('ไม่พบ sheet ค่ากำอัดอัดทั้งปี69'); return; }
-  Logger.log('พบ sheet: ' + srcSheet.getName() + ' (' + (srcSheet.getLastRow()-1) + ' แถว)');
-  var rows = srcSheet.getDataRange().getValues();
-  var headers = rows[0].map(function(x){ return String(x).trim(); });
-  var ci = {};
-  headers.forEach(function(n,i){ ci[n] = i; });
-
-  // หา index คอลัมน์
-  var iDate   = ci['วันที่'] !== undefined ? ci['วันที่'] : 0;
-  var iForm   = ci['สูตร']  !== undefined ? ci['สูตร']  : 1;
-  var iSet    = ci['ชุดที่'] !== undefined ? ci['ชุดที่'] : 2;
-  var iAge    = ci['อายุ (วัน)'] !== undefined ? ci['อายุ (วัน)'] : (ci['อายุ(วัน)'] !== undefined ? ci['อายุ(วัน)'] : 3);
-  var iKN     = ci['แรงกด (kN)'] !== undefined ? ci['แรงกด (kN)'] : (ci['แรงกด(kN)'] !== undefined ? ci['แรงกด(kN)'] : 4);
-  var iKSC    = ci['กำลังอัด (KSC)'] !== undefined ? ci['กำลังอัด (KSC)'] : (ci['กำลังอัด(KSC)'] !== undefined ? ci['กำลังอัด(KSC)'] : 5);
-
-  // จัดกลุ่ม 3 ก้อน
-  var groups = {};
-  for (var i = 1; i < rows.length; i++) {
-    var r = rows[i];
-    if (!r[iDate]) continue;
-    var rawDate = r[iDate];
-    var age     = Number(r[iAge] || 0);
-    var formula = String(r[iForm] || '').trim();
-    var set     = String(r[iSet] || '1').trim();
-    var kn      = Number(r[iKN]  || 0);
-    var ksc     = Number(r[iKSC] || 0);
-
-    // แปลงวันที่
-    var testDate = '';
-    if (rawDate instanceof Date) {
-      testDate = Utilities.formatDate(rawDate, 'Asia/Bangkok', 'yyyy-MM-dd');
-    } else {
-      var parts = String(rawDate).split('/');
-      if (parts.length === 3) {
-        var y = Number(parts[2]) < 100 ? 2000 + Number(parts[2]) : Number(parts[2]);
-        testDate = y + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
-      }
-    }
-    if (!testDate) continue;
-    // เฉพาะปี 2026 (พ.ศ. 2569) เท่านั้น
-    if (testDate.slice(0,4) !== '2026') continue;
-
-    // วันที่ในชีต = วันที่เก็บตัวอย่าง, คำนวณวันทดสอบ = วันเก็บ + อายุ
-    var sampleDate = testDate;
-    var td2 = new Date(sampleDate);
-    td2.setDate(td2.getDate() + age);
-    testDate = Utilities.formatDate(td2, 'Asia/Bangkok', 'yyyy-MM-dd');
-
-    var key = sampleDate + '|' + formula + '|' + set + '|' + age;
-    if (!groups[key]) groups[key] = { sampleDate:sampleDate, testDate:testDate, age:age, formula:formula, kns:[], kscs:[] };
-    groups[key].kns.push(kn);
-    groups[key].kscs.push(ksc);
-  }
-
-  // ล้างข้อมูลเดิมทั้งหมด (เก็บแถวหัวไว้)
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(TARGET_NAME);
-  if (!sh) { Logger.log('ไม่พบ target sheet: ' + TARGET_NAME); return; }
-  if (sh.getLastRow() > 1) {
-    sh.getRange(2, 1, sh.getLastRow()-1, sh.getLastColumn()).clearContent();
-  }
-  Logger.log('ล้างข้อมูลเดิมแล้ว');
-
-  var added = 0;
-  var keys = Object.keys(groups);
-  for (var k = 0; k < keys.length; k++) {
-    var g = groups[keys[k]];
-    if (g.kns.length < 1) continue;
-    var r1 = g.kns[0] || '';
-    var r2 = g.kns[1] || '';
-    var r3 = g.kns[2] || '';
-    var avgKn  = g.kns.reduce(function(a,b){return a+b;},0) / g.kns.length;
-    var avgKsc = g.kscs.reduce(function(a,b){return a+b;},0) / g.kscs.length;
-    sh.appendRow([
-      g.sampleDate,
-      g.testDate,
-      g.age,
-      g.formula,
-      '15x15',
-      r1, r2, r3,
-      Math.round(avgKn*100)/100,
-      '',
-      Math.round(avgKsc*10)/10
-    ]);
-    added++;
-  }
-
-  Logger.log('นำเข้าสำเร็จ: ' + added + ' แถว');
-  try { SpreadsheetApp.getUi().alert('✅ นำเข้าสำเร็จ ' + added + ' แถว'); }
-  catch(e) { Logger.log('done'); }
-}
-
-// ============================================================
-// เมนูเลือกเดือน — สร้างตอนเปิด Sheet
-// ============================================================
-// ============================================================
-// Sync ข้อมูลไป Supabase Dashboard
-// ============================================================
-var SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
-var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
-
 function syncConcrete() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) { SpreadsheetApp.getUi().alert('❌ ไม่พบ Sheet'); return; }
 
   var rows = sh.getDataRange().getValues();
-  var headers = rows[0];
   var records = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
-    var sampleDate = r[0] instanceof Date ? Utilities.formatDate(r[0],'Asia/Bangkok','yyyy-MM-dd') : String(r[0]).slice(0,10);
-    var testDate   = r[1] instanceof Date ? Utilities.formatDate(r[1],'Asia/Bangkok','yyyy-MM-dd') : String(r[1]).slice(0,10);
     return {
-      sample_date:   sampleDate,
-      test_date:     testDate,
-      age_days:      Number(r[2]) || 0,
-      formula_name:  String(r[3]),
-      cube_size:     String(r[4]),
-      result1_kn:    Number(r[5]) || 0,
-      result2_kn:    Number(r[6]) || 0,
-      result3_kn:    Number(r[7]) || 0,
-      avg_kn:        Number(r[8]) || 0,
-      avg_mpa:       Number(r[9]) || 0,
-      avg_ksc:       Number(r[10]) || 0
+      sample_date:  r[0] instanceof Date ? Utilities.formatDate(r[0],'Asia/Bangkok','yyyy-MM-dd') : String(r[0]).slice(0,10),
+      test_date:    r[1] instanceof Date ? Utilities.formatDate(r[1],'Asia/Bangkok','yyyy-MM-dd') : String(r[1]).slice(0,10),
+      age_days:     Number(r[2]) || 0,
+      formula_name: String(r[3]),
+      cube_size:    String(r[4]),
+      result1_kn:   Number(r[5]) || 0,
+      result2_kn:   Number(r[6]) || 0,
+      result3_kn:   Number(r[7]) || 0,
+      avg_kn:       Number(r[8]) || 0,
+      avg_mpa:      Number(r[9]) || 0,
+      avg_ksc:      Number(r[10]) || 0
     };
   });
 
   // ลบข้อมูลเก่าก่อน
-  var delResp = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results?id=gte.0', {
+  UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results?id=gte.0', {
     method: 'DELETE',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Content-Type': 'application/json'
-    },
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
     muteHttpExceptions: true
   });
 
-  // แทรกข้อมูลใหม่ทีละ 500 แถว
+  // แทรกทีละ 500 แถว
   var BATCH = 500;
   for (var i = 0; i < records.length; i += BATCH) {
-    var batch = records.slice(i, i + BATCH);
     UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results', {
       method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      payload: JSON.stringify(batch),
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      payload: JSON.stringify(records.slice(i, i + BATCH)),
       muteHttpExceptions: true
     });
   }
@@ -252,59 +161,44 @@ function syncConcrete() {
   SpreadsheetApp.getUi().alert('✅ Sync สำเร็จ ' + records.length + ' แถว');
 }
 
+// ============================================================
+// ลบแถวซ้ำ
+// ============================================================
 function removeDuplicates() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sh) return;
   var data = sh.getDataRange().getValues();
   var seen = {};
   var toDelete = [];
-
   for (var i = data.length - 1; i >= 1; i--) {
-    var key = [
-      String(data[i][0]).slice(0,10),
-      String(data[i][1]).slice(0,10),
-      data[i][2],
-      data[i][3],
-      data[i][5], data[i][6], data[i][7]
-    ].join('|');
-
-    if (seen[key]) {
-      toDelete.push(i + 1);
-    } else {
-      seen[key] = true;
-    }
+    var key = [String(data[i][0]).slice(0,10), String(data[i][1]).slice(0,10), data[i][2], data[i][3], data[i][5], data[i][6], data[i][7]].join('|');
+    if (seen[key]) { toDelete.push(i + 1); } else { seen[key] = true; }
   }
-
-  toDelete.forEach(function(row) {
-    sh.deleteRow(row);
-  });
-
+  toDelete.forEach(function(row){ sh.deleteRow(row); });
   SpreadsheetApp.getUi().alert('✅ ลบแถวซ้ำแล้ว ' + toDelete.length + ' แถว');
 }
 
+// ============================================================
+// เมนูบน Sheet
+// ============================================================
 function onOpen() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
   var ui = SpreadsheetApp.getUi();
   var menu = ui.createMenu('📅 เลือกเดือน');
 
-  // หาเดือนทั้งหมดที่มีในชีต
   if (sh && sh.getLastRow() > 1) {
     var dates = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
     var months = {};
     dates.forEach(function(r) {
       var d = r[0];
-      var ym = d instanceof Date
-        ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM')
-        : String(d).slice(0, 7);
+      var ym = d instanceof Date ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM') : String(d).slice(0, 7);
       if (ym && ym.length === 7) months[ym] = true;
     });
-    var sortedMonths = Object.keys(months).sort().reverse();
-    sortedMonths.forEach(function(ym) {
+    Object.keys(months).sort().reverse().forEach(function(ym) {
       var parts = ym.split('-');
       var be = Number(parts[0]) + 543;
-      var label = 'เดือน ' + parts[1] + '/' + String(be).slice(2) + '  (' + ym + ')';
-      menu.addItem(label, 'showMonth_' + ym.replace('-', '_'));
+      menu.addItem('เดือน ' + parts[1] + '/' + String(be).slice(2) + '  (' + ym + ')', 'showMonth_' + ym.replace('-', '_'));
     });
   }
 
@@ -314,27 +208,20 @@ function onOpen() {
   menu.addToUi();
 
   ui.createMenu('Sync Dashboard')
-    .addItem('🔄 Sync ไป Dashboard', 'syncConcrete')
+    .addItem('🔄 Sync ทั้งหมดไป Dashboard', 'syncConcrete')
     .addItem('🗑️ ลบแถวซ้ำ', 'removeDuplicates')
     .addToUi();
 }
 
-// dynamic stubs — Apps Script ต้องการ function จริง
-// สร้างอัตโนมัติตอน onOpen แต่ต้องมี handler กลาง
 function handleMonthMenu(ym) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEET_NAME);
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sh || sh.getLastRow() <= 1) return;
   var dates = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
   for (var i = 0; i < dates.length; i++) {
     var d = dates[i][0];
-    var rowYM = d instanceof Date
-      ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM')
-      : String(d).slice(0, 7);
-    if (rowYM === ym) sh.showRows(i + 2, 1);
-    else sh.hideRows(i + 2, 1);
+    var rowYM = d instanceof Date ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM') : String(d).slice(0, 7);
+    if (rowYM === ym) sh.showRows(i + 2, 1); else sh.hideRows(i + 2, 1);
   }
-  try { SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะ ' + ym); } catch(e) {}
 }
 
 function showAllRows() {
@@ -343,7 +230,24 @@ function showAllRows() {
   try { SpreadsheetApp.getUi().alert('✅ แสดงทั้งหมดแล้ว'); } catch(e) {}
 }
 
-// stubs สำหรับแต่ละเดือน (เพิ่มได้ถ้ามีเดือนใหม่)
+function showLatestMonthOnly() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sh || sh.getLastRow() <= 1) return;
+  var dates = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  var latestYM = '';
+  dates.forEach(function(r) {
+    var ym = r[0] instanceof Date ? Utilities.formatDate(r[0], 'Asia/Bangkok', 'yyyy-MM') : String(r[0]).slice(0, 7);
+    if (ym > latestYM) latestYM = ym;
+  });
+  if (!latestYM) return;
+  for (var i = 0; i < dates.length; i++) {
+    var ym = dates[i][0] instanceof Date ? Utilities.formatDate(dates[i][0], 'Asia/Bangkok', 'yyyy-MM') : String(dates[i][0]).slice(0, 7);
+    if (ym === latestYM) sh.showRows(i + 2, 1); else sh.hideRows(i + 2, 1);
+  }
+  try { SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะเดือน ' + latestYM); } catch(e) {}
+}
+
+function showMonth_2026_01(){handleMonthMenu('2026-01');}
 function showMonth_2026_02(){handleMonthMenu('2026-02');}
 function showMonth_2026_03(){handleMonthMenu('2026-03');}
 function showMonth_2026_04(){handleMonthMenu('2026-04');}
@@ -355,89 +259,6 @@ function showMonth_2026_09(){handleMonthMenu('2026-09');}
 function showMonth_2026_10(){handleMonthMenu('2026-10');}
 function showMonth_2026_11(){handleMonthMenu('2026-11');}
 function showMonth_2026_12(){handleMonthMenu('2026-12');}
-
-// ============================================================
-// ซ่อนแถวเดือนก่อน แสดงแค่เดือนล่าสุด
-// ============================================================
-function showLatestMonthOnly() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEET_NAME);
-  if (!sh) { Logger.log('ไม่พบ sheet'); return; }
-
-  var lastRow = sh.getLastRow();
-  if (lastRow <= 1) return; // มีแค่หัว
-
-  // หาเดือนล่าสุดจากคอลัมน์ A (วันที่เก็บตัวอย่าง)
-  var dates = sh.getRange(2, 1, lastRow - 1, 1).getValues();
-  var latestYM = '';
-  dates.forEach(function(r) {
-    var d = r[0];
-    var ym = d instanceof Date
-      ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM')
-      : String(d).slice(0, 7);
-    if (ym > latestYM) latestYM = ym;
-  });
-
-  if (!latestYM) return;
-  Logger.log('เดือนล่าสุด: ' + latestYM);
-
-  // แสดง/ซ่อนทีละแถว
-  for (var i = 0; i < dates.length; i++) {
-    var d = dates[i][0];
-    var ym = d instanceof Date
-      ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM')
-      : String(d).slice(0, 7);
-    var row = i + 2; // +2 เพราะเริ่มแถว 2
-    if (ym === latestYM) {
-      sh.showRows(row, 1);
-    } else {
-      sh.hideRows(row, 1);
-    }
-  }
-
-  Logger.log('เสร็จสิ้น — แสดงเฉพาะ ' + latestYM);
-  try { SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะเดือน ' + latestYM); }
-  catch(e) { Logger.log('done'); }
-}
-
-// ============================================================
-// แก้ค่าเฉลี่ย kN และ KSC ทุกแถวให้ถูกต้อง
-// คอลัมน์: F=ลูก1, G=ลูก2, H=ลูก3, I=เฉลี่ยkN, K=เฉลี่ยKSC
-// ============================================================
-function fixAllKscValues() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEET_NAME);
-  if (!sh) { Logger.log('ไม่พบ sheet'); return; }
-
-  var lastRow = sh.getLastRow();
-  if (lastRow <= 1) return;
-
-  var range = sh.getRange(2, 1, lastRow - 1, 11); // A2:K
-  var values = range.getValues();
-  var fixed = 0;
-
-  for (var i = 0; i < values.length; i++) {
-    var kn1 = Number(values[i][5]) || 0; // F
-    var kn2 = Number(values[i][6]) || 0; // G
-    var kn3 = Number(values[i][7]) || 0; // H
-
-    if (kn1 > 0 && kn2 > 0 && kn3 > 0) {
-      var avgKn  = Math.round((kn1 + kn2 + kn3) / 3 * 100) / 100;
-      var avgMpa = Math.round(avgKn / 22.5 * 100) / 100;
-      var avgKsc = Math.round(avgKn / 22.5 * 10.197 * 10) / 10;
-
-      values[i][8]  = avgKn;  // I: เฉลี่ย kN
-      values[i][9]  = avgMpa; // J: เฉลี่ย MPa
-      values[i][10] = avgKsc; // K: เฉลี่ย KSC
-      fixed++;
-    }
-  }
-
-  range.setValues(values);
-  Logger.log('แก้ไขแล้ว ' + fixed + ' แถว');
-  try { SpreadsheetApp.getUi().alert('✅ แก้ไขแล้ว ' + fixed + ' แถว'); }
-  catch(e) { Logger.log('done'); }
-}
 
 function respond(success, message) {
   return ContentService
