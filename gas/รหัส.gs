@@ -190,6 +190,98 @@ function importFromOldSheet() {
 // ============================================================
 // เมนูเลือกเดือน — สร้างตอนเปิด Sheet
 // ============================================================
+// ============================================================
+// Sync ข้อมูลไป Supabase Dashboard
+// ============================================================
+var SUPABASE_URL = 'https://jxkuufqayjjsnpcbnjnf.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4a3V1ZnFheWpqc25wY2Juam5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5MDM1MzgsImV4cCI6MjA1ODQ3OTUzOH0.IrE5QEMmJO-y1gSQ03DoPqjW2Y10aJv3GXbIp-b0nM8';
+
+function syncConcrete() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_NAME);
+  if (!sh) { SpreadsheetApp.getUi().alert('❌ ไม่พบ Sheet'); return; }
+
+  var rows = sh.getDataRange().getValues();
+  var headers = rows[0];
+  var records = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+    var sampleDate = r[0] instanceof Date ? Utilities.formatDate(r[0],'Asia/Bangkok','yyyy-MM-dd') : String(r[0]).slice(0,10);
+    var testDate   = r[1] instanceof Date ? Utilities.formatDate(r[1],'Asia/Bangkok','yyyy-MM-dd') : String(r[1]).slice(0,10);
+    return {
+      sample_date:   sampleDate,
+      test_date:     testDate,
+      age_days:      Number(r[2]) || 0,
+      formula_name:  String(r[3]),
+      cube_size:     String(r[4]),
+      result1_kn:    Number(r[5]) || 0,
+      result2_kn:    Number(r[6]) || 0,
+      result3_kn:    Number(r[7]) || 0,
+      avg_kn:        Number(r[8]) || 0,
+      avg_mpa:       Number(r[9]) || 0,
+      avg_ksc:       Number(r[10]) || 0
+    };
+  });
+
+  // ลบข้อมูลเก่าก่อน
+  var delResp = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results?id=gte.0', {
+    method: 'DELETE',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    },
+    muteHttpExceptions: true
+  });
+
+  // แทรกข้อมูลใหม่ทีละ 500 แถว
+  var BATCH = 500;
+  for (var i = 0; i < records.length; i += BATCH) {
+    var batch = records.slice(i, i + BATCH);
+    UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      payload: JSON.stringify(batch),
+      muteHttpExceptions: true
+    });
+  }
+
+  SpreadsheetApp.getUi().alert('✅ Sync สำเร็จ ' + records.length + ' แถว');
+}
+
+function removeDuplicates() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sh) return;
+  var data = sh.getDataRange().getValues();
+  var seen = {};
+  var toDelete = [];
+
+  for (var i = data.length - 1; i >= 1; i--) {
+    var key = [
+      String(data[i][0]).slice(0,10),
+      String(data[i][1]).slice(0,10),
+      data[i][2],
+      data[i][3],
+      data[i][5], data[i][6], data[i][7]
+    ].join('|');
+
+    if (seen[key]) {
+      toDelete.push(i + 1);
+    } else {
+      seen[key] = true;
+    }
+  }
+
+  toDelete.forEach(function(row) {
+    sh.deleteRow(row);
+  });
+
+  SpreadsheetApp.getUi().alert('✅ ลบแถวซ้ำแล้ว ' + toDelete.length + ' แถว');
+}
+
 function onOpen() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
@@ -220,6 +312,11 @@ function onOpen() {
   menu.addItem('✅ แสดงทั้งหมด', 'showAllRows');
   menu.addItem('🔒 แค่เดือนล่าสุด', 'showLatestMonthOnly');
   menu.addToUi();
+
+  ui.createMenu('Sync Dashboard')
+    .addItem('🔄 Sync ไป Dashboard', 'syncConcrete')
+    .addItem('🗑️ ลบแถวซ้ำ', 'removeDuplicates')
+    .addToUi();
 }
 
 // dynamic stubs — Apps Script ต้องการ function จริง
