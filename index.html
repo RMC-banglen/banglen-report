@@ -1940,44 +1940,69 @@ window.__dataReady.then(data => {
 
     const [materials,setMaterials]=useState([]);
 
-    useEffect(()=>{
-      fetch(CONCRETE_URL)
-        .then(r=>r.json())
-        .then(res=>{
-          const raw=res.data||[];
-          const data=raw.map(r=>({
-            sample_date: String(r['วันที่เก็บตัวอย่าง']||'').slice(0,10),
-            test_date:   String(r['วันที่ทดสอบ']||'').slice(0,10),
-            age_days:    Number(r['อายุ(วัน)']||r['อายุ (วัน)']||0),
-            formula_name:String(r['ชื่อสูตร']||''),
-            cube_size:   String(r['ขนาด cube']||''),
-            result1_kn:  Number(r['ลูก1(kN)']||0),
-            result2_kn:  Number(r['ลูก2(kN)']||0),
-            result3_kn:  Number(r['ลูก3(kN)']||0),
-            avg_kn:      Number(r['เฉลี่ย kN']||0),
-            avg_mpa:     Number(r['เฉลี่ย MPa']||0),
-            avg_ksc:     Number(r['เฉลี่ย KSC']||0),
-          }));
-          const mats=res.materials||[];
-          setRows(data);
-          setMaterials(mats);
-          const dates=data.map(r=>String(r.sample_date||'').slice(0,10)).filter(Boolean).sort();
-          if(dates.length){
-            const last=dates[dates.length-1];
-            const day7dates=data.filter(r=>Number(r.age_days||0)===7).map(r=>String(r.sample_date||'').slice(0,10)).filter(Boolean).sort();
-            const lastDay7=day7dates.length?day7dates[day7dates.length-1]:last;
-            setSelSample(lastDay7);
-            const d=new Date(lastDay7); d.setDate(d.getDate()-9);
-            setDateTo(lastDay7);
-            setDateFrom(d.toISOString().slice(0,10));
-          }
-          setLoading(false);
-        }).catch(e=>{setErr('เชื่อมต่อไม่ได้: '+e.message);setLoading(false);});
-    },[]);
+    const loadFromSupabase=()=>{
+      const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+      Promise.all([
+        db.from('concrete_results').select('*').order('sample_date'),
+        db.from('materials_daily').select('*').order('id')
+      ]).then(([cr,mr])=>{
+        const data=cr.data||[];
+        const mats=mr.data||[];
+        setRows(data);
+        setMaterials(mats);
+        const dates=data.map(r=>String(r.sample_date||'').slice(0,10)).filter(Boolean).sort();
+        if(dates.length){
+          const last=dates[dates.length-1];
+          const day7dates=data.filter(r=>Number(r.age_days||0)===7).map(r=>String(r.sample_date||'').slice(0,10)).filter(Boolean).sort();
+          const lastDay7=day7dates.length?day7dates[day7dates.length-1]:last;
+          setSelSample(lastDay7);
+          const d=new Date(lastDay7); d.setDate(d.getDate()-9);
+          setDateTo(lastDay7);
+          setDateFrom(d.toISOString().slice(0,10));
+        }
+        setLoading(false);
+      }).catch(e=>{setErr('เชื่อมต่อไม่ได้: '+e.message);setLoading(false);});
+    };
 
+    const [syncing,setSyncing]=useState(false);
+    const [syncMsg,setSyncMsg]=useState('');
+    const syncFromGAS=()=>{
+      setSyncing(true); setSyncMsg('');
+      fetch(CONCRETE_URL).then(r=>r.json()).then(res=>{
+        const raw=res.data||[];
+        const rows=raw.map(r=>({
+          sample_date: String(r['วันที่เก็บตัวอย่าง']||'').slice(0,10),
+          test_date:   String(r['วันที่ทดสอบ']||'').slice(0,10),
+          age_days:    Number(r['อายุ(วัน)']||r['อายุ (วัน)']||0),
+          formula_name:String(r['ชื่อสูตร']||''),
+          cube_size:   String(r['ขนาด cube']||'15x15'),
+          result1_kn:  Number(r['ลูก1(kN)']||0),
+          result2_kn:  Number(r['ลูก2(kN)']||0),
+          result3_kn:  Number(r['ลูก3(kN)']||0),
+          avg_kn:      Number(r['เฉลี่ย kN']||0),
+          avg_mpa:     Number(r['เฉลี่ย MPa']||0),
+          avg_ksc:     Number(r['เฉลี่ย KSC']||0),
+        })).filter(r=>r.sample_date&&r.formula_name);
+        const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+        db.from('concrete_results').delete().neq('id',0).then(()=>{
+          db.from('concrete_results').insert(rows).then(({error})=>{
+            if(error){setSyncMsg('❌ '+error.message);}
+            else{setSyncMsg('✅ Sync สำเร็จ '+rows.length+' แถว'); loadFromSupabase();}
+            setSyncing(false);
+          });
+        });
+      }).catch(e=>{setSyncMsg('❌ ดึงข้อมูลไม่ได้: '+e.message);setSyncing(false);});
+    };
+
+    useEffect(()=>{ loadFromSupabase(); },[]);
+
+    const SyncBtn=()=>React.createElement('div',{style:{textAlign:'right',padding:'8px 0'}},
+      React.createElement('button',{onClick:syncFromGAS,disabled:syncing,style:{background:'#1a56db',color:'#fff',border:'none',borderRadius:6,padding:'6px 16px',cursor:'pointer',fontSize:13}},syncing?'กำลัง Sync...':'🔄 Sync จาก Google Sheet'),
+      syncMsg&&React.createElement('span',{style:{marginLeft:10,fontSize:12,color:syncMsg.startsWith('✅')?'#059669':'#c00'}},syncMsg)
+    );
     if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
-    if(err) return <div style={{padding:40,textAlign:'center',color:'#c00'}}>{err}</div>;
-    if(!rows.length) return <div style={{padding:40,textAlign:'center',color:'#888'}}>ยังไม่มีข้อมูล — ใช้ /คอนกรีต ใน Code tab เพื่อบันทึกผลทดสอบ</div>;
+    if(err) return <div style={{padding:40,textAlign:'center',color:'#c00'}}>{err}<br/><SyncBtn/></div>;
+    if(!rows.length) return <div style={{padding:40,textAlign:'center',color:'#888'}}>ยังไม่มีข้อมูล<br/><SyncBtn/></div>;
 
     const sd=r=>String(r.sample_date||'').slice(0,10);
     const fm=r=>String(r.formula_name||'').trim();
@@ -2136,6 +2161,7 @@ window.__dataReady.then(data => {
     const strAvg=dAvg;
 
     return <div style={{padding:'24px 20px'}}>
+      <SyncBtn/>
       {/* KPI row */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:14,marginBottom:24}}>
         {[
