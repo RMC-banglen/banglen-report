@@ -2490,7 +2490,9 @@ window.__dataReady.then(data => {
       {prevSubTab&&<button onClick={()=>{setSubTab(prevSubTab);setPrevSubTab(null);}} style={{display:'flex',alignItems:'center',gap:6,marginBottom:14,padding:'6px 14px',border:'1px solid #e2e8f0',borderRadius:8,background:'#f8fafc',cursor:'pointer',fontSize:13,fontWeight:600,color:'#2f5fd0'}}>← กลับ KPI</button>}
       {(()=>{
         const availYears=[...new Set(reports.map(r=>new Date(r.report_date).getFullYear()+543))].sort((a,b)=>b-a);
-        const availMonths=[...new Set(allYearReps.map(r=>new Date(r.report_date).getMonth()+1))].sort((a,b)=>a-b);
+        const hasDataMonths=[...new Set(allYearReps.map(r=>new Date(r.report_date).getMonth()+1))];
+        const latestMonth=hasDataMonths.length?Math.max(...hasDataMonths):new Date().getMonth()+1;
+        const availMonths=Array.from({length:latestMonth},(_,i)=>i+1);
         return<div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
           <label style={{fontSize:13,color:'#64748b',fontWeight:500,whiteSpace:'nowrap'}}>เลือกปี:</label>
           <select value={selYear} onChange={e=>{const y=Number(e.target.value);const ms=[...new Set(reports.filter(r=>new Date(r.report_date).getFullYear()===y-543).map(r=>new Date(r.report_date).getMonth()+1))].sort((a,b)=>a-b);setSelYear(y);setSelMonth(ms.length?ms[ms.length-1]:1);}} style={{padding:'7px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,background:'#fff',outline:'none',fontFamily:'inherit',cursor:'pointer',color:'#1e293b',fontWeight:600}}>
