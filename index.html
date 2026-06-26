@@ -3217,6 +3217,11 @@ window.__dataReady.then(data => {
                   ))}
                 </div>
               ))}
+              {tType!=='__all__'&&a.breakdown&&a.breakdown.flatMap(b=>b.subBk||[]).filter(s=>s.diff>0||s.prev===0&&s.cur>0).sort((x,y)=>y.diff-x.diff).map((s,j)=>(
+                <div key={j} style={{fontSize:12,color:'#991b1b',paddingLeft:12,marginTop:2}}>
+                  {s.prev===0?<>🆕 {s.sub}: {s.cur} เคส (ใหม่)</>:<>↑ {s.sub}: {s.prev}→{s.cur} เคส (+{s.diff})</>}
+                </div>
+              ))}
             </div>)}
           </div>}
           {goods.length>0&&<div style={{marginTop:12,background:'#f0fdf4',border:'1px solid #86efac',borderRadius:12,padding:'14px 18px'}}>
@@ -3229,6 +3234,11 @@ window.__dataReady.then(data => {
                   {b.subBk&&b.subBk.filter(s=>s.diff<0).map((s,si)=>(
                     <div key={si} style={{paddingLeft:10,fontSize:11,color:'#166534',marginTop:1}}>• {s.sub}: {s.prev}→{s.cur} เคส</div>
                   ))}
+                </div>
+              ))}
+              {tType!=='__all__'&&a.breakdown&&a.breakdown.flatMap(b=>b.subBk||[]).filter(s=>s.diff<0).sort((x,y)=>x.diff-y.diff).map((s,j)=>(
+                <div key={j} style={{fontSize:12,color:'#166534',paddingLeft:12,marginTop:2}}>
+                  ↓ {s.sub}: {s.prev}→{s.cur} เคส ({s.diff})
                 </div>
               ))}
             </div>)}
