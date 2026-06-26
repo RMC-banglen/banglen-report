@@ -1312,15 +1312,26 @@ window.__dataReady.then(data => {
           const allKeys=[...new Set([...Object.keys(cMap),...Object.keys(pMap)])];
           return allKeys.map(k=>({cause:k,cur:cMap[k]||0,prev:pMap[k]||0,diff:(cMap[k]||0)-(pMap[k]||0)})).sort((a,b)=>b.diff-a.diff);
         };
+        // helper: breakdown เทียบ period ปัจจุบัน vs period ก่อนหน้าในปีเดียวกัน
+        const causeBreakdownVsPrevPeriod=(curIdx)=>{
+          if(curIdx===0||period==='year') return [];
+          const curMonths=periodMonths(curIdx);
+          const prevMonths=periodMonths(curIdx-1);
+          const cMap={}, pMap={};
+          curItems.filter(r=>curMonths.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';cMap[k]=(cMap[k]||0)+(r.amount||0);});
+          curItems.filter(r=>prevMonths.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';pMap[k]=(pMap[k]||0)+(r.amount||0);});
+          const allKeys=[...new Set([...Object.keys(cMap),...Object.keys(pMap)])];
+          return allKeys.map(k=>({cause:k,cur:cMap[k]||0,prev:pMap[k]||0,diff:(cMap[k]||0)-(pMap[k]||0)})).sort((a,b)=>b.diff-a.diff);
+        };
+
         // วิเคราะห์ระดับสาเหตุ แยกตาม period — เฉพาะ period ที่มีข้อมูลปีนี้
         const periodLabel=period==='quarter'?'ไตรมาส':period==='half'?'ช่วง':period==='year'?'ทั้งปี':'';
-        // periodAnalysis[i] = {cat, ups:[], goods:[]}
         const periodAnalysis=[];
         if(period!=='month'&&selCause==='__all__'){
-          // spike detection: หาค่าเฉลี่ยของแต่ละสาเหตุ ข้ามทุก period ที่มีข้อมูลปีนี้
+          // spike detection
           const causeMeans={};
           pd.cats.forEach((cat,i)=>{
-            if(pd.cur[i]==null||pd.cur[i]===0) return; // ข้ามถ้าปีนี้ไม่มีข้อมูล
+            if(pd.cur[i]==null||pd.cur[i]===0) return;
             causeBreakdownForIdx(i).forEach(b=>{
               if(!causeMeans[b.cause]) causeMeans[b.cause]=[];
               if(b.cur>0) causeMeans[b.cause].push(b.cur);
@@ -1334,22 +1345,47 @@ window.__dataReady.then(data => {
             causeStats[c]={mean,std};
           });
 
-          pd.cats.forEach((cat,i)=>{
-            if(pd.cur[i]==null||pd.cur[i]===0) return; // ข้าม period ที่ปีนี้ไม่มีข้อมูล
-            const bk=causeBreakdownForIdx(i);
-            const catUps=[], catGoods=[];
+          const buildFlags=(bk,statsMap)=>{
+            const fUps=[], fGoods=[];
             bk.forEach(b=>{
               const pct=b.prev>0?(b.diff/b.prev)*100:null;
-              if(b.prev>0&&pct>=50) catUps.push({...b,pct,flagType:'up'});
-              else if(b.prev===0&&b.cur>0) catUps.push({...b,pct:null,flagType:'new'});
-              else if(causeStats[b.cause]&&b.cur>causeStats[b.cause].mean+1.5*causeStats[b.cause].std&&!(b.prev>0&&pct>=50)){
-                catUps.push({...b,pct:null,flagType:'spike',mean:causeStats[b.cause].mean,stdDiff:b.cur-causeStats[b.cause].mean});
+              if(b.prev>0&&pct>=50) fUps.push({...b,pct,flagType:'up'});
+              else if(b.prev===0&&b.cur>0) fUps.push({...b,pct:null,flagType:'new'});
+              else if(statsMap&&statsMap[b.cause]&&b.cur>statsMap[b.cause].mean+1.5*statsMap[b.cause].std){
+                fUps.push({...b,pct:null,flagType:'spike',stdDiff:b.cur-statsMap[b.cause].mean});
               }
-              if(b.prev>0&&pct<=-30) catGoods.push({...b,pct,flagType:'good'});
+              if(b.prev>0&&pct<=-30) fGoods.push({...b,pct});
             });
-            if(catUps.length>0||catGoods.length>0) periodAnalysis.push({cat,idx:i,ups:catUps,goods:catGoods});
+            return {fUps,fGoods};
+          };
+
+          pd.cats.forEach((cat,i)=>{
+            if(pd.cur[i]==null||pd.cur[i]===0) return;
+            const bkYoY=causeBreakdownForIdx(i);
+            const {fUps:yoyUps,fGoods:yoyGoods}=buildFlags(bkYoY,causeStats);
+            // เทียบ vs period ก่อนในปีนี้
+            const bkQoQ=causeBreakdownVsPrevPeriod(i);
+            const {fUps:qoqUps,fGoods:qoqGoods}=buildFlags(bkQoQ,null);
+            const prevCat=i>0?pd.cats[i-1]:null;
+            if(yoyUps.length>0||yoyGoods.length>0||qoqUps.length>0||qoqGoods.length>0){
+              periodAnalysis.push({cat,idx:i,prevCat,yoyUps,yoyGoods,qoqUps,qoqGoods});
+            }
           });
         }
+
+        const renderCauseRows=(list,colorRed)=>list.map((b,j)=>(
+          <div key={j} style={{fontSize:13,color:colorRed?'#7f1d1d':'#166534',paddingLeft:8,borderLeft:`3px solid ${colorRed?'#c0392b':'#16a34a'}`,marginBottom:5}}>
+            {colorRed
+              ? (b.flagType==='spike'
+                  ? <>📈 <b>{b.cause}</b> สูงผิดปกติ ({bahtFmt(b.cur)} ฿) เกินค่าเฉลี่ย {bahtFmt(Math.round(b.stdDiff))} ฿</>
+                  : b.flagType==='new'
+                    ? <>🆕 <b>{b.cause}</b> เกิดขึ้นใหม่ ({bahtFmt(b.cur)} ฿) ไม่มีในช่วงก่อน</>
+                    : <>🔺 <b>{b.cause}</b> เพิ่มขึ้น <b>{b.pct.toFixed(1)}%</b> ({bahtFmt(b.prev)} → {bahtFmt(b.cur)} ฿)</>)
+              : <>✅ <b>{b.cause}</b> ลดลง <b>{Math.abs(b.pct).toFixed(1)}%</b> ({bahtFmt(b.prev)} → {bahtFmt(b.cur)} ฿) — {b.pct<=-70?'ยอดเยี่ยมมาก!':b.pct<=-50?'ดีมากควบคุมได้ดี':'ปรับตัวดีขึ้น'}</>
+            }
+          </div>
+        ));
+
         return <>
           {/* ยอดรวม period ผิดปกติ */}
           {ups.length>0&&<div style={{marginTop:16,background:'#fff5f5',border:'1px solid #fecaca',borderRadius:12,padding:'14px 18px'}}>
@@ -1374,34 +1410,42 @@ window.__dataReady.then(data => {
             ))}
           </div>}
           {/* วิเคราะห์แยกราย period */}
-          {periodAnalysis.map(({cat,ups:pUps,goods:pGoods},pi)=>(
+          {periodAnalysis.map(({cat,idx,prevCat,yoyUps,yoyGoods,qoqUps,qoqGoods},pi)=>(
             <div key={pi} style={{marginTop:14,border:'1px solid #e2e8f0',borderRadius:12,overflow:'hidden'}}>
               <div style={{background:'#f8fafc',padding:'10px 16px',fontWeight:700,fontSize:14,color:'#334155',borderBottom:'1px solid #e2e8f0'}}>
                 📊 {periodLabel} <span style={{color:'#2f5fd0'}}>{cat}</span> — การวิเคราะห์สาเหตุ
               </div>
-              <div style={{padding:'12px 16px'}}>
-                {pUps.length>0&&<>
-                  <div style={{fontSize:12,fontWeight:700,color:'#991b1b',marginBottom:6}}>⚠ สาเหตุที่น่าเฝ้าระวัง</div>
-                  {pUps.map((b,j)=>(
-                    <div key={j} style={{fontSize:13,color:'#7f1d1d',paddingLeft:8,borderLeft:'3px solid #c0392b',marginBottom:5}}>
-                      {b.flagType==='spike'
-                        ? <>📈 <b>{b.cause}</b> สูงผิดปกติ ({bahtFmt(b.cur)} ฿) เกินค่าเฉลี่ย {bahtFmt(Math.round(b.stdDiff))} ฿</>
-                        : b.flagType==='new'
-                          ? <>🆕 <b>{b.cause}</b> เกิดขึ้นใหม่ ({bahtFmt(b.cur)} ฿) ไม่มีในปีก่อน</>
-                          : <>🔺 <b>{b.cause}</b> เพิ่มขึ้น <b>{b.pct.toFixed(1)}%</b> ({bahtFmt(b.prev)} → {bahtFmt(b.cur)} ฿)</>
-                      }
-                    </div>
-                  ))}
-                </>}
-                {pUps.length>0&&pGoods.length>0&&<div style={{height:8}}/>}
-                {pGoods.length>0&&<>
-                  <div style={{fontSize:12,fontWeight:700,color:'#14532d',marginBottom:6}}>✅ สาเหตุที่ควบคุมได้ดี</div>
-                  {pGoods.map((b,j)=>(
-                    <div key={j} style={{fontSize:13,color:'#166534',paddingLeft:8,borderLeft:'3px solid #16a34a',marginBottom:5}}>
-                      ✅ <b>{b.cause}</b> ลดลง <b>{Math.abs(b.pct).toFixed(1)}%</b> ({bahtFmt(b.prev)} → {bahtFmt(b.cur)} ฿) — {b.pct<=-70?'ยอดเยี่ยมมาก!':b.pct<=-50?'ดีมากควบคุมได้ดี':'ปรับตัวดีขึ้น'}
-                    </div>
-                  ))}
-                </>}
+              <div style={{padding:'12px 16px',display:'flex',gap:16,flexWrap:'wrap'}}>
+                {/* เทียบปีก่อน */}
+                {(yoyUps.length>0||yoyGoods.length>0)&&<div style={{flex:'1 1 280px'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'#475569',marginBottom:8,paddingBottom:4,borderBottom:'1px solid #e2e8f0'}}>
+                    🗓 เทียบ {cat} ปี {curYear} vs ปี {prevYear}
+                  </div>
+                  {yoyUps.length>0&&<>
+                    <div style={{fontSize:11,fontWeight:700,color:'#991b1b',marginBottom:4}}>⚠ น่าเฝ้าระวัง</div>
+                    {renderCauseRows(yoyUps,true)}
+                  </>}
+                  {yoyUps.length>0&&yoyGoods.length>0&&<div style={{height:6}}/>}
+                  {yoyGoods.length>0&&<>
+                    <div style={{fontSize:11,fontWeight:700,color:'#14532d',marginBottom:4}}>✅ ควบคุมได้ดี</div>
+                    {renderCauseRows(yoyGoods,false)}
+                  </>}
+                </div>}
+                {/* เทียบ period ก่อน */}
+                {prevCat&&(qoqUps.length>0||qoqGoods.length>0)&&<div style={{flex:'1 1 280px'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'#475569',marginBottom:8,paddingBottom:4,borderBottom:'1px solid #e2e8f0'}}>
+                    🔄 เทียบ {cat} vs {prevCat} ปี {curYear}
+                  </div>
+                  {qoqUps.length>0&&<>
+                    <div style={{fontSize:11,fontWeight:700,color:'#991b1b',marginBottom:4}}>⚠ น่าเฝ้าระวัง</div>
+                    {renderCauseRows(qoqUps,true)}
+                  </>}
+                  {qoqUps.length>0&&qoqGoods.length>0&&<div style={{height:6}}/>}
+                  {qoqGoods.length>0&&<>
+                    <div style={{fontSize:11,fontWeight:700,color:'#14532d',marginBottom:4}}>✅ ควบคุมได้ดี</div>
+                    {renderCauseRows(qoqGoods,false)}
+                  </>}
+                </div>}
               </div>
             </div>
           ))}
