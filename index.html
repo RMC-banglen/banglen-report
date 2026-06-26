@@ -1238,49 +1238,88 @@ window.__dataReady.then(data => {
         </span>
       </div>
 
-      {hasData
-        ? <LineChart categories={pd.cats} height={300} unit="฿" decimals={0}
-            series={[
-              {label:`ปี ${curYear}`,color:'#2f5fd0',data:pd.cur},
-              {label:`ปี ${prevYear}`,color:'#94a3b8',data:pd.prev,dashed:true}
-            ]}/>
-        : <div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>ไม่มีข้อมูล</div>
+      {hasData ? (()=>{
+        const n=pd.cats.length;
+        const LCOL=100; // first column width px
+        const CHART_H=220;
+        // useMeasure ใช้ไม่ได้ใน IIFE ต้องใช้ component แยก
+        // ใช้ TrendGrid ที่ wrap ทั้งหมด
+        const TrendGrid=(()=>{
+          const [ref,W]=useMeasure();
+          const colW=W>0?(W-LCOL)/n:0;
+          const padT=16,padB=8,padL=0,padR=0;
+          const iW=W-LCOL; const iH=CHART_H-padT-padB;
+          const allV=[...pd.cur,...pd.prev].filter(v=>v!=null&&v>0);
+          const lo=allV.length?Math.min(...allV)*0.9:0;
+          const rawHi=allV.length?Math.max(...allV):1;
+          const {ticks,hi}=niceLineTicks(lo,rawHi);
+          const xp=i=>LCOL+(i+0.5)*colW;
+          const yp=v=>padT+iH-((v-lo)/(hi-lo))*iH;
+          const linePath=(data,color,dashed)=>{
+            const pts=data.map((v,i)=>v!=null?{x:xp(i),y:yp(v)}:null);
+            let d='';
+            pts.forEach((p,i)=>{if(!p)return;d+=d||pts.slice(0,i).every(x=>!x)?`M${p.x},${p.y}`:`L${p.x},${p.y}`;});
+            return d?<path d={d} fill="none" stroke={color} strokeWidth="2" strokeDasharray={dashed?'6,4':'none'}/>:null;
+          };
+          return <div ref={ref} style={{marginTop:4}}>
+            <svg width={W||'100%'} height={CHART_H} style={{display:'block',overflow:'visible'}}>
+              {/* y-axis ticks */}
+              {ticks.map((t,i)=><g key={i}>
+                <line x1={LCOL} x2={W} y1={yp(t)} y2={yp(t)} stroke="#e2e8f0"/>
+                <text x={LCOL-6} y={yp(t)+4} textAnchor="end" style={{fontSize:10,fill:'#94a3b8',fontFamily:'var(--num)'}}>{fmt(t,0)}</text>
+              </g>)}
+              {/* col separators */}
+              {pd.cats.map((_,i)=><line key={i} x1={xp(i)} x2={xp(i)} y1={padT} y2={padT+iH} stroke="#f1f5f9"/>)}
+              {/* lines */}
+              {colW>0&&linePath(pd.prev,'#94a3b8',true)}
+              {colW>0&&linePath(pd.cur,'#2f5fd0',false)}
+              {/* dots */}
+              {colW>0&&pd.cur.map((v,i)=>v!=null&&<circle key={i} cx={xp(i)} cy={yp(v)} r={4} fill="white" stroke="#2f5fd0" strokeWidth="2"/>)}
+              {colW>0&&pd.prev.map((v,i)=>v!=null&&<circle key={i} cx={xp(i)} cy={yp(v)} r={4} fill="white" stroke="#94a3b8" strokeWidth="2"/>)}
+            </svg>
+          </div>;
+        })();
+        return <div style={{marginTop:8,overflowX:'auto'}}>
+          {TrendGrid}
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,tableLayout:'fixed'}}>
+            <colgroup>
+              <col style={{width:LCOL}}/>
+              {pd.cats.map((_,i)=><col key={i}/>)}
+            </colgroup>
+            <thead>
+              <tr style={{background:'#f8fafc'}}>
+                <th style={{padding:'8px 12px',textAlign:'left',borderBottom:'1px solid #e2e8f0',borderTop:'2px solid #e2e8f0',color:'#64748b'}}>ปี / ช่วง</th>
+                {pd.cats.map(c=><th key={c} style={{padding:'8px 8px',textAlign:'center',borderBottom:'1px solid #e2e8f0',borderTop:'2px solid #e2e8f0',color:'#64748b',fontWeight:600}}>{c}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{padding:'8px 12px',fontWeight:700,color:'#2f5fd0',borderBottom:'1px solid #f1f5f9'}}>ปี {curYear}</td>
+                {pd.cur.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'center',borderBottom:'1px solid #f1f5f9',color:v?'#1e293b':'#cbd5e1'}}>{bahtFmt(v)}</td>)}
+              </tr>
+              <tr>
+                <td style={{padding:'8px 12px',fontWeight:700,color:'#94a3b8',borderBottom:'1px solid #f1f5f9'}}>ปี {prevYear}</td>
+                {pd.prev.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'center',borderBottom:'1px solid #f1f5f9',color:v?'#64748b':'#cbd5e1'}}>{bahtFmt(v)}</td>)}
+              </tr>
+              <tr style={{background:'#f8fafc'}}>
+                <td style={{padding:'8px 12px',fontWeight:700,color:'#334155'}}>ส่วนต่าง</td>
+                {pd.cats.map((_,i)=>{
+                  const c=pd.cur[i], p=pd.prev[i];
+                  if(c==null&&p==null) return <td key={i} style={{padding:'8px 8px',textAlign:'center',color:'#cbd5e1'}}>–</td>;
+                  if(c==null||p==null) return <td key={i} style={{padding:'8px 8px',textAlign:'center',color:'#94a3b8'}}>–</td>;
+                  const diff=c-p; const pct=(diff/p*100);
+                  return <td key={i} style={{padding:'8px 8px',textAlign:'center',fontWeight:700,color:diff>0?'#c0392b':'#3B6D11'}}>
+                    {diff>0?'+':''}{bahtFmt(diff)}<br/>
+                    <span style={{fontSize:11,fontWeight:600}}>{diff>0?'▲':'▼'} {Math.abs(pct).toFixed(1)}%</span>
+                  </td>;
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>;
+      })()
+      : <div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>ไม่มีข้อมูล</div>
       }
-
-      {/* ตารางเปรียบเทียบ + ส่วนต่าง */}
-      <div style={{marginTop:20,overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-          <thead>
-            <tr style={{background:'#f8fafc'}}>
-              <th style={{padding:'8px 12px',textAlign:'left',borderBottom:'1px solid #e2e8f0',color:'#64748b',minWidth:90}}>ปี / ช่วง</th>
-              {pd.cats.map(c=><th key={c} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #e2e8f0',color:'#64748b',fontWeight:600}}>{c}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{padding:'8px 12px',fontWeight:700,color:'#2f5fd0',borderBottom:'1px solid #f1f5f9'}}>ปี {curYear}</td>
-              {pd.cur.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #f1f5f9',color:v?'#1e293b':'#cbd5e1'}}>{bahtFmt(v)}</td>)}
-            </tr>
-            <tr>
-              <td style={{padding:'8px 12px',fontWeight:700,color:'#94a3b8',borderBottom:'1px solid #f1f5f9'}}>ปี {prevYear}</td>
-              {pd.prev.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #f1f5f9',color:v?'#64748b':'#cbd5e1'}}>{bahtFmt(v)}</td>)}
-            </tr>
-            <tr style={{background:'#f8fafc'}}>
-              <td style={{padding:'8px 12px',fontWeight:700,color:'#334155'}}>ส่วนต่าง</td>
-              {pd.cats.map((_,i)=>{
-                const c=pd.cur[i], p=pd.prev[i];
-                if(c==null&&p==null) return <td key={i} style={{padding:'8px 8px',textAlign:'right',color:'#cbd5e1'}}>–</td>;
-                if(c==null||p==null) return <td key={i} style={{padding:'8px 8px',textAlign:'right',color:'#94a3b8'}}>–</td>;
-                const diff=c-p; const pct=(diff/p*100);
-                return <td key={i} style={{padding:'8px 8px',textAlign:'right',fontWeight:700,color:diff>0?'#c0392b':'#3B6D11'}}>
-                  {diff>0?'+':''}{bahtFmt(diff)}<br/>
-                  <span style={{fontSize:11,fontWeight:600}}>{diff>0?'▲':'▼'} {Math.abs(pct).toFixed(1)}%</span>
-                </td>;
-              })}
-            </tr>
-          </tbody>
-        </table>
-      </div>
 
       {/* วิเคราะห์ */}
       {(()=>{
