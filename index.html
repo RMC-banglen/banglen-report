@@ -1134,8 +1134,9 @@ window.__dataReady.then(data => {
     const MONTHS_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const curYear = filterYear==='ALL' ? (years[years.length-1]||new Date().getFullYear()) : Number(filterYear);
     const prevYear = curYear - 1;
-    const curItems = rawItems.filter(r=>r.year===curYear);
-    const prevItems = rawItems.filter(r=>r.year===prevYear);
+    const EXCLUDE_CAUSES=['รับคืนสินค้าใช้ได้','ย้ายไปบ่อตะกั่ว'];
+    const curItems = rawItems.filter(r=>r.year===curYear&&!EXCLUDE_CAUSES.includes(r.cause));
+    const prevItems = rawItems.filter(r=>r.year===prevYear&&!EXCLUDE_CAUSES.includes(r.cause));
 
     // รายชื่อสาเหตุทั้งหมด (เรียงตามมูลค่าปีปัจจุบัน)
     const allCauses = [...new Set([...curItems,...prevItems].map(r=>r.cause||'ไม่ระบุ'))]
