@@ -3071,7 +3071,14 @@ window.__dataReady.then(data => {
           curReps.filter(r=>months.includes(getMonth(r))&&typeFilter(r)).forEach(r=>{const k=r.type||'ไม่ระบุ';cm[k]=(cm[k]||0)+1;});
           prevReps.filter(r=>months.includes(getMonth(r))&&typeFilter(r)).forEach(r=>{const k=r.type||'ไม่ระบุ';pm[k]=(pm[k]||0)+1;});
           const allK=[...new Set([...Object.keys(cm),...Object.keys(pm)])];
-          const bk=allK.map(k=>({type:k,cur:cm[k]||0,prev:pm[k]||0,diff:(cm[k]||0)-(pm[k]||0)}));
+          const bk=allK.map(k=>{
+            const sCm={},sPm={};
+            curReps.filter(r=>months.includes(getMonth(r))&&typeFilter(r)&&(r.type||'ไม่ระบุ')===k).forEach(r=>{if(r.sub_type){sCm[r.sub_type]=(sCm[r.sub_type]||0)+1;}});
+            prevReps.filter(r=>months.includes(getMonth(r))&&typeFilter(r)&&(r.type||'ไม่ระบุ')===k).forEach(r=>{if(r.sub_type){sPm[r.sub_type]=(sPm[r.sub_type]||0)+1;}});
+            const allSK=[...new Set([...Object.keys(sCm),...Object.keys(sPm)])];
+            const subBk=allSK.map(sk=>({sub:sk,cur:sCm[sk]||0,prev:sPm[sk]||0,diff:(sCm[sk]||0)-(sPm[sk]||0)})).sort((a,b2)=>b2.diff-a.diff);
+            return {type:k,cur:cm[k]||0,prev:pm[k]||0,diff:(cm[k]||0)-(pm[k]||0),subBk};
+          });
           if(pct>=10) ups.push({cat,cur:c,prev:p,pct,type:'up',breakdown:bk.sort((a,b)=>b.diff-a.diff)});
           else if(pct<=-10) goods.push({cat,cur:c,prev:p,pct,breakdown:bk.sort((a,b)=>a.diff-b.diff)});
         });
@@ -3093,12 +3100,19 @@ window.__dataReady.then(data => {
         cats.forEach((cat,i)=>{
           if(curVals[i]==null||curVals[i]===0) return;
           const months=periodMonths(i);
+          const addSubBk=(bkArr,curList,prevList,mA,mB)=>bkArr.map(b=>{
+            const sCm={},sPm={};
+            curList.filter(r=>mA.includes(getMonth(r))&&typeFilter(r)&&(r.type||'ไม่ระบุ')===b.type).forEach(r=>{if(r.sub_type){sCm[r.sub_type]=(sCm[r.sub_type]||0)+1;}});
+            prevList.filter(r=>mB.includes(getMonth(r))&&typeFilter(r)&&(r.type||'ไม่ระบุ')===b.type).forEach(r=>{if(r.sub_type){sPm[r.sub_type]=(sPm[r.sub_type]||0)+1;}});
+            const allSK=[...new Set([...Object.keys(sCm),...Object.keys(sPm)])];
+            return {...b,subBk:allSK.map(sk=>({sub:sk,cur:sCm[sk]||0,prev:sPm[sk]||0,diff:(sCm[sk]||0)-(sPm[sk]||0)})).sort((a,b2)=>b2.diff-a.diff)};
+          });
           // yoy breakdown
           const cm={},pm={};
           curReps.filter(r=>months.includes(getMonth(r))&&typeFilter(r)).forEach(r=>{const k=r.type||'ไม่ระบุ';cm[k]=(cm[k]||0)+1;});
           prevReps.filter(r=>months.includes(getMonth(r))&&typeFilter(r)).forEach(r=>{const k=r.type||'ไม่ระบุ';pm[k]=(pm[k]||0)+1;});
           const allK=[...new Set([...Object.keys(cm),...Object.keys(pm)])];
-          const bkYoY=allK.map(k=>({type:k,cur:cm[k]||0,prev:pm[k]||0,diff:(cm[k]||0)-(pm[k]||0)}));
+          const bkYoY=addSubBk(allK.map(k=>({type:k,cur:cm[k]||0,prev:pm[k]||0,diff:(cm[k]||0)-(pm[k]||0)})),curReps,prevReps,months,months);
           const yoyUps=bkYoY.filter(b=>b.prev>0&&b.diff/b.prev*100>=10||b.prev===0&&b.cur>0).map(b=>({...b,pct:b.prev>0?b.diff/b.prev*100:null,flagType:b.prev===0?'new':'up'}));
           const yoyGoods=bkYoY.filter(b=>b.prev>0&&b.diff/b.prev*100<=-10).map(b=>({...b,pct:b.diff/b.prev*100}));
           // qoq breakdown (vs prev period same year)
@@ -3110,7 +3124,7 @@ window.__dataReady.then(data => {
             curReps.filter(r=>months.includes(getMonth(r))&&typeFilter(r)).forEach(r=>{const k=r.type||'ไม่ระบุ';cm2[k]=(cm2[k]||0)+1;});
             curReps.filter(r=>pm2.includes(getMonth(r))&&typeFilter(r)).forEach(r=>{const k=r.type||'ไม่ระบุ';pm3[k]=(pm3[k]||0)+1;});
             const allK2=[...new Set([...Object.keys(cm2),...Object.keys(pm3)])];
-            const bkQoQ=allK2.map(k=>({type:k,cur:cm2[k]||0,prev:pm3[k]||0,diff:(cm2[k]||0)-(pm3[k]||0)}));
+            const bkQoQ=addSubBk(allK2.map(k=>({type:k,cur:cm2[k]||0,prev:pm3[k]||0,diff:(cm2[k]||0)-(pm3[k]||0)})),curReps,curReps,months,pm2);
             qoqUps=bkQoQ.filter(b=>b.prev>0&&b.diff/b.prev*100>=10||b.prev===0&&b.cur>0).map(b=>({...b,pct:b.prev>0?b.diff/b.prev*100:null,flagType:b.prev===0?'new':'up'}));
             qoqGoods=bkQoQ.filter(b=>b.prev>0&&b.diff/b.prev*100<=-10).map(b=>({...b,pct:b.diff/b.prev*100}));
           }
@@ -3118,13 +3132,21 @@ window.__dataReady.then(data => {
             periodCards.push({cat,i,prevCat,yoyUps,yoyGoods,qoqUps,qoqGoods});
         });
         const renderTypeRows=(list,isRed)=>list.map((b,j)=>(
-          <div key={j} style={{fontSize:13,color:isRed?'#7f1d1d':'#166534',paddingLeft:8,borderLeft:`3px solid ${isRed?'#c0392b':'#16a34a'}`,marginBottom:5}}>
+          <div key={j} style={{fontSize:13,color:isRed?'#7f1d1d':'#166534',paddingLeft:8,borderLeft:`3px solid ${isRed?'#c0392b':'#16a34a'}`,marginBottom:6}}>
             {isRed
               ? b.flagType==='new'
                 ? <>🆕 <b>{b.type}</b> เกิดขึ้นใหม่ ({b.cur} เคส) ไม่มีในช่วงก่อน</>
                 : <>🔺 <b>{b.type}</b> เพิ่มขึ้น <b>{b.pct.toFixed(1)}%</b> ({b.prev} → {b.cur} เคส)</>
               : <>✅ <b>{b.type}</b> ลดลง <b>{Math.abs(b.pct).toFixed(1)}%</b> ({b.prev} → {b.cur} เคส) — {b.pct<=-70?'ยอดเยี่ยมมาก!':b.pct<=-50?'ดีมากควบคุมได้ดี':'ปรับตัวดีขึ้น'}</>
             }
+            {b.subBk&&b.subBk.filter(s=>isRed?s.diff>0:s.diff<0).map((s,si)=>(
+              <div key={si} style={{fontSize:12,paddingLeft:12,marginTop:2,color:isRed?'#991b1b':'#166534'}}>
+                {isRed?'↑':'↓'} {s.sub}: {s.prev}→{s.cur} เคส ({isRed?'+':''}{s.diff})
+              </div>
+            ))}
+            {b.subBk&&isRed&&b.subBk.filter(s=>s.prev===0&&s.cur>0).map((s,si)=>(
+              <div key={'n'+si} style={{fontSize:12,paddingLeft:12,marginTop:2,color:'#991b1b'}}>🆕 {s.sub}: {s.cur} เคส (ใหม่)</div>
+            ))}
           </div>
         ));
         // chart component (proper component so useMeasure is valid)
@@ -3187,10 +3209,14 @@ window.__dataReady.then(data => {
             {ups.map((a,i)=><div key={i} style={{marginBottom:8,paddingLeft:8,borderLeft:'3px solid #c0392b',fontSize:13,color:'#7f1d1d'}}>
               {a.type==='spike'?<>📈 <b>{a.cat}</b> สูงผิดปกติ ({a.cur} เคส) เกินค่าเฉลี่ย {a.diff.toFixed(1)} เคส</>
               :<>🔺 <b>{a.cat}</b> เพิ่มขึ้น <b>{a.pct.toFixed(1)}%</b> ({a.prev} → {a.cur} เคส)</>}
-              {tType==='__all__'&&a.breakdown&&a.breakdown.filter(b=>b.diff>0).map((b,j)=>(
-                <div key={j} style={{fontSize:12,color:'#991b1b',paddingLeft:12,marginTop:2}}>↑ {b.type}: {b.prev}→{b.cur} เคส (+{b.diff})</div>
+              {tType==='__all__'&&a.breakdown&&a.breakdown.filter(b=>b.diff>0||b.prev===0&&b.cur>0).map((b,j)=>(
+                <div key={j} style={{fontSize:12,color:'#991b1b',paddingLeft:12,marginTop:2}}>
+                  {b.prev===0?<>🆕 {b.type}: {b.cur} เคส (ใหม่)</>:<>↑ {b.type}: {b.prev}→{b.cur} เคส (+{b.diff})</>}
+                  {b.subBk&&b.subBk.filter(s=>s.diff>0||s.prev===0&&s.cur>0).map((s,si)=>(
+                    <div key={si} style={{paddingLeft:10,fontSize:11,color:'#7f1d1d',marginTop:1}}>• {s.sub}: {s.prev}→{s.cur} เคส</div>
+                  ))}
+                </div>
               ))}
-              {tType==='__all__'&&a.breakdown&&a.breakdown.filter(b=>b.prev===0&&b.cur>0).length===0&&a.breakdown.filter(b=>b.diff>0).length===0&&<div style={{fontSize:12,color:'#94a3b8',paddingLeft:12,marginTop:2}}>—</div>}
             </div>)}
           </div>}
           {goods.length>0&&<div style={{marginTop:12,background:'#f0fdf4',border:'1px solid #86efac',borderRadius:12,padding:'14px 18px'}}>
@@ -3198,7 +3224,12 @@ window.__dataReady.then(data => {
             {goods.map((a,i)=><div key={i} style={{marginBottom:8,paddingLeft:8,borderLeft:'3px solid #16a34a',fontSize:13,color:'#166534'}}>
               ✅ {praiseTexts[i%praiseTexts.length](a.cat,a.pct)} ({a.prev} → {a.cur} เคส)
               {tType==='__all__'&&a.breakdown&&a.breakdown.filter(b=>b.diff<0).map((b,j)=>(
-                <div key={j} style={{fontSize:12,color:'#166534',paddingLeft:12,marginTop:2}}>↓ {b.type}: {b.prev}→{b.cur} เคส ({b.diff})</div>
+                <div key={j} style={{fontSize:12,color:'#166534',paddingLeft:12,marginTop:2}}>
+                  ↓ {b.type}: {b.prev}→{b.cur} เคส ({b.diff})
+                  {b.subBk&&b.subBk.filter(s=>s.diff<0).map((s,si)=>(
+                    <div key={si} style={{paddingLeft:10,fontSize:11,color:'#166534',marginTop:1}}>• {s.sub}: {s.prev}→{s.cur} เคส</div>
+                  ))}
+                </div>
               ))}
             </div>)}
           </div>}
