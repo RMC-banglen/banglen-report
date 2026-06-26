@@ -1138,28 +1138,70 @@ window.__dataReady.then(data => {
     const curItems = rawItems.filter(r=>r.year===curYear&&!EXCLUDE_CAUSES.includes(r.cause));
     const prevItems = rawItems.filter(r=>r.year===prevYear&&!EXCLUDE_CAUSES.includes(r.cause));
 
-    // รายชื่อสาเหตุทั้งหมด (เรียงตามมูลค่าปีปัจจุบัน)
     const allCauses = [...new Set([...curItems,...prevItems].map(r=>r.cause||'ไม่ระบุ'))]
       .map(c=>({cause:c, total:curItems.filter(r=>(r.cause||'ไม่ระบุ')===c).reduce((a,r)=>a+(r.amount||0),0)}))
       .sort((a,b)=>b.total-a.total);
 
-    const [selCause, setSelCause] = useState(allCauses[0]?.cause||null);
+    const [selCause, setSelCause] = useState('__all__');
+    const [period, setPeriod] = useState('month'); // month | quarter | half | year
 
-    const monthData = (items, cause) => Array.from({length:12},(_,i)=>{
-      const m=i+1;
-      const v=items.filter(r=>(r.cause||'ไม่ระบุ')===cause&&r.month===m).reduce((a,r)=>a+(r.amount||0),0);
-      return v>0?v:null;
-    });
+    const PERIODS=[{v:'month',l:'รายเดือน'},{v:'quarter',l:'ไตรมาส'},{v:'half',l:'6 เดือน'},{v:'year',l:'ทั้งปี'}];
+
+    const sumByPeriod=(items, cause)=>{
+      const filterFn = r => cause==='__all__' ? true : (r.cause||'ไม่ระบุ')===cause;
+      if(period==='month'){
+        return {
+          cats: MONTHS_TH,
+          cur: Array.from({length:12},(_,i)=>{const v=items.cur.filter(r=>filterFn(r)&&r.month===i+1).reduce((a,r)=>a+(r.amount||0),0);return v||null;}),
+          prev: Array.from({length:12},(_,i)=>{const v=items.prev.filter(r=>filterFn(r)&&r.month===i+1).reduce((a,r)=>a+(r.amount||0),0);return v||null;})
+        };
+      } else if(period==='quarter'){
+        const qNames=['Q1 (ม.ค.–มี.ค.)','Q2 (เม.ย.–มิ.ย.)','Q3 (ก.ค.–ก.ย.)','Q4 (ต.ค.–ธ.ค.)'];
+        const qm=[[1,2,3],[4,5,6],[7,8,9],[10,11,12]];
+        return {
+          cats: qNames,
+          cur: qm.map(ms=>{const v=items.cur.filter(r=>filterFn(r)&&ms.includes(r.month)).reduce((a,r)=>a+(r.amount||0),0);return v||null;}),
+          prev: qm.map(ms=>{const v=items.prev.filter(r=>filterFn(r)&&ms.includes(r.month)).reduce((a,r)=>a+(r.amount||0),0);return v||null;})
+        };
+      } else if(period==='half'){
+        return {
+          cats:[`ครึ่งแรก (ม.ค.–มิ.ย.)`,`ครึ่งหลัง (ก.ค.–ธ.ค.)`],
+          cur:[[1,2,3,4,5,6],[7,8,9,10,11,12]].map(ms=>{const v=items.cur.filter(r=>filterFn(r)&&ms.includes(r.month)).reduce((a,r)=>a+(r.amount||0),0);return v||null;}),
+          prev:[[1,2,3,4,5,6],[7,8,9,10,11,12]].map(ms=>{const v=items.prev.filter(r=>filterFn(r)&&ms.includes(r.month)).reduce((a,r)=>a+(r.amount||0),0);return v||null;})
+        };
+      } else {
+        const cv=items.cur.filter(filterFn).reduce((a,r)=>a+(r.amount||0),0);
+        const pv=items.prev.filter(filterFn).reduce((a,r)=>a+(r.amount||0),0);
+        return {cats:[`ปี ${curYear}`,`ปี ${prevYear}`],cur:[cv||null,null],prev:[null,pv||null]};
+      }
+    };
 
     const bahtFmt=v=>v==null?'–':v.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const pd = sumByPeriod({cur:curItems,prev:prevItems}, selCause);
+    const hasData = [...pd.cur,...pd.prev].some(v=>v!=null);
 
-    const curData  = selCause ? monthData(curItems,  selCause) : [];
-    const prevData = selCause ? monthData(prevItems, selCause) : [];
-    const hasData  = [...curData,...prevData].some(v=>v!=null);
+    return <ChartCard title="เทียบมูลค่าเสียหายตามสาเหตุ" subtitle={`ปี ${curYear} vs ${prevYear}`} span="full">
+      {/* เลือกช่วงเวลา */}
+      <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{fontSize:13,color:'#64748b',fontWeight:500,marginRight:4}}>ช่วงเวลา:</span>
+        {PERIODS.map(p=>(
+          <button key={p.v} onClick={()=>setPeriod(p.v)}
+            style={{padding:'5px 14px',borderRadius:8,border:`1.5px solid ${period===p.v?'#2f5fd0':'#e2e8f0'}`,
+              background:period===p.v?'#2f5fd0':'#fff',color:period===p.v?'#fff':'#334155',
+              fontSize:13,fontWeight:period===p.v?700:400,cursor:'pointer'}}>
+            {p.l}
+          </button>
+        ))}
+      </div>
 
-    return <ChartCard title="เทียบมูลค่าเสียหายรายเดือนตามสาเหตุ" subtitle={`ปี ${curYear} vs ${prevYear}`} span="full">
       {/* เลือกสาเหตุ */}
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>
+        <button onClick={()=>setSelCause('__all__')}
+          style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${selCause==='__all__'?'#0f766e':'#e2e8f0'}`,
+            background:selCause==='__all__'?'#0f766e':'#fff',color:selCause==='__all__'?'#fff':'#334155',
+            fontSize:13,fontWeight:selCause==='__all__'?700:400,cursor:'pointer',whiteSpace:'nowrap'}}>
+          รวมทุกสาเหตุ
+        </button>
         {allCauses.map(({cause})=>(
           <button key={cause} onClick={()=>setSelCause(cause)}
             style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${selCause===cause?'#2f5fd0':'#e2e8f0'}`,
@@ -1170,46 +1212,47 @@ window.__dataReady.then(data => {
         ))}
       </div>
 
-      {/* กราฟเส้น */}
-      {selCause&&<>
-        <div style={{display:'flex',gap:16,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
-          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600}}>
-            <span style={{width:24,height:3,background:'#2f5fd0',display:'inline-block',borderRadius:2}}></span>ปี {curYear}
-          </span>
-          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600,color:'#94a3b8'}}>
-            <span style={{width:24,height:0,borderTop:'2px dashed #94a3b8',display:'inline-block'}}></span>ปี {prevYear}
-          </span>
-        </div>
-        {hasData
-          ? <LineChart categories={MONTHS_TH} height={300} unit="฿" decimals={0}
-              series={[
-                {label:`ปี ${curYear}`,color:'#2f5fd0',data:curData},
-                {label:`ปี ${prevYear}`,color:'#94a3b8',data:prevData,dashed:true}
-              ]}/>
-          : <div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>ไม่มีข้อมูลสาเหตุนี้</div>
-        }
-        {/* ตารางเปรียบเทียบ */}
-        <div style={{marginTop:20,overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead>
-              <tr style={{background:'#f8fafc'}}>
-                <th style={{padding:'8px 12px',textAlign:'left',borderBottom:'1px solid #e2e8f0',color:'#64748b'}}>เดือน</th>
-                {MONTHS_TH.map(m=><th key={m} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #e2e8f0',color:'#64748b',fontWeight:600}}>{m}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{padding:'8px 12px',fontWeight:700,color:'#2f5fd0',borderBottom:'1px solid #f1f5f9'}}>ปี {curYear}</td>
-                {curData.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #f1f5f9',color:v?'#1e293b':'#cbd5e1'}}>{v?bahtFmt(v):'–'}</td>)}
-              </tr>
-              <tr>
-                <td style={{padding:'8px 12px',fontWeight:700,color:'#94a3b8'}}>ปี {prevYear}</td>
-                {prevData.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',color:v?'#64748b':'#cbd5e1'}}>{v?bahtFmt(v):'–'}</td>)}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </>}
+      {/* legend */}
+      <div style={{display:'flex',gap:16,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600}}>
+          <span style={{width:24,height:3,background:'#2f5fd0',display:'inline-block',borderRadius:2}}></span>ปี {curYear}
+        </span>
+        <span style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600,color:'#94a3b8'}}>
+          <span style={{width:24,height:0,borderTop:'2px dashed #94a3b8',display:'inline-block'}}></span>ปี {prevYear}
+        </span>
+      </div>
+
+      {hasData
+        ? <LineChart categories={pd.cats} height={300} unit="฿" decimals={0}
+            series={[
+              {label:`ปี ${curYear}`,color:'#2f5fd0',data:pd.cur},
+              {label:`ปี ${prevYear}`,color:'#94a3b8',data:pd.prev,dashed:true}
+            ]}/>
+        : <div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>ไม่มีข้อมูล</div>
+      }
+
+      {/* ตารางเปรียบเทียบ */}
+      <div style={{marginTop:20,overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead>
+            <tr style={{background:'#f8fafc'}}>
+              <th style={{padding:'8px 12px',textAlign:'left',borderBottom:'1px solid #e2e8f0',color:'#64748b'}}>ปี</th>
+              {pd.cats.map(c=><th key={c} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #e2e8f0',color:'#64748b',fontWeight:600}}>{c}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{padding:'8px 12px',fontWeight:700,color:'#2f5fd0',borderBottom:'1px solid #f1f5f9'}}>ปี {curYear}</td>
+              {pd.cur.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #f1f5f9',color:v?'#1e293b':'#cbd5e1'}}>{bahtFmt(v)}</td>)}
+            </tr>
+            <tr>
+              <td style={{padding:'8px 12px',fontWeight:700,color:'#94a3b8'}}>ปี {prevYear}</td>
+              {pd.prev.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',color:v?'#64748b':'#cbd5e1'}}>{bahtFmt(v)}</td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
     </ChartCard>;
   }
 
