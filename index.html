@@ -1317,7 +1317,7 @@ window.__dataReady.then(data => {
             <div style={{fontSize:14,fontWeight:700,color:'#991b1b',marginBottom:10}}>⚠ ข้อสังเกตผิดปกติ — ยอดเพิ่มสูงขึ้น</div>
             {ups.map((a,i)=>{
               const idx=pd.cats.indexOf(a.cat);
-              const breakdown=selCause==='__all__'&&idx>=0?causeBreakdownForIdx(idx).filter(x=>x.diff>0).slice(0,5):[];
+              const breakdown=selCause==='__all__'&&idx>=0&&period!=='month'?causeBreakdownForIdx(idx).filter(x=>x.diff>0).slice(0,5):[];
               return <div key={i} style={{marginBottom:breakdown.length?12:6,paddingLeft:8,borderLeft:'3px solid #c0392b'}}>
                 <div style={{fontSize:13,color:'#7f1d1d'}}>
                   {a.type==='spike'
