@@ -1889,9 +1889,9 @@ window.__dataReady.then(data => {
       {/* Filter bar */}
       <div className="yc-head">
         <Segmented value={view} onChange={setView} options={[
-          {value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},{value:'summary',label:'ตารางสรุป'},
-          {value:'cause',label:'แยกสาเหตุ'},{value:'customer',label:'แยกลูกค้า'},
-          {value:'detail',label:'ตารางรายการ'},{value:'damage',label:'มูลค่าเสียหาย'}
+          {value:'damage',label:'มูลค่าเสียหาย'},{value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},
+          {value:'summary',label:'ตารางสรุป'},{value:'cause',label:'แยกสาเหตุ'},
+          {value:'customer',label:'แยกลูกค้า'},{value:'detail',label:'ตารางรายการ'}
         ]}/>
         <div style={{display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'center'}}>
           {view==='damage' ? <>
