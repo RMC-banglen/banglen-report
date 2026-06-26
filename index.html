@@ -1786,7 +1786,7 @@ window.__dataReady.then(data => {
   }
 
   function DamageDetailTab(){
-    const [view,setView]   = useState('summary');
+    const [view,setView]   = useState('damage');
     const [filterCode,setFilterCode] = useState('ALL');
     const [filterYear,setFilterYear] = useState(()=>{
       const ys=[...new Set((D.damageItems||[]).map(r=>r.year))].sort((a,b)=>a-b);
