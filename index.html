@@ -1172,7 +1172,7 @@ window.__dataReady.then(data => {
       } else {
         const cv=items.cur.filter(filterFn).reduce((a,r)=>a+(r.amount||0),0);
         const pv=items.prev.filter(filterFn).reduce((a,r)=>a+(r.amount||0),0);
-        return {cats:[`ปี ${curYear}`,`ปี ${prevYear}`],cur:[cv||null,null],prev:[null,pv||null]};
+        return {cats:['ยอดรวมทั้งปี'],cur:[cv||null],prev:[pv||null]};
       }
     };
 
