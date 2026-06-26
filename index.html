@@ -1130,6 +1130,88 @@ window.__dataReady.then(data => {
     </>;
   }
 
+  function CauseTrendView({rawItems, years, filterYear}){
+    const MONTHS_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const curYear = filterYear==='ALL' ? (years[years.length-1]||new Date().getFullYear()) : Number(filterYear);
+    const prevYear = curYear - 1;
+    const curItems = rawItems.filter(r=>r.year===curYear);
+    const prevItems = rawItems.filter(r=>r.year===prevYear);
+
+    // รายชื่อสาเหตุทั้งหมด (เรียงตามมูลค่าปีปัจจุบัน)
+    const allCauses = [...new Set([...curItems,...prevItems].map(r=>r.cause||'ไม่ระบุ'))]
+      .map(c=>({cause:c, total:curItems.filter(r=>(r.cause||'ไม่ระบุ')===c).reduce((a,r)=>a+(r.amount||0),0)}))
+      .sort((a,b)=>b.total-a.total);
+
+    const [selCause, setSelCause] = useState(allCauses[0]?.cause||null);
+
+    const monthData = (items, cause) => Array.from({length:12},(_,i)=>{
+      const m=i+1;
+      const v=items.filter(r=>(r.cause||'ไม่ระบุ')===cause&&r.month===m).reduce((a,r)=>a+(r.amount||0),0);
+      return v>0?v:null;
+    });
+
+    const bahtFmt=v=>v==null?'–':v.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+    const curData  = selCause ? monthData(curItems,  selCause) : [];
+    const prevData = selCause ? monthData(prevItems, selCause) : [];
+    const hasData  = [...curData,...prevData].some(v=>v!=null);
+
+    return <ChartCard title="เทียบมูลค่าเสียหายรายเดือนตามสาเหตุ" subtitle={`ปี ${curYear} vs ${prevYear}`} span="full">
+      {/* เลือกสาเหตุ */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>
+        {allCauses.map(({cause})=>(
+          <button key={cause} onClick={()=>setSelCause(cause)}
+            style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${selCause===cause?'#2f5fd0':'#e2e8f0'}`,
+              background:selCause===cause?'#2f5fd0':'#fff',color:selCause===cause?'#fff':'#334155',
+              fontSize:13,fontWeight:selCause===cause?700:400,cursor:'pointer',whiteSpace:'nowrap'}}>
+            {cause}
+          </button>
+        ))}
+      </div>
+
+      {/* กราฟเส้น */}
+      {selCause&&<>
+        <div style={{display:'flex',gap:16,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600}}>
+            <span style={{width:24,height:3,background:'#2f5fd0',display:'inline-block',borderRadius:2}}></span>ปี {curYear}
+          </span>
+          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600,color:'#94a3b8'}}>
+            <span style={{width:24,height:0,borderTop:'2px dashed #94a3b8',display:'inline-block'}}></span>ปี {prevYear}
+          </span>
+        </div>
+        {hasData
+          ? <LineChart categories={MONTHS_TH} height={300} unit="฿" decimals={0}
+              series={[
+                {label:`ปี ${curYear}`,color:'#2f5fd0',data:curData},
+                {label:`ปี ${prevYear}`,color:'#94a3b8',data:prevData,dashed:true}
+              ]}/>
+          : <div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>ไม่มีข้อมูลสาเหตุนี้</div>
+        }
+        {/* ตารางเปรียบเทียบ */}
+        <div style={{marginTop:20,overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead>
+              <tr style={{background:'#f8fafc'}}>
+                <th style={{padding:'8px 12px',textAlign:'left',borderBottom:'1px solid #e2e8f0',color:'#64748b'}}>เดือน</th>
+                {MONTHS_TH.map(m=><th key={m} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #e2e8f0',color:'#64748b',fontWeight:600}}>{m}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{padding:'8px 12px',fontWeight:700,color:'#2f5fd0',borderBottom:'1px solid #f1f5f9'}}>ปี {curYear}</td>
+                {curData.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',borderBottom:'1px solid #f1f5f9',color:v?'#1e293b':'#cbd5e1'}}>{v?bahtFmt(v):'–'}</td>)}
+              </tr>
+              <tr>
+                <td style={{padding:'8px 12px',fontWeight:700,color:'#94a3b8'}}>ปี {prevYear}</td>
+                {prevData.map((v,i)=><td key={i} style={{padding:'8px 8px',textAlign:'right',color:v?'#64748b':'#cbd5e1'}}>{v?bahtFmt(v):'–'}</td>)}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </>}
+    </ChartCard>;
+  }
+
   function CauseView({items, totalAll}){
     const [selCause, setSelCause] = useState(null);
     const [selCustInCause, setSelCustInCause] = useState(null);
@@ -1527,7 +1609,7 @@ window.__dataReady.then(data => {
         <Segmented value={view} onChange={setView} options={[
           {value:'summary',label:'ตารางสรุป'},{value:'damage',label:'มูลค่าเสียหาย'},
           {value:'cause',label:'แยกสาเหตุ'},{value:'customer',label:'แยกลูกค้า'},
-          {value:'detail',label:'ตารางรายการ'}
+          {value:'trend',label:'เทียบรายเดือน'},{value:'detail',label:'ตารางรายการ'}
         ]}/>
         <div style={{display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'center'}}>
           {view==='damage' ? <>
@@ -1805,6 +1887,9 @@ window.__dataReady.then(data => {
 
       {/* Cause view */}
       {view==='cause' && <CauseView items={items} totalAll={totalAll}/>}
+
+      {/* Trend view */}
+      {view==='trend' && <CauseTrendView rawItems={rawItems} years={years} filterYear={filterYear}/>}
 
       {/* Customer view */}
       {view==='customer' && <CustomerView items={items} totalAll={totalAll}/>}
