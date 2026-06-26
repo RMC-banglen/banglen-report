@@ -1177,6 +1177,22 @@ window.__dataReady.then(data => {
     };
 
     const bahtFmt=v=>v==null?'–':v.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+    // หาเดือนของแต่ละ period index
+    const periodMonths=(i)=>{
+      if(period==='month') return [i+1];
+      if(period==='quarter') return [[1,2,3],[4,5,6],[7,8,9],[10,11,12]][i];
+      if(period==='half') return [[1,2,3,4,5,6],[7,8,9,10,11,12]][i];
+      return [1,2,3,4,5,6,7,8,9,10,11,12];
+    };
+    // breakdown สาเหตุในช่วงเวลา
+    const causesInPeriod=(items, months)=>{
+      const map={};
+      items.filter(r=>months.includes(r.month)).forEach(r=>{
+        const k=r.cause||'ไม่ระบุ'; map[k]=(map[k]||0)+(r.amount||0);
+      });
+      return Object.entries(map).map(([c,v])=>({cause:c,value:v})).sort((a,b)=>b.value-a.value);
+    };
     const pd = sumByPeriod({cur:curItems,prev:prevItems}, selCause);
     const hasData = [...pd.cur,...pd.prev].some(v=>v!=null);
 
@@ -1287,25 +1303,54 @@ window.__dataReady.then(data => {
           (cat,pct)=>`ยอดเยี่ยม! ${cat} ปรับตัวดีขึ้น ${Math.abs(pct).toFixed(1)}% แสดงถึงการพัฒนาที่ชัดเจน`,
           (cat,pct)=>`น่าชื่นชม! ${cat} ลดลง ${Math.abs(pct).toFixed(1)}% สะท้อนการทำงานที่มีประสิทธิภาพ`,
         ];
+        // helper: breakdown สาเหตุสำหรับ period index
+        const causeBreakdownForIdx=(idx)=>{
+          const months=periodMonths(idx);
+          const cMap={}, pMap={};
+          curItems.filter(r=>months.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';cMap[k]=(cMap[k]||0)+(r.amount||0);});
+          prevItems.filter(r=>months.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';pMap[k]=(pMap[k]||0)+(r.amount||0);});
+          const allKeys=[...new Set([...Object.keys(cMap),...Object.keys(pMap)])];
+          return allKeys.map(k=>({cause:k,cur:cMap[k]||0,prev:pMap[k]||0,diff:(cMap[k]||0)-(pMap[k]||0)})).sort((a,b)=>b.diff-a.diff);
+        };
         return <>
           {ups.length>0&&<div style={{marginTop:16,background:'#fff5f5',border:'1px solid #fecaca',borderRadius:12,padding:'14px 18px'}}>
             <div style={{fontSize:14,fontWeight:700,color:'#991b1b',marginBottom:10}}>⚠ ข้อสังเกตผิดปกติ — ยอดเพิ่มสูงขึ้น</div>
-            {ups.map((a,i)=>(
-              <div key={i} style={{fontSize:13,color:'#7f1d1d',marginBottom:6,paddingLeft:8,borderLeft:'3px solid #c0392b'}}>
-                {a.type==='spike'
-                  ? <>📈 <b>{a.cat}</b> มีมูลค่าสูงผิดปกติ ({bahtFmt(a.cur)} ฿) สูงกว่าค่าเฉลี่ย {bahtFmt(Math.round(a.diff))} ฿ — ควรตรวจสอบสาเหตุ</>
-                  : <>🔺 <b>{a.cat}</b> เพิ่มขึ้น <b>{a.pct.toFixed(1)}%</b> เทียบปีก่อน ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿) — ต้องเฝ้าระวัง</>
-                }
-              </div>
-            ))}
+            {ups.map((a,i)=>{
+              const idx=pd.cats.indexOf(a.cat);
+              const breakdown=selCause==='__all__'&&idx>=0?causeBreakdownForIdx(idx).filter(x=>x.diff>0).slice(0,5):[];
+              return <div key={i} style={{marginBottom:breakdown.length?12:6,paddingLeft:8,borderLeft:'3px solid #c0392b'}}>
+                <div style={{fontSize:13,color:'#7f1d1d'}}>
+                  {a.type==='spike'
+                    ? <>📈 <b>{a.cat}</b> มีมูลค่าสูงผิดปกติ ({bahtFmt(a.cur)} ฿) สูงกว่าค่าเฉลี่ย {bahtFmt(Math.round(a.diff))} ฿ — ควรตรวจสอบสาเหตุ</>
+                    : <>🔺 <b>{a.cat}</b> เพิ่มขึ้น <b>{a.pct.toFixed(1)}%</b> เทียบปีก่อน ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿) — ต้องเฝ้าระวัง</>
+                  }
+                </div>
+                {breakdown.length>0&&<div style={{marginTop:6,paddingLeft:8}}>
+                  <div style={{fontSize:11,color:'#991b1b',fontWeight:600,marginBottom:3}}>สาเหตุที่เพิ่มขึ้น:</div>
+                  {breakdown.map((b,j)=><div key={j} style={{fontSize:12,color:'#7f1d1d',display:'flex',gap:6,alignItems:'center',marginBottom:2}}>
+                    <span style={{minWidth:6,height:6,borderRadius:'50%',background:'#c0392b',display:'inline-block',flexShrink:0}}/>
+                    <span><b>{b.cause}</b> +{bahtFmt(b.diff)} ฿ ({bahtFmt(b.prev)} → {bahtFmt(b.cur)} ฿)</span>
+                  </div>)}
+                </div>}
+              </div>;
+            })}
           </div>}
           {goods.length>0&&<div style={{marginTop:12,background:'#f0fdf4',border:'1px solid #86efac',borderRadius:12,padding:'14px 18px'}}>
             <div style={{fontSize:14,fontWeight:700,color:'#14532d',marginBottom:10}}>🏆 ทำได้ดี — ยอดลดลง</div>
-            {goods.map((a,i)=>(
-              <div key={i} style={{fontSize:13,color:'#166534',marginBottom:6,paddingLeft:8,borderLeft:'3px solid #16a34a'}}>
-                ✅ {praiseTexts[i%praiseTexts.length](a.cat,a.pct)} ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿)
-              </div>
-            ))}
+            {goods.map((a,i)=>{
+              const idx=pd.cats.indexOf(a.cat);
+              const breakdown=selCause==='__all__'&&idx>=0?causeBreakdownForIdx(idx).filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,5):[];
+              return <div key={i} style={{marginBottom:breakdown.length?12:6,paddingLeft:8,borderLeft:'3px solid #16a34a'}}>
+                <div style={{fontSize:13,color:'#166534'}}>✅ {praiseTexts[i%praiseTexts.length](a.cat,a.pct)} ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿)</div>
+                {breakdown.length>0&&<div style={{marginTop:6,paddingLeft:8}}>
+                  <div style={{fontSize:11,color:'#14532d',fontWeight:600,marginBottom:3}}>สาเหตุที่ลดลง:</div>
+                  {breakdown.map((b,j)=><div key={j} style={{fontSize:12,color:'#166534',display:'flex',gap:6,alignItems:'center',marginBottom:2}}>
+                    <span style={{minWidth:6,height:6,borderRadius:'50%',background:'#16a34a',display:'inline-block',flexShrink:0}}/>
+                    <span><b>{b.cause}</b> {bahtFmt(b.diff)} ฿ ({bahtFmt(b.prev)} → {bahtFmt(b.cur)} ฿)</span>
+                  </div>)}
+                </div>}
+              </div>;
+            })}
           </div>}
         </>;
       })()}
