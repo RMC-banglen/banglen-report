@@ -1339,7 +1339,7 @@ window.__dataReady.then(data => {
             <div style={{fontSize:14,fontWeight:700,color:'#14532d',marginBottom:10}}>🏆 ทำได้ดี — ยอดลดลง</div>
             {goods.map((a,i)=>{
               const idx=pd.cats.indexOf(a.cat);
-              const breakdown=selCause==='__all__'&&idx>=0?causeBreakdownForIdx(idx).filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,5):[];
+              const breakdown=selCause==='__all__'&&idx>=0&&period!=='month'?causeBreakdownForIdx(idx).filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,5):[];
               return <div key={i} style={{marginBottom:breakdown.length?12:6,paddingLeft:8,borderLeft:'3px solid #16a34a'}}>
                 <div style={{fontSize:13,color:'#166534'}}>✅ {praiseTexts[i%praiseTexts.length](a.cat,a.pct)} ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿)</div>
                 {breakdown.length>0&&<div style={{marginTop:6,paddingLeft:8}}>
