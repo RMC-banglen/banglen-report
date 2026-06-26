@@ -1303,12 +1303,13 @@ window.__dataReady.then(data => {
           (cat,pct)=>`ยอดเยี่ยม! ${cat} ปรับตัวดีขึ้น ${Math.abs(pct).toFixed(1)}% แสดงถึงการพัฒนาที่ชัดเจน`,
           (cat,pct)=>`น่าชื่นชม! ${cat} ลดลง ${Math.abs(pct).toFixed(1)}% สะท้อนการทำงานที่มีประสิทธิภาพ`,
         ];
-        // helper: breakdown สาเหตุสำหรับ period index
+        // helper: breakdown สาเหตุสำหรับ period index (กรอง selCause ถ้าเลือกอยู่)
+        const causeFilter=(r)=>selCause==='__all__'||(r.cause||'ไม่ระบุ')===selCause;
         const causeBreakdownForIdx=(idx)=>{
           const months=periodMonths(idx);
           const cMap={}, pMap={};
-          curItems.filter(r=>months.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';cMap[k]=(cMap[k]||0)+(r.amount||0);});
-          prevItems.filter(r=>months.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';pMap[k]=(pMap[k]||0)+(r.amount||0);});
+          curItems.filter(r=>months.includes(r.month)&&causeFilter(r)).forEach(r=>{const k=r.cause||'ไม่ระบุ';cMap[k]=(cMap[k]||0)+(r.amount||0);});
+          prevItems.filter(r=>months.includes(r.month)&&causeFilter(r)).forEach(r=>{const k=r.cause||'ไม่ระบุ';pMap[k]=(pMap[k]||0)+(r.amount||0);});
           const allKeys=[...new Set([...Object.keys(cMap),...Object.keys(pMap)])];
           return allKeys.map(k=>({cause:k,cur:cMap[k]||0,prev:pMap[k]||0,diff:(cMap[k]||0)-(pMap[k]||0)})).sort((a,b)=>b.diff-a.diff);
         };
@@ -1318,16 +1319,16 @@ window.__dataReady.then(data => {
           const curMonths=periodMonths(curIdx);
           const prevMonths=periodMonths(curIdx-1);
           const cMap={}, pMap={};
-          curItems.filter(r=>curMonths.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';cMap[k]=(cMap[k]||0)+(r.amount||0);});
-          curItems.filter(r=>prevMonths.includes(r.month)).forEach(r=>{const k=r.cause||'ไม่ระบุ';pMap[k]=(pMap[k]||0)+(r.amount||0);});
+          curItems.filter(r=>curMonths.includes(r.month)&&causeFilter(r)).forEach(r=>{const k=r.cause||'ไม่ระบุ';cMap[k]=(cMap[k]||0)+(r.amount||0);});
+          curItems.filter(r=>prevMonths.includes(r.month)&&causeFilter(r)).forEach(r=>{const k=r.cause||'ไม่ระบุ';pMap[k]=(pMap[k]||0)+(r.amount||0);});
           const allKeys=[...new Set([...Object.keys(cMap),...Object.keys(pMap)])];
           return allKeys.map(k=>({cause:k,cur:cMap[k]||0,prev:pMap[k]||0,diff:(cMap[k]||0)-(pMap[k]||0)})).sort((a,b)=>b.diff-a.diff);
         };
 
         // วิเคราะห์ระดับสาเหตุ แยกตาม period — เฉพาะ period ที่มีข้อมูลปีนี้
-        const periodLabel=period==='quarter'?'ไตรมาส':period==='half'?'ช่วง':period==='year'?'ทั้งปี':'';
+        const periodLabel=period==='quarter'?'ไตรมาส':period==='half'?'ช่วง':period==='year'?'ทั้งปี':'เดือน';
         const periodAnalysis=[];
-        if(period!=='month'&&selCause==='__all__'){
+        if(true){
           // spike detection
           const causeMeans={};
           pd.cats.forEach((cat,i)=>{
