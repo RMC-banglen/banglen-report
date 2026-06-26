@@ -1266,37 +1266,48 @@ window.__dataReady.then(data => {
         </table>
       </div>
 
-      {/* วิเคราะห์ผิดปกติ */}
+      {/* วิเคราะห์ */}
       {(()=>{
-        const alerts=[];
+        const ups=[], goods=[];
         pd.cats.forEach((cat,i)=>{
           const c=pd.cur[i], p=pd.prev[i];
           if(c==null||p==null) return;
           const diff=c-p; const pct=diff/p*100;
-          if(pct>=50) alerts.push({cat,diff,pct,type:'up',cur:c,prev:p});
-          else if(pct<=-30) alerts.push({cat,diff,pct,type:'down',cur:c,prev:p});
+          if(pct>=50) ups.push({cat,diff,pct,cur:c,prev:p,type:'up'});
+          else if(pct<=-30) goods.push({cat,diff,pct,cur:c,prev:p});
         });
-        // หา period ที่สูงผิดปกติในปีนี้ (สูงกว่า mean+1.5*std)
         const vals=pd.cur.filter(v=>v!=null);
         if(vals.length>=3){
           const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
           const std=Math.sqrt(vals.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/vals.length);
-          pd.cur.forEach((v,i)=>{if(v!=null&&v>mean+1.5*std&&!alerts.find(a=>a.cat===pd.cats[i])){alerts.push({cat:pd.cats[i],diff:v-mean,pct:null,type:'spike',cur:v,mean});}});
+          pd.cur.forEach((v,i)=>{if(v!=null&&v>mean+1.5*std&&!ups.find(a=>a.cat===pd.cats[i])){ups.push({cat:pd.cats[i],diff:v-mean,pct:null,type:'spike',cur:v,mean});}});
         }
-        if(!alerts.length) return null;
-        return <div style={{marginTop:16,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:12,padding:'14px 18px'}}>
-          <div style={{fontSize:14,fontWeight:700,color:'#92400e',marginBottom:10}}>⚠ ข้อสังเกตผิดปกติ</div>
-          {alerts.map((a,i)=>(
-            <div key={i} style={{fontSize:13,color:'#78350f',marginBottom:6,paddingLeft:8,borderLeft:'3px solid '+(a.type==='up'?'#c0392b':a.type==='down'?'#3B6D11':'#d97706')}}>
-              {a.type==='spike'
-                ? <>📈 <b>{a.cat}</b> มีมูลค่าสูงผิดปกติ ({bahtFmt(a.cur)} ฿) สูงกว่าค่าเฉลี่ย {bahtFmt(Math.round(a.diff))} ฿</>
-                : a.type==='up'
-                ? <>🔺 <b>{a.cat}</b> เพิ่มขึ้น <b>{a.pct.toFixed(1)}%</b> เทียบปีก่อน ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿)</>
-                : <>🔻 <b>{a.cat}</b> ลดลง <b>{Math.abs(a.pct).toFixed(1)}%</b> เทียบปีก่อน ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿)</>
-              }
-            </div>
-          ))}
-        </div>;
+        const praiseTexts=[
+          (cat,pct)=>`ควบคุมได้ดีมาก! ${cat} ลดลงถึง ${Math.abs(pct).toFixed(1)}% เทียบปีก่อน`,
+          (cat,pct)=>`ยอดเยี่ยม! ${cat} ปรับตัวดีขึ้น ${Math.abs(pct).toFixed(1)}% แสดงถึงการพัฒนาที่ชัดเจน`,
+          (cat,pct)=>`น่าชื่นชม! ${cat} ลดลง ${Math.abs(pct).toFixed(1)}% สะท้อนการทำงานที่มีประสิทธิภาพ`,
+        ];
+        return <>
+          {ups.length>0&&<div style={{marginTop:16,background:'#fff5f5',border:'1px solid #fecaca',borderRadius:12,padding:'14px 18px'}}>
+            <div style={{fontSize:14,fontWeight:700,color:'#991b1b',marginBottom:10}}>⚠ ข้อสังเกตผิดปกติ — ยอดเพิ่มสูงขึ้น</div>
+            {ups.map((a,i)=>(
+              <div key={i} style={{fontSize:13,color:'#7f1d1d',marginBottom:6,paddingLeft:8,borderLeft:'3px solid #c0392b'}}>
+                {a.type==='spike'
+                  ? <>📈 <b>{a.cat}</b> มีมูลค่าสูงผิดปกติ ({bahtFmt(a.cur)} ฿) สูงกว่าค่าเฉลี่ย {bahtFmt(Math.round(a.diff))} ฿ — ควรตรวจสอบสาเหตุ</>
+                  : <>🔺 <b>{a.cat}</b> เพิ่มขึ้น <b>{a.pct.toFixed(1)}%</b> เทียบปีก่อน ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿) — ต้องเฝ้าระวัง</>
+                }
+              </div>
+            ))}
+          </div>}
+          {goods.length>0&&<div style={{marginTop:12,background:'#f0fdf4',border:'1px solid #86efac',borderRadius:12,padding:'14px 18px'}}>
+            <div style={{fontSize:14,fontWeight:700,color:'#14532d',marginBottom:10}}>🏆 ทำได้ดี — ยอดลดลง</div>
+            {goods.map((a,i)=>(
+              <div key={i} style={{fontSize:13,color:'#166534',marginBottom:6,paddingLeft:8,borderLeft:'3px solid #16a34a'}}>
+                ✅ {praiseTexts[i%praiseTexts.length](a.cat,a.pct)} ({bahtFmt(a.prev)} → {bahtFmt(a.cur)} ฿)
+              </div>
+            ))}
+          </div>}
+        </>;
       })()}
 
     </ChartCard>;
