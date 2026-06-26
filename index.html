@@ -1327,8 +1327,8 @@ window.__dataReady.then(data => {
           const c=pd.cur[i], p=pd.prev[i];
           if(c==null||p==null) return;
           const diff=c-p; const pct=diff/p*100;
-          if(pct>=50) ups.push({cat,diff,pct,cur:c,prev:p,type:'up'});
-          else if(pct<=-30) goods.push({cat,diff,pct,cur:c,prev:p});
+          if(pct>=10) ups.push({cat,diff,pct,cur:c,prev:p,type:'up'});
+          else if(pct<=-10) goods.push({cat,diff,pct,cur:c,prev:p});
         });
         const vals=pd.cur.filter(v=>v!=null);
         if(vals.length>=3){
@@ -1388,12 +1388,12 @@ window.__dataReady.then(data => {
             const fUps=[], fGoods=[];
             bk.forEach(b=>{
               const pct=b.prev>0?(b.diff/b.prev)*100:null;
-              if(b.prev>0&&pct>=50) fUps.push({...b,pct,flagType:'up'});
+              if(b.prev>0&&pct>=10) fUps.push({...b,pct,flagType:'up'});
               else if(b.prev===0&&b.cur>0) fUps.push({...b,pct:null,flagType:'new'});
               else if(statsMap&&statsMap[b.cause]&&b.cur>statsMap[b.cause].mean+1.5*statsMap[b.cause].std){
                 fUps.push({...b,pct:null,flagType:'spike',stdDiff:b.cur-statsMap[b.cause].mean});
               }
-              if(b.prev>0&&pct<=-30) fGoods.push({...b,pct});
+              if(b.prev>0&&pct<=-10) fGoods.push({...b,pct});
             });
             return {fUps,fGoods};
           };
