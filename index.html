@@ -4084,25 +4084,26 @@ window.__dataReady.then(data => {
       </div>
     );
 
-    const FormModal = ()=>(
-      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setShowForm(false)}>
+    return <div style={{padding:'20px 24px',minHeight:600}}>
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setShowForm(false)}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
           <div style={{fontSize:16,fontWeight:700,color:'#1e293b',marginBottom:16}}>{editTask?'แก้ไขงาน':'เพิ่มงานใหม่'}</div>
-          {[
-            {label:'ชื่องาน *',el:<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="ระบุชื่องาน..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/>},
-            {label:'ฝ่าย',el:<div style={{display:'flex',gap:8}}>{WT_DEPT.map(d=><button key={d.id} onClick={()=>setForm({...form,dept:d.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.dept===d.id?'#0f766e':'#e2e8f0'}`,background:form.dept===d.id?'#0f766e':'#fff',color:form.dept===d.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{d.label}</button>)}</div>},
-            {label:'ประเภทงาน',el:<input value={form.type} onChange={e=>setForm({...form,type:e.target.value})} placeholder="พิมพ์ประเภทงาน..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/>},
-            {label:'ลำดับความสำคัญ',el:<div style={{display:'flex',gap:8}}>{WT_PRI.map(p=><button key={p.id} onClick={()=>setForm({...form,priority:p.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.priority===p.id?p.color:'#e2e8f0'}`,background:form.priority===p.id?p.color:'#fff',color:form.priority===p.id?'#fff':p.color,fontSize:12,fontWeight:600,cursor:'pointer'}}>{p.label}</button>)}</div>},
-            {label:'สถานะ',el:<div style={{display:'flex',gap:8}}>{WT_STATUS.map(s=><button key={s.id} onClick={()=>setForm({...form,status:s.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.status===s.id?'#0369a1':'#e2e8f0'}`,background:form.status===s.id?'#0369a1':'#fff',color:form.status===s.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{s.label}</button>)}</div>},
-            {label:'ความคืบหน้า ('+form.pct+'%)',el:<input type="range" min={0} max={100} value={form.pct} onChange={e=>setForm({...form,pct:Number(e.target.value)})} style={{width:'100%'}}/>},
-            {label:'วันที่กำหนดเสร็จ',el:<input type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/>},
-            {label:'หมายเหตุ',el:<textarea value={form.note} onChange={e=>setForm({...form,note:e.target.value})} rows={2} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,resize:'vertical',boxSizing:'border-box'}}/>},
-          ].map(({label,el})=>(
-            <div key={label} style={{marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>{label}</div>
-              {el}
-            </div>
-          ))}
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ชื่องาน *</div>
+            <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="ระบุชื่องาน..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ฝ่าย</div>
+            <div style={{display:'flex',gap:8}}>{WT_DEPT.map(d=><button key={d.id} onClick={()=>setForm({...form,dept:d.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.dept===d.id?'#0f766e':'#e2e8f0'}`,background:form.dept===d.id?'#0f766e':'#fff',color:form.dept===d.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{d.label}</button>)}</div></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ประเภทงาน</div>
+            <input value={form.type} onChange={e=>setForm({...form,type:e.target.value})} placeholder="พิมพ์ประเภทงาน..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ลำดับความสำคัญ</div>
+            <div style={{display:'flex',gap:8}}>{WT_PRI.map(p=><button key={p.id} onClick={()=>setForm({...form,priority:p.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.priority===p.id?p.color:'#e2e8f0'}`,background:form.priority===p.id?p.color:'#fff',color:form.priority===p.id?'#fff':p.color,fontSize:12,fontWeight:600,cursor:'pointer'}}>{p.label}</button>)}</div></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>สถานะ</div>
+            <div style={{display:'flex',gap:8}}>{WT_STATUS.map(s=><button key={s.id} onClick={()=>setForm({...form,status:s.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.status===s.id?'#0369a1':'#e2e8f0'}`,background:form.status===s.id?'#0369a1':'#fff',color:form.status===s.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{s.label}</button>)}</div></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ความคืบหน้า ({form.pct}%)</div>
+            <input type="range" min={0} max={100} value={form.pct} onChange={e=>setForm({...form,pct:Number(e.target.value)})} style={{width:'100%'}}/></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>วันที่กำหนดเสร็จ</div>
+            <input type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>หมายเหตุ</div>
+            <textarea value={form.note} onChange={e=>setForm({...form,note:e.target.value})} rows={2} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,resize:'vertical',boxSizing:'border-box'}}/></div>
           <div style={{marginBottom:16}}>
             <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,fontWeight:600,color:'#0369a1'}}>
               <input type="checkbox" checked={form.boss} onChange={e=>setForm({...form,boss:e.target.checked})} style={{width:16,height:16}}/>
@@ -4114,11 +4115,7 @@ window.__dataReady.then(data => {
             <button onClick={()=>setShowForm(false)} style={{padding:'10px 18px',background:'#f1f5f9',color:'#475569',border:'none',borderRadius:10,fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
           </div>
         </div>
-      </div>
-    );
-
-    return <div style={{padding:'20px 24px',minHeight:600}}>
-      {showForm&&<FormModal/>}
+      </div>}
       {/* Dept tabs */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,marginBottom:16}}>
         <div style={{display:'flex',gap:8}}>
