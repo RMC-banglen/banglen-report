@@ -4050,18 +4050,22 @@ window.__dataReady.then(data => {
     const saveUpd = fn => { setTasks(prev=>{ const next=fn(prev); localStorage.setItem(WT_KEY,JSON.stringify(next)); return next; }); };
 
     const [fromRaft,setFromRaft] = React.useState(false);
-    const openAdd = () => { setForm({title:'',type:'',dept,status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''}); setEditTask(null); setFromRaft(false); setShowForm(true); };
-    const openEdit = t => { setForm({...t}); setEditTask(t.id); setFromRaft(false); setShowForm(true); };
+    const [raftTarget,setRaftTarget] = React.useState(null);
+    const openAdd = () => { setForm({title:'',type:'',dept,status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''}); setEditTask(null); setFromRaft(false); setRaftTarget(null); setShowForm(true); };
+    const openEdit = t => { setForm({...t}); setEditTask(t.id); setFromRaft(false); setRaftTarget(null); setShowForm(true); };
     const openRaftRepair = (num,part) => {
       setForm({title:`ซ่อมแพที่ ${num} — ${part}`,type:`แพผลิตเสาเข็ม — ${part}`,dept:'production',status:'todo',priority:'normal',pct:0,due:'',stage:part,note:''});
-      setEditTask(null); setFromRaft(true); setShowForm(true);
+      setEditTask(null); setFromRaft(true); setRaftTarget({num,part}); setShowForm(true);
     };
     const saveForm = () => {
       if(!form.title.trim()) return;
       if(editTask){ saveUpd(prev=>prev.map(t=>t.id===editTask?{...form,id:editTask}:t)); }
       else { saveUpd(prev=>[{...form,id:Date.now()+''},...prev]); }
       setShowForm(false);
-      if(fromRaft){ setDept('production'); setFromRaft(false); }
+      if(fromRaft){
+        if(raftTarget) toggleRaftPart(raftTarget.num, raftTarget.part);
+        setDept('production'); setFromRaft(false); setRaftTarget(null);
+      }
     };
     const deleteTask = id => { if(confirm('ลบงานนี้?')) saveUpd(prev=>prev.filter(t=>t.id!==id)); };
     const setStatus = (id,status) => {
@@ -4149,7 +4153,7 @@ window.__dataReady.then(data => {
                 {RAFT_PARTS.map(part=>{
                   const bad=getRaftStatus(num,part)==='bad';
                   return <td key={part} style={{padding:'10px 8px',textAlign:'center'}}>
-                    <button onClick={()=>{ toggleRaftPart(num,part); if(!bad) openRaftRepair(num,part); }} title={bad?'กดเพื่อทำเครื่องหมายซ่อมเสร็จ':'กดเพื่อสร้างงานซ่อม'} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                    <button onClick={()=>{ if(bad) toggleRaftPart(num,part); else openRaftRepair(num,part); }} title={bad?'กดเพื่อทำเครื่องหมายซ่อมเสร็จ':'กดเพื่อสร้างงานซ่อม'} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
                       {bad?'🔴':'🟢'}
                     </button>
                   </td>;
