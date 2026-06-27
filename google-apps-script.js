@@ -776,19 +776,34 @@ function addPersonnelColumns(ss) {
     }
   }
 
-  // ID: ชุดผู้รับเหมา + ชื่อพนักงาน
+  // ID: ชุดผู้รับเหมา (dropdown) + ชื่อพนักงาน
   const sheetID = ss.getSheetByName('เสียหายในโรงงานบางเลน รหัสID');
   if (sheetID) {
-    const headers = sheetID.getRange(1, 1, 1, sheetID.getLastColumn()).getValues()[0].map(h => String(h).trim());
-    let nextCol = sheetID.getLastColumn() + 1;
-    if (!headers.includes('ชุดผู้รับเหมา')) {
-      sheetID.getRange(1, nextCol).setValue('ชุดผู้รับเหมา');
+    const headersID = sheetID.getRange(1, 1, 1, sheetID.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    let nextColID = sheetID.getLastColumn() + 1;
+
+    if (!headersID.includes('ชุดผู้รับเหมา')) {
+      sheetID.getRange(1, nextColID).setValue('ชุดผู้รับเหมา');
       Logger.log('✅ ID: เพิ่มคอลัมน์ "ชุดผู้รับเหมา"');
-      nextCol++;
+      nextColID++;
     }
-    if (!headers.includes('ชื่อพนักงาน')) {
-      sheetID.getRange(1, nextCol).setValue('ชื่อพนักงาน');
+    if (!headersID.includes('ชื่อพนักงาน')) {
+      sheetID.getRange(1, nextColID).setValue('ชื่อพนักงาน');
       Logger.log('✅ ID: เพิ่มคอลัมน์ "ชื่อพนักงาน"');
+    }
+
+    // ตั้ง dropdown สำหรับคอลัมน์ ชุดผู้รับเหมา
+    const headersID2 = sheetID.getRange(1, 1, 1, sheetID.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const colContractor = headersID2.indexOf('ชุดผู้รับเหมา');
+    if (colContractor >= 0) {
+      const lastRow = Math.max(sheetID.getLastRow(), 2);
+      const contractorChoices = ['ชุดยกเสาข้างใน','ยกเสาด้านนอก','เข้าแบบ','ถอดแบบ','ชุดจี้คอนกรีต'];
+      const rule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(contractorChoices, true)
+        .setAllowInvalid(true)
+        .build();
+      sheetID.getRange(2, colContractor + 1, lastRow - 1, 1).setDataValidation(rule);
+      Logger.log('✅ ID: ตั้ง dropdown ชุดผู้รับเหมาแล้ว');
     }
   }
 }
