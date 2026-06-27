@@ -4122,7 +4122,13 @@ window.__dataReady.then(data => {
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
                   <span style={{fontSize:13,fontWeight:700,padding:'3px 12px',borderRadius:20,background:pi.color+'18',color:pi.color}}>{pi.label}</span>
                   {t.type&&<span style={{fontSize:13,padding:'3px 12px',borderRadius:20,background:'#f1f5f9',color:'#475569',fontWeight:600}}>{t.type}</span>}
-                  {t.due&&<span style={{fontSize:13,color:'#64748b'}}>📅 {t.due}</span>}
+                  {t.due&&(()=>{
+                    const diff=Math.ceil((new Date(t.due)-new Date(new Date().toDateString()))/86400000);
+                    const done=t.status==='done';
+                    const color=done?'#16a34a':diff<0?'#dc2626':diff<=3?'#d97706':'#64748b';
+                    const label=done?'เสร็จแล้ว':diff<0?`เกินแผน ${Math.abs(diff)} วัน`:diff===0?'ครบกำหนดวันนี้':`เหลืออีก ${diff} วัน`;
+                    return <span style={{fontSize:13,color,fontWeight:diff<=3&&!done?700:400}}>📅 {t.due} · {label}</span>;
+                  })()}
                 </div>
                 {t.stage&&<div style={{fontSize:14,color:'#0369a1',fontWeight:700,marginBottom:6,background:'#e0f2fe',borderRadius:8,padding:'5px 12px',display:'inline-block'}}>📍 ขั้นตอนปัจจุบัน: {t.stage}</div>}
                 {t.note&&<div style={{fontSize:13,color:'#64748b',marginTop:6,lineHeight:1.6}}>{t.note}</div>}
