@@ -545,7 +545,7 @@ function setupContractorColumn(sheet) {
   const colI = headers.indexOf('ชุดผู้รับเหมา') + 1;
   if (!colG || !colH || !colI) { Logger.log('⚠️ ไม่พบคอลัมน์ที่ต้องการใน ID sheet'); return; }
 
-  const contractorChoices = ['ชุดยกเสาข้างใน','ยกเสาด้านนอก','เข้าแบบ','ถอดแบบ','ชุดจี้คอนกรีต'];
+  const contractorChoices = ['ชุดยกเสาข้างใน','ชุดยกเสาด้านนอก','ชุดเข้าแบบ','ชุดถอดแบบ','ชุดจี้คอนกรีต'];
   const rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(contractorChoices, true)
     .setAllowInvalid(true)
