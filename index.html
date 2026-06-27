@@ -1831,6 +1831,7 @@ window.__dataReady.then(data => {
 
   function DamageDetailTab(){
     const [view,setView]   = useState('damage');
+    const [workerTab,setWorkerTab] = useState('employee');
     const [filterCode,setFilterCode] = useState('ALL');
     const [filterYear,setFilterYear] = useState(()=>{
       const ys=[...new Set((D.damageItems||[]).map(r=>r.year))].sort((a,b)=>a-b);
@@ -1935,7 +1936,7 @@ window.__dataReady.then(data => {
         <Segmented value={view} onChange={setView} options={[
           {value:'damage',label:'มูลค่าเสียหาย'},{value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},
           {value:'summary',label:'ตารางสรุป'},{value:'cause',label:'แยกสาเหตุ'},
-          {value:'customer',label:'แยกลูกค้า'},{value:'employee',label:'วิเคราะห์พนักงาน'},{value:'contractor',label:'วิเคราะห์ผู้รับเหมา'},
+          {value:'customer',label:'แยกลูกค้า'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
           {value:'detail',label:'ตารางรายการ'}
         ]}/>
         <div style={{display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'center'}}>
@@ -2082,7 +2083,7 @@ window.__dataReady.then(data => {
                 delta={pctDelta!=null?{dir:pctDelta<=0?-1:1,text:''}:null}/>
             </div>;
           })()
-        : (view==='employee'||view==='contractor') ? null
+        : view==='worker' ? null
         : <div className="kpi-row" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
             <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
               sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
@@ -2222,8 +2223,17 @@ window.__dataReady.then(data => {
       {/* Customer view */}
       {view==='customer' && <CustomerView items={items} totalAll={totalAll}/>}
 
+      {/* Worker sub-tab nav */}
+      {view==='worker' && <div style={{gridColumn:'1 / -1',display:'flex',gap:8,marginBottom:4}}>
+        {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'}].map(({v,l})=>(
+          <button key={v} onClick={()=>setWorkerTab(v)} style={{padding:'7px 20px',borderRadius:20,border:`1.5px solid ${workerTab===v?'#0f766e':'#e2e8f0'}`,background:workerTab===v?'#0f766e':'#fff',color:workerTab===v?'#fff':'#334155',fontSize:13,fontWeight:workerTab===v?700:400,cursor:'pointer'}}>
+            {l}
+          </button>
+        ))}
+      </div>}
+
       {/* Employee / Blowcount analysis */}
-      {view==='employee' && (()=>{
+      {view==='worker' && workerTab==='employee' && (()=>{
         const curYear  = filterYear==='ALL' ? null : Number(filterYear);
         const prevYear = curYear ? curYear-1 : null;
         const empBase  = r => notReturnOk(r) && (r.code_type==='REB'||r.code_type==='ROB') && r.employee_name && (selMonths.size===0||selMonths.has(r.month));
@@ -2471,7 +2481,7 @@ window.__dataReady.then(data => {
       })()}
 
       {/* Contractor view */}
-      {view==='contractor' && (()=>{
+      {view==='worker' && workerTab==='contractor' && (()=>{
         const curYear  = filterYear==='ALL' ? null : Number(filterYear);
         const prevYear = curYear ? curYear-1 : null;
         const baseFilter = r => r.contractor_team && (r.cause||'').includes('ผู้รับเหมา') && (selMonths.size===0 || selMonths.has(r.month));
