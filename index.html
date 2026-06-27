@@ -4094,7 +4094,7 @@ window.__dataReady.then(data => {
       {/* KPI cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:16}}>
         {[
-          {label:'งานค้างทั้งหมด',   val:byStatus('todo').length,   color:'#dc2626', bg:'#fef2f2'},
+          {label:'งานค้างทั้งหมด',   val:filtered.filter(t=>t.status!=='done').length, color:'#dc2626', bg:'#fef2f2'},
           {label:'กำลังดำเนินการ',   val:byStatus('doing').length,  color:'#d97706', bg:'#fffbeb'},
           {label:'เสร็จแล้ว',        val:doneMonth,                 color:'#16a34a', bg:'#f0fdf4'},
           {label:'งานด่วนที่รอ',     val:urgentCount,               color:'#7c3aed', bg:'#f5f3ff'},
