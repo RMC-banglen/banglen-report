@@ -4099,7 +4099,7 @@ window.__dataReady.then(data => {
           {label:'งานค้างทั้งหมด',   val:filtered.filter(t=>t.status!=='done').length, color:'#dc2626', bg:'#fef2f2'},
           {label:'กำลังดำเนินการ',   val:byStatus('doing').length,  color:'#d97706', bg:'#fffbeb'},
           {label:'เสร็จแล้ว',        val:doneMonth,                 color:'#16a34a', bg:'#f0fdf4'},
-          {label:'งานด่วนที่รอ',     val:urgentCount,               color:'#7c3aed', bg:'#f5f3ff'},
+          {label:'ยังไม่ได้ดำเนินการ', val:byStatus('todo').length,   color:'#7c3aed', bg:'#f5f3ff'},
         ].map(k=>(
           <div key={k.label} style={{background:k.bg,borderRadius:12,padding:'14px 18px',border:`1.5px solid ${k.color}33`}}>
             <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>{k.label}</div>
