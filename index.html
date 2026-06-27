@@ -2557,44 +2557,26 @@ window.__dataReady.then(data => {
             const allMonths = [...new Set(rawItems.filter(r=>r.contractor_team&&(r.cause||'').includes('ผู้รับเหมา')&&(curYear===null||r.year===thisYear)).map(r=>r.month))].sort((a,b)=>b-a);
             if(allMonths.length===0) return null;
 
-            // group by contractor_team → damage_group counts
-            const groupTeam = rows => {
-              const m={};
-              rows.forEach(r=>{
-                if(!m[r.contractor_team]) m[r.contractor_team]={};
-                const dg=r.damage_group||r.reason||'อื่นๆ';
-                m[r.contractor_team][dg]=(m[r.contractor_team][dg]||0)+1;
-              });
-              return m;
-            };
+            const teamAmt = rows => { const m={}; rows.forEach(r=>{ m[r.contractor_team]=(m[r.contractor_team]||0)+(r.amount||0); }); return m; };
 
             const renderSection = (curRows,prevRows) => {
-              const curMap=groupTeam(curRows), prevMap=groupTeam(prevRows);
+              const curMap=teamAmt(curRows), prevMap=teamAmt(prevRows);
               const allTeams=[...new Set([...Object.keys(curMap),...Object.keys(prevMap)])];
               const ups=[], goods=[];
-              allTeams.forEach(team=>{
-                const cDg=curMap[team]||{}, pDg=prevMap[team]||{};
-                const cTot=Object.values(cDg).reduce((a,b)=>a+b,0);
-                const pTot=Object.values(pDg).reduce((a,b)=>a+b,0);
-                if(cTot===0&&pTot===0) return;
-                const pct=pTot>0?(cTot-pTot)/pTot*100:null;
-                const isNew=pct===null&&cTot>0&&pTot===0;
-                const allDgs=[...new Set([...Object.keys(cDg),...Object.keys(pDg)])];
-                const subs=allDgs.map(dg=>{
-                  const c=cDg[dg]||0,p=pDg[dg]||0; if(c===0&&p===0) return null;
-                  const d=c-p;
-                  return <div key={dg} style={{fontSize:11,color:'#64748b',paddingLeft:12,marginTop:2}}>{d>0?'↑':d<0?'↓':'→'} {dg}: {p}→{c} เคส ({d>0?'+':''}{d})</div>;
-                }).filter(Boolean);
-                const el=<div key={team} style={{marginBottom:8,paddingLeft:8,borderLeft:`3px solid ${pct===null||(pct>=10)?'#c0392b':'#16a34a'}`}}>
-                  <div style={{fontSize:13,fontWeight:700,color:pct===null||(pct>=10)?'#7f1d1d':'#166534'}}>
-                    {pct===null||(pct>=10)
-                      ? isNew?<>🆕 <b>{team}</b> เกิดขึ้นใหม่ ({cTot} เคส) ไม่มีในช่วงก่อน</>:<>▲ <b>{team}</b> เพิ่มขึ้น <b>{pct.toFixed(1)}%</b> ({pTot}→{cTot} เคส)</>
-                      : <>✅ <b>{team}</b> ลดลง <b>{Math.abs(pct).toFixed(1)}%</b> ({pTot}→{cTot} เคส) — {pct<=-70?'ยอดเยี่ยมมาก!':pct<=-50?'ดีมากควบคุมได้ดี':'ปรับตัวดีขึ้น'}</>
-                    }
-                  </div>
-                  {subs}
+              allTeams.forEach(t=>{
+                const c=curMap[t]||0, p=prevMap[t]||0;
+                if(c===0&&p===0) return;
+                const pct=p>0?(c-p)/p*100:null;
+                const isNew=pct===null&&c>0&&p===0;
+                const isUp=isNew||pct>=10, isDown=pct!==null&&pct<=-10;
+                if(!isUp&&!isDown) return;
+                const el=<div key={t} style={{fontSize:13,color:isUp?'#7f1d1d':'#166534',paddingLeft:8,borderLeft:`3px solid ${isUp?'#c0392b':'#16a34a'}`,marginBottom:5}}>
+                  {isUp
+                    ? isNew?<>🆕 <b>{t}</b> เกิดขึ้นใหม่ ({bahtFmt(c)} ฿) ไม่มีในช่วงก่อน</>:<>🔺 <b>{t}</b> เพิ่มขึ้น <b>{pct.toFixed(1)}%</b> ({bahtFmt(p)} → {bahtFmt(c)} ฿)</>
+                    : <>✅ <b>{t}</b> ลดลง <b>{Math.abs(pct).toFixed(1)}%</b> ({bahtFmt(p)} → {bahtFmt(c)} ฿) — {pct<=-70?'ยอดเยี่ยมมาก!':pct<=-50?'ดีมากควบคุมได้ดี':'ปรับตัวดีขึ้น'}</>
+                  }
                 </div>;
-                if(pct===null||(pct>=10)) ups.push(el); else goods.push(el);
+                if(isUp) ups.push(el); else goods.push(el);
               });
               return {ups,goods};
             };
