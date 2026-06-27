@@ -4254,7 +4254,7 @@ window.__dataReady.then(data => {
                           <span style={{fontSize:12,fontWeight:700,padding:'4px 8px',borderRadius:16,background:allOk?'#f0fdf4':'#fef2f2',color:allOk?'#16a34a':'#dc2626',border:`1px solid ${allOk?'#86efac':'#fca5a5'}`,display:'block',marginBottom:4}}>
                             {allOk?'✅ พร้อม':`⚠️ ซ่อม ${badParts.length}`}
                           </span>
-                          {!info.noChange&&<button onClick={()=>updateRaftInfo(num,{waiting:true})} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #fca5a5',background:'#fef2f2',color:'#dc2626',cursor:'pointer',fontWeight:600,width:'100%',marginBottom:3}}>รอติดตั้งแพ</button>}
+                          {!info.noChange&&num===9&&<button onClick={()=>updateRaftInfo(num,{waiting:true})} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #fca5a5',background:'#fef2f2',color:'#dc2626',cursor:'pointer',fontWeight:600,width:'100%',marginBottom:3}}>รอติดตั้งแพ</button>}
                           {!info.noChange&&<button onClick={()=>openRaftChange(num)} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#475569',cursor:'pointer',fontWeight:600,width:'100%'}}>เปลี่ยนแพ</button>}
                         </div>
                   }
