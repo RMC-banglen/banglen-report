@@ -2382,6 +2382,84 @@ window.__dataReady.then(data => {
               </div>;
             })}
           </div>
+
+          {/* ===== วิเคราะห์ชุดผู้รับเหมา ===== */}
+          {(()=>{
+            const cItems = rawItems.filter(r =>
+              r.contractor_team &&
+              (r.cause||'').includes('ผู้รับเหมา') &&
+              (filterYear==='ALL' || r.year===Number(filterYear)) &&
+              (selMonths.size===0 || selMonths.has(r.month))
+            );
+            if (cItems.length===0) return <ChartCard title="วิเคราะห์ชุดผู้รับเหมา" subtitle="ยังไม่มีข้อมูลชุดผู้รับเหมาในระบบ — กรุณากรอกข้อมูลในคอลัมน์ 'ชุดผู้รับเหมา' ในชีท ID แล้ว Sync ใหม่" span="full">
+              <div style={{color:'#94a3b8',fontSize:15,padding:'32px 0',textAlign:'center'}}>ไม่มีข้อมูล</div>
+            </ChartCard>;
+
+            const cMap = {};
+            cItems.forEach(r => {
+              const t = r.contractor_team;
+              if (!cMap[t]) cMap[t] = { name:t, count:0, amount:0 };
+              cMap[t].count++;
+              cMap[t].amount += r.amount||0;
+            });
+            const cList = Object.values(cMap).sort((a,b)=>b.amount-a.amount);
+            const maxAmt = cList[0]?.amount||1;
+            const totalAmt = cItems.reduce((s,r)=>s+(r.amount||0),0);
+            const mostTeam  = cList[0]||null;
+            const leastTeam = cList[cList.length-1]||null;
+            const TEAM_COLORS = ['#c0392b','#e67e22','#f39c12','#8e44ad','#2980b9'];
+
+            return <>
+              <div style={{gridColumn:'1/-1',marginTop:24,marginBottom:4,fontSize:18,fontWeight:800,color:'#1e293b',borderLeft:'4px solid #e67e22',paddingLeft:12}}>
+                วิเคราะห์ความเสียหายตามชุดผู้รับเหมา
+              </div>
+              <div className="kpi-row" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+                <div style={{background:'#fff2f2',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fca5a5'}}>
+                  <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>ชุดที่ทำเสียหายมากสุด</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'#c0392b'}}>{mostTeam?.name||'–'}</div>
+                  <div style={{fontSize:13,color:'#c0392b',fontWeight:700}}>{mostTeam?`${mostTeam.count} เคส • ${bahtFmt(mostTeam.amount)}`:''}</div>
+                </div>
+                <div style={{background:'#f0fdf4',borderRadius:14,padding:'18px 22px',border:'1.5px solid #86efac'}}>
+                  <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>ชุดที่ทำเสียหายน้อยสุด</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'#16a34a'}}>{leastTeam&&leastTeam!==mostTeam?leastTeam.name:'–'}</div>
+                  <div style={{fontSize:13,color:'#16a34a',fontWeight:700}}>{leastTeam&&leastTeam!==mostTeam?`${leastTeam.count} เคส • ${bahtFmt(leastTeam.amount)}`:''}</div>
+                </div>
+                <div style={{background:'#fdf8ee',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fde68a'}}>
+                  <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>รวมมูลค่าความเสียหาย (ผู้รับเหมา)</div>
+                  <div style={{fontSize:28,fontWeight:800,color:'#b45309'}}>{bahtFmt(totalAmt)}</div>
+                  <div style={{fontSize:12,color:'#94a3b8'}}>{cItems.length} รายการ • {cList.length} ชุด</div>
+                </div>
+              </div>
+              <ChartCard title="ความเสียหายแยกตามชุดผู้รับเหมา" subtitle="เรียงตามมูลค่าความเสียหายมากสุด" span="full">
+                {cList.map((t,i)=>(
+                  <div key={i} style={{marginBottom:14}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{display:'inline-block',width:12,height:12,borderRadius:'50%',background:TEAM_COLORS[i%TEAM_COLORS.length]}}/>
+                        <span style={{fontSize:15,fontWeight:i===0?800:600,color:'#1e293b'}}>{i+1}. {t.name}</span>
+                        <span style={{fontSize:12,color:'#64748b',background:'#f1f5f9',padding:'2px 8px',borderRadius:10}}>{t.count} เคส</span>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <span style={{fontSize:15,fontWeight:800,color:TEAM_COLORS[i%TEAM_COLORS.length]}}>{bahtFmt(t.amount)}</span>
+                        <span style={{fontSize:12,color:'#94a3b8',marginLeft:6}}>{Math.round(t.amount/totalAmt*100)}%</span>
+                      </div>
+                    </div>
+                    <div style={{background:'#f1f5f9',borderRadius:8,height:14,overflow:'hidden'}}>
+                      <div style={{height:'100%',borderRadius:8,background:TEAM_COLORS[i%TEAM_COLORS.length],width:`${t.amount/maxAmt*100}%`,transition:'width .4s'}}/>
+                    </div>
+                  </div>
+                ))}
+                <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0',display:'flex',gap:24,flexWrap:'wrap'}}>
+                  {cList.map((t,i)=>(
+                    <span key={i} style={{fontSize:12,color:'#64748b',display:'flex',alignItems:'center',gap:4}}>
+                      <span style={{width:10,height:10,borderRadius:'50%',background:TEAM_COLORS[i%TEAM_COLORS.length],display:'inline-block'}}/>
+                      {t.name}: {Math.round(t.amount/totalAmt*100)}%
+                    </span>
+                  ))}
+                </div>
+              </ChartCard>
+            </>;
+          })()}
         </>;
       })()}
 
