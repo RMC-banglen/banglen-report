@@ -4064,7 +4064,19 @@ window.__dataReady.then(data => {
       if(fromRaft){ setDept('production'); setFromRaft(false); }
     };
     const deleteTask = id => { if(confirm('ลบงานนี้?')) saveUpd(prev=>prev.filter(t=>t.id!==id)); };
-    const setStatus = (id,status) => saveUpd(prev=>prev.map(t=>t.id===id?{...t,status}:t));
+    const setStatus = (id,status) => {
+      saveUpd(prev=>prev.map(t=>t.id===id?{...t,status}:t));
+      if(status==='done'){
+        const task=tasks.find(t=>t.id===id);
+        if(task&&task.type==='raft_fix'){
+          const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
+          if(m){
+            const num=Number(m[1]), part=m[2].trim();
+            setRaftData(prev=>{ const next={...prev}; delete next[`${num}__${part}`]; localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; });
+          }
+        }
+      }
+    };
 
     const filtered = tasks.filter(t=>t.dept===dept&&(typeFilter==='ALL'||t.type===typeFilter));
     const byStatus = s => filtered.filter(t=>t.status===s);
