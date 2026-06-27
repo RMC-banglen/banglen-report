@@ -4049,13 +4049,19 @@ window.__dataReady.then(data => {
     const save = ts => { setTasks(ts); localStorage.setItem(WT_KEY,JSON.stringify(ts)); };
     const saveUpd = fn => { setTasks(prev=>{ const next=fn(prev); localStorage.setItem(WT_KEY,JSON.stringify(next)); return next; }); };
 
-    const openAdd = () => { setForm({title:'',type:'',dept,status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''}); setEditTask(null); setShowForm(true); };
-    const openEdit = t => { setForm({...t}); setEditTask(t.id); setShowForm(true); };
+    const [fromRaft,setFromRaft] = React.useState(false);
+    const openAdd = () => { setForm({title:'',type:'',dept,status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''}); setEditTask(null); setFromRaft(false); setShowForm(true); };
+    const openEdit = t => { setForm({...t}); setEditTask(t.id); setFromRaft(false); setShowForm(true); };
+    const openRaftRepair = (num,part) => {
+      setForm({title:`ซ่อมแพที่ ${num} — ${part}`,type:'raft_fix',dept:'production',status:'todo',priority:'normal',pct:0,due:'',stage:part,note:''});
+      setEditTask(null); setFromRaft(true); setShowForm(true);
+    };
     const saveForm = () => {
       if(!form.title.trim()) return;
       if(editTask){ saveUpd(prev=>prev.map(t=>t.id===editTask?{...form,id:editTask}:t)); }
       else { saveUpd(prev=>[{...form,id:Date.now()+''},...prev]); }
       setShowForm(false);
+      if(fromRaft){ setDept('production'); setFromRaft(false); }
     };
     const deleteTask = id => { if(confirm('ลบงานนี้?')) saveUpd(prev=>prev.filter(t=>t.id!==id)); };
     const setStatus = (id,status) => saveUpd(prev=>prev.map(t=>t.id===id?{...t,status}:t));
@@ -4108,7 +4114,7 @@ window.__dataReady.then(data => {
         <div style={{display:'flex',gap:8}}>
           {WT_DEPT.map(d=><button key={d.id} onClick={()=>setDept(d.id)} style={{padding:'8px 22px',borderRadius:20,border:`2px solid ${dept===d.id?'#0f766e':'#e2e8f0'}`,background:dept===d.id?'#0f766e':'#fff',color:dept===d.id?'#fff':'#334155',fontSize:14,fontWeight:700,cursor:'pointer'}}>{d.label}</button>)}
         </div>
-        <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>
+        {dept!=='raft'&&<button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>}
       </div>
 
       {/* Raft view — table layout */}
@@ -4131,7 +4137,7 @@ window.__dataReady.then(data => {
                 {RAFT_PARTS.map(part=>{
                   const bad=getRaftStatus(num,part)==='bad';
                   return <td key={part} style={{padding:'10px 8px',textAlign:'center'}}>
-                    <button onClick={()=>toggleRaftPart(num,part)} title={part} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,lineHeight:'36px',padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                    <button onClick={()=>{ toggleRaftPart(num,part); if(!bad) openRaftRepair(num,part); }} title={bad?'กดเพื่อทำเครื่องหมายซ่อมเสร็จ':'กดเพื่อสร้างงานซ่อม'} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
                       {bad?'🔴':'🟢'}
                     </button>
                   </td>;
