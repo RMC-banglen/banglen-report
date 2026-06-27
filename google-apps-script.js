@@ -720,7 +720,6 @@ function syncDamageItems(ss) {
 
       const typeVal = String(r[colType] || '').trim() || null;
       const cause   = String(r[colCause] || '').trim() || null;
-      const causeAll = (typeVal && cause) ? typeVal + ' — ' + cause : (typeVal || cause);
 
       const contractorID = colContractorID >= 0 ? (String(r[colContractorID] || '').trim() || null) : null;
       const employeeID   = colEmployeeID   >= 0 ? (String(r[colEmployeeID]   || '').trim() || null) : null;
@@ -731,7 +730,7 @@ function syncDamageItems(ss) {
         code_type:        'ID',
         damage_group:     'เสียหายในโรงงาน',
         customer_name:    null,
-        cause:            causeAll,
+        cause:            typeVal || cause,
         reason:           cause,
         amount:           amount,
         bill_no:          bill || null,
