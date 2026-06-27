@@ -4133,8 +4133,11 @@ window.__dataReady.then(data => {
                     return <span style={{fontSize:13,color,fontWeight:diff<=3&&!done?700:400}}>📅 {t.due} · {label}</span>;
                   })()}
                 </div>
-                {t.stage&&<div style={{fontSize:14,color:'#0369a1',fontWeight:700,marginBottom:6,background:'#e0f2fe',borderRadius:8,padding:'5px 12px',display:'inline-block'}}>📍 ขั้นตอนปัจจุบัน: {t.stage}</div>}
-                {t.note&&<div style={{fontSize:13,color:'#64748b',marginTop:6,lineHeight:1.6}}>{t.note}</div>}
+                {(t.stage||t.note)&&<div style={{fontSize:14,marginBottom:6,background:'#e0f2fe',borderRadius:8,padding:'6px 14px',lineHeight:1.7}}>
+                  {t.stage&&<span style={{color:'#0369a1',fontWeight:700}}>📍 ขั้นตอน: {t.stage}</span>}
+                  {t.stage&&t.note&&<span style={{color:'#94a3b8',margin:'0 8px'}}>·</span>}
+                  {t.note&&<span style={{color:'#475569'}}>{t.note}</span>}
+                </div>}
                 <div style={{marginTop:10,display:'flex',alignItems:'center',gap:10}} onClick={e=>e.stopPropagation()}>
                   <div style={{flex:1,height:10,background:'#e2e8f0',borderRadius:5,overflow:'hidden'}}>
                     <div style={{height:'100%',borderRadius:5,background:t.pct>=100?'#16a34a':t.pct>=50?'#0f766e':'#0369a1',width:`${t.pct||0}%`,transition:'width .3s'}}/>
