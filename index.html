@@ -4024,6 +4024,9 @@ window.__dataReady.then(data => {
   const WT_STATUS = [{id:'todo',label:'รอดำเนินการ'},{id:'doing',label:'กำลังดำเนินการ'},{id:'done',label:'เสร็จแล้ว'}];
   const WT_DEPT   = [{id:'production',label:'ฝ่ายผลิต'},{id:'maintenance',label:'ซ่อมบำรุง'},{id:'raft',label:'แพผลิตเสาเข็ม'}];
   const WT_PRI    = [{id:'urgent',label:'ด่วนมาก',color:'#dc2626'},{id:'high',label:'ด่วน',color:'#d97706'},{id:'normal',label:'ปกติ',color:'#16a34a'}];
+  const RAFT_INFO_KEY = 'rmc_raft_info_v1';
+  const PILE_S_SEC = ['18','22','26','30','35','40'];
+  const PILE_I_SEC = ['12','14','16','18','20','22','26'];
 
   function WorkTrackTab(){
     const loadTasks = () => { try{ return JSON.parse(localStorage.getItem(WT_KEY)||'[]'); }catch{ return []; } };
@@ -4045,6 +4048,33 @@ window.__dataReady.then(data => {
       });
     };
     const getRaftStatus = (raftIdx,part) => raftData[`${raftIdx}__${part}`]||'ok';
+
+    const loadRaftInfo = () => { try{ return JSON.parse(localStorage.getItem(RAFT_INFO_KEY)||'{}'); }catch{ return {}; } };
+    const [raftInfo,setRaftInfo] = React.useState(loadRaftInfo);
+    const [raftChangeModal,setRaftChangeModal] = React.useState(null);
+    const [raftChangeForm,setRaftChangeForm] = React.useState({pileType:'S',section:'22'});
+    const getRaftInfo = num => ({pileType:'S',section:'22',changing:false,...(raftInfo[num]||{})});
+    const updateRaftInfo = (num,updates) => setRaftInfo(prev=>{
+      const cur={pileType:'S',section:'22',changing:false,...(prev[num]||{})};
+      const next={...prev,[num]:{...cur,...updates}};
+      localStorage.setItem(RAFT_INFO_KEY,JSON.stringify(next));
+      return next;
+    });
+    const openRaftChange = num => {
+      const info=getRaftInfo(num);
+      setRaftChangeForm({pileType:info.pileType,section:info.section});
+      setRaftChangeModal(num);
+    };
+    const confirmRaftChange = () => {
+      const num=raftChangeModal;
+      const info=getRaftInfo(num);
+      const oldLabel=`${info.pileType}${info.section}`;
+      const newLabel=`${raftChangeForm.pileType}${raftChangeForm.section}`;
+      const newTask={id:Date.now()+'',title:`เปลี่ยนแพที่ ${num}: ${oldLabel} → ${newLabel}`,type:`เปลี่ยนแพผลิต — แพที่ ${num}`,dept:'production',status:'todo',priority:'high',pct:0,due:'',stage:'',note:''};
+      saveUpd(prev=>[newTask,...prev]);
+      updateRaftInfo(num,{changing:true,pendingType:raftChangeForm.pileType,pendingSection:raftChangeForm.section});
+      setRaftChangeModal(null);
+    };
 
     const save = ts => { setTasks(ts); localStorage.setItem(WT_KEY,JSON.stringify(ts)); };
     const saveUpd = fn => { setTasks(prev=>{ const next=fn(prev); localStorage.setItem(WT_KEY,JSON.stringify(next)); return next; }); };
@@ -4072,11 +4102,26 @@ window.__dataReady.then(data => {
       saveUpd(prev=>prev.map(t=>t.id===id?{...t,status}:t));
       if(status==='done'){
         const task=tasks.find(t=>t.id===id);
-        if(task&&task.title&&task.title.startsWith('ซ่อมแพที่')){
-          const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
-          if(m){
-            const num=Number(m[1]), part=m[2].trim();
-            setRaftData(prev=>{ const next={...prev}; delete next[`${num}__${part}`]; localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; });
+        if(task&&task.title){
+          if(task.title.startsWith('ซ่อมแพที่')){
+            const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
+            if(m){
+              const num=Number(m[1]),part=m[2].trim();
+              setRaftData(prev=>{ const next={...prev}; delete next[`${num}__${part}`]; localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; });
+            }
+          }
+          if(task.title.startsWith('เปลี่ยนแพที่')){
+            const m=task.title.match(/เปลี่ยนแพที่\s*(\d+):/);
+            if(m){
+              const num=Number(m[1]);
+              setRaftInfo(prev=>{
+                const cur={pileType:'S',section:'22',changing:false,...(prev[num]||{})};
+                const next={...prev,[num]:{...cur,pileType:cur.pendingType||cur.pileType,section:cur.pendingSection||cur.section,changing:false,pendingType:undefined,pendingSection:undefined}};
+                localStorage.setItem(RAFT_INFO_KEY,JSON.stringify(next));
+                return next;
+              });
+              setRaftData(prev=>{ const next={...prev}; RAFT_PARTS.forEach(p=>delete next[`${num}__${p}`]); localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; });
+            }
           }
         }
       }
@@ -4134,34 +4179,72 @@ window.__dataReady.then(data => {
       </div>
 
       {/* Raft view — table layout */}
+      {raftChangeModal!==null&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:420}}>
+          <div style={{fontSize:17,fontWeight:800,color:'#1e293b',marginBottom:4}}>เปลี่ยนแพที่ {raftChangeModal}</div>
+          <div style={{fontSize:13,color:'#64748b',marginBottom:18}}>จาก <b>{getRaftInfo(raftChangeModal).pileType}{getRaftInfo(raftChangeModal).section}</b> → เลือกประเภทใหม่</div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#475569',marginBottom:8}}>ประเภทเสาเข็ม</div>
+            <div style={{display:'flex',gap:10}}>
+              {['S','I'].map(t=><button key={t} onClick={()=>setRaftChangeForm(f=>({...f,pileType:t,section:t==='S'?'22':'14'}))} style={{flex:1,padding:'10px',borderRadius:10,border:`2px solid ${raftChangeForm.pileType===t?'#0f766e':'#e2e8f0'}`,background:raftChangeForm.pileType===t?'#0f766e':'#fff',color:raftChangeForm.pileType===t?'#fff':'#334155',fontSize:16,fontWeight:800,cursor:'pointer'}}>เสาเข็ม {t}</button>)}
+            </div>
+          </div>
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#475569',marginBottom:8}}>หน้าตัด (ซม.)</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+              {(raftChangeForm.pileType==='S'?PILE_S_SEC:PILE_I_SEC).map(s=><button key={s} onClick={()=>setRaftChangeForm(f=>({...f,section:s}))} style={{padding:'8px 16px',borderRadius:8,border:`2px solid ${raftChangeForm.section===s?'#0f766e':'#e2e8f0'}`,background:raftChangeForm.section===s?'#0f766e':'#fff',color:raftChangeForm.section===s?'#fff':'#334155',fontSize:14,fontWeight:700,cursor:'pointer'}}>{raftChangeForm.pileType}{s}</button>)}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={confirmRaftChange} style={{flex:1,padding:'11px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer'}}>ยืนยันเปลี่ยนแพ</button>
+            <button onClick={()=>setRaftChangeModal(null)} style={{padding:'11px 18px',background:'#f1f5f9',color:'#475569',border:'none',borderRadius:10,fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+          </div>
+        </div>
+      </div>}
+
       {dept==='raft'&&<div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',background:'#fff',borderRadius:14,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,.07)',tableLayout:'fixed'}}>
           <thead>
             <tr style={{background:'#0f766e'}}>
-              <th style={{padding:'12px 8px',textAlign:'left',fontSize:14,fontWeight:700,color:'#fff',width:'9%'}}>แพ</th>
-              {RAFT_PARTS.map(p=><th key={p} style={{padding:'12px 4px',fontSize:13,fontWeight:700,color:'#fff',textAlign:'center',width:'8%'}}>{p}</th>)}
-              <th style={{padding:'12px 8px',fontSize:13,fontWeight:700,color:'#fff',textAlign:'center',width:'9%'}}>สถานะ</th>
+              <th style={{padding:'12px 8px',textAlign:'left',fontSize:14,fontWeight:700,color:'#fff',width:'8%'}}>แพ</th>
+              <th style={{padding:'12px 6px',fontSize:13,fontWeight:700,color:'#fff',textAlign:'center',width:'7%'}}>ผลิต</th>
+              {RAFT_PARTS.map(p=><th key={p} style={{padding:'12px 2px',fontSize:12,fontWeight:700,color:'#fff',textAlign:'center',width:'7%'}}>{p}</th>)}
+              <th style={{padding:'12px 6px',fontSize:13,fontWeight:700,color:'#fff',textAlign:'center',width:'10%'}}>สถานะ</th>
             </tr>
           </thead>
           <tbody>
             {Array.from({length:RAFT_COUNT},(_,i)=>{
               const num=i+1;
-              const badParts=RAFT_PARTS.filter(p=>getRaftStatus(num,p)==='bad');
-              const allOk=badParts.length===0;
-              return <tr key={num} style={{borderBottom:'1px solid #e2e8f0',background:i%2===0?'#fff':'#f8fafc'}}>
-                <td style={{padding:'12px 18px',fontSize:15,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap'}}>แพที่ {num}</td>
+              const info=getRaftInfo(num);
+              const changing=info.changing;
+              const badParts=RAFT_PARTS.filter(p=>changing||getRaftStatus(num,p)==='bad');
+              const allOk=!changing&&badParts.length===0;
+              const rowBg=changing?'#fff7ed':i%2===0?'#fff':'#f8fafc';
+              return <tr key={num} style={{borderBottom:'1px solid #e2e8f0',background:rowBg}}>
+                <td style={{padding:'10px 8px',fontSize:15,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap'}}>แพที่ {num}</td>
+                <td style={{padding:'8px 4px',textAlign:'center'}}>
+                  <span style={{display:'inline-block',fontSize:13,fontWeight:800,padding:'4px 8px',borderRadius:8,background:changing?'#fed7aa':'#dbeafe',color:changing?'#c2410c':'#1d4ed8',border:`1.5px solid ${changing?'#fdba74':'#93c5fd'}`}}>
+                    {info.pileType}{info.section}
+                  </span>
+                </td>
                 {RAFT_PARTS.map(part=>{
-                  const bad=getRaftStatus(num,part)==='bad';
-                  return <td key={part} style={{padding:'10px 8px',textAlign:'center'}}>
-                    <button onClick={()=>{ if(!bad) openRaftRepair(num,part); }} title={bad?'รอการซ่อม — ยืนยันเสร็จจากหน้าฝ่ายผลิต':'กดเพื่อสร้างงานซ่อม'} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                  const bad=changing||getRaftStatus(num,part)==='bad';
+                  return <td key={part} style={{padding:'8px 4px',textAlign:'center'}}>
+                    <button onClick={()=>{ if(!bad&&!changing) openRaftRepair(num,part); }} title={changing?'กำลังเปลี่ยนแพ':bad?'รอซ่อม — ยืนยันเสร็จจากฝ่ายผลิต':'กดเพื่อสร้างงานซ่อม'} style={{width:34,height:34,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:bad?'default':'pointer',fontSize:17,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
                       {bad?'🔴':'🟢'}
                     </button>
                   </td>;
                 })}
-                <td style={{padding:'10px 14px',textAlign:'center',whiteSpace:'nowrap'}}>
-                  <span style={{fontSize:12,fontWeight:700,padding:'4px 12px',borderRadius:20,background:allOk?'#f0fdf4':'#fef2f2',color:allOk?'#16a34a':'#dc2626',border:`1px solid ${allOk?'#86efac':'#fca5a5'}`}}>
-                    {allOk?'✅ พร้อมใช้':`⚠️ ซ่อม ${badParts.length}`}
-                  </span>
+                <td style={{padding:'8px 6px',textAlign:'center'}}>
+                  {changing
+                    ? <span style={{fontSize:12,fontWeight:700,padding:'4px 10px',borderRadius:20,background:'#fff7ed',color:'#c2410c',border:'1px solid #fdba74',display:'block',marginBottom:4}}>🔄 เปลี่ยนแพ<br/><span style={{fontSize:11,color:'#9a3412'}}>→ {info.pendingType}{info.pendingSection}</span></span>
+                    : <div>
+                        <span style={{fontSize:12,fontWeight:700,padding:'4px 8px',borderRadius:16,background:allOk?'#f0fdf4':'#fef2f2',color:allOk?'#16a34a':'#dc2626',border:`1px solid ${allOk?'#86efac':'#fca5a5'}`,display:'block',marginBottom:4}}>
+                          {allOk?'✅ พร้อม':`⚠️ ซ่อม ${badParts.length}`}
+                        </span>
+                        <button onClick={()=>openRaftChange(num)} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#475569',cursor:'pointer',fontWeight:600,width:'100%'}}>เปลี่ยนแพ</button>
+                      </div>
+                  }
                 </td>
               </tr>;
             })}
