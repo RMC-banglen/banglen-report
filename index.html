@@ -4099,7 +4099,21 @@ window.__dataReady.then(data => {
         setDept('production'); setFromRaft(false); setRaftTarget(null);
       }
     };
-    const deleteTask = id => { if(confirm('ลบงานนี้?')) saveUpd(prev=>prev.filter(t=>t.id!==id)); };
+    const deleteTask = id => {
+      const task=tasks.find(t=>t.id===id);
+      if(task&&task.status!=='done'&&!confirm('งานนี้ยังไม่เสร็จ — ยืนยันลบ?')) return;
+      if(task&&task.title){
+        if(task.title.startsWith('ซ่อมแพที่')){
+          const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
+          if(m){ const num=Number(m[1]),part=m[2].trim(); setRaftData(prev=>{ const next={...prev}; delete next[`${num}__${part}`]; localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; }); }
+        }
+        if(task.title.startsWith('เปลี่ยนแพที่')){
+          const m=task.title.match(/เปลี่ยนแพที่\s*(\d+):/);
+          if(m){ const num=Number(m[1]); updateRaftInfo(num,{changing:false,pendingType:undefined,pendingSection:undefined}); setRaftData(prev=>{ const next={...prev}; RAFT_PARTS.forEach(p=>delete next[`${num}__${p}`]); localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; }); }
+        }
+      }
+      saveUpd(prev=>prev.filter(t=>t.id!==id));
+    };
     const setStatus = (id,status) => {
       saveUpd(prev=>prev.map(t=>t.id===id?{...t,status}:t));
       if(status==='done'){
