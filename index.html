@@ -4111,31 +4111,40 @@ window.__dataReady.then(data => {
         <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>
       </div>
 
-      {/* Raft view */}
-      {dept==='raft'&&<div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14}}>
-          {Array.from({length:RAFT_COUNT},(_,i)=>{
-            const num=i+1;
-            const badParts=RAFT_PARTS.filter(p=>getRaftStatus(num,p)==='bad');
-            const allOk=badParts.length===0;
-            return <div key={num} style={{background:'#fff',border:`2px solid ${allOk?'#16a34a':'#dc2626'}`,borderRadius:14,padding:'14px 16px',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-                <span style={{fontSize:18,fontWeight:800,color:'#1e293b'}}>แพที่ {num}</span>
-                <span style={{marginLeft:'auto',fontSize:13,fontWeight:700,padding:'3px 12px',borderRadius:20,background:allOk?'#f0fdf4':'#fef2f2',color:allOk?'#16a34a':'#dc2626'}}>
-                  {allOk?'✅ พร้อมใช้':`⚠️ ต้องซ่อม ${badParts.length} รายการ`}
-                </span>
-              </div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+      {/* Raft view — table layout */}
+      {dept==='raft'&&<div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',background:'#fff',borderRadius:14,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,.07)'}}>
+          <thead>
+            <tr style={{background:'#0f766e'}}>
+              <th style={{padding:'12px 18px',textAlign:'left',fontSize:14,fontWeight:700,color:'#fff',whiteSpace:'nowrap',minWidth:90}}>แพ</th>
+              {RAFT_PARTS.map(p=><th key={p} style={{padding:'12px 10px',fontSize:13,fontWeight:700,color:'#fff',textAlign:'center',whiteSpace:'nowrap'}}>{p}</th>)}
+              <th style={{padding:'12px 14px',fontSize:13,fontWeight:700,color:'#fff',textAlign:'center',whiteSpace:'nowrap'}}>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({length:RAFT_COUNT},(_,i)=>{
+              const num=i+1;
+              const badParts=RAFT_PARTS.filter(p=>getRaftStatus(num,p)==='bad');
+              const allOk=badParts.length===0;
+              return <tr key={num} style={{borderBottom:'1px solid #e2e8f0',background:i%2===0?'#fff':'#f8fafc'}}>
+                <td style={{padding:'12px 18px',fontSize:15,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap'}}>แพที่ {num}</td>
                 {RAFT_PARTS.map(part=>{
                   const bad=getRaftStatus(num,part)==='bad';
-                  return <button key={part} onClick={()=>toggleRaftPart(num,part)} style={{fontSize:13,fontWeight:600,padding:'5px 12px',borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',color:bad?'#dc2626':'#16a34a',cursor:'pointer',transition:'all .15s'}}>
-                    {bad?'🔴':'🟢'} {part}
-                  </button>;
+                  return <td key={part} style={{padding:'10px 8px',textAlign:'center'}}>
+                    <button onClick={()=>toggleRaftPart(num,part)} title={part} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,lineHeight:'36px',padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                      {bad?'🔴':'🟢'}
+                    </button>
+                  </td>;
                 })}
-              </div>
-            </div>;
-          })}
-        </div>
+                <td style={{padding:'10px 14px',textAlign:'center',whiteSpace:'nowrap'}}>
+                  <span style={{fontSize:12,fontWeight:700,padding:'4px 12px',borderRadius:20,background:allOk?'#f0fdf4':'#fef2f2',color:allOk?'#16a34a':'#dc2626',border:`1px solid ${allOk?'#86efac':'#fca5a5'}`}}>
+                    {allOk?'✅ พร้อมใช้':`⚠️ ซ่อม ${badParts.length}`}
+                  </span>
+                </td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
       </div>}
 
       {/* KPI + task list (hidden for raft view) */}
