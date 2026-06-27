@@ -2389,6 +2389,84 @@ window.__dataReady.then(data => {
             })}
           </div>
 
+          {/* เทียบ MoM รายเดือน สำหรับประเภทปัญหา */}
+          {(()=>{
+            const thisYear = curYear||Number(filterYear)||2569;
+            const typeAmt = (yr,mo) => {
+              const m={fail:0,slide:0,tilt:0};
+              rawItems.filter(r=>empBase(r)&&r.year===yr&&r.month===mo).forEach(r=>{
+                if(isFail(r.cause)) m.fail++; else if(isSlide(r.cause)) m.slide++; else if(isTilt(r.cause)) m.tilt++;
+              });
+              return m;
+            };
+            const allMonths = [...new Set(empItems.map(r=>r.month))].sort((a,b)=>b-a);
+            if(allMonths.length===0) return null;
+
+            const TYPE_META = [
+              {key:'fail',label:'เสาเข็ม Fail',color:'#c0392b'},
+              {key:'slide',label:'ตอกสไลด์',color:'#e67e22'},
+              {key:'tilt',label:'ตอกเอียง/เทสต์ไม่ผ่าน/ผิดหมุด',color:'#8e44ad'},
+            ];
+
+            const renderTypeRows = (cur,prev,colorRed) => TYPE_META.map(t=>{
+              const c=cur[t.key]||0, p=prev[t.key]||0;
+              if(c===0&&p===0) return null;
+              const pct = p>0?(c-p)/p*100:null;
+              if(colorRed&&!(pct===null?(c>0&&p===0):pct>=10)) return null;
+              if(!colorRed&&!(pct!==null&&pct<=-10)) return null;
+              return <div key={t.key} style={{fontSize:13,color:colorRed?'#7f1d1d':'#166534',paddingLeft:8,borderLeft:`3px solid ${colorRed?'#c0392b':'#16a34a'}`,marginBottom:5}}>
+                {colorRed
+                  ? pct===null ? <>🆕 <b>{t.label}</b> เกิดขึ้นใหม่ ({c} เคส)</> : <>🔺 <b>{t.label}</b> เพิ่มขึ้น <b>{pct.toFixed(1)}%</b> ({p} → {c} เคส)</>
+                  : <>✅ <b>{t.label}</b> ลดลง <b>{Math.abs(pct).toFixed(1)}%</b> ({p} → {c} เคส) — {pct<=-70?'ยอดเยี่ยมมาก!':pct<=-50?'ดีมากควบคุมได้ดี':'ปรับตัวดีขึ้น'}</>
+                }
+              </div>;
+            }).filter(Boolean);
+
+            const blocks = allMonths.map(mo=>{
+              const prevMo = mo>1?mo-1:12;
+              const prevMoYr = mo>1?thisYear:thisYear-1;
+              const cur = typeAmt(thisYear,mo);
+              const prev = typeAmt(prevMoYr,prevMo);
+              const ups = renderTypeRows(cur,prev,true);
+              const goods = renderTypeRows(cur,prev,false);
+              if(ups.length+goods.length===0) return null;
+              return {mo,prevMo,ups,goods};
+            }).filter(Boolean);
+
+            // YoY รวมทั้งปี
+            const curYr  = {fail:empItems.filter(r=>isFail(r.cause)).length, slide:empItems.filter(r=>isSlide(r.cause)).length, tilt:empItems.filter(r=>isTilt(r.cause)).length};
+            const prevYrItems = prevYear ? rawItems.filter(r=>empBase(r)&&r.year===prevYear) : [];
+            const prevYrData  = {fail:prevYrItems.filter(r=>isFail(r.cause)).length, slide:prevYrItems.filter(r=>isSlide(r.cause)).length, tilt:prevYrItems.filter(r=>isTilt(r.cause)).length};
+            const yoyUps   = prevYear ? renderTypeRows(curYr,prevYrData,true) : [];
+            const yoyGoods = prevYear ? renderTypeRows(curYr,prevYrData,false) : [];
+
+            if(blocks.length===0&&yoyUps.length+yoyGoods.length===0) return null;
+            return <>
+              {blocks.map(({mo,prevMo,ups,goods})=>(
+                <div key={mo} style={{marginTop:14,border:'1px solid #e2e8f0',borderRadius:12,overflow:'hidden'}}>
+                  <div style={{background:'#f8fafc',padding:'10px 16px',fontWeight:700,fontSize:14,color:'#334155',borderBottom:'1px solid #e2e8f0'}}>
+                    📊 {MONTHS_TH_SHORT[mo-1]}. — เทียบ {MONTHS_TH_SHORT[mo-1]}. vs {MONTHS_TH_SHORT[prevMo-1]}. ปี {thisYear}
+                  </div>
+                  <div style={{padding:'12px 16px'}}>
+                    {ups.length>0&&<><div style={{fontSize:11,fontWeight:700,color:'#991b1b',marginBottom:4}}>⚠ น่าเฝ้าระวัง</div>{ups}</>}
+                    {ups.length>0&&goods.length>0&&<div style={{height:6}}/>}
+                    {goods.length>0&&<><div style={{fontSize:11,fontWeight:700,color:'#14532d',marginBottom:4}}>✅ ควบคุมได้ดี</div>{goods}</>}
+                  </div>
+                </div>
+              ))}
+              {prevYear&&(yoyUps.length+yoyGoods.length>0)&&<div style={{marginTop:14,border:'1px solid #dbeafe',borderRadius:12,overflow:'hidden'}}>
+                <div style={{background:'#eff6ff',padding:'10px 16px',fontWeight:700,fontSize:14,color:'#1e40af',borderBottom:'1px solid #dbeafe'}}>
+                  🗓 เทียบรวมทั้งปี {thisYear} vs ปี {prevYear} — แนวโน้มประเภทปัญหา (Blowcount)
+                </div>
+                <div style={{padding:'12px 16px'}}>
+                  {yoyUps.length>0&&<><div style={{fontSize:11,fontWeight:700,color:'#991b1b',marginBottom:4}}>⚠ น่าเฝ้าระวัง — เพิ่มขึ้นเทียบปีที่แล้ว</div>{yoyUps}</>}
+                  {yoyUps.length>0&&yoyGoods.length>0&&<div style={{height:8}}/>}
+                  {yoyGoods.length>0&&<><div style={{fontSize:11,fontWeight:700,color:'#14532d',marginBottom:4}}>✅ ควบคุมได้ดี — ลดลงเทียบปีที่แล้ว</div>{yoyGoods}</>}
+                </div>
+              </div>}
+            </>;
+          })()}
+
         </>;
       })()}
 
