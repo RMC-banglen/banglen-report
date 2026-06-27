@@ -4006,10 +4006,174 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  // ─── WorkTrack Tab ─────────────────────────────────────────────
+  const WT_KEY = 'rmc_worktrack_v1';
+  const WT_TYPES = [
+    {id:'backlog',   label:'งานค้าง',              color:'#dc2626', bg:'#fef2f2'},
+    {id:'progress',  label:'รายงานความคืบหน้า',    color:'#d97706', bg:'#fffbeb'},
+    {id:'newproject',label:'งานโปรเจคใหม่',        color:'#7c3aed', bg:'#f5f3ff'},
+    {id:'boss',      label:'งานที่เจ้านายสั่ง',   color:'#0369a1', bg:'#e0f2fe'},
+    {id:'raft_fix',  label:'ซ่อมแพผลิตเสาเข็ม',   color:'#0f766e', bg:'#f0fdfa'},
+    {id:'raft_new',  label:'สร้างแพผลิตใหม่',      color:'#059669', bg:'#ecfdf5'},
+    {id:'maintain',  label:'ซ่อมบำรุงทั่วไป',      color:'#92400e', bg:'#fef3c7'},
+    {id:'machine',   label:'สร้างเครื่องจักรใหม่', color:'#1d4ed8', bg:'#eff6ff'},
+  ];
+  const WT_STATUS = [{id:'todo',label:'รอดำเนินการ'},{id:'doing',label:'กำลังดำเนินการ'},{id:'done',label:'เสร็จแล้ว'}];
+  const WT_DEPT   = [{id:'production',label:'ฝ่ายผลิต'},{id:'maintenance',label:'ซ่อมบำรุง'}];
+  const WT_PRI    = [{id:'urgent',label:'ด่วนมาก',color:'#dc2626'},{id:'high',label:'ด่วน',color:'#d97706'},{id:'normal',label:'ปกติ',color:'#16a34a'}];
+
+  function WorkTrackTab(){
+    const loadTasks = () => { try{ return JSON.parse(localStorage.getItem(WT_KEY)||'[]'); }catch{ return []; } };
+    const [tasks,setTasks]   = React.useState(loadTasks);
+    const [dept,setDept]     = React.useState('production');
+    const [typeFilter,setTypeFilter] = React.useState('ALL');
+    const [showForm,setShowForm]     = React.useState(false);
+    const [editTask,setEditTask]     = React.useState(null);
+    const [form,setForm]     = React.useState({title:'',type:'backlog',dept:'production',status:'todo',priority:'normal',pct:0,due:'',note:'',boss:false});
+
+    const save = ts => { setTasks(ts); localStorage.setItem(WT_KEY,JSON.stringify(ts)); };
+
+    const openAdd = () => { setForm({title:'',type:'backlog',dept,status:'todo',priority:'normal',pct:0,due:'',note:'',boss:false}); setEditTask(null); setShowForm(true); };
+    const openEdit = t => { setForm({...t}); setEditTask(t.id); setShowForm(true); };
+    const saveForm = () => {
+      if(!form.title.trim()) return;
+      if(editTask){ save(tasks.map(t=>t.id===editTask?{...form,id:editTask}:t)); }
+      else { save([{...form,id:Date.now()+''},...tasks]); }
+      setShowForm(false);
+    };
+    const deleteTask = id => { if(confirm('ลบงานนี้?')) save(tasks.filter(t=>t.id!==id)); };
+    const setStatus = (id,status) => save(tasks.map(t=>t.id===id?{...t,status}:t));
+    const setPct    = (id,pct)    => save(tasks.map(t=>t.id===id?{...t,pct}:t));
+
+    const filtered = tasks.filter(t=>t.dept===dept&&(typeFilter==='ALL'||t.type===typeFilter));
+    const byStatus = s => filtered.filter(t=>t.status===s);
+    const urgentCount = tasks.filter(t=>t.dept===dept&&t.priority==='urgent'&&t.status!=='done').length;
+    const bossCount   = tasks.filter(t=>t.dept===dept&&t.boss&&t.status!=='done').length;
+    const doneMonth   = tasks.filter(t=>t.dept===dept&&t.status==='done').length;
+
+    const typeInfo = id => WT_TYPES.find(x=>x.id===id)||WT_TYPES[0];
+    const priInfo  = id => WT_PRI.find(x=>x.id===id)||WT_PRI[2];
+
+    const TaskCard = ({t})=>(
+      <div style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:12,padding:'12px 14px',marginBottom:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer'}} onClick={()=>openEdit(t)}>
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:6,marginBottom:6}}>
+          <div style={{fontSize:13,fontWeight:700,color:'#1e293b',lineHeight:1.4,flex:1}}>{t.boss&&<span title="งานเจ้านายสั่ง" style={{marginRight:4}}>⭐</span>}{t.title}</div>
+          <button onClick={e=>{e.stopPropagation();deleteTask(t.id);}} style={{flexShrink:0,background:'none',border:'none',color:'#94a3b8',cursor:'pointer',fontSize:14,lineHeight:1}}>✕</button>
+        </div>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:8}}>
+          <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:10,background:typeInfo(t.type).bg,color:typeInfo(t.type).color}}>{typeInfo(t.type).label}</span>
+          <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:10,background:'#f8fafc',color:priInfo(t.priority).color,border:'1px solid '+priInfo(t.priority).color}}>{priInfo(t.priority).label}</span>
+        </div>
+        {t.note&&<div style={{fontSize:11,color:'#64748b',marginBottom:8,lineHeight:1.5}}>{t.note}</div>}
+        <div style={{marginBottom:6}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#64748b',marginBottom:3}}>
+            <span>ความคืบหน้า</span><span style={{fontWeight:700,color:'#0f766e'}}>{t.pct||0}%</span>
+          </div>
+          <div style={{height:6,background:'#e2e8f0',borderRadius:3,overflow:'hidden'}} onClick={e=>e.stopPropagation()}>
+            <div style={{height:'100%',borderRadius:3,background:t.pct>=100?'#16a34a':t.pct>=50?'#0f766e':'#0369a1',width:`${t.pct||0}%`,transition:'width .3s'}}/>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:6}}>
+          {t.due&&<span style={{fontSize:10,color:'#64748b'}}>📅 {t.due}</span>}
+          <div style={{display:'flex',gap:4,marginLeft:'auto'}} onClick={e=>e.stopPropagation()}>
+            {WT_STATUS.filter(s=>s.id!==t.status).map(s=>(
+              <button key={s.id} onClick={()=>setStatus(t.id,s.id)} style={{fontSize:10,padding:'3px 8px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#334155',cursor:'pointer'}}>{s.label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+    const FormModal = ()=>(
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setShowForm(false)}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:16,fontWeight:700,color:'#1e293b',marginBottom:16}}>{editTask?'แก้ไขงาน':'เพิ่มงานใหม่'}</div>
+          {[
+            {label:'ชื่องาน *',el:<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="ระบุชื่องาน..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/>},
+            {label:'ฝ่าย',el:<div style={{display:'flex',gap:8}}>{WT_DEPT.map(d=><button key={d.id} onClick={()=>setForm({...form,dept:d.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.dept===d.id?'#0f766e':'#e2e8f0'}`,background:form.dept===d.id?'#0f766e':'#fff',color:form.dept===d.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{d.label}</button>)}</div>},
+            {label:'ประเภทงาน',el:<select value={form.type} onChange={e=>setForm({...form,type:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13}}>{WT_TYPES.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select>},
+            {label:'ลำดับความสำคัญ',el:<div style={{display:'flex',gap:8}}>{WT_PRI.map(p=><button key={p.id} onClick={()=>setForm({...form,priority:p.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.priority===p.id?p.color:'#e2e8f0'}`,background:form.priority===p.id?p.color:'#fff',color:form.priority===p.id?'#fff':p.color,fontSize:12,fontWeight:600,cursor:'pointer'}}>{p.label}</button>)}</div>},
+            {label:'สถานะ',el:<div style={{display:'flex',gap:8}}>{WT_STATUS.map(s=><button key={s.id} onClick={()=>setForm({...form,status:s.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.status===s.id?'#0369a1':'#e2e8f0'}`,background:form.status===s.id?'#0369a1':'#fff',color:form.status===s.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{s.label}</button>)}</div>},
+            {label:'ความคืบหน้า ('+form.pct+'%)',el:<input type="range" min={0} max={100} value={form.pct} onChange={e=>setForm({...form,pct:Number(e.target.value)})} style={{width:'100%'}}/>},
+            {label:'วันที่กำหนดเสร็จ',el:<input type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/>},
+            {label:'หมายเหตุ',el:<textarea value={form.note} onChange={e=>setForm({...form,note:e.target.value})} rows={2} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,resize:'vertical',boxSizing:'border-box'}}/>},
+          ].map(({label,el})=>(
+            <div key={label} style={{marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>{label}</div>
+              {el}
+            </div>
+          ))}
+          <div style={{marginBottom:16}}>
+            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,fontWeight:600,color:'#0369a1'}}>
+              <input type="checkbox" checked={form.boss} onChange={e=>setForm({...form,boss:e.target.checked})} style={{width:16,height:16}}/>
+              ⭐ งานที่เจ้านายสั่ง
+            </label>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={saveForm} style={{flex:1,padding:'10px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer'}}>{editTask?'บันทึก':'เพิ่มงาน'}</button>
+            <button onClick={()=>setShowForm(false)} style={{padding:'10px 18px',background:'#f1f5f9',color:'#475569',border:'none',borderRadius:10,fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+          </div>
+        </div>
+      </div>
+    );
+
+    return <div style={{padding:'20px 24px',minHeight:600}}>
+      {showForm&&<FormModal/>}
+      {/* Dept tabs */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,marginBottom:16}}>
+        <div style={{display:'flex',gap:8}}>
+          {WT_DEPT.map(d=><button key={d.id} onClick={()=>setDept(d.id)} style={{padding:'8px 22px',borderRadius:20,border:`2px solid ${dept===d.id?'#0f766e':'#e2e8f0'}`,background:dept===d.id?'#0f766e':'#fff',color:dept===d.id?'#fff':'#334155',fontSize:14,fontWeight:700,cursor:'pointer'}}>{d.label}</button>)}
+        </div>
+        <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>
+      </div>
+
+      {/* KPI cards */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:16}}>
+        {[
+          {label:'งานค้างทั้งหมด',   val:byStatus('todo').length,   color:'#dc2626', bg:'#fef2f2'},
+          {label:'กำลังดำเนินการ',   val:byStatus('doing').length,  color:'#d97706', bg:'#fffbeb'},
+          {label:'เสร็จแล้ว',        val:doneMonth,                 color:'#16a34a', bg:'#f0fdf4'},
+          {label:'งานด่วนที่รอ',     val:urgentCount,               color:'#7c3aed', bg:'#f5f3ff'},
+        ].map(k=>(
+          <div key={k.label} style={{background:k.bg,borderRadius:12,padding:'14px 18px',border:`1.5px solid ${k.color}33`}}>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>{k.label}</div>
+            <div style={{fontSize:28,fontWeight:800,color:k.color}}>{k.val}</div>
+          </div>
+        ))}
+      </div>
+      {bossCount>0&&<div style={{background:'#eff6ff',border:'1.5px solid #93c5fd',borderRadius:10,padding:'8px 14px',marginBottom:16,fontSize:13,color:'#1d4ed8',fontWeight:600}}>⭐ มีงานที่เจ้านายสั่งรอดำเนินการ {bossCount} งาน</div>}
+
+      {/* Type filter pills */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:16}}>
+        <button onClick={()=>setTypeFilter('ALL')} style={{padding:'5px 14px',borderRadius:16,border:`1.5px solid ${typeFilter==='ALL'?'#0f766e':'#e2e8f0'}`,background:typeFilter==='ALL'?'#0f766e':'#fff',color:typeFilter==='ALL'?'#fff':'#334155',fontSize:12,fontWeight:typeFilter==='ALL'?700:400,cursor:'pointer'}}>ทั้งหมด</button>
+        {WT_TYPES.map(x=>(
+          <button key={x.id} onClick={()=>setTypeFilter(x.id)} style={{padding:'5px 14px',borderRadius:16,border:`1.5px solid ${typeFilter===x.id?x.color:'#e2e8f0'}`,background:typeFilter===x.id?x.bg:'#fff',color:typeFilter===x.id?x.color:'#334155',fontSize:12,fontWeight:typeFilter===x.id?700:400,cursor:'pointer'}}>{x.label}</button>
+        ))}
+      </div>
+
+      {/* Kanban */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
+        {WT_STATUS.map(s=>{
+          const cards=byStatus(s.id);
+          const hdr={todo:{bg:'#fef2f2',c:'#dc2626',icon:'📋'},doing:{bg:'#fffbeb',c:'#d97706',icon:'⚙️'},done:{bg:'#f0fdf4',c:'#16a34a',icon:'✅'}}[s.id];
+          return <div key={s.id} style={{background:'#f8fafc',borderRadius:14,padding:'12px 12px 4px',minHeight:200}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,background:hdr.bg,borderRadius:10,padding:'8px 12px'}}>
+              <span style={{fontSize:16}}>{hdr.icon}</span>
+              <span style={{fontWeight:700,fontSize:14,color:hdr.c}}>{s.label}</span>
+              <span style={{marginLeft:'auto',fontSize:12,fontWeight:700,color:hdr.c,background:'#fff',borderRadius:10,padding:'1px 8px'}}>{cards.length}</span>
+            </div>
+            {cards.length===0&&<div style={{textAlign:'center',color:'#94a3b8',fontSize:13,padding:'24px 0'}}>ไม่มีงาน</div>}
+            {cards.map(t=><TaskCard key={t.id} t={t}/>)}
+          </div>;
+        })}
+      </div>
+    </div>;
+  }
+
   function App(){
     const [tab,setTab]=useState('meeting');
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
-    const tabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'}];
+    const tabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'}];
     return <div className="app">
       <header className="topbar">
         <div className="topbar__brand">
@@ -4035,6 +4199,7 @@ window.__dataReady.then(data => {
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='damage'&&<DamageDetailTab/>}
         {tab==='concrete'&&<ConcreteView year={year}/>}
+        {tab==='worktrack'&&<WorkTrackTab/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
     </div>;
