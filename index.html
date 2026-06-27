@@ -4085,8 +4085,8 @@ window.__dataReady.then(data => {
     );
 
     return <div style={{padding:'20px 24px',minHeight:600}}>
-      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setShowForm(false)}>
-        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={e=>{if(e.target===e.currentTarget)setShowForm(false);}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}}>
           <div style={{fontSize:16,fontWeight:700,color:'#1e293b',marginBottom:16}}>{editTask?'แก้ไขงาน':'เพิ่มงานใหม่'}</div>
           <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ชื่องาน *</div>
             <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="ระบุชื่องาน..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
