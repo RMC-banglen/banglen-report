@@ -4153,7 +4153,7 @@ window.__dataReady.then(data => {
                 {RAFT_PARTS.map(part=>{
                   const bad=getRaftStatus(num,part)==='bad';
                   return <td key={part} style={{padding:'10px 8px',textAlign:'center'}}>
-                    <button onClick={()=>{ if(bad) toggleRaftPart(num,part); else openRaftRepair(num,part); }} title={bad?'กดเพื่อทำเครื่องหมายซ่อมเสร็จ':'กดเพื่อสร้างงานซ่อม'} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                    <button onClick={()=>{ if(!bad) openRaftRepair(num,part); }} title={bad?'รอการซ่อม — ยืนยันเสร็จจากหน้าฝ่ายผลิต':'กดเพื่อสร้างงานซ่อม'} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:'pointer',fontSize:18,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
                       {bad?'🔴':'🟢'}
                     </button>
                   </td>;
