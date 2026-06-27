@@ -491,7 +491,49 @@ function onOpen() {
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
     .addItem('📋 ดู Log', 'showLog')
+    .addSeparator()
+    .addItem('🔀 รวมสาเหตุเข้าคอลัมน์ H (ทำครั้งเดียว)', 'mergeCauseToH')
     .addToUi();
+}
+
+// รวมคอลัมน์ G (ประเภทเสียหาย) เข้า H (สาเหตุ) — รันครั้งเดียว
+function mergeCauseToH() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = 'เสียหายในโรงงานบางเลน รหัสID';
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) { SpreadsheetApp.getUi().alert('ไม่พบ Sheet: ' + sheetName); return; }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const colG = 7; // G = ประเภทเสียหาย
+  const colH = 8; // H = สาเหตุ
+
+  const gVals = sheet.getRange(2, colG, lastRow - 1, 1).getValues();
+  const hVals = sheet.getRange(2, colH, lastRow - 1, 1).getValues();
+
+  const newH = [];
+  const clearG = [];
+
+  for (let i = 0; i < gVals.length; i++) {
+    const g = String(gVals[i][0] || '').trim();
+    const h = String(hVals[i][0] || '').trim();
+
+    if (g && !h) {
+      newH.push([g]);   // H ว่าง → ย้าย G มาใส่ H
+      clearG.push([i + 2, true]);
+    } else if (g && h) {
+      newH.push([g + ' — ' + h]);  // ทั้งคู่มี → รวมกัน
+      clearG.push([i + 2, true]);
+    } else {
+      newH.push([h]);   // G ว่าง → เก็บ H เดิม
+    }
+  }
+
+  sheet.getRange(2, colH, newH.length, 1).setValues(newH);
+  clearG.forEach(([row]) => sheet.getRange(row, colG).clearContent());
+
+  SpreadsheetApp.getUi().alert('✅ รวมสาเหตุเข้าคอลัมน์ H เรียบร้อย\nคอลัมน์ G ถูกล้างแล้ว');
 }
 
 function showLog() {
@@ -678,6 +720,7 @@ function syncDamageItems(ss) {
 
       const typeVal = String(r[colType] || '').trim() || null;
       const cause   = String(r[colCause] || '').trim() || null;
+      const causeAll = (typeVal && cause) ? typeVal + ' — ' + cause : (typeVal || cause);
 
       const contractorID = colContractorID >= 0 ? (String(r[colContractorID] || '').trim() || null) : null;
       const employeeID   = colEmployeeID   >= 0 ? (String(r[colEmployeeID]   || '').trim() || null) : null;
@@ -688,7 +731,7 @@ function syncDamageItems(ss) {
         code_type:        'ID',
         damage_group:     'เสียหายในโรงงาน',
         customer_name:    null,
-        cause:            typeVal || cause,
+        cause:            causeAll,
         reason:           cause,
         amount:           amount,
         bill_no:          bill || null,
@@ -714,36 +757,31 @@ function syncDamageItems(ss) {
 function addPersonnelColumns(ss) {
   if (!ss) ss = SpreadsheetApp.openById(SS_MAIN_ID);
 
-  const sheetsToUpdate = [
-    'รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB',
-    'เสียหายในโรงงานบางเลน รหัสID',
-  ];
+  // REB-ROB: เฉพาะชื่อพนักงาน (blowcount) ไม่มีผู้รับเหมา
+  const sheetRR = ss.getSheetByName('รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB');
+  if (sheetRR) {
+    const headers = sheetRR.getRange(1, 1, 1, sheetRR.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    if (!headers.includes('ชื่อพนักงาน')) {
+      sheetRR.getRange(1, sheetRR.getLastColumn() + 1).setValue('ชื่อพนักงาน');
+      Logger.log('✅ REB-ROB: เพิ่มคอลัมน์ "ชื่อพนักงาน"');
+    }
+  }
 
-  sheetsToUpdate.forEach(sheetName => {
-    const sheet = ss.getSheetByName(sheetName);
-    if (!sheet) { Logger.log(`⚠️ ไม่พบ Sheet: ${sheetName}`); return; }
-
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
-    const hasContractor = headers.includes('ชุดผู้รับเหมา');
-    const hasEmployee   = headers.includes('ชื่อพนักงาน');
-
-    let nextCol = sheet.getLastColumn() + 1;
-
-    if (!hasContractor) {
-      sheet.getRange(1, nextCol).setValue('ชุดผู้รับเหมา');
-      Logger.log(`✅ ${sheetName}: เพิ่มคอลัมน์ "ชุดผู้รับเหมา" ที่คอลัมน์ ${nextCol}`);
+  // ID: ชุดผู้รับเหมา + ชื่อพนักงาน
+  const sheetID = ss.getSheetByName('เสียหายในโรงงานบางเลน รหัสID');
+  if (sheetID) {
+    const headers = sheetID.getRange(1, 1, 1, sheetID.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    let nextCol = sheetID.getLastColumn() + 1;
+    if (!headers.includes('ชุดผู้รับเหมา')) {
+      sheetID.getRange(1, nextCol).setValue('ชุดผู้รับเหมา');
+      Logger.log('✅ ID: เพิ่มคอลัมน์ "ชุดผู้รับเหมา"');
       nextCol++;
-    } else {
-      Logger.log(`ℹ️ ${sheetName}: มีคอลัมน์ "ชุดผู้รับเหมา" แล้ว`);
     }
-
-    if (!hasEmployee) {
-      sheet.getRange(1, nextCol).setValue('ชื่อพนักงาน');
-      Logger.log(`✅ ${sheetName}: เพิ่มคอลัมน์ "ชื่อพนักงาน" ที่คอลัมน์ ${nextCol}`);
-    } else {
-      Logger.log(`ℹ️ ${sheetName}: มีคอลัมน์ "ชื่อพนักงาน" แล้ว`);
+    if (!headers.includes('ชื่อพนักงาน')) {
+      sheetID.getRange(1, nextCol).setValue('ชื่อพนักงาน');
+      Logger.log('✅ ID: เพิ่มคอลัมน์ "ชื่อพนักงาน"');
     }
-  });
+  }
 }
 
 // ============================================================
