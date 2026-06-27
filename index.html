@@ -4053,7 +4053,7 @@ window.__dataReady.then(data => {
     const openAdd = () => { setForm({title:'',type:'',dept,status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''}); setEditTask(null); setFromRaft(false); setShowForm(true); };
     const openEdit = t => { setForm({...t}); setEditTask(t.id); setFromRaft(false); setShowForm(true); };
     const openRaftRepair = (num,part) => {
-      setForm({title:`ซ่อมแพที่ ${num} — ${part}`,type:'raft_fix',dept:'production',status:'todo',priority:'normal',pct:0,due:'',stage:part,note:''});
+      setForm({title:`ซ่อมแพที่ ${num} — ${part}`,type:`แพผลิตเสาเข็ม — ${part}`,dept:'production',status:'todo',priority:'normal',pct:0,due:'',stage:part,note:''});
       setEditTask(null); setFromRaft(true); setShowForm(true);
     };
     const saveForm = () => {
@@ -4068,7 +4068,7 @@ window.__dataReady.then(data => {
       saveUpd(prev=>prev.map(t=>t.id===id?{...t,status}:t));
       if(status==='done'){
         const task=tasks.find(t=>t.id===id);
-        if(task&&task.type==='raft_fix'){
+        if(task&&task.title&&task.title.startsWith('ซ่อมแพที่')){
           const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
           if(m){
             const num=Number(m[1]), part=m[2].trim();
@@ -4100,7 +4100,7 @@ window.__dataReady.then(data => {
           <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ชื่องาน *</div>
             <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="ระบุชื่องาน..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
           <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ฝ่าย</div>
-            <div style={{display:'flex',gap:8}}>{WT_DEPT.map(d=><button key={d.id} onClick={()=>setForm({...form,dept:d.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.dept===d.id?'#0f766e':'#e2e8f0'}`,background:form.dept===d.id?'#0f766e':'#fff',color:form.dept===d.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{d.label}</button>)}</div></div>
+            <div style={{display:'flex',gap:8}}>{WT_DEPT.filter(d=>d.id!=='raft').map(d=><button key={d.id} onClick={()=>setForm({...form,dept:d.id})} style={{flex:1,padding:'7px',borderRadius:8,border:`1.5px solid ${form.dept===d.id?'#0f766e':'#e2e8f0'}`,background:form.dept===d.id?'#0f766e':'#fff',color:form.dept===d.id?'#fff':'#334155',fontSize:12,fontWeight:600,cursor:'pointer'}}>{d.label}</button>)}</div></div>
           <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ประเภทงาน</div>
             <input value={form.type} onChange={e=>setForm({...form,type:e.target.value})} placeholder="เช่น งานค้าง, โปรเจคใหม่..." style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
           <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ขั้นตอนปัจจุบัน</div>
