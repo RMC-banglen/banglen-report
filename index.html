@@ -2621,10 +2621,10 @@ window.__dataReady.then(data => {
               {yoyGoods.length>0&&<><div style={{fontSize:11,fontWeight:700,color:'#14532d',marginBottom:6}}>✅ ควบคุมได้ดี</div>{yoyGoods}</>}
             </div>;
 
-            return <>
+            return <div style={{gridColumn:'1 / -1'}}>
               {renderBlock(blocks[0], yoyCol)}
               {blocks.slice(1).map(b=>renderBlock(b))}
-            </>;
+            </div>;
           })()}
         </>;
       })()}
