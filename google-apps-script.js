@@ -833,24 +833,21 @@ function addPersonnelColumns(ss) {
     }
   }
 
-  // ID: ชุดผู้รับเหมา (dropdown) + ชื่อพนักงาน
+  // ID: ลบ ชุดผู้รับเหมา ออกถ้ามี, เพิ่มแค่ ชื่อพนักงาน
   const sheetID = ss.getSheetByName('เสียหายในโรงงานบางเลน รหัสID');
   if (sheetID) {
     const headersID = sheetID.getRange(1, 1, 1, sheetID.getLastColumn()).getValues()[0].map(h => String(h).trim());
-    let nextColID = sheetID.getLastColumn() + 1;
-
-    if (!headersID.includes('ชุดผู้รับเหมา')) {
-      sheetID.getRange(1, nextColID).setValue('ชุดผู้รับเหมา');
-      Logger.log('✅ ID: เพิ่มคอลัมน์ "ชุดผู้รับเหมา"');
-      nextColID++;
+    for (let i = headersID.length - 1; i >= 0; i--) {
+      if (headersID[i] === 'ชุดผู้รับเหมา') {
+        sheetID.deleteColumn(i + 1);
+        Logger.log('🗑️ ID: ลบคอลัมน์ "ชุดผู้รับเหมา" ออกแล้ว');
+      }
     }
-    if (!headersID.includes('ชื่อพนักงาน')) {
-      sheetID.getRange(1, nextColID).setValue('ชื่อพนักงาน');
+    const headersID2 = sheetID.getRange(1, 1, 1, sheetID.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    if (!headersID2.includes('ชื่อพนักงาน')) {
+      sheetID.getRange(1, sheetID.getLastColumn() + 1).setValue('ชื่อพนักงาน');
       Logger.log('✅ ID: เพิ่มคอลัมน์ "ชื่อพนักงาน"');
     }
-
-    // ผสานเซลล์คอลัมน์ I ตาม H และใส่ dropdown เฉพาะแถวที่ G = "ผู้รับเหมา"
-    setupContractorColumn(sheetID);
   }
 }
 
