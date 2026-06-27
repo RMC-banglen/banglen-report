@@ -1491,6 +1491,50 @@ window.__dataReady.then(data => {
         </>;
       })()}
 
+      {/* Contractor breakdown — แสดงเมื่อเลือกสาเหตุที่เกี่ยวกับผู้รับเหมา */}
+      {selCause!=='__all__' && /รับเหมา/i.test(selCause) && (()=>{
+        const contractorItems = curItems.filter(r=>(r.cause||'ไม่ระบุ')===selCause && r.contractor_team);
+        if (contractorItems.length===0) return <div style={{marginTop:16,padding:'14px 18px',background:'#f8fafc',borderRadius:12,border:'1.5px solid #e2e8f0',color:'#94a3b8',fontSize:13}}>
+          ยังไม่มีข้อมูลชุดผู้รับเหมา — กรอกข้อมูลในคอลัมน์ "ชุดผู้รับเหมา" ในชีท ID แล้ว Sync ใหม่
+        </div>;
+
+        const teamMap = {};
+        contractorItems.forEach(r => {
+          const t = r.contractor_team;
+          if (!teamMap[t]) teamMap[t] = { name:t, amount:0, count:0 };
+          teamMap[t].amount += r.amount||0;
+          teamMap[t].count++;
+        });
+        const teamList = Object.values(teamMap).sort((a,b)=>b.amount-a.amount);
+        const maxAmt = teamList[0]?.amount||1;
+        const totalAmt = teamList.reduce((a,t)=>a+t.amount,0);
+        const TEAM_COLORS = ['#c0392b','#e67e22','#8e44ad','#2980b9','#27ae60'];
+
+        return <div style={{marginTop:20,padding:'18px 20px',background:'#fff8f0',borderRadius:14,border:'1.5px solid #fdba74'}}>
+          <div style={{fontSize:15,fontWeight:800,color:'#c0392b',marginBottom:14}}>
+            🏗️ แยกตามชุดผู้รับเหมา — {selCause} (ปี {curYear})
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {teamList.map((t,i)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'160px 1fr 130px 70px 60px',gap:10,alignItems:'center'}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{i+1}. {t.name}</div>
+                <div style={{background:'#f1f5f9',borderRadius:6,height:18,overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:6,background:TEAM_COLORS[i%TEAM_COLORS.length],width:`${t.amount/maxAmt*100}%`}}/>
+                </div>
+                <div style={{fontFamily:'var(--num)',fontSize:13,fontWeight:700,textAlign:'right',color:'#c0392b'}}>
+                  {t.amount.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                </div>
+                <div style={{fontSize:12,color:'#64748b',textAlign:'right'}}>{t.count} รายการ</div>
+                <div style={{fontSize:12,color:'#94a3b8',textAlign:'right'}}>{(t.amount/totalAmt*100).toFixed(1)}%</div>
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid #fdba74',fontSize:12,color:'#92400e',fontWeight:600}}>
+            รวม {teamList.length} ชุด • {contractorItems.length} รายการ • {totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+          </div>
+        </div>;
+      })()}
+
     </ChartCard>;
   }
 
