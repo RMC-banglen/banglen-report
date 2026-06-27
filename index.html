@@ -4101,7 +4101,7 @@ window.__dataReady.then(data => {
     };
     const deleteTask = id => {
       const task=tasks.find(t=>t.id===id);
-      if(task&&task.status!=='done'&&!confirm('งานนี้ยังไม่เสร็จ — ยืนยันลบ?')) return;
+      if(!confirm('ลบงานนี้?')) return;
       if(task&&task.title){
         if(task.title.startsWith('ซ่อมแพที่')){
           const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
