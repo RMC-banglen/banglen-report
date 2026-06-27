@@ -488,6 +488,8 @@ function onOpen() {
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
     .addItem('📋 ดู Log', 'showLog')
+    .addSeparator()
+    .addItem('➕ เพิ่มคอลัมน์ ชุดผู้รับเหมา / ชื่อพนักงาน', 'addPersonnelColumns')
     .addToUi();
 }
 
@@ -569,19 +571,23 @@ function syncDamageItems(ss) {
     headers.forEach((h, i) => { ci[h] = i; });
 
     // คอลัมน์อาจใช้ชื่อต่างกัน — map อัตโนมัติ
-    const colMonthYear   = ci['เดือน/ปี']        ?? 0;
-    const colBillNo      = ci['เลขที่ใบรับคืน']  ?? 1;
-    const colAmount      = ci['ยอดเงินสุทธิ']    ?? 4;
-    const colType        = ci['ประเภท']           ?? 5;
-    const colCause       = headers.findIndex(h => h.includes('สาเหตุ'));  // G
-    const colCustomer    = ci['ชื่อลูกค้า']       ?? 7;
+    const colMonthYear      = ci['เดือน/ปี']        ?? 0;
+    const colBillNo         = ci['เลขที่ใบรับคืน']  ?? 1;
+    const colAmount         = ci['ยอดเงินสุทธิ']    ?? 4;
+    const colType           = ci['ประเภท']           ?? 5;
+    const colCause          = headers.findIndex(h => h.includes('สาเหตุ'));  // G
+    const colCustomer       = ci['ชื่อลูกค้า']       ?? 7;
+    const colContractor     = ci['ชุดผู้รับเหมา']    ?? -1;
+    const colEmployee       = ci['ชื่อพนักงาน']      ?? -1;
 
-    let lastYM      = null;
-    let lastBillNo  = '';
-    let lastCode    = 'REB';
-    let lastCustomer = null;
-    let lastCause   = null;
-    let lastType    = null;
+    let lastYM           = null;
+    let lastBillNo       = '';
+    let lastCode         = 'REB';
+    let lastCustomer     = null;
+    let lastCause        = null;
+    let lastType         = null;
+    let lastContractor   = null;
+    let lastEmployee     = null;
 
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
@@ -600,9 +606,11 @@ function syncDamageItems(ss) {
           lastYM = { year: Number('25' + ymFromBill[1]), month: Number(ymFromBill[2]) };
         }
 
-        lastCustomer = String(r[colCustomer] || '').trim() || null;
-        lastType     = String(r[colType]     || '').trim() || null;
-        lastCause    = colCause >= 0 ? (String(r[colCause] || '').trim() || null) : null;
+        lastCustomer   = String(r[colCustomer]   || '').trim() || null;
+        lastType       = String(r[colType]        || '').trim() || null;
+        lastCause      = colCause >= 0 ? (String(r[colCause] || '').trim() || null) : null;
+        lastContractor = colContractor >= 0 ? (String(r[colContractor] || '').trim() || null) : null;
+        lastEmployee   = colEmployee >= 0 ? (String(r[colEmployee] || '').trim() || null) : null;
       }
 
       if (!lastYM || !lastBillNo) continue;
@@ -611,15 +619,17 @@ function syncDamageItems(ss) {
       if (amount === 0) continue;
 
       records.push({
-        year:          lastYM.year,
-        month:         lastYM.month,
-        code_type:     lastCode,
-        damage_group:  'รับคืน-เสียหายหน้างาน',
-        customer_name: lastCustomer,
-        cause:         lastType || lastCause,
-        reason:        lastCause,
-        amount:        amount,
-        bill_no:       lastBillNo,
+        year:             lastYM.year,
+        month:            lastYM.month,
+        code_type:        lastCode,
+        damage_group:     'รับคืน-เสียหายหน้างาน',
+        customer_name:    lastCustomer,
+        cause:            lastType || lastCause,
+        reason:           lastCause,
+        amount:           amount,
+        bill_no:          lastBillNo,
+        contractor_team:  lastContractor,
+        employee_name:    lastEmployee,
       });
     }
     Logger.log(`REB-ROB: อ่านได้ ${records.length} แถว`);
@@ -637,10 +647,12 @@ function syncDamageItems(ss) {
     const ci = {};
     headers.forEach((h, i) => { ci[h] = i; });
 
-    const colBillNo  = ci['เลขที่บิล']         ?? 0;
-    const colAmount  = ci['ยอดเงินสุทธิ']      ?? 3;
-    const colType    = ci['ประเภทเสียหาย']     ?? 5;
-    const colCause   = ci['สาเหตุ']            ?? 6;
+    const colBillNo      = ci['เลขที่บิล']         ?? 0;
+    const colAmount      = ci['ยอดเงินสุทธิ']      ?? 3;
+    const colType        = ci['ประเภทเสียหาย']     ?? 5;
+    const colCause       = ci['สาเหตุ']            ?? 6;
+    const colContractorID = ci['ชุดผู้รับเหมา']   ?? -1;
+    const colEmployeeID   = ci['ชื่อพนักงาน']      ?? -1;
 
     let lastYM = null; // carry forward year/month
 
@@ -666,16 +678,21 @@ function syncDamageItems(ss) {
       const typeVal = String(r[colType] || '').trim() || null;
       const cause   = String(r[colCause] || '').trim() || null;
 
+      const contractorID = colContractorID >= 0 ? (String(r[colContractorID] || '').trim() || null) : null;
+      const employeeID   = colEmployeeID   >= 0 ? (String(r[colEmployeeID]   || '').trim() || null) : null;
+
       records.push({
-        year:          lastYM.year,
-        month:         lastYM.month,
-        code_type:     'ID',
-        damage_group:  'เสียหายในโรงงาน',
-        customer_name: null,
-        cause:         typeVal || cause,
-        reason:        cause,
-        amount:        amount,
-        bill_no:       bill || null,
+        year:             lastYM.year,
+        month:            lastYM.month,
+        code_type:        'ID',
+        damage_group:     'เสียหายในโรงงาน',
+        customer_name:    null,
+        cause:            typeVal || cause,
+        reason:           cause,
+        amount:           amount,
+        bill_no:          bill || null,
+        contractor_team:  contractorID,
+        employee_name:    employeeID,
       });
     }
     Logger.log(`ID: อ่านได้ ${records.length - countBefore} แถว`);
@@ -687,6 +704,47 @@ function syncDamageItems(ss) {
   truncateDamageItems();
   insertInBatches('damage_items', records, 200);
   Logger.log(`✅ damage_items: sync รวม ${records.length} แถว`);
+}
+
+// ============================================================
+// เพิ่มคอลัมน์ ชุดผู้รับเหมา และ ชื่อพนักงาน ในชีทเสียหาย (ถ้ายังไม่มี)
+// รันครั้งเดียวจาก Menu หรือ Script Editor
+// ============================================================
+function addPersonnelColumns() {
+  const ss = SpreadsheetApp.openById(SS_DAMAGE_ID);
+
+  const sheetsToUpdate = [
+    'รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB',
+    'เสียหายในโรงงานบางเลน รหัสID',
+  ];
+
+  sheetsToUpdate.forEach(sheetName => {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) { Logger.log(`⚠️ ไม่พบ Sheet: ${sheetName}`); return; }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const hasContractor = headers.includes('ชุดผู้รับเหมา');
+    const hasEmployee   = headers.includes('ชื่อพนักงาน');
+
+    let nextCol = sheet.getLastColumn() + 1;
+
+    if (!hasContractor) {
+      sheet.getRange(1, nextCol).setValue('ชุดผู้รับเหมา');
+      Logger.log(`✅ ${sheetName}: เพิ่มคอลัมน์ "ชุดผู้รับเหมา" ที่คอลัมน์ ${nextCol}`);
+      nextCol++;
+    } else {
+      Logger.log(`ℹ️ ${sheetName}: มีคอลัมน์ "ชุดผู้รับเหมา" แล้ว`);
+    }
+
+    if (!hasEmployee) {
+      sheet.getRange(1, nextCol).setValue('ชื่อพนักงาน');
+      Logger.log(`✅ ${sheetName}: เพิ่มคอลัมน์ "ชื่อพนักงาน" ที่คอลัมน์ ${nextCol}`);
+    } else {
+      Logger.log(`ℹ️ ${sheetName}: มีคอลัมน์ "ชื่อพนักงาน" แล้ว`);
+    }
+  });
+
+  SpreadsheetApp.getUi().alert('เพิ่มคอลัมน์ ชุดผู้รับเหมา / ชื่อพนักงาน เรียบร้อยแล้ว\nตรวจสอบ Log เพื่อดูรายละเอียด');
 }
 
 // ============================================================
