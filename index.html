@@ -2260,10 +2260,6 @@ window.__dataReady.then(data => {
         const CAT_COLOR = { fail:'#c0392b', slide:'#e67e22', tilt:'#8e44ad', other:'#7f8c8d' };
         const CAT_LABEL = { fail:'เสาเข็ม Fail', slide:'ตอกสไลด์', tilt:'ตอกเอียง/เทสต์ไม่ผ่าน/ผิดหมุด', other:'อื่นๆ' };
 
-        if (empItems.length===0) return <ChartCard title="วิเคราะห์พนักงาน (Blowcount)" subtitle="ยังไม่มีข้อมูลชื่อพนักงานในระบบ — กรุณากรอกข้อมูลในคอลัมน์ 'ชื่อพนักงาน' ในชีท REB-ROB แล้ว Sync ใหม่" span="full">
-          <div style={{color:'#94a3b8',fontSize:15,padding:'32px 0',textAlign:'center'}}>ไม่มีข้อมูลพนักงาน</div>
-        </ChartCard>;
-
         return <>
           {/* KPI summary row */}
           <div className="kpi-row" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
