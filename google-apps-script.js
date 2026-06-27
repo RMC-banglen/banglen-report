@@ -24,6 +24,9 @@ function syncAll() {
   syncDecades(ss);
   syncCauses(ss);
 
+  // เพิ่มคอลัมน์ใหม่ถ้ายังไม่มี (ทำอัตโนมัติ ไม่ต้องกดเอง)
+  addPersonnelColumns(ss);
+
   // sync ข้อมูลเสียหาย (อยู่ใน Sheet การผลิตเดิม)
   syncDamageItems(ss);
   syncDamageSales(ss);
@@ -488,8 +491,6 @@ function onOpen() {
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
     .addItem('📋 ดู Log', 'showLog')
-    .addSeparator()
-    .addItem('➕ เพิ่มคอลัมน์ ชุดผู้รับเหมา / ชื่อพนักงาน', 'addPersonnelColumns')
     .addToUi();
 }
 
@@ -710,8 +711,8 @@ function syncDamageItems(ss) {
 // เพิ่มคอลัมน์ ชุดผู้รับเหมา และ ชื่อพนักงาน ในชีทเสียหาย (ถ้ายังไม่มี)
 // รันครั้งเดียวจาก Menu หรือ Script Editor
 // ============================================================
-function addPersonnelColumns() {
-  const ss = SpreadsheetApp.openById(SS_DAMAGE_ID);
+function addPersonnelColumns(ss) {
+  if (!ss) ss = SpreadsheetApp.openById(SS_MAIN_ID);
 
   const sheetsToUpdate = [
     'รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB',
@@ -743,8 +744,6 @@ function addPersonnelColumns() {
       Logger.log(`ℹ️ ${sheetName}: มีคอลัมน์ "ชื่อพนักงาน" แล้ว`);
     }
   });
-
-  SpreadsheetApp.getUi().alert('เพิ่มคอลัมน์ ชุดผู้รับเหมา / ชื่อพนักงาน เรียบร้อยแล้ว\nตรวจสอบ Log เพื่อดูรายละเอียด');
 }
 
 // ============================================================
