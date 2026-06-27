@@ -4133,7 +4133,10 @@ window.__dataReady.then(data => {
                     return <span style={{fontSize:13,color,fontWeight:diff<=3&&!done?700:400}}>📅 {t.due} · {label}</span>;
                   })()}
                 </div>
-                {t.stage&&<div style={{fontSize:14,color:'#0369a1',fontWeight:700,marginBottom:6,background:'#e0f2fe',borderRadius:8,padding:'5px 12px',display:'inline-block'}}>📍 ขั้นตอนปัจจุบัน: {t.stage}</div>}
+                {t.stage&&<div style={{background:'#e0f2fe',borderRadius:8,padding:'6px 14px',marginBottom:6}}>
+                  <div style={{fontSize:11,color:'#0369a1',fontWeight:700,marginBottom:2}}>📍 ขั้นตอนปัจจุบัน</div>
+                  <div style={{fontSize:14,color:'#1e3a5f',fontWeight:600}}>{t.stage}</div>
+                </div>}
                 {t.note&&<div style={{fontSize:13,color:'#64748b',marginTop:6,lineHeight:1.6}}>{t.note}</div>}
                 <div style={{marginTop:10,display:'flex',alignItems:'center',gap:10}} onClick={e=>e.stopPropagation()}>
                   <div style={{flex:1,height:10,background:'#e2e8f0',borderRadius:5,overflow:'hidden'}}>
