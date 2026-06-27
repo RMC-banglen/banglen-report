@@ -4007,7 +4007,10 @@ window.__dataReady.then(data => {
   }
 
   // ─── WorkTrack Tab ─────────────────────────────────────────────
-  const WT_KEY = 'rmc_worktrack_v1';
+  const WT_KEY  = 'rmc_worktrack_v1';
+  const RAFT_KEY   = 'rmc_raft_v1';
+  const RAFT_COUNT = 18;
+  const RAFT_PARTS = ['ไส้กลาง','ฝาข้าง','พื้นแบบ','ขอสับ','ตัวกันเข้าพื้น','ฝาครอบ','ล็อคไส้กลาง','ล็อครอยต่อ','รูล็อคฝาครอบ'];
   const WT_TYPES = [
     {id:'backlog',   label:'งานค้าง',              color:'#dc2626', bg:'#fef2f2'},
     {id:'progress',  label:'รายงานความคืบหน้า',    color:'#d97706', bg:'#fffbeb'},
@@ -4019,7 +4022,7 @@ window.__dataReady.then(data => {
     {id:'machine',   label:'สร้างเครื่องจักรใหม่', color:'#1d4ed8', bg:'#eff6ff'},
   ];
   const WT_STATUS = [{id:'todo',label:'รอดำเนินการ'},{id:'doing',label:'กำลังดำเนินการ'},{id:'done',label:'เสร็จแล้ว'}];
-  const WT_DEPT   = [{id:'production',label:'ฝ่ายผลิต'},{id:'maintenance',label:'ซ่อมบำรุง'}];
+  const WT_DEPT   = [{id:'production',label:'ฝ่ายผลิต'},{id:'maintenance',label:'ซ่อมบำรุง'},{id:'raft',label:'แพผลิตเสาเข็ม'}];
   const WT_PRI    = [{id:'urgent',label:'ด่วนมาก',color:'#dc2626'},{id:'high',label:'ด่วน',color:'#d97706'},{id:'normal',label:'ปกติ',color:'#16a34a'}];
 
   function WorkTrackTab(){
@@ -4030,6 +4033,18 @@ window.__dataReady.then(data => {
     const [showForm,setShowForm]     = React.useState(false);
     const [editTask,setEditTask]     = React.useState(null);
     const [form,setForm]     = React.useState({title:'',type:'',dept:'production',status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''});
+
+    const loadRaft = () => { try{ return JSON.parse(localStorage.getItem(RAFT_KEY)||'{}'); }catch{ return {}; } };
+    const [raftData,setRaftData] = React.useState(loadRaft);
+    const toggleRaftPart = (raftIdx,part) => {
+      setRaftData(prev => {
+        const key = `${raftIdx}__${part}`;
+        const next = {...prev,[key]: prev[key]==='bad'?'ok':'bad'};
+        localStorage.setItem(RAFT_KEY,JSON.stringify(next));
+        return next;
+      });
+    };
+    const getRaftStatus = (raftIdx,part) => raftData[`${raftIdx}__${part}`]||'ok';
 
     const save = ts => { setTasks(ts); localStorage.setItem(WT_KEY,JSON.stringify(ts)); };
     const saveUpd = fn => { setTasks(prev=>{ const next=fn(prev); localStorage.setItem(WT_KEY,JSON.stringify(next)); return next; }); };
@@ -4096,7 +4111,35 @@ window.__dataReady.then(data => {
         <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>
       </div>
 
-      {/* KPI cards */}
+      {/* Raft view */}
+      {dept==='raft'&&<div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14}}>
+          {Array.from({length:RAFT_COUNT},(_,i)=>{
+            const num=i+1;
+            const badParts=RAFT_PARTS.filter(p=>getRaftStatus(num,p)==='bad');
+            const allOk=badParts.length===0;
+            return <div key={num} style={{background:'#fff',border:`2px solid ${allOk?'#16a34a':'#dc2626'}`,borderRadius:14,padding:'14px 16px',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                <span style={{fontSize:18,fontWeight:800,color:'#1e293b'}}>แพที่ {num}</span>
+                <span style={{marginLeft:'auto',fontSize:13,fontWeight:700,padding:'3px 12px',borderRadius:20,background:allOk?'#f0fdf4':'#fef2f2',color:allOk?'#16a34a':'#dc2626'}}>
+                  {allOk?'✅ พร้อมใช้':`⚠️ ต้องซ่อม ${badParts.length} รายการ`}
+                </span>
+              </div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {RAFT_PARTS.map(part=>{
+                  const bad=getRaftStatus(num,part)==='bad';
+                  return <button key={part} onClick={()=>toggleRaftPart(num,part)} style={{fontSize:13,fontWeight:600,padding:'5px 12px',borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',color:bad?'#dc2626':'#16a34a',cursor:'pointer',transition:'all .15s'}}>
+                    {bad?'🔴':'🟢'} {part}
+                  </button>;
+                })}
+              </div>
+            </div>;
+          })}
+        </div>
+      </div>}
+
+      {/* KPI + task list (hidden for raft view) */}
+      {dept!=='raft'&&<div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:16}}>
         {[
           {label:'งานค้างทั้งหมด',     val:filtered.filter(t=>t.status!=='done').length, color:'#dc2626', bg:'#fef2f2'},
@@ -4159,6 +4202,7 @@ window.__dataReady.then(data => {
           </div>;
         })}
       </div>
+      </div>}
     </div>;
   }
 
