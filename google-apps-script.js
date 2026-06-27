@@ -536,6 +536,64 @@ function mergeCauseToH() {
   SpreadsheetApp.getUi().alert('✅ รวมสาเหตุเข้าคอลัมน์ H เรียบร้อย\nคอลัมน์ G ถูกล้างแล้ว');
 }
 
+// ผสานเซลล์คอลัมน์ I ตาม H และใส่ dropdown เฉพาะแถวที่ G = "ผู้รับเหมา"
+function setupContractorColumn(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+  const colG = headers.indexOf('ประเภทเสียหาย') + 1; // 1-based
+  const colH = headers.indexOf('สาเหตุ') + 1;
+  const colI = headers.indexOf('ชุดผู้รับเหมา') + 1;
+  if (!colG || !colH || !colI) { Logger.log('⚠️ ไม่พบคอลัมน์ที่ต้องการใน ID sheet'); return; }
+
+  const contractorChoices = ['ชุดยกเสาข้างใน','ยกเสาด้านนอก','เข้าแบบ','ถอดแบบ','ชุดจี้คอนกรีต'];
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(contractorChoices, true)
+    .setAllowInvalid(true)
+    .build();
+
+  // อ่าน merge ranges ของคอลัมน์ H
+  const merges = sheet.getRange(2, colH, lastRow - 1, 1).getMergedRanges();
+  const mergedRows = new Set(); // แถวที่อยู่ใน merge range แล้ว
+
+  // ล้าง merge เก่าในคอลัมน์ I ก่อน
+  sheet.getRange(2, colI, lastRow - 1, 1).breakApart();
+
+  // อ่านค่าคอลัมน์ G ทั้งหมด
+  const gVals = sheet.getRange(2, colG, lastRow - 1, 1).getValues();
+
+  merges.forEach(mr => {
+    const startRow = mr.getRow();
+    const numRows  = mr.getNumRows();
+    const typeVal  = String(sheet.getRange(startRow, colG).getValue() || '').trim();
+
+    // ผสาน I เฉพาะถ้า G = ผู้รับเหมา
+    if (/รับเหมา/i.test(typeVal)) {
+      if (numRows > 1) {
+        sheet.getRange(startRow, colI, numRows, 1).merge();
+      }
+      sheet.getRange(startRow, colI).setDataValidation(rule);
+    }
+
+    for (let r = startRow; r < startRow + numRows; r++) mergedRows.add(r);
+  });
+
+  // แถวที่ไม่ได้ merge — ตรวจ G แต่ละแถว
+  for (let i = 0; i < gVals.length; i++) {
+    const row = i + 2;
+    if (mergedRows.has(row)) continue;
+    const typeVal = String(gVals[i][0] || '').trim();
+    if (/รับเหมา/i.test(typeVal)) {
+      sheet.getRange(row, colI).setDataValidation(rule);
+    } else {
+      sheet.getRange(row, colI).clearDataValidations();
+    }
+  }
+
+  Logger.log('✅ ID: ตั้ง dropdown + merge ชุดผู้รับเหมาเรียบร้อย');
+}
+
 function showLog() {
   SpreadsheetApp.getUi().alert(
     'ดู Log ได้ที่:\nApps Script → View → Logs (Ctrl+Enter)'
@@ -791,19 +849,8 @@ function addPersonnelColumns(ss) {
       Logger.log('✅ ID: เพิ่มคอลัมน์ "ชื่อพนักงาน"');
     }
 
-    // ตั้ง dropdown สำหรับคอลัมน์ ชุดผู้รับเหมา
-    const headersID2 = sheetID.getRange(1, 1, 1, sheetID.getLastColumn()).getValues()[0].map(h => String(h).trim());
-    const colContractor = headersID2.indexOf('ชุดผู้รับเหมา');
-    if (colContractor >= 0) {
-      const lastRow = Math.max(sheetID.getLastRow(), 2);
-      const contractorChoices = ['ชุดยกเสาข้างใน','ยกเสาด้านนอก','เข้าแบบ','ถอดแบบ','ชุดจี้คอนกรีต'];
-      const rule = SpreadsheetApp.newDataValidation()
-        .requireValueInList(contractorChoices, true)
-        .setAllowInvalid(true)
-        .build();
-      sheetID.getRange(2, colContractor + 1, lastRow - 1, 1).setDataValidation(rule);
-      Logger.log('✅ ID: ตั้ง dropdown ชุดผู้รับเหมาแล้ว');
-    }
+    // ผสานเซลล์คอลัมน์ I ตาม H และใส่ dropdown เฉพาะแถวที่ G = "ผู้รับเหมา"
+    setupContractorColumn(sheetID);
   }
 }
 
