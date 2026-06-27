@@ -4029,11 +4029,11 @@ window.__dataReady.then(data => {
     const [typeFilter,setTypeFilter] = React.useState('ALL');
     const [showForm,setShowForm]     = React.useState(false);
     const [editTask,setEditTask]     = React.useState(null);
-    const [form,setForm]     = React.useState({title:'',type:'backlog',dept:'production',status:'todo',priority:'normal',pct:0,due:'',note:'',boss:false});
+    const [form,setForm]     = React.useState({title:'',type:'backlog',dept:'production',status:'todo',priority:'normal',pct:0,due:'',note:''});
 
     const save = ts => { setTasks(ts); localStorage.setItem(WT_KEY,JSON.stringify(ts)); };
 
-    const openAdd = () => { setForm({title:'',type:'backlog',dept,status:'todo',priority:'normal',pct:0,due:'',note:'',boss:false}); setEditTask(null); setShowForm(true); };
+    const openAdd = () => { setForm({title:'',type:'backlog',dept,status:'todo',priority:'normal',pct:0,due:'',note:''}); setEditTask(null); setShowForm(true); };
     const openEdit = t => { setForm({...t}); setEditTask(t.id); setShowForm(true); };
     const saveForm = () => {
       if(!form.title.trim()) return;
@@ -4048,7 +4048,6 @@ window.__dataReady.then(data => {
     const filtered = tasks.filter(t=>t.dept===dept&&(typeFilter==='ALL'||t.type===typeFilter));
     const byStatus = s => filtered.filter(t=>t.status===s);
     const urgentCount = tasks.filter(t=>t.dept===dept&&t.priority==='urgent'&&t.status!=='done').length;
-    const bossCount   = tasks.filter(t=>t.dept===dept&&t.boss&&t.status!=='done').length;
     const doneMonth   = tasks.filter(t=>t.dept===dept&&t.status==='done').length;
 
     const typeInfo = id => WT_TYPES.find(x=>x.id===id)||WT_TYPES[0];
@@ -4057,7 +4056,7 @@ window.__dataReady.then(data => {
     const TaskCard = ({t})=>(
       <div style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:12,padding:'12px 14px',marginBottom:10,boxShadow:'0 1px 4px rgba(0,0,0,.06)',cursor:'pointer'}} onClick={()=>openEdit(t)}>
         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:6,marginBottom:6}}>
-          <div style={{fontSize:13,fontWeight:700,color:'#1e293b',lineHeight:1.4,flex:1}}>{t.boss&&<span title="งานเจ้านายสั่ง" style={{marginRight:4}}>⭐</span>}{t.title}</div>
+          <div style={{fontSize:13,fontWeight:700,color:'#1e293b',lineHeight:1.4,flex:1}}>{t.title}</div>
           <button onClick={e=>{e.stopPropagation();deleteTask(t.id);}} style={{flexShrink:0,background:'none',border:'none',color:'#94a3b8',cursor:'pointer',fontSize:14,lineHeight:1}}>✕</button>
         </div>
         <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:8}}>
@@ -4104,12 +4103,6 @@ window.__dataReady.then(data => {
             <input type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
           <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>หมายเหตุ</div>
             <textarea value={form.note} onChange={e=>setForm({...form,note:e.target.value})} rows={2} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,resize:'vertical',boxSizing:'border-box'}}/></div>
-          <div style={{marginBottom:16}}>
-            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,fontWeight:600,color:'#0369a1'}}>
-              <input type="checkbox" checked={form.boss} onChange={e=>setForm({...form,boss:e.target.checked})} style={{width:16,height:16}}/>
-              ⭐ งานที่เจ้านายสั่ง
-            </label>
-          </div>
           <div style={{display:'flex',gap:8}}>
             <button onClick={saveForm} style={{flex:1,padding:'10px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer'}}>{editTask?'บันทึก':'เพิ่มงาน'}</button>
             <button onClick={()=>setShowForm(false)} style={{padding:'10px 18px',background:'#f1f5f9',color:'#475569',border:'none',borderRadius:10,fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
@@ -4138,7 +4131,6 @@ window.__dataReady.then(data => {
           </div>
         ))}
       </div>
-      {bossCount>0&&<div style={{background:'#eff6ff',border:'1.5px solid #93c5fd',borderRadius:10,padding:'8px 14px',marginBottom:16,fontSize:13,color:'#1d4ed8',fontWeight:600}}>⭐ มีงานที่เจ้านายสั่งรอดำเนินการ {bossCount} งาน</div>}
 
       {/* Kanban */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
