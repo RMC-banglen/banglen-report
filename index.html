@@ -2224,46 +2224,38 @@ window.__dataReady.then(data => {
 
       {/* Employee / Blowcount analysis */}
       {view==='employee' && (()=>{
-        // เฉพาะ REB-ROB ที่มีชื่อพนักงาน
-        const empItems = rawItems.filter(r =>
-          notReturnOk(r) &&
-          (r.code_type==='REB'||r.code_type==='ROB') &&
-          r.employee_name &&
-          (filterYear==='ALL' || r.year===Number(filterYear)) &&
-          (selMonths.size===0 || selMonths.has(r.month))
-        );
+        const curYear  = filterYear==='ALL' ? null : Number(filterYear);
+        const prevYear = curYear ? curYear-1 : null;
+        const empBase  = r => notReturnOk(r) && (r.code_type==='REB'||r.code_type==='ROB') && r.employee_name && (selMonths.size===0||selMonths.has(r.month));
+        const empItems = rawItems.filter(r => empBase(r) && (curYear===null||r.year===curYear));
+        const empPrev  = prevYear ? rawItems.filter(r => empBase(r) && r.year===prevYear) : [];
 
         const isFail    = c => /fail/i.test(c||'');
         const isSlide   = c => /สไลด์/i.test(c||'');
         const isTilt    = c => /เอียง|เทสต์|หมุด/i.test(c||'');
 
-        // สรุปรายพนักงาน
-        const empMap = {};
-        empItems.forEach(r => {
-          const e = r.employee_name;
-          if (!empMap[e]) empMap[e] = { name:e, fail:0, slide:0, tilt:0, other:0, total:0, amount:0 };
-          empMap[e].total++;
-          empMap[e].amount += r.amount||0;
-          if      (isFail(r.cause))  empMap[e].fail++;
-          else if (isSlide(r.cause)) empMap[e].slide++;
-          else if (isTilt(r.cause))  empMap[e].tilt++;
-          else                        empMap[e].other++;
-        });
+        const buildEmpMap = arr => { const m={}; arr.forEach(r=>{ const e=r.employee_name; if(!m[e])m[e]={name:e,fail:0,slide:0,tilt:0,other:0,total:0,amount:0}; m[e].total++; m[e].amount+=r.amount||0; if(isFail(r.cause))m[e].fail++; else if(isSlide(r.cause))m[e].slide++; else if(isTilt(r.cause))m[e].tilt++; else m[e].other++; }); return m; };
+        const empMap  = buildEmpMap(empItems);
+        const prevMap = buildEmpMap(empPrev);
 
         const empList = Object.values(empMap).sort((a,b)=>b.total-a.total);
         const maxTotal = empList[0]?.total || 1;
 
-        // top / bottom fail
-        const failList = empList.filter(e=>e.fail>0).sort((a,b)=>b.fail-a.fail);
-        const mostFail = failList[0] || null;
+        const failList  = empList.filter(e=>e.fail>0).sort((a,b)=>b.fail-a.fail);
+        const mostFail  = failList[0] || null;
         const leastFail = failList[failList.length-1] || null;
+
+        const totalFail  = empItems.filter(r=>isFail(r.cause)).length;
+        const prevFail   = empPrev.filter(r=>isFail(r.cause)).length;
+        const failDiff   = prevFail>0 ? totalFail-prevFail : null;
+        const yoyLabel   = curYear ? `ปี ${curYear+543} vs ${prevYear+543}` : 'ทุกปี';
 
         const CAT_COLOR = { fail:'#c0392b', slide:'#e67e22', tilt:'#8e44ad', other:'#7f8c8d' };
         const CAT_LABEL = { fail:'เสาเข็ม Fail', slide:'ตอกสไลด์', tilt:'ตอกเอียง/เทสต์ไม่ผ่าน/ผิดหมุด', other:'อื่นๆ' };
 
         return <>
           {/* KPI summary row */}
-          <div className="kpi-row" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+          <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
             <div style={{background:'#fff',borderRadius:14,padding:'18px 22px',border:'1.5px solid #e2e8f0',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>พนักงานทั้งหมด</div>
               <div style={{fontSize:32,fontWeight:800,color:'#1e293b'}}>{empList.length} <span style={{fontSize:15,fontWeight:500}}>คน</span></div>
@@ -2271,23 +2263,30 @@ window.__dataReady.then(data => {
             </div>
             <div style={{background:'#fff2f2',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fca5a5',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เสาเข็ม Fail มากสุด</div>
-              <div style={{fontSize:24,fontWeight:800,color:'#c0392b'}}>{mostFail?.name||'–'}</div>
+              <div style={{fontSize:22,fontWeight:800,color:'#c0392b'}}>{mostFail?.name||'–'}</div>
               <div style={{fontSize:13,color:'#c0392b',fontWeight:700}}>{mostFail?`${mostFail.fail} เคส`:''}</div>
             </div>
             <div style={{background:'#f0fdf4',borderRadius:14,padding:'18px 22px',border:'1.5px solid #86efac',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เสาเข็ม Fail น้อยสุด</div>
-              <div style={{fontSize:24,fontWeight:800,color:'#16a34a'}}>{leastFail&&leastFail!==mostFail?leastFail.name:failList.length>1?leastFail?.name:'–'}</div>
+              <div style={{fontSize:22,fontWeight:800,color:'#16a34a'}}>{leastFail&&leastFail!==mostFail?leastFail.name:failList.length>1?leastFail?.name:'–'}</div>
               <div style={{fontSize:13,color:'#16a34a',fontWeight:700}}>{failList.length>1?`${failList[failList.length-1].fail} เคส`:failList.length===1?'พนักงานคนเดียวที่มี Fail':''}</div>
             </div>
             <div style={{background:'#fdf4ff',borderRadius:14,padding:'18px 22px',border:'1.5px solid #e9d5ff',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>ตอกเอียง/เทสต์/ผิดหมุด</div>
-              <div style={{fontSize:32,fontWeight:800,color:'#8e44ad'}}>{empItems.filter(r=>isTilt(r.cause)).length} <span style={{fontSize:15,fontWeight:500}}>เคส</span></div>
+              <div style={{fontSize:28,fontWeight:800,color:'#8e44ad'}}>{empItems.filter(r=>isTilt(r.cause)).length} <span style={{fontSize:15,fontWeight:500}}>เคส</span></div>
               <div style={{fontSize:12,color:'#94a3b8'}}>ตอกสไลด์: {empItems.filter(r=>isSlide(r.cause)).length} เคส</div>
+            </div>
+            <div style={{background:failDiff===null?'#f8fafc':failDiff<=0?'#f0fdf4':'#fff2f2',borderRadius:14,padding:'18px 22px',border:`1.5px solid ${failDiff===null?'#e2e8f0':failDiff<=0?'#86efac':'#fca5a5'}`,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เทียบปีที่แล้ว ({yoyLabel})</div>
+              <div style={{fontSize:22,fontWeight:800,color:failDiff===null?'#94a3b8':failDiff<=0?'#16a34a':'#c0392b'}}>
+                Fail: {failDiff===null?'–':(failDiff>=0?'+':'')+failDiff+' เคส'}
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>ปีก่อน: {prevFail>0?prevFail+' เคส':'ไม่มีข้อมูล'}</div>
             </div>
           </div>
 
           {/* ตารางรายพนักงาน */}
-          <ChartCard title="สรุปรายพนักงาน (Blowcount — REB/ROB)" subtitle="เรียงตามจำนวนเคสมากสุด" span="full">
+          <ChartCard title={`สรุปรายพนักงาน (Blowcount — REB/ROB) ${yoyLabel}`} subtitle="เรียงตามจำนวนเคสมากสุด" span="full">
             <div className="table-wrap"><table className="dt">
               <thead><tr>
                 <th className="ta-l">พนักงาน</th>
@@ -2296,11 +2295,15 @@ window.__dataReady.then(data => {
                 <th style={{textAlign:'center',color:CAT_COLOR.tilt}}>ตอกเอียง/<br/>เทสต์ไม่ผ่าน/ผิดหมุด</th>
                 <th style={{textAlign:'center',color:'#7f8c8d'}}>อื่นๆ</th>
                 <th style={{textAlign:'center'}}>รวม (เคส)</th>
+                {prevYear&&<th style={{textAlign:'center',color:'#64748b'}}>ปีก่อน<br/>(เคส)</th>}
+                {prevYear&&<th style={{textAlign:'center'}}>±เทียบปีก่อน</th>}
                 <th>สัดส่วน</th>
                 <th>มูลค่ารวม (฿)</th>
               </tr></thead>
-              <tbody>{empList.map((e,i)=>(
-                <tr key={i} style={{background:i===0?'#fff8f8':i%2===0?'#fafafa':'#fff'}}>
+              <tbody>{empList.map((e,i)=>{
+                const prev = prevMap[e.name]||{total:0,fail:0};
+                const diff = prev.total>0||empPrev.length>0 ? e.total-(prev.total||0) : null;
+                return <tr key={i} style={{background:i===0?'#fff8f8':i%2===0?'#fafafa':'#fff'}}>
                   <td className="ta-l" style={{fontWeight:700,fontSize:14}}>{e.name}</td>
                   <td style={{textAlign:'center',fontWeight:700,color:e.fail>0?CAT_COLOR.fail:'#cbd5e1',fontSize:16}}>
                     {e.fail>0?e.fail:'–'}
@@ -2315,6 +2318,10 @@ window.__dataReady.then(data => {
                     {e.other>0?e.other:'–'}
                   </td>
                   <td style={{textAlign:'center',fontWeight:800,fontSize:18,color:'#1e293b'}}>{e.total}</td>
+                  {prevYear&&<td style={{textAlign:'center',color:'#94a3b8',fontSize:14}}>{prev.total||'–'}</td>}
+                  {prevYear&&<td style={{textAlign:'center',fontWeight:700,fontSize:14,color:diff===null?'#94a3b8':diff<=0?'#16a34a':'#c0392b'}}>
+                    {diff===null?'–':(diff>=0?'+':'')+diff}
+                  </td>}
                   <td style={{minWidth:140}}>
                     <div style={{display:'flex',height:18,borderRadius:6,overflow:'hidden',background:'#f1f5f9'}}>
                       {['fail','slide','tilt','other'].map(k=>e[k]>0&&(
@@ -2331,8 +2338,8 @@ window.__dataReady.then(data => {
                     </div>
                   </td>
                   <td className="strong">{bahtFmt(e.amount)}</td>
-                </tr>
-              ))}</tbody>
+                </tr>;
+              })}</tbody>
               <tfoot><tr>
                 <td className="ta-l" style={{fontWeight:700}}>รวม</td>
                 <td style={{textAlign:'center',fontWeight:700,color:CAT_COLOR.fail}}>{empItems.filter(r=>isFail(r.cause)).length}</td>
@@ -2340,6 +2347,8 @@ window.__dataReady.then(data => {
                 <td style={{textAlign:'center',fontWeight:700,color:CAT_COLOR.tilt}}>{empItems.filter(r=>isTilt(r.cause)).length}</td>
                 <td style={{textAlign:'center',color:'#64748b'}}>{empItems.filter(r=>!isFail(r.cause)&&!isSlide(r.cause)&&!isTilt(r.cause)).length}</td>
                 <td style={{textAlign:'center',fontWeight:800,fontSize:16}}>{empItems.length}</td>
+                {prevYear&&<td style={{textAlign:'center',color:'#94a3b8'}}>{empPrev.length}</td>}
+                {prevYear&&<td style={{textAlign:'center',fontWeight:700,color:empItems.length<=empPrev.length?'#16a34a':'#c0392b'}}>{empPrev.length>0?(empItems.length>=empPrev.length?'+':'')+( empItems.length-empPrev.length):'–'}</td>}
                 <td></td>
                 <td className="strong">{bahtFmt(empItems.reduce((a,r)=>a+(r.amount||0),0))}</td>
               </tr></tfoot>
@@ -2385,74 +2394,81 @@ window.__dataReady.then(data => {
 
       {/* Contractor view */}
       {view==='contractor' && (()=>{
-        const cItems = rawItems.filter(r =>
-          r.contractor_team &&
-          (r.cause||'').includes('ผู้รับเหมา') &&
-          (filterYear==='ALL' || r.year===Number(filterYear)) &&
-          (selMonths.size===0 || selMonths.has(r.month))
-        );
+        const curYear  = filterYear==='ALL' ? null : Number(filterYear);
+        const prevYear = curYear ? curYear-1 : null;
+        const baseFilter = r => r.contractor_team && (r.cause||'').includes('ผู้รับเหมา') && (selMonths.size===0 || selMonths.has(r.month));
+        const cItems  = rawItems.filter(r => baseFilter(r) && (curYear===null || r.year===curYear));
+        const pItems  = prevYear ? rawItems.filter(r => baseFilter(r) && r.year===prevYear) : [];
+
         if (cItems.length===0) return <ChartCard title="วิเคราะห์ผู้รับเหมา" subtitle="ยังไม่มีข้อมูลชุดผู้รับเหมาในระบบ — กรุณากรอกข้อมูลในคอลัมน์ 'ชุดผู้รับเหมา' ในชีท ID แล้ว Sync ใหม่" span="full">
           <div style={{color:'#94a3b8',fontSize:15,padding:'32px 0',textAlign:'center'}}>ไม่มีข้อมูล</div>
         </ChartCard>;
 
-        const cMap = {};
-        cItems.forEach(r => {
-          const t = r.contractor_team;
-          if (!cMap[t]) cMap[t] = { name:t, count:0, amount:0 };
-          cMap[t].count++;
-          cMap[t].amount += r.amount||0;
-        });
-        const cList = Object.values(cMap).sort((a,b)=>b.amount-a.amount);
-        const maxAmt = cList[0]?.amount||1;
+        const buildMap = arr => { const m={}; arr.forEach(r=>{ const t=r.contractor_team; if(!m[t])m[t]={name:t,count:0,amount:0}; m[t].count++; m[t].amount+=r.amount||0; }); return m; };
+        const cMap = buildMap(cItems);
+        const pMap = buildMap(pItems);
+        const allTeams = [...new Set([...Object.keys(cMap),...Object.keys(pMap)])];
+        const cList = allTeams.map(t=>({ name:t, count:cMap[t]?.count||0, amount:cMap[t]?.amount||0, prevCount:pMap[t]?.count||0, prevAmount:pMap[t]?.amount||0 })).sort((a,b)=>b.amount-a.amount);
+        const maxAmt   = Math.max(...cList.map(t=>Math.max(t.amount,t.prevAmount)),1);
         const totalAmt = cItems.reduce((s,r)=>s+(r.amount||0),0);
+        const prevTotalAmt = pItems.reduce((s,r)=>s+(r.amount||0),0);
         const mostTeam  = cList[0]||null;
-        const leastTeam = cList[cList.length-1]||null;
+        const leastTeam = cList.filter(t=>t.amount>0).slice(-1)[0]||null;
         const TEAM_COLORS = ['#c0392b','#e67e22','#f39c12','#8e44ad','#2980b9'];
+        const totalDiff = prevTotalAmt>0 ? totalAmt-prevTotalAmt : null;
+        const yoyLabel = curYear ? `ปี ${curYear+543} vs ปี ${prevYear+543}` : 'ทุกปี';
 
         return <>
-          <div className="kpi-row" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+          <div className="kpi-row" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
             <div style={{background:'#fff2f2',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fca5a5'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>ชุดที่ทำเสียหายมากสุด</div>
-              <div style={{fontSize:22,fontWeight:800,color:'#c0392b'}}>{mostTeam?.name||'–'}</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#c0392b'}}>{mostTeam?.name||'–'}</div>
               <div style={{fontSize:13,color:'#c0392b',fontWeight:700}}>{mostTeam?`${mostTeam.count} เคส • ${bahtFmt(mostTeam.amount)}`:''}</div>
             </div>
             <div style={{background:'#f0fdf4',borderRadius:14,padding:'18px 22px',border:'1.5px solid #86efac'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>ชุดที่ทำเสียหายน้อยสุด</div>
-              <div style={{fontSize:22,fontWeight:800,color:'#16a34a'}}>{leastTeam&&leastTeam!==mostTeam?leastTeam.name:'–'}</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#16a34a'}}>{leastTeam&&leastTeam!==mostTeam?leastTeam.name:'–'}</div>
               <div style={{fontSize:13,color:'#16a34a',fontWeight:700}}>{leastTeam&&leastTeam!==mostTeam?`${leastTeam.count} เคส • ${bahtFmt(leastTeam.amount)}`:''}</div>
             </div>
             <div style={{background:'#fdf8ee',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fde68a'}}>
-              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>รวมมูลค่าความเสียหาย (ผู้รับเหมา)</div>
-              <div style={{fontSize:28,fontWeight:800,color:'#b45309'}}>{bahtFmt(totalAmt)}</div>
-              <div style={{fontSize:12,color:'#94a3b8'}}>{cItems.length} รายการ • {cList.length} ชุด</div>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>รวมมูลค่าความเสียหาย</div>
+              <div style={{fontSize:24,fontWeight:800,color:'#b45309'}}>{bahtFmt(totalAmt)}</div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>{cItems.length} รายการ • {cList.filter(t=>t.amount>0).length} ชุด</div>
+            </div>
+            <div style={{background: totalDiff===null?'#f8fafc':totalDiff<=0?'#f0fdf4':'#fff2f2', borderRadius:14,padding:'18px 22px',border:`1.5px solid ${totalDiff===null?'#e2e8f0':totalDiff<=0?'#86efac':'#fca5a5'}`}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เทียบปีที่แล้ว ({yoyLabel})</div>
+              <div style={{fontSize:22,fontWeight:800,color:totalDiff===null?'#94a3b8':totalDiff<=0?'#16a34a':'#c0392b'}}>
+                {totalDiff===null?'–':(totalDiff>=0?'+':'')+bahtFmt(totalDiff)}
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>ปีก่อน: {prevTotalAmt>0?bahtFmt(prevTotalAmt):'ไม่มีข้อมูล'}</div>
             </div>
           </div>
-          <ChartCard title="ความเสียหายแยกตามชุดผู้รับเหมา" subtitle="เรียงตามมูลค่าความเสียหายมากสุด" span="full">
-            {cList.map((t,i)=>(
-              <div key={i} style={{marginBottom:14}}>
+          <ChartCard title={`ความเสียหายแยกตามชุดผู้รับเหมา (${yoyLabel})`} subtitle="แท่งเข้ม = ปีนี้ • แท่งจาง = ปีที่แล้ว" span="full">
+            {cList.map((t,i)=>{
+              const diff = t.prevAmount>0 ? t.amount-t.prevAmount : null;
+              const diffPct = t.prevAmount>0 ? ((t.amount-t.prevAmount)/t.prevAmount*100) : null;
+              return <div key={i} style={{marginBottom:18}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
                     <span style={{display:'inline-block',width:12,height:12,borderRadius:'50%',background:TEAM_COLORS[i%TEAM_COLORS.length]}}/>
                     <span style={{fontSize:15,fontWeight:i===0?800:600,color:'#1e293b'}}>{i+1}. {t.name}</span>
-                    <span style={{fontSize:12,color:'#64748b',background:'#f1f5f9',padding:'2px 8px',borderRadius:10}}>{t.count} เคส</span>
+                    <span style={{fontSize:12,color:'#64748b',background:'#f1f5f9',padding:'2px 7px',borderRadius:10}}>{t.count} เคส</span>
+                    {diff!==null&&<span style={{fontSize:12,fontWeight:700,color:diff<=0?'#16a34a':'#c0392b'}}>
+                      {diff>=0?'+':''}{bahtFmt(diff)} ({diffPct>=0?'+':''}{diffPct.toFixed(1)}%)
+                    </span>}
                   </div>
-                  <div style={{textAlign:'right'}}>
-                    <span style={{fontSize:15,fontWeight:800,color:TEAM_COLORS[i%TEAM_COLORS.length]}}>{bahtFmt(t.amount)}</span>
-                    <span style={{fontSize:12,color:'#94a3b8',marginLeft:6}}>{Math.round(t.amount/totalAmt*100)}%</span>
-                  </div>
+                  <span style={{fontSize:15,fontWeight:800,color:TEAM_COLORS[i%TEAM_COLORS.length]}}>{bahtFmt(t.amount)}</span>
                 </div>
-                <div style={{background:'#f1f5f9',borderRadius:8,height:14,overflow:'hidden'}}>
-                  <div style={{height:'100%',borderRadius:8,background:TEAM_COLORS[i%TEAM_COLORS.length],width:`${t.amount/maxAmt*100}%`,transition:'width .4s'}}/>
+                <div style={{background:'#f1f5f9',borderRadius:6,height:12,overflow:'hidden',marginBottom:3}}>
+                  <div style={{height:'100%',borderRadius:6,background:TEAM_COLORS[i%TEAM_COLORS.length],width:`${t.amount/maxAmt*100}%`,transition:'width .4s'}}/>
                 </div>
-              </div>
-            ))}
-            <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0',display:'flex',gap:24,flexWrap:'wrap'}}>
-              {cList.map((t,i)=>(
-                <span key={i} style={{fontSize:12,color:'#64748b',display:'flex',alignItems:'center',gap:4}}>
-                  <span style={{width:10,height:10,borderRadius:'50%',background:TEAM_COLORS[i%TEAM_COLORS.length],display:'inline-block'}}/>
-                  {t.name}: {Math.round(t.amount/totalAmt*100)}%
-                </span>
-              ))}
+                {t.prevAmount>0&&<div style={{background:'#e2e8f0',borderRadius:6,height:7,overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:6,background:TEAM_COLORS[i%TEAM_COLORS.length],opacity:.35,width:`${t.prevAmount/maxAmt*100}%`}}/>
+                </div>}
+              </div>;
+            })}
+            <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid #e2e8f0',fontSize:12,color:'#94a3b8'}}>
+              แท่งเข้ม = ปีนี้ ({bahtFmt(totalAmt)}) • แท่งจาง = ปีที่แล้ว ({prevTotalAmt>0?bahtFmt(prevTotalAmt):'ไม่มีข้อมูล'})
             </div>
           </ChartCard>
         </>;
