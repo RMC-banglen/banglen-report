@@ -4551,7 +4551,7 @@ window.__dataReady.then(data => {
       {!selected?<>
         <div style={{display:'flex',flexWrap:'wrap',gap:14,justifyContent:'center',maxWidth:640,marginBottom:20}}>
           {users.map(u=><div key={u.id} onClick={()=>{if(!u.pin||u.pin==='')onLogin(u);else{setSelected(u);setPin('');setError('');}}} style={{cursor:'pointer',textAlign:'center',padding:'18px 22px',background:'#fff',borderRadius:16,border:'2px solid #e2e8f0',minWidth:110,boxShadow:'0 2px 8px rgba(0,0,0,.05)'}}>
-            <div style={{width:52,height:52,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:700,color:'#fff',margin:'0 auto 8px'}}>{u.name[0]}</div>
+            <div style={{width:52,height:52,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:700,color:'#fff',margin:'0 auto 8px'}}></div>
             <div style={{fontSize:14,fontWeight:600,color:'#1e293b'}}>{u.name}</div>
             <div style={{fontSize:11,color:'#94a3b8',marginTop:3}}>{u.role==='admin'?'ผู้ดูแลระบบ':u.role==='viewer'?'ดูอย่างเดียว':'ผู้ใช้งาน'}</div>
           </div>)}
@@ -4590,7 +4590,7 @@ window.__dataReady.then(data => {
     const isAdmin=u.role==='admin';
     return <div style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:16,padding:'16px 20px',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
       <div style={{display:'flex',alignItems:'center',gap:14}}>
-        <div style={{width:48,height:48,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,fontWeight:700,color:'#fff',flexShrink:0}}>{u.name[0]}</div>
+        <div style={{width:48,height:48,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,fontWeight:700,color:'#fff',flexShrink:0}}></div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             {editName
