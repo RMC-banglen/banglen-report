@@ -4694,10 +4694,16 @@ window.__dataReady.then(data => {
             {[{id:'admin',label:'Admin'},{id:'editor',label:'ผู้ใช้งาน'},{id:'viewer',label:'ดูอย่างเดียว'}].map(r=><button key={r.id} onClick={()=>setNu({...nu,role:r.id})} style={{padding:'7px 16px',borderRadius:8,border:`1.5px solid ${nu.role===r.id?'#0f766e':'#e2e8f0'}`,background:nu.role===r.id?'#0f766e':'#fff',color:nu.role===r.id?'#fff':'#334155',fontSize:13,cursor:'pointer'}}>{r.label}</button>)}
           </div>
         </div>
-        {nu.role==='editor'&&<div style={{marginBottom:14}}>
+        {nu.role==='editor'&&<div style={{marginBottom:10}}>
           <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>สิทธิ์แก้ไข</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {PERM_LIST.map(({k,v})=><button key={k} onClick={()=>setNu({...nu,permissions:{...nu.permissions,[k]:!nu.permissions[k]}})} style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${nu.permissions[k]?'#0f766e':'#e2e8f0'}`,background:nu.permissions[k]?'#f0fdf4':'#fff',color:nu.permissions[k]?'#0f766e':'#94a3b8',fontSize:13,cursor:'pointer'}}>{v} {nu.permissions[k]?'✓':'✗'}</button>)}
+          </div>
+        </div>}
+        {nu.role!=='admin'&&<div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>หน้าที่เข้าดูได้</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {TAB_PERM_LIST.map(({k,v})=><button key={k} onClick={()=>setNu({...nu,tab_perms:{...nu.tab_perms,[k]:!nu.tab_perms[k]}})} style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${nu.tab_perms[k]?'#3b82f6':'#e2e8f0'}`,background:nu.tab_perms[k]?'#eff6ff':'#fff',color:nu.tab_perms[k]?'#2563eb':'#94a3b8',fontSize:13,cursor:'pointer'}}>{v} {nu.tab_perms[k]?'✓':'✗'}</button>)}
           </div>
         </div>}
         <div style={{display:'flex',gap:8}}>
