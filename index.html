@@ -4036,7 +4036,6 @@ window.__dataReady.then(data => {
     const [dept,setDept]     = React.useState('production');
     const [typeFilter,setTypeFilter] = React.useState('ALL');
     const [showForm,setShowForm]     = React.useState(false);
-    const [showDone,setShowDone]     = React.useState(false);
     const [editTask,setEditTask]     = React.useState(null);
     const [form,setForm]     = React.useState({title:'',type:'',dept:'production',status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''});
 
@@ -4260,7 +4259,7 @@ window.__dataReady.then(data => {
       }
     };
 
-    const filtered = tasks.filter(t=>t.dept===dept&&(typeFilter==='ALL'||t.type===typeFilter)&&(showDone||t.status!=='done'));
+    const filtered = tasks.filter(t=>t.dept===dept&&(typeFilter==='ALL'||t.type===typeFilter));
     const byStatus = s => filtered.filter(t=>t.status===s);
     const urgentCount = tasks.filter(t=>t.dept===dept&&t.priority==='urgent'&&t.status!=='done').length;
     const doneMonth   = tasks.filter(t=>t.dept===dept&&t.status==='done').length;
@@ -4271,6 +4270,9 @@ window.__dataReady.then(data => {
     const priOrder = {urgent:0,high:1,normal:2};
     const statusInfo = {todo:{label:'รอดำเนินการ',color:'#dc2626',bg:'#fef2f2'},doing:{label:'กำลังดำเนินการ',color:'#d97706',bg:'#fffbeb'},done:{label:'เสร็จแล้ว',color:'#16a34a',bg:'#f0fdf4'}};
     const sortedFiltered = [...filtered].sort((a,b)=>{
+      const aDone=a.status==='done'?0:1;
+      const bDone=b.status==='done'?0:1;
+      if(aDone!==bDone) return aDone-bDone;
       const pd=(priOrder[a.priority]??2)-(priOrder[b.priority]??2);
       return pd!==0 ? pd : (b.pct||0)-(a.pct||0);
     });
@@ -4330,12 +4332,7 @@ window.__dataReady.then(data => {
         <div style={{display:'flex',gap:8}}>
           {WT_DEPT.map(d=><button key={d.id} onClick={()=>setDept(d.id)} style={{padding:'8px 22px',borderRadius:20,border:`2px solid ${dept===d.id?'#0f766e':'#e2e8f0'}`,background:dept===d.id?'#0f766e':'#fff',color:dept===d.id?'#fff':'#334155',fontSize:14,fontWeight:700,cursor:'pointer'}}>{d.label}</button>)}
         </div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          {dept!=='raft'&&<button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>}
-          <button onClick={()=>setShowDone(v=>!v)} style={{padding:'9px 16px',background:showDone?'#f0fdf4':'#f1f5f9',color:showDone?'#16a34a':'#64748b',border:`1.5px solid ${showDone?'#16a34a':'#e2e8f0'}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer'}}>
-            {showDone?'✓ ซ่อนงานเสร็จ':'แสดงงานเสร็จแล้ว'}
-          </button>
-        </div>
+        {dept!=='raft'&&<button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>}
       </div>
 
       {/* Raft view — table layout */}
@@ -4487,9 +4484,12 @@ window.__dataReady.then(data => {
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}} onClick={e=>e.stopPropagation()}>
                 <span style={{fontSize:15,fontWeight:700,padding:'7px 18px',borderRadius:20,background:si.bg,color:si.color}}>{si.label}</span>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}}>
-                  {WT_STATUS.filter(s=>s.id!==t.status).map(s=>(
-                    <button key={s.id} onClick={()=>setStatus(t.id,s.id)} style={{fontSize:14,padding:'6px 14px',borderRadius:10,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#334155',cursor:'pointer',fontWeight:600}}>{s.label}</button>
-                  ))}
+                  {t.status==='done'
+                    ? <button onClick={()=>{if(window.confirm('รายงานผลและลบงานนี้ออกจากระบบ?'))deleteTask(t.id);}} style={{fontSize:14,padding:'7px 16px',borderRadius:10,border:'none',background:'#16a34a',color:'#fff',cursor:'pointer',fontWeight:700}}>✓ รายงานผลเสร็จแล้ว</button>
+                    : WT_STATUS.filter(s=>s.id!==t.status).map(s=>(
+                        <button key={s.id} onClick={()=>setStatus(t.id,s.id)} style={{fontSize:14,padding:'6px 14px',borderRadius:10,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#334155',cursor:'pointer',fontWeight:600}}>{s.label}</button>
+                      ))
+                  }
                   <button onClick={()=>deleteTask(t.id)} style={{fontSize:14,padding:'6px 12px',borderRadius:10,border:'1px solid #fee2e2',background:'#fef2f2',color:'#dc2626',cursor:'pointer',fontWeight:600}}>ลบ</button>
                 </div>
               </div>
