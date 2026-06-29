@@ -4024,7 +4024,9 @@ window.__dataReady.then(data => {
   const PILE_S_SEC = PILE_SEC;
   const PILE_I_SEC = PILE_SEC;
 
-  function WorkTrackTab(){
+  function WorkTrackTab({currentUser}){
+    const canEdit = currentUser?.role !== 'viewer';
+    const deptPerm = d => currentUser?.role==='admin' || (currentUser?.role==='editor' && (currentUser?.permissions||{})[d]!==false);
     const db = React.useMemo(()=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY),[]);
     const [loading,setLoading] = React.useState(true);
     const [tasks,setTasks]   = React.useState([]);
@@ -4328,7 +4330,7 @@ window.__dataReady.then(data => {
         <div style={{display:'flex',gap:8}}>
           {WT_DEPT.map(d=><button key={d.id} onClick={()=>setDept(d.id)} style={{padding:'8px 22px',borderRadius:20,border:`2px solid ${dept===d.id?'#0f766e':'#e2e8f0'}`,background:dept===d.id?'#0f766e':'#fff',color:dept===d.id?'#fff':'#334155',fontSize:14,fontWeight:700,cursor:'pointer'}}>{d.label}</button>)}
         </div>
-        {dept!=='raft'&&<button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>}
+        {dept!=='raft'&&canEdit&&deptPerm(dept)&&<button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>+ เพิ่มงาน</button>}
       </div>
 
       {/* Raft view — table layout */}
@@ -4389,12 +4391,13 @@ window.__dataReady.then(data => {
                   const bad=blocked||getRaftStatus(num,part)==='bad';
                   return <td key={part} style={{padding:'8px 4px',textAlign:'center'}}>
                     <button onClick={()=>{
+                      if(!(canEdit&&deptPerm('raft'))) return;
                       if(!bad&&!blocked){ openRaftRepair(num,part); return; }
                       if(bad&&!blocked){
                         const hasTask=tasks.some(t=>t.status!=='done'&&t.title===`ซ่อมแพที่ ${num} — ${part}`);
                         if(!hasTask) clearRaftPart(num,part);
                       }
-                    }} title={waiting?'รอติดตั้งแพ':changing?'กำลังเปลี่ยนแพ':bad?'รอซ่อม':'กดเพื่อสร้างงานซ่อม'} style={{width:34,height:34,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:bad&&!blocked&&!waiting?'pointer':'default',fontSize:17,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                    }} title={waiting?'รอติดตั้งแพ':changing?'กำลังเปลี่ยนแพ':bad?'รอซ่อม':canEdit&&deptPerm('raft')?'กดเพื่อสร้างงานซ่อม':'ดูอย่างเดียว'} style={{width:34,height:34,borderRadius:8,border:`1.5px solid ${bad?'#fca5a5':'#86efac'}`,background:bad?'#fef2f2':'#f0fdf4',cursor:(canEdit&&deptPerm('raft'))&&bad&&!blocked&&!waiting?'pointer':'default',fontSize:17,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
                       {bad?'🔴':'🟢'}
                     </button>
                   </td>;
@@ -4403,7 +4406,7 @@ window.__dataReady.then(data => {
                   {waiting
                     ? <div>
                         <span style={{fontSize:11,fontWeight:700,padding:'4px 8px',borderRadius:16,background:'#fef2f2',color:'#dc2626',border:'1px solid #fca5a5',display:'block',marginBottom:4}}>⏳ รอติดตั้งแพ</span>
-                        <button onClick={()=>updateRaftInfo(num,{waiting:false})} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#475569',cursor:'pointer',fontWeight:600,width:'100%'}}>ยกเลิก</button>
+                        {canEdit&&deptPerm('raft')&&<button onClick={()=>updateRaftInfo(num,{waiting:false})} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#475569',cursor:'pointer',fontWeight:600,width:'100%'}}>ยกเลิก</button>}
                       </div>
                     : changing
                       ? <span style={{fontSize:12,fontWeight:700,padding:'4px 10px',borderRadius:20,background:'#fff7ed',color:'#c2410c',border:'1px solid #fdba74',display:'block',marginBottom:4}}>🔄 เปลี่ยนแพ<br/><span style={{fontSize:11,color:'#9a3412'}}>→ {info.pendingType}{info.pendingSection}</span></span>
@@ -4411,8 +4414,8 @@ window.__dataReady.then(data => {
                           <span style={{fontSize:12,fontWeight:700,padding:'4px 8px',borderRadius:16,background:allOk?'#f0fdf4':'#fef2f2',color:allOk?'#16a34a':'#dc2626',border:`1px solid ${allOk?'#86efac':'#fca5a5'}`,display:'block',marginBottom:4}}>
                             {allOk?'✅ พร้อม':`⚠️ ซ่อม ${badParts.length}`}
                           </span>
-                          {!info.noChange&&num===9&&<button onClick={()=>updateRaftInfo(num,{waiting:true})} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #fca5a5',background:'#fef2f2',color:'#dc2626',cursor:'pointer',fontWeight:600,width:'100%',marginBottom:3}}>รอติดตั้งแพ</button>}
-                          {!info.noChange&&<button onClick={()=>openRaftChange(num)} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#475569',cursor:'pointer',fontWeight:600,width:'100%'}}>เปลี่ยนแพ</button>}
+                          {canEdit&&deptPerm('raft')&&!info.noChange&&num===9&&<button onClick={()=>updateRaftInfo(num,{waiting:true})} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #fca5a5',background:'#fef2f2',color:'#dc2626',cursor:'pointer',fontWeight:600,width:'100%',marginBottom:3}}>รอติดตั้งแพ</button>}
+                          {canEdit&&deptPerm('raft')&&!info.noChange&&<button onClick={()=>openRaftChange(num)} style={{fontSize:11,padding:'3px 8px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#475569',cursor:'pointer',fontWeight:600,width:'100%'}}>เปลี่ยนแพ</button>}
                         </div>
                   }
                 </td>
@@ -4480,13 +4483,13 @@ window.__dataReady.then(data => {
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}} onClick={e=>e.stopPropagation()}>
                 <span style={{fontSize:15,fontWeight:700,padding:'7px 18px',borderRadius:20,background:si.bg,color:si.color}}>{si.label}</span>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}}>
-                  {t.status==='done'
+                  {canEdit&&deptPerm(t.dept)&&(t.status==='done'
                     ? <button onClick={()=>{if(window.confirm('รายงานผลและลบงานนี้ออกจากระบบ?'))deleteTask(t.id);}} style={{fontSize:14,padding:'7px 16px',borderRadius:10,border:'none',background:'#16a34a',color:'#fff',cursor:'pointer',fontWeight:700}}>✓ รายงานผลเสร็จแล้ว</button>
                     : WT_STATUS.filter(s=>s.id!==t.status).map(s=>(
                         <button key={s.id} onClick={()=>setStatus(t.id,s.id)} style={{fontSize:14,padding:'6px 14px',borderRadius:10,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#334155',cursor:'pointer',fontWeight:600}}>{s.label}</button>
                       ))
-                  }
-                  <button onClick={()=>deleteTask(t.id)} style={{fontSize:14,padding:'6px 12px',borderRadius:10,border:'1px solid #fee2e2',background:'#fef2f2',color:'#dc2626',cursor:'pointer',fontWeight:600}}>ลบ</button>
+                  )}
+                  {canEdit&&deptPerm(t.dept)&&<button onClick={()=>deleteTask(t.id)} style={{fontSize:14,padding:'6px 12px',borderRadius:10,border:'1px solid #fee2e2',background:'#fef2f2',color:'#dc2626',cursor:'pointer',fontWeight:600}}>ลบ</button>}
                 </div>
               </div>
             </div>
@@ -4497,10 +4500,150 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  // ── Login & User Management ──────────────────────────────────────────
+  const AVATAR_COLORS=['#6366f1','#0f766e','#d97706','#dc2626','#7c3aed','#0369a1','#0891b2'];
+  const avatarColor=name=>AVATAR_COLORS[((name||'A').charCodeAt(0))%AVATAR_COLORS.length];
+
+  function LoginScreen({onLogin}){
+    const db=React.useMemo(()=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY),[]);
+    const [users,setUsers]=React.useState([]);
+    const [selected,setSelected]=React.useState(null);
+    const [pin,setPin]=React.useState('');
+    const [error,setError]=React.useState('');
+    const [loading,setLoading]=React.useState(true);
+    React.useEffect(()=>{
+      db.from('worktrack_users').select('*').eq('active',true).order('created_at').then(({data})=>{setUsers(data||[]);setLoading(false);});
+    },[]);
+    const pressPin=d=>{
+      if(error||pin.length>=4)return;
+      const next=pin+d;
+      setPin(next);
+      if(next.length===4){
+        if(next===selected.pin) onLogin(selected);
+        else{setError('PIN ไม่ถูกต้อง');setTimeout(()=>{setPin('');setError('');},900);}
+      }
+    };
+    if(loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'#64748b',fontSize:16}}>กำลังโหลด...</div>;
+    return <div style={{minHeight:'100vh',background:'#f1f5f9',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
+      <div style={{textAlign:'center',marginBottom:28}}>
+        <img src="logo.png" style={{height:56,marginBottom:10}}/>
+        <div style={{fontSize:17,fontWeight:700,color:'#1e293b'}}>บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด</div>
+        <div style={{fontSize:13,color:'#64748b',marginTop:4}}>เลือกผู้ใช้งานเพื่อเข้าสู่ระบบ</div>
+      </div>
+      {!selected?<>
+        <div style={{display:'flex',flexWrap:'wrap',gap:14,justifyContent:'center',maxWidth:640,marginBottom:20}}>
+          {users.map(u=><div key={u.id} onClick={()=>{setSelected(u);setPin('');setError('');}} style={{cursor:'pointer',textAlign:'center',padding:'18px 22px',background:'#fff',borderRadius:16,border:'2px solid #e2e8f0',minWidth:110,boxShadow:'0 2px 8px rgba(0,0,0,.05)'}}>
+            <div style={{width:52,height:52,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:700,color:'#fff',margin:'0 auto 8px'}}>{u.name[0]}</div>
+            <div style={{fontSize:14,fontWeight:600,color:'#1e293b'}}>{u.name}</div>
+            <div style={{fontSize:11,color:'#94a3b8',marginTop:3}}>{u.role==='admin'?'ผู้ดูแลระบบ':u.role==='viewer'?'ดูอย่างเดียว':'ผู้ใช้งาน'}</div>
+          </div>)}
+        </div>
+        <button onClick={()=>onLogin({id:'guest',name:'ผู้เยี่ยมชม',role:'viewer',permissions:{}})} style={{padding:'11px 28px',border:'2px solid #cbd5e1',background:'#fff',borderRadius:12,fontSize:14,color:'#64748b',cursor:'pointer',fontWeight:600}}>👁 เข้าดูแบบไม่ต้องล็อกอิน</button>
+      </>:<div style={{background:'#fff',borderRadius:20,padding:'32px 28px',boxShadow:'0 4px 20px rgba(0,0,0,.1)',textAlign:'center',minWidth:260}}>
+        <div style={{width:60,height:60,borderRadius:'50%',background:avatarColor(selected.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:700,color:'#fff',margin:'0 auto 10px'}}>{selected.name[0]}</div>
+        <div style={{fontSize:17,fontWeight:700,color:'#1e293b',marginBottom:4}}>{selected.name}</div>
+        <div style={{fontSize:13,color:'#94a3b8',marginBottom:18}}>กรอก PIN 4 หลัก</div>
+        <div style={{display:'flex',gap:10,justifyContent:'center',marginBottom:20}}>
+          {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:'50%',background:error?'#dc2626':pin.length>i?'#0f766e':'#e2e8f0',transition:'background .15s'}}/>)}
+        </div>
+        {error&&<div style={{color:'#dc2626',fontSize:13,marginBottom:10,fontWeight:600}}>{error}</div>}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
+          {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d,i)=><button key={i} onClick={()=>d===''?null:d==='⌫'?setPin(p=>p.slice(0,-1)):pressPin(String(d))} style={{padding:'13px',fontSize:19,fontWeight:600,border:'1.5px solid #e2e8f0',borderRadius:10,background:d===''?'transparent':'#f8fafc',color:'#1e293b',cursor:d===''?'default':'pointer',visibility:d===''?'hidden':'visible'}}>{d}</button>)}
+        </div>
+        <button onClick={()=>setSelected(null)} style={{fontSize:13,color:'#94a3b8',background:'none',border:'none',cursor:'pointer'}}>← เลือกผู้ใช้อื่น</button>
+      </div>}
+    </div>;
+  }
+
+  function UserCard({u,onDelete,onUpdatePin}){
+    const PERM_LABELS={production:'ฝ่ายผลิต',maintenance:'ซ่อมบำรุง',raft:'แพผลิตเสาเข็ม'};
+    const [editPin,setEditPin]=React.useState(false);
+    const [pinVal,setPinVal]=React.useState('');
+    return <div style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:16,padding:'16px 20px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+        <div style={{width:44,height:44,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:700,color:'#fff',flexShrink:0}}>{u.name[0]}</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#1e293b'}}>{u.name}</div>
+          <div style={{fontSize:12,color:'#94a3b8'}}>{u.role==='admin'?'ผู้ดูแลระบบ':u.role==='viewer'?'ดูอย่างเดียว':'ผู้ใช้งาน'}</div>
+        </div>
+        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+          {!editPin?<button onClick={()=>setEditPin(true)} style={{fontSize:12,padding:'5px 12px',border:'1px solid #e2e8f0',borderRadius:8,background:'#f8fafc',color:'#475569',cursor:'pointer'}}>เปลี่ยน PIN</button>
+          :<><input type="password" maxLength={4} placeholder="PIN ใหม่" value={pinVal} onChange={e=>setPinVal(e.target.value)} style={{width:72,padding:'5px 8px',border:'1.5px solid #0f766e',borderRadius:8,fontSize:13}}/>
+            <button onClick={()=>{if(pinVal.length===4){onUpdatePin(u.id,pinVal);setEditPin(false);setPinVal('');}else alert('PIN ต้องมี 4 หลัก');}} style={{fontSize:12,padding:'5px 10px',background:'#0f766e',color:'#fff',border:'none',borderRadius:8,cursor:'pointer'}}>บันทึก</button>
+            <button onClick={()=>setEditPin(false)} style={{fontSize:12,padding:'5px 10px',background:'#f1f5f9',color:'#64748b',border:'none',borderRadius:8,cursor:'pointer'}}>ยกเลิก</button></>}
+          {u.id!=='admin'&&<button onClick={()=>onDelete(u.id)} style={{fontSize:12,padding:'5px 12px',border:'1px solid #fee2e2',borderRadius:8,background:'#fef2f2',color:'#dc2626',cursor:'pointer'}}>ลบ</button>}
+        </div>
+      </div>
+      {u.role==='editor'&&<div style={{marginTop:10,display:'flex',gap:6,flexWrap:'wrap'}}>
+        {Object.entries(PERM_LABELS).map(([k,v])=>{const has=(u.permissions||{})[k];return <span key={k} style={{fontSize:12,padding:'3px 10px',borderRadius:20,background:has?'#f0fdf4':'#f1f5f9',color:has?'#16a34a':'#94a3b8',border:`1px solid ${has?'#bbf7d0':'#e2e8f0'}`}}>{v} {has?'✓':'✗'}</span>;})}
+      </div>}
+    </div>;
+  }
+
+  function UserManagementTab(){
+    const db=React.useMemo(()=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY),[]);
+    const [users,setUsers]=React.useState([]);
+    const [loading,setLoading]=React.useState(true);
+    const [showAdd,setShowAdd]=React.useState(false);
+    const [nu,setNu]=React.useState({name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true}});
+    const PERM_LABELS={production:'ฝ่ายผลิต',maintenance:'ซ่อมบำรุง',raft:'แพผลิตเสาเข็ม'};
+    const load=()=>db.from('worktrack_users').select('*').order('created_at').then(({data})=>{setUsers(data||[]);setLoading(false);});
+    React.useEffect(load,[]);
+    const addUser=async()=>{
+      if(!nu.name||nu.pin.length!==4){alert('กรอกชื่อและ PIN 4 หลัก');return;}
+      await db.from('worktrack_users').insert({...nu,id:Date.now().toString()});
+      setShowAdd(false);setNu({name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true}});load();
+    };
+    const deleteUser=async id=>{if(id==='admin'){alert('ไม่สามารถลบ Admin');return;}if(!window.confirm('ลบผู้ใช้นี้?'))return;await db.from('worktrack_users').delete().eq('id',id);load();};
+    const updatePin=async(id,pin)=>{await db.from('worktrack_users').update({pin}).eq('id',id);load();};
+    if(loading) return <div style={{padding:40,textAlign:'center',color:'#64748b'}}>กำลังโหลด...</div>;
+    return <div style={{padding:'24px',maxWidth:760,margin:'0 auto'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:700,color:'#1e293b'}}>จัดการผู้ใช้งาน</div>
+          <div style={{fontSize:13,color:'#64748b'}}>กำหนดสิทธิ์การเข้าถึงฟังก์ชันต่างๆ ให้แต่ละผู้ใช้</div>
+        </div>
+        <button onClick={()=>setShowAdd(true)} style={{padding:'10px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer'}}>+ เพิ่มผู้ใช้</button>
+      </div>
+      {showAdd&&<div style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:16,padding:24,marginBottom:20}}>
+        <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>เพิ่มผู้ใช้ใหม่</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ชื่อ</div><input value={nu.name} onChange={e=>setNu({...nu,name:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
+          <div><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>PIN (4 หลัก)</div><input type="password" maxLength={4} value={nu.pin} onChange={e=>setNu({...nu,pin:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
+        </div>
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>บทบาท</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {[{id:'admin',label:'Admin (เต็มสิทธิ์)'},{id:'editor',label:'ผู้ใช้งาน (แก้ไขได้)'},{id:'viewer',label:'ดูอย่างเดียว'}].map(r=><button key={r.id} onClick={()=>setNu({...nu,role:r.id})} style={{padding:'7px 16px',borderRadius:8,border:`1.5px solid ${nu.role===r.id?'#0f766e':'#e2e8f0'}`,background:nu.role===r.id?'#0f766e':'#fff',color:nu.role===r.id?'#fff':'#334155',fontSize:13,cursor:'pointer'}}>{r.label}</button>)}
+          </div>
+        </div>
+        {nu.role==='editor'&&<div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>สิทธิ์แก้ไข (ติดตามงาน)</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {Object.entries(PERM_LABELS).map(([k,v])=><button key={k} onClick={()=>setNu({...nu,permissions:{...nu.permissions,[k]:!nu.permissions[k]}})} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${nu.permissions[k]?'#0f766e':'#e2e8f0'}`,background:nu.permissions[k]?'#f0fdf4':'#fff',color:nu.permissions[k]?'#0f766e':'#94a3b8',fontSize:13,cursor:'pointer'}}>{v} {nu.permissions[k]?'✓':'✗'}</button>)}
+          </div>
+        </div>}
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={addUser} style={{padding:'8px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer'}}>เพิ่ม</button>
+          <button onClick={()=>setShowAdd(false)} style={{padding:'8px 16px',background:'#f1f5f9',color:'#64748b',border:'none',borderRadius:8,fontSize:13,cursor:'pointer'}}>ยกเลิก</button>
+        </div>
+      </div>}
+      <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        {users.map(u=><UserCard key={u.id} u={u} onDelete={deleteUser} onUpdatePin={updatePin}/>)}
+      </div>
+    </div>;
+  }
+  // ─────────────────────────────────────────────────────────────────────
+
   function App(){
+    const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const [tab,setTab]=useState('meeting');
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
-    const tabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'}];
+    const login=user=>{sessionStorage.setItem('wt_user',JSON.stringify(user));setCurrentUser(user);};
+    const logout=()=>{sessionStorage.removeItem('wt_user');setCurrentUser(null);};
+    if(!currentUser) return <LoginScreen onLogin={login}/>;
+    const isAdmin=currentUser.role==='admin';
+    const tabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
         <div className="topbar__brand">
@@ -4516,6 +4659,11 @@ window.__dataReady.then(data => {
             <Segmented value={year} onChange={setYear} options={Object.keys(D.years).map(Number).sort((a,b)=>a-b).map(y=>({value:y,label:String(y)}))}/>
             {!yearData(year).real&&<span className="badge-sample">ข้อมูลตัวอย่าง</span>}
           </div>}
+          <div style={{display:'flex',alignItems:'center',gap:10,marginLeft:12}}>
+            <div style={{width:32,height:32,borderRadius:'50%',background:avatarColor(currentUser.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#fff',flexShrink:0}}>{currentUser.name[0]}</div>
+            <span style={{fontSize:13,fontWeight:600,color:'#1e293b'}}>{currentUser.name}</span>
+            <button onClick={logout} style={{fontSize:12,padding:'5px 12px',border:'1px solid #e2e8f0',borderRadius:8,background:'#f8fafc',color:'#64748b',cursor:'pointer'}}>ออก</button>
+          </div>
         </div>
       </header>
       <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}</nav>
@@ -4526,7 +4674,8 @@ window.__dataReady.then(data => {
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='damage'&&<DamageDetailTab/>}
         {tab==='concrete'&&<ConcreteView year={year}/>}
-        {tab==='worktrack'&&<WorkTrackTab/>}
+        {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
+        {tab==='users'&&isAdmin&&<UserManagementTab/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
     </div>;
