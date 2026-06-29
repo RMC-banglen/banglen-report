@@ -4651,7 +4651,8 @@ window.__dataReady.then(data => {
     const addUser=async()=>{
       if(!nu.name){alert('กรอกชื่อ');return;}
       if(!nu.noPin&&nu.pin.length!==4){alert('กรอก PIN 4 หลัก หรือเลือก ไม่ต้องใส่รหัส PIN');return;}
-      await db.from('worktrack_users').insert({...nu,id:Date.now().toString()});
+      const {noPin,...nuData}=nu;
+      await db.from('worktrack_users').insert({...nuData,id:Date.now().toString()});
       setShowAdd(false);setNu(EMPTY_NU);load();
     };
     const saveUser=async(id,fields)=>{
