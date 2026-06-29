@@ -4058,18 +4058,19 @@ window.__dataReady.then(data => {
             const lsTasks=JSON.parse(localStorage.getItem(WT_KEY)||'[]');
             if(lsTasks.length>0){
               const tasksWithTs=lsTasks.map(t=>({...t,created_at:t.created_at||new Date().toISOString()}));
-              await db.from('worktrack_tasks').upsert(tasksWithTs);
-              allTasks=tasksWithTs;
+              const {error:te}=await db.from('worktrack_tasks').upsert(tasksWithTs);
+              if(te) console.error('[migrate tasks]',te);
+              else allTasks=tasksWithTs;
             }
-          }catch(e){}
+          }catch(e){console.error('[migrate tasks catch]',e);}
           try{
             const lsRaft=JSON.parse(localStorage.getItem(RAFT_KEY)||'{}');
             const rows=Object.entries(lsRaft).filter(([,v])=>v==='bad').map(([k])=>{
               const [num,part]=k.split('__');
               return {raft_num:Number(num),part,bad:true};
             });
-            if(rows.length>0) await db.from('worktrack_raft_parts').upsert(rows);
-          }catch(e){}
+            if(rows.length>0){const {error:re}=await db.from('worktrack_raft_parts').upsert(rows);if(re)console.error('[migrate raft]',re);}
+          }catch(e){console.error('[migrate raft catch]',e);}
           try{
             const lsInfo=JSON.parse(localStorage.getItem(RAFT_INFO_KEY)||'{}');
             const rows=Object.entries(lsInfo).map(([num,v])=>({
@@ -4078,8 +4079,8 @@ window.__dataReady.then(data => {
               pending_type:v.pendingType||'',pending_section:v.pendingSection||'',
               updated_at:new Date().toISOString()
             }));
-            if(rows.length>0) await db.from('worktrack_raft_info').upsert(rows);
-          }catch(e){}
+            if(rows.length>0){const {error:ie}=await db.from('worktrack_raft_info').upsert(rows);if(ie)console.error('[migrate info]',ie);}
+          }catch(e){console.error('[migrate info catch]',e);}
           // Re-fetch after migration
           const [t2,p2,i2]=await Promise.all([
             db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}),
@@ -4249,6 +4250,27 @@ window.__dataReady.then(data => {
       return pd!==0 ? pd : (b.pct||0)-(a.pct||0);
     });
 
+    const manualRestore = async () => {
+      try{
+        const lsTasks=JSON.parse(localStorage.getItem(WT_KEY)||'[]');
+        if(lsTasks.length===0){alert('ไม่พบข้อมูลเก่าในเครื่องนี้ (localStorage ว่างเปล่า)');return;}
+        const tasksWithTs=lsTasks.map(t=>({...t,created_at:t.created_at||new Date().toISOString()}));
+        const {error:te}=await db.from('worktrack_tasks').upsert(tasksWithTs);
+        if(te){alert('เกิดข้อผิดพลาด: '+te.message);return;}
+        const lsRaft=JSON.parse(localStorage.getItem(RAFT_KEY)||'{}');
+        const raftRows=Object.entries(lsRaft).filter(([,v])=>v==='bad').map(([k])=>{const [num,part]=k.split('__');return {raft_num:Number(num),part,bad:true};});
+        if(raftRows.length>0) await db.from('worktrack_raft_parts').upsert(raftRows);
+        const lsInfo=JSON.parse(localStorage.getItem(RAFT_INFO_KEY)||'{}');
+        const infoRows=Object.entries(lsInfo).map(([num,v])=>({raft_num:Number(num),pile_type:v.pileType||'S',section:v.section||'22',changing:!!v.changing,waiting:!!v.waiting,pending_type:v.pendingType||'',pending_section:v.pendingSection||'',updated_at:new Date().toISOString()}));
+        if(infoRows.length>0) await db.from('worktrack_raft_info').upsert(infoRows);
+        const [t2,p2,i2]=await Promise.all([db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}),db.from('worktrack_raft_parts').select('*'),db.from('worktrack_raft_info').select('*')]);
+        setTasks(t2.data||[]);
+        const rd={};(p2.data||[]).filter(p=>p.bad).forEach(p=>{rd[`${p.raft_num}__${p.part}`]='bad';});setRaftData(rd);
+        const ri={};(i2.data||[]).forEach(r=>{ri[r.raft_num]={pileType:r.pile_type,section:r.section,changing:r.changing,waiting:r.waiting,pendingType:r.pending_type,pendingSection:r.pending_section};});setRaftInfo(ri);
+        alert(`กู้ข้อมูลสำเร็จ! ${lsTasks.length} รายการ`);
+      }catch(e){alert('เกิดข้อผิดพลาด: '+e.message);}
+    };
+
     if(loading) return <div style={{padding:'60px',textAlign:'center',color:'#64748b',fontSize:16}}>⏳ กำลังโหลดข้อมูล...</div>;
     return <div style={{padding:'20px 24px',minHeight:600}}>
       {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
@@ -4395,7 +4417,11 @@ window.__dataReady.then(data => {
 
       {/* Task list */}
       <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        {sortedFiltered.length===0&&<div style={{textAlign:'center',color:'#94a3b8',fontSize:14,padding:'48px 0'}}>ยังไม่มีงาน — กด "+ เพิ่มงาน" เพื่อเริ่ม</div>}
+        {sortedFiltered.length===0&&tasks.length===0&&<div style={{background:'#fff7ed',border:'1.5px solid #fed7aa',borderRadius:12,padding:'16px 20px',marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+          <div style={{color:'#92400e',fontSize:14}}>⚠️ ไม่พบข้อมูลงาน — หากข้อมูลหายหลังจากอัพเดทระบบ กดปุ่มนี้บนเครื่องเดิมเพื่อกู้คืน</div>
+          <button onClick={manualRestore} style={{background:'#d97706',color:'#fff',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>กู้ข้อมูลจากเครื่องนี้</button>
+        </div>}
+        {sortedFiltered.length===0&&<div style={{textAlign:'center',color:'#94a3b8',fontSize:14,padding:'24px 0'}}>ยังไม่มีงาน — กด "+ เพิ่มงาน" เพื่อเริ่ม</div>}
         {sortedFiltered.map(t=>{
           const si=statusInfo[t.status]||statusInfo.todo;
           const pi=priInfo(t.priority);
