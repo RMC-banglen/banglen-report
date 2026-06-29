@@ -4645,9 +4645,13 @@ window.__dataReady.then(data => {
     };
     const saveUser=async(id,fields)=>{
       const u=users.find(u=>u.id===id)||{};
-      const {error}=await db.from('worktrack_users').update(fields).eq('id',id);
-      if(error){
-        await db.from('worktrack_users').insert({id,name:u.name||'Admin',pin:u.pin||'1234',role:u.role||'admin',permissions:u.permissions||{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{})},...fields});
+      console.log('[saveUser] update id=',id,'fields=',fields);
+      const {data,error}=await db.from('worktrack_users').update(fields).eq('id',id).select();
+      console.log('[saveUser] result data=',data,'error=',error);
+      if(error||!data||data.length===0){
+        console.log('[saveUser] fallback insert');
+        const {error:e2}=await db.from('worktrack_users').insert({id,name:u.name||'Admin',pin:u.pin||'1234',role:u.role||'admin',permissions:u.permissions||{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{})},...fields});
+        console.log('[saveUser] insert error=',e2);
       }
       load();
     };
