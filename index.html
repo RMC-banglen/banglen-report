@@ -4547,7 +4547,7 @@ window.__dataReady.then(data => {
       </div>
       {!selected?<>
         <div style={{display:'flex',flexWrap:'wrap',gap:14,justifyContent:'center',maxWidth:640,marginBottom:20}}>
-          {users.map(u=><div key={u.id} onClick={()=>{setSelected(u);setPin('');setError('');}} style={{cursor:'pointer',textAlign:'center',padding:'18px 22px',background:'#fff',borderRadius:16,border:'2px solid #e2e8f0',minWidth:110,boxShadow:'0 2px 8px rgba(0,0,0,.05)'}}>
+          {users.map(u=><div key={u.id} onClick={()=>{if(!u.pin||u.pin==='')onLogin(u);else{setSelected(u);setPin('');setError('');}}} style={{cursor:'pointer',textAlign:'center',padding:'18px 22px',background:'#fff',borderRadius:16,border:'2px solid #e2e8f0',minWidth:110,boxShadow:'0 2px 8px rgba(0,0,0,.05)'}}>
             <div style={{width:52,height:52,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:700,color:'#fff',margin:'0 auto 8px'}}>{u.name[0]}</div>
             <div style={{fontSize:14,fontWeight:600,color:'#1e293b'}}>{u.name}</div>
             <div style={{fontSize:11,color:'#94a3b8',marginTop:3}}>{u.role==='admin'?'ผู้ดูแลระบบ':u.role==='viewer'?'ดูอย่างเดียว':'ผู้ใช้งาน'}</div>
@@ -4649,7 +4649,8 @@ window.__dataReady.then(data => {
     });};
     React.useEffect(()=>{load();},[]);
     const addUser=async()=>{
-      if(!nu.name||nu.pin.length!==4){alert('กรอกชื่อและ PIN 4 หลัก');return;}
+      if(!nu.name){alert('กรอกชื่อ');return;}
+      if(!nu.noPin&&nu.pin.length!==4){alert('กรอก PIN 4 หลัก หรือเลือก ไม่ต้องใส่รหัส PIN');return;}
       await db.from('worktrack_users').insert({...nu,id:Date.now().toString()});
       setShowAdd(false);setNu(EMPTY_NU);load();
     };
@@ -4686,7 +4687,14 @@ window.__dataReady.then(data => {
         <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>เพิ่มผู้ใช้ใหม่</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ชื่อ</div><input value={nu.name} onChange={e=>setNu({...nu,name:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
-          <div><div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>PIN (4 หลัก)</div><input type="password" maxLength={4} value={nu.pin} onChange={e=>setNu({...nu,pin:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/></div>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>PIN (4 หลัก)</div>
+            {!nu.noPin&&<input type="password" maxLength={4} value={nu.pin} onChange={e=>setNu({...nu,pin:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,boxSizing:'border-box'}}/>}
+            <label style={{display:'flex',alignItems:'center',gap:6,marginTop:6,fontSize:12,color:'#64748b',cursor:'pointer'}}>
+              <input type="checkbox" checked={!!nu.noPin} onChange={e=>setNu({...nu,noPin:e.target.checked,pin:''})}/>
+              ไม่ต้องใส่รหัส PIN
+            </label>
+          </div>
         </div>
         <div style={{marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>บทบาท</div>
