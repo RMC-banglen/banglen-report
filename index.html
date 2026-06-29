@@ -4721,16 +4721,14 @@ window.__dataReady.then(data => {
         </div>
         <div style={{marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ตำแหน่ง</div>
-          <select value={nu.position||''} onChange={e=>setNu({...nu,position:e.target.value})} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,background:'#fff'}}>
+          <select value={nu.position||''} onChange={e=>{
+            const pos=e.target.value;
+            const role=pos==='ผู้ดูแลระบบ'?'admin':pos==='ผู้บริหาร'||pos==='ฝ่ายที่ปรึกษา'?'viewer':'editor';
+            setNu({...nu,position:pos,role});
+          }} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,background:'#fff'}}>
             <option value=''>-- เลือกตำแหน่ง --</option>
             {POSITION_OPTIONS.map(p=><option key={p} value={p}>{p}</option>)}
           </select>
-        </div>
-        <div style={{marginBottom:12}}>
-          <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>บทบาท</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {[{id:'admin',label:'Admin'},{id:'editor',label:'ผู้ใช้งาน'},{id:'viewer',label:'ดูอย่างเดียว'}].map(r=><button key={r.id} onClick={()=>setNu({...nu,role:r.id})} style={{padding:'7px 16px',borderRadius:8,border:`1.5px solid ${nu.role===r.id?'#0f766e':'#e2e8f0'}`,background:nu.role===r.id?'#0f766e':'#fff',color:nu.role===r.id?'#fff':'#334155',fontSize:13,cursor:'pointer'}}>{r.label}</button>)}
-          </div>
         </div>
         {nu.role==='editor'&&<div style={{marginBottom:10}}>
           <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>สิทธิ์แก้ไข</div>
