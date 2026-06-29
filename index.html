@@ -4051,10 +4051,22 @@ window.__dataReady.then(data => {
         db.from('worktrack_raft_parts').select('*'),
         db.from('worktrack_raft_info').select('*'),
       ]).then(([tRes,pRes,iRes])=>{
-        setTasks(tRes.data||[]);
+        const allTasks=tRes.data||[];
+        setTasks(allTasks);
+        const activeTitles=new Set(allTasks.filter(t=>t.status!=='done').map(t=>t.title));
         const rd={};
-        (pRes.data||[]).forEach(p=>{ if(p.bad) rd[`${p.raft_num}__${p.part}`]='bad'; });
+        const orphans=[];
+        (pRes.data||[]).forEach(p=>{
+          if(!p.bad) return;
+          const expectedTitle=`ซ่อมแพที่ ${p.raft_num} — ${p.part}`;
+          if(activeTitles.has(expectedTitle)){
+            rd[`${p.raft_num}__${p.part}`]='bad';
+          } else {
+            orphans.push(p);
+          }
+        });
         setRaftData(rd);
+        orphans.forEach(p=>db.from('worktrack_raft_parts').delete().eq('raft_num',p.raft_num).eq('part',p.part).then(()=>{}));
         const ri={};
         (iRes.data||[]).forEach(r=>{ ri[r.raft_num]={pileType:r.pile_type,section:r.section,changing:r.changing,waiting:r.waiting,pendingType:r.pending_type,pendingSection:r.pending_section}; });
         setRaftInfo(ri);
