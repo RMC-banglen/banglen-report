@@ -4764,7 +4764,12 @@ window.__dataReady.then(data => {
 
   function App(){
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
-    const [tab,setTab]=useState('meeting');
+    const getFirstTab=(user)=>{
+      const tp={...DEFAULT_TAB_PERMS,...(user?.tab_perms||{})};
+      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack'];
+      return user?.role==='admin'?'meeting':(ordered.find(k=>tp[k]!==false)||'meeting');
+    };
+    const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
     const login=user=>{sessionStorage.setItem('wt_user',JSON.stringify(user));setCurrentUser(user);};
     const logout=()=>{sessionStorage.removeItem('wt_user');setCurrentUser(null);};
