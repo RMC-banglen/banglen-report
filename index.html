@@ -4456,7 +4456,8 @@ window.__dataReady.then(data => {
         {sortedFiltered.map(t=>{
           const si=statusInfo[t.status]||statusInfo.todo;
           const pi=priInfo(t.priority);
-          return <div key={t.id} style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:16,padding:'18px 22px',boxShadow:'0 2px 8px rgba(0,0,0,.06)',cursor:'pointer',borderLeft:`5px solid ${pi.color}`}} onClick={()=>openEdit(t)}>
+          const canEditThis=canEdit&&deptPerm(t.dept);
+          return <div key={t.id} style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:16,padding:'18px 22px',boxShadow:'0 2px 8px rgba(0,0,0,.06)',cursor:canEditThis?'pointer':'default',borderLeft:`5px solid ${pi.color}`}} onClick={()=>canEditThis&&openEdit(t)}>
             <div style={{display:'flex',alignItems:'flex-start',gap:16}}>
               {/* Left */}
               <div style={{flex:1,minWidth:0}}>
