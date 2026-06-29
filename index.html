@@ -1830,7 +1830,15 @@ window.__dataReady.then(data => {
     </>;
   }
 
-  function DamageDetailTab(){
+  function DamageDetailTab({currentUser}){
+    const isAdmin=currentUser?.role==='admin';
+    const tp={...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
+    const dmgSubTabs=[
+      {value:'damage',label:'มูลค่าเสียหาย'},{value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},
+      {value:'summary',label:'ตารางสรุป'},{value:'cause',label:'แยกสาเหตุ'},
+      {value:'customer',label:'แยกลูกค้า'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
+      {value:'detail',label:'ตารางรายการ'}
+    ].filter(t=>isAdmin||tp['dmg_'+t.value]!==false);
     const [view,setView]   = useState('damage');
     const [workerTab,setWorkerTab] = useState('employee');
     const [filterCode,setFilterCode] = useState('ALL');
@@ -1934,12 +1942,7 @@ window.__dataReady.then(data => {
     return <div className="grid">
       {/* Filter bar */}
       <div className="yc-head">
-        <Segmented value={view} onChange={setView} options={[
-          {value:'damage',label:'มูลค่าเสียหาย'},{value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},
-          {value:'summary',label:'ตารางสรุป'},{value:'cause',label:'แยกสาเหตุ'},
-          {value:'customer',label:'แยกลูกค้า'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
-          {value:'detail',label:'ตารางรายการ'}
-        ]}/>
+        <Segmented value={view} onChange={v=>setView(v)} options={dmgSubTabs}/>
         <div style={{display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'center'}}>
           {view==='damage' ? <>
             <select value={dmgYear} onChange={e=>{setDmgYear(e.target.value);setDmgMonth('ALL');}}
@@ -4571,7 +4574,9 @@ window.__dataReady.then(data => {
 
   const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'}];
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'}];
-  const DEFAULT_TAB_PERMS=Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true]));
+  const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
+  const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
+  const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
 
   function UserCard({u,onDelete,onUpdatePin,onTogglePerm,onUpdateName}){
     const [showPin,setShowPin]=React.useState(false);
@@ -4630,6 +4635,17 @@ window.__dataReady.then(data => {
             </button>;
           })}
         </div>
+        {(isAdmin||tabPerms['damage'])&&<div style={{marginTop:8,paddingLeft:12,borderLeft:'2px solid #bfdbfe'}}>
+          <div style={{fontSize:11,color:'#93c5fd',marginBottom:4}}>↳ แท็บย่อย: มูลค่าเสียหาย</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {DMG_SUBTAB_LIST.map(({k,v})=>{
+              const has=isAdmin||tabPerms[k]!==false;
+              return <button key={k} onClick={()=>!isAdmin&&onTogglePerm(u.id,'tab',k,!tabPerms[k])} style={{fontSize:11,padding:'3px 10px',borderRadius:20,border:`1.5px solid ${has?'#3b82f6':'#e2e8f0'}`,background:has?'#eff6ff':'#f8fafc',color:has?'#2563eb':'#94a3b8',cursor:isAdmin?'default':'pointer'}}>
+                {v} {has?'✓':'✗'}
+              </button>;
+            })}
+          </div>
+        </div>}
       </div>
     </div>;
   }
@@ -4712,8 +4728,14 @@ window.__dataReady.then(data => {
         {nu.role!=='admin'&&<div style={{marginBottom:14}}>
           <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>หน้าที่เข้าดูได้</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {TAB_PERM_LIST.map(({k,v})=><button key={k} onClick={()=>setNu({...nu,tab_perms:{...nu.tab_perms,[k]:!nu.tab_perms[k]}})} style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${nu.tab_perms[k]?'#3b82f6':'#e2e8f0'}`,background:nu.tab_perms[k]?'#eff6ff':'#fff',color:nu.tab_perms[k]?'#2563eb':'#94a3b8',fontSize:13,cursor:'pointer'}}>{v} {nu.tab_perms[k]?'✓':'✗'}</button>)}
+            {TAB_PERM_LIST.map(({k,v})=><button key={k} onClick={()=>setNu({...nu,tab_perms:{...nu.tab_perms,[k]:!nu.tab_perms[k]}})} style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${nu.tab_perms[k]!==false?'#3b82f6':'#e2e8f0'}`,background:nu.tab_perms[k]!==false?'#eff6ff':'#fff',color:nu.tab_perms[k]!==false?'#2563eb':'#94a3b8',fontSize:13,cursor:'pointer'}}>{v} {nu.tab_perms[k]!==false?'✓':'✗'}</button>)}
           </div>
+          {nu.tab_perms['damage']!==false&&<div style={{marginTop:8,paddingLeft:12,borderLeft:'2px solid #bfdbfe'}}>
+            <div style={{fontSize:11,color:'#93c5fd',marginBottom:4}}>↳ แท็บย่อย: มูลค่าเสียหาย</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {DMG_SUBTAB_LIST.map(({k,v})=><button key={k} onClick={()=>setNu({...nu,tab_perms:{...nu.tab_perms,[k]:nu.tab_perms[k]===false?true:false}})} style={{padding:'4px 10px',borderRadius:20,border:`1.5px solid ${nu.tab_perms[k]!==false?'#3b82f6':'#e2e8f0'}`,background:nu.tab_perms[k]!==false?'#eff6ff':'#fff',color:nu.tab_perms[k]!==false?'#2563eb':'#94a3b8',fontSize:12,cursor:'pointer'}}>{v} {nu.tab_perms[k]!==false?'✓':'✗'}</button>)}
+            </div>
+          </div>}
         </div>}
         <div style={{display:'flex',gap:8}}>
           <button onClick={addUser} style={{padding:'8px 20px',background:'#0f766e',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer'}}>เพิ่ม</button>
@@ -4779,7 +4801,7 @@ window.__dataReady.then(data => {
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
         {tab==='overview'&&<OverviewTab year={year}/>}
         {tab==='compare'&&<YearCompareTab/>}
-        {tab==='damage'&&<DamageDetailTab/>}
+        {tab==='damage'&&<DamageDetailTab currentUser={currentUser}/>}
         {tab==='concrete'&&<ConcreteView year={year}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
