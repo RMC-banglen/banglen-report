@@ -4632,7 +4632,7 @@ window.__dataReady.then(data => {
     const EMPTY_NU={name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}};
     const [nu,setNu]=React.useState(EMPTY_NU);
     const load=()=>{db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{
-      console.log('[UserMgmt] data',data,'error',error);
+      console.log('[UserMgmt] data',data,'error',error,'ids=',(data||[]).map(r=>r.id+'/'+r.name));
       const rows=data||[];
       if(rows.length===0) rows.push({id:'admin',name:'Admin',pin:'1234',role:'admin',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}});
       setUsers(rows);setLoading(false);
