@@ -4517,7 +4517,7 @@ window.__dataReady.then(data => {
     const [error,setError]=React.useState('');
     const [loading,setLoading]=React.useState(true);
     React.useEffect(()=>{
-      db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{
+      db.from('worktrack_users').select('*').order('sort_order',{ascending:true,nullsFirst:false}).order('created_at').then(({data,error})=>{
         const rows=(data||[]).filter(u=>u.active!==false);
         if(rows.length===0) rows.push({id:'admin',name:'Admin',pin:'1234',role:'admin',permissions:{production:true,maintenance:true,raft:true}});
         setUsers(rows);setLoading(false);
@@ -4657,7 +4657,7 @@ window.__dataReady.then(data => {
     const [showAdd,setShowAdd]=React.useState(false);
     const EMPTY_NU={name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}};
     const [nu,setNu]=React.useState(EMPTY_NU);
-    const load=()=>{db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{
+    const load=()=>{db.from('worktrack_users').select('*').order('sort_order',{ascending:true,nullsFirst:false}).order('created_at').then(({data,error})=>{
       console.log('[UserMgmt] data',data,'error',error,'ids=',(data||[]).map(r=>r.id+'/'+r.name));
       const rows=data||[];
       if(rows.length===0) rows.push({id:'admin',name:'Admin',pin:'1234',role:'admin',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}});
