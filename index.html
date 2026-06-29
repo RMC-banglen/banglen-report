@@ -4528,6 +4528,15 @@ window.__dataReady.then(data => {
         else{setError('PIN ไม่ถูกต้อง');setTimeout(()=>{setPin('');setError('');},900);}
       }
     };
+    React.useEffect(()=>{
+      if(!selected) return;
+      const onKey=e=>{
+        if(e.key>='0'&&e.key<='9') pressPin(e.key);
+        else if(e.key==='Backspace') setPin(p=>p.slice(0,-1));
+      };
+      window.addEventListener('keydown',onKey);
+      return ()=>window.removeEventListener('keydown',onKey);
+    },[selected,pin,error]);
     if(loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'#64748b',fontSize:16}}>กำลังโหลด...</div>;
     return <div style={{minHeight:'100vh',background:'#f1f5f9',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
       <div style={{textAlign:'center',marginBottom:28}}>
