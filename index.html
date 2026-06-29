@@ -4643,19 +4643,21 @@ window.__dataReady.then(data => {
       await db.from('worktrack_users').insert({...nu,id:Date.now().toString()});
       setShowAdd(false);setNu(EMPTY_NU);load();
     };
-    const deleteUser=async id=>{if(!window.confirm('ลบผู้ใช้นี้?'))return;await db.from('worktrack_users').delete().eq('id',id);load();};
-    const updatePin=async(id,pin)=>{await db.from('worktrack_users').update({pin}).eq('id',id);load();};
-    const updateName=async(id,name)=>{await db.from('worktrack_users').update({name}).eq('id',id);load();};
-    const togglePerm=async(id,type,key,val)=>{
-      const u=users.find(u=>u.id===id);
-      if(type==='perm'){
-        const perms={...(u?.permissions||{}),[key]:val};
-        await db.from('worktrack_users').update({permissions:perms}).eq('id',id);
-      } else {
-        const tp={...DEFAULT_TAB_PERMS,...(u?.tab_perms||{}),[key]:val};
-        await db.from('worktrack_users').update({tab_perms:tp}).eq('id',id);
-      }
+    const upsertUser=async(id,fields)=>{
+      const u=users.find(u=>u.id===id)||{};
+      await db.from('worktrack_users').upsert({id,name:u.name||'',pin:u.pin||'',role:u.role||'editor',permissions:u.permissions||{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{})},...fields},{onConflict:'id'});
       load();
+    };
+    const deleteUser=async id=>{if(!window.confirm('ลบผู้ใช้นี้?'))return;await db.from('worktrack_users').delete().eq('id',id);load();};
+    const updatePin=async(id,pin)=>upsertUser(id,{pin});
+    const updateName=async(id,name)=>upsertUser(id,{name});
+    const togglePerm=async(id,type,key,val)=>{
+      const u=users.find(u=>u.id===id)||{};
+      if(type==='perm'){
+        upsertUser(id,{permissions:{...(u.permissions||{}),[key]:val}});
+      } else {
+        upsertUser(id,{tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{}),[key]:val}});
+      }
     };
     if(loading) return <div style={{padding:40,textAlign:'center',color:'#64748b'}}>กำลังโหลด...</div>;
     return <div style={{padding:'24px',maxWidth:800,margin:'0 auto'}}>
