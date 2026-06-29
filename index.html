@@ -4612,7 +4612,12 @@ window.__dataReady.then(data => {
     const [loading,setLoading]=React.useState(true);
     const [showAdd,setShowAdd]=React.useState(false);
     const [nu,setNu]=React.useState({name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true}});
-    const load=()=>db.from('worktrack_users').select('*').order('created_at').then(({data})=>{setUsers(data||[]);setLoading(false);});
+    const load=()=>db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{
+      console.log('[UserMgmt] data',data,'error',error);
+      const rows=data||[];
+      if(rows.length===0) rows.push({id:'admin',name:'Admin',pin:'1234',role:'admin',permissions:{production:true,maintenance:true,raft:true}});
+      setUsers(rows);setLoading(false);
+    });
     React.useEffect(load,[]);
     const addUser=async()=>{
       if(!nu.name||nu.pin.length!==4){alert('กรอกชื่อและ PIN 4 หลัก');return;}
