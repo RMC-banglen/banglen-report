@@ -2822,13 +2822,9 @@ window.__dataReady.then(data => {
 
     useEffect(()=>{ loadFromSupabase(); },[]);
 
-    const SyncBtn=()=>React.createElement('div',{style:{textAlign:'right',padding:'8px 0'}},
-      React.createElement('button',{onClick:syncFromGAS,disabled:syncing,style:{background:'#1a56db',color:'#fff',border:'none',borderRadius:6,padding:'6px 16px',cursor:'pointer',fontSize:13}},syncing?'กำลัง Sync...':'🔄 Sync จาก Google Sheet'),
-      syncMsg&&React.createElement('span',{style:{marginLeft:10,fontSize:12,color:syncMsg.startsWith('✅')?'#059669':'#c00'}},syncMsg)
-    );
     if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
-    if(err) return <div style={{padding:40,textAlign:'center',color:'#c00'}}>{err}<br/><SyncBtn/></div>;
-    if(!rows.length) return <div style={{padding:40,textAlign:'center',color:'#888'}}>ยังไม่มีข้อมูล<br/><SyncBtn/></div>;
+    if(err) return <div style={{padding:40,textAlign:'center',color:'#c00'}}>{err}</div>;
+    if(!rows.length) return <div style={{padding:40,textAlign:'center',color:'#888'}}>ยังไม่มีข้อมูล</div>;
 
     const sd=r=>String(r.sample_date||'').slice(0,10);
     const fm=r=>String(r.formula_name||'').trim();
@@ -2987,7 +2983,6 @@ window.__dataReady.then(data => {
     const strAvg=dAvg;
 
     return <div style={{padding:'24px 20px'}}>
-      <SyncBtn/>
       {/* KPI row */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:14,marginBottom:24}}>
         {[
