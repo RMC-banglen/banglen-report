@@ -4631,32 +4631,35 @@ window.__dataReady.then(data => {
     const [showAdd,setShowAdd]=React.useState(false);
     const EMPTY_NU={name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}};
     const [nu,setNu]=React.useState(EMPTY_NU);
-    const load=()=>db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{
+    const load=()=>{db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{
       console.log('[UserMgmt] data',data,'error',error);
       const rows=data||[];
       if(rows.length===0) rows.push({id:'admin',name:'Admin',pin:'1234',role:'admin',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}});
       setUsers(rows);setLoading(false);
-    });
-    React.useEffect(load,[]);
+    });};
+    React.useEffect(()=>{load();},[]);
     const addUser=async()=>{
       if(!nu.name||nu.pin.length!==4){alert('กรอกชื่อและ PIN 4 หลัก');return;}
       await db.from('worktrack_users').insert({...nu,id:Date.now().toString()});
       setShowAdd(false);setNu(EMPTY_NU);load();
     };
-    const upsertUser=async(id,fields)=>{
+    const saveUser=async(id,fields)=>{
       const u=users.find(u=>u.id===id)||{};
-      await db.from('worktrack_users').upsert({id,name:u.name||'',pin:u.pin||'',role:u.role||'editor',permissions:u.permissions||{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{})},...fields},{onConflict:'id'});
+      const {error}=await db.from('worktrack_users').update(fields).eq('id',id);
+      if(error){
+        await db.from('worktrack_users').insert({id,name:u.name||'Admin',pin:u.pin||'1234',role:u.role||'admin',permissions:u.permissions||{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{})},...fields});
+      }
       load();
     };
     const deleteUser=async id=>{if(!window.confirm('ลบผู้ใช้นี้?'))return;await db.from('worktrack_users').delete().eq('id',id);load();};
-    const updatePin=async(id,pin)=>upsertUser(id,{pin});
-    const updateName=async(id,name)=>upsertUser(id,{name});
+    const updatePin=async(id,pin)=>saveUser(id,{pin});
+    const updateName=async(id,name)=>saveUser(id,{name});
     const togglePerm=async(id,type,key,val)=>{
       const u=users.find(u=>u.id===id)||{};
       if(type==='perm'){
-        upsertUser(id,{permissions:{...(u.permissions||{}),[key]:val}});
+        saveUser(id,{permissions:{...(u.permissions||{}),[key]:val}});
       } else {
-        upsertUser(id,{tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{}),[key]:val}});
+        saveUser(id,{tab_perms:{...DEFAULT_TAB_PERMS,...(u.tab_perms||{}),[key]:val}});
       }
     };
     if(loading) return <div style={{padding:40,textAlign:'center',color:'#64748b'}}>กำลังโหลด...</div>;
