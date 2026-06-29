@@ -4111,6 +4111,30 @@ window.__dataReady.then(data => {
           setLoading(false);
         }
       });
+
+      // Realtime subscriptions
+      const channel = db.channel('worktrack-realtime')
+        .on('postgres_changes',{event:'*',schema:'public',table:'worktrack_tasks'},()=>{
+          db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setTasks(data); });
+        })
+        .on('postgres_changes',{event:'*',schema:'public',table:'worktrack_raft_parts'},()=>{
+          db.from('worktrack_raft_parts').select('*').then(({data})=>{
+            if(!data) return;
+            const rd={};
+            data.filter(p=>p.bad).forEach(p=>{ rd[`${p.raft_num}__${p.part}`]='bad'; });
+            setRaftData(rd);
+          });
+        })
+        .on('postgres_changes',{event:'*',schema:'public',table:'worktrack_raft_info'},()=>{
+          db.from('worktrack_raft_info').select('*').then(({data})=>{
+            if(!data) return;
+            const ri={};
+            data.forEach(r=>{ ri[r.raft_num]={pileType:r.pile_type,section:r.section,changing:r.changing,waiting:r.waiting,pendingType:r.pending_type,pendingSection:r.pending_section}; });
+            setRaftInfo(ri);
+          });
+        })
+        .subscribe();
+      return ()=>{ db.removeChannel(channel); };
     },[]);
 
     const getRaftStatus = (raftIdx,part) => raftData[`${raftIdx}__${part}`]||'ok';
