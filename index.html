@@ -4050,27 +4050,65 @@ window.__dataReady.then(data => {
         db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}),
         db.from('worktrack_raft_parts').select('*'),
         db.from('worktrack_raft_info').select('*'),
-      ]).then(([tRes,pRes,iRes])=>{
-        const allTasks=tRes.data||[];
-        setTasks(allTasks);
-        const activeTitles=new Set(allTasks.filter(t=>t.status!=='done').map(t=>t.title));
-        const rd={};
-        const orphans=[];
-        (pRes.data||[]).forEach(p=>{
-          if(!p.bad) return;
-          const expectedTitle=`ซ่อมแพที่ ${p.raft_num} — ${p.part}`;
-          if(activeTitles.has(expectedTitle)){
-            rd[`${p.raft_num}__${p.part}`]='bad';
-          } else {
-            orphans.push(p);
-          }
-        });
-        setRaftData(rd);
-        orphans.forEach(p=>db.from('worktrack_raft_parts').delete().eq('raft_num',p.raft_num).eq('part',p.part).then(()=>{}));
-        const ri={};
-        (iRes.data||[]).forEach(r=>{ ri[r.raft_num]={pileType:r.pile_type,section:r.section,changing:r.changing,waiting:r.waiting,pendingType:r.pending_type,pendingSection:r.pending_section}; });
-        setRaftInfo(ri);
-        setLoading(false);
+      ]).then(async ([tRes,pRes,iRes])=>{
+        let allTasks=tRes.data||[];
+        // Auto-migrate from localStorage if Supabase is empty
+        if(allTasks.length===0){
+          try{
+            const lsTasks=JSON.parse(localStorage.getItem(WT_KEY)||'[]');
+            if(lsTasks.length>0){
+              const tasksWithTs=lsTasks.map(t=>({...t,created_at:t.created_at||new Date().toISOString()}));
+              await db.from('worktrack_tasks').upsert(tasksWithTs);
+              allTasks=tasksWithTs;
+            }
+          }catch(e){}
+          try{
+            const lsRaft=JSON.parse(localStorage.getItem(RAFT_KEY)||'{}');
+            const rows=Object.entries(lsRaft).filter(([,v])=>v==='bad').map(([k])=>{
+              const [num,part]=k.split('__');
+              return {raft_num:Number(num),part,bad:true};
+            });
+            if(rows.length>0) await db.from('worktrack_raft_parts').upsert(rows);
+          }catch(e){}
+          try{
+            const lsInfo=JSON.parse(localStorage.getItem(RAFT_INFO_KEY)||'{}');
+            const rows=Object.entries(lsInfo).map(([num,v])=>({
+              raft_num:Number(num),pile_type:v.pileType||'S',section:v.section||'22',
+              changing:!!v.changing,waiting:!!v.waiting,
+              pending_type:v.pendingType||'',pending_section:v.pendingSection||'',
+              updated_at:new Date().toISOString()
+            }));
+            if(rows.length>0) await db.from('worktrack_raft_info').upsert(rows);
+          }catch(e){}
+          // Re-fetch after migration
+          const [t2,p2,i2]=await Promise.all([
+            db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}),
+            db.from('worktrack_raft_parts').select('*'),
+            db.from('worktrack_raft_info').select('*'),
+          ]);
+          allTasks=t2.data||[];
+          const finalParts=p2.data||[]; const finalInfo=i2.data||[];
+          applyData(allTasks,finalParts,finalInfo); return;
+        }
+        applyData(allTasks,pRes.data||[],iRes.data||[]);
+        function applyData(tasks,parts,infoRows){
+          setTasks(tasks);
+          const activeTitles=new Set(tasks.filter(t=>t.status!=='done').map(t=>t.title));
+          const rd={};
+          const orphans=[];
+          parts.forEach(p=>{
+            if(!p.bad) return;
+            const expectedTitle=`ซ่อมแพที่ ${p.raft_num} — ${p.part}`;
+            if(activeTitles.has(expectedTitle)) rd[`${p.raft_num}__${p.part}`]='bad';
+            else orphans.push(p);
+          });
+          setRaftData(rd);
+          orphans.forEach(p=>db.from('worktrack_raft_parts').delete().eq('raft_num',p.raft_num).eq('part',p.part).then(()=>{}));
+          const ri={};
+          infoRows.forEach(r=>{ ri[r.raft_num]={pileType:r.pile_type,section:r.section,changing:r.changing,waiting:r.waiting,pendingType:r.pending_type,pendingSection:r.pending_section}; });
+          setRaftInfo(ri);
+          setLoading(false);
+        }
       });
     },[]);
 
