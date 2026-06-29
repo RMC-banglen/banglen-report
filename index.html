@@ -4513,7 +4513,7 @@ window.__dataReady.then(data => {
     const [error,setError]=React.useState('');
     const [loading,setLoading]=React.useState(true);
     React.useEffect(()=>{
-      db.from('worktrack_users').select('*').eq('active',true).order('created_at').then(({data})=>{setUsers(data||[]);setLoading(false);});
+      db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{console.log('[users]',data,error);setUsers((data||[]).filter(u=>u.active!==false));setLoading(false);});
     },[]);
     const pressPin=d=>{
       if(error||pin.length>=4)return;
