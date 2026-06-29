@@ -4560,6 +4560,8 @@ window.__dataReady.then(data => {
   }
 
   const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'}];
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'}];
+  const DEFAULT_TAB_PERMS=Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true]));
 
   function UserCard({u,onDelete,onUpdatePin,onTogglePerm,onUpdateName}){
     const [showPin,setShowPin]=React.useState(false);
@@ -4569,6 +4571,8 @@ window.__dataReady.then(data => {
     const [nameVal,setNameVal]=React.useState(u.name);
     const roleLabel=u.role==='admin'?'ผู้ดูแลระบบ':u.role==='viewer'?'ดูอย่างเดียว':'ผู้ใช้งาน';
     const perms=u.permissions||{};
+    const tabPerms={...DEFAULT_TAB_PERMS,...(u.tab_perms||{})};
+    const isAdmin=u.role==='admin';
     return <div style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:16,padding:'16px 20px',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
       <div style={{display:'flex',alignItems:'center',gap:14}}>
         <div style={{width:48,height:48,borderRadius:'50%',background:avatarColor(u.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,fontWeight:700,color:'#fff',flexShrink:0}}>{u.name[0]}</div>
@@ -4594,14 +4598,28 @@ window.__dataReady.then(data => {
         </div>
         {u.id!=='admin'&&<button onClick={()=>onDelete(u.id)} style={{fontSize:12,padding:'5px 12px',border:'1px solid #fee2e2',borderRadius:8,background:'#fef2f2',color:'#dc2626',cursor:'pointer',flexShrink:0}}>✕ ลบ</button>}
       </div>
-      <div style={{marginTop:12,display:'flex',gap:8,flexWrap:'wrap'}}>
-        {PERM_LIST.map(({k,v})=>{
-          const has=u.role==='admin'||perms[k];
-          const disabled=u.role==='admin'||u.role==='viewer';
-          return <button key={k} onClick={()=>!disabled&&onTogglePerm(u.id,k,!perms[k])} style={{fontSize:13,padding:'6px 14px',borderRadius:20,border:`1.5px solid ${has?'#0f766e':'#e2e8f0'}`,background:has?'#f0fdf4':'#f8fafc',color:has?'#0f766e':'#94a3b8',cursor:disabled?'default':'pointer',fontWeight:600}}>
-            {v} {has?'✓':'✗'}
-          </button>;
-        })}
+      <div style={{marginTop:12}}>
+        <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',marginBottom:5}}>สิทธิ์แก้ไข (ติดตามงาน)</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {PERM_LIST.map(({k,v})=>{
+            const has=isAdmin||perms[k];
+            const disabled=isAdmin||u.role==='viewer';
+            return <button key={k} onClick={()=>!disabled&&onTogglePerm(u.id,'perm',k,!perms[k])} style={{fontSize:12,padding:'5px 12px',borderRadius:20,border:`1.5px solid ${has?'#0f766e':'#e2e8f0'}`,background:has?'#f0fdf4':'#f8fafc',color:has?'#0f766e':'#94a3b8',cursor:disabled?'default':'pointer',fontWeight:600}}>
+              {v} {has?'✓':'✗'}
+            </button>;
+          })}
+        </div>
+      </div>
+      <div style={{marginTop:10}}>
+        <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',marginBottom:5}}>หน้าที่เข้าดูได้</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {TAB_PERM_LIST.map(({k,v})=>{
+            const has=isAdmin||tabPerms[k];
+            return <button key={k} onClick={()=>!isAdmin&&onTogglePerm(u.id,'tab',k,!tabPerms[k])} style={{fontSize:12,padding:'5px 12px',borderRadius:20,border:`1.5px solid ${has?'#3b82f6':'#e2e8f0'}`,background:has?'#eff6ff':'#f8fafc',color:has?'#2563eb':'#94a3b8',cursor:isAdmin?'default':'pointer',fontWeight:600}}>
+              {v} {has?'✓':'✗'}
+            </button>;
+          })}
+        </div>
       </div>
     </div>;
   }
@@ -4611,26 +4629,33 @@ window.__dataReady.then(data => {
     const [users,setUsers]=React.useState([]);
     const [loading,setLoading]=React.useState(true);
     const [showAdd,setShowAdd]=React.useState(false);
-    const [nu,setNu]=React.useState({name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true}});
+    const EMPTY_NU={name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}};
+    const [nu,setNu]=React.useState(EMPTY_NU);
     const load=()=>db.from('worktrack_users').select('*').order('created_at').then(({data,error})=>{
       console.log('[UserMgmt] data',data,'error',error);
       const rows=data||[];
-      if(rows.length===0) rows.push({id:'admin',name:'Admin',pin:'1234',role:'admin',permissions:{production:true,maintenance:true,raft:true}});
+      if(rows.length===0) rows.push({id:'admin',name:'Admin',pin:'1234',role:'admin',permissions:{production:true,maintenance:true,raft:true},tab_perms:{...DEFAULT_TAB_PERMS}});
       setUsers(rows);setLoading(false);
     });
     React.useEffect(load,[]);
     const addUser=async()=>{
       if(!nu.name||nu.pin.length!==4){alert('กรอกชื่อและ PIN 4 หลัก');return;}
       await db.from('worktrack_users').insert({...nu,id:Date.now().toString()});
-      setShowAdd(false);setNu({name:'',pin:'',role:'editor',permissions:{production:true,maintenance:true,raft:true}});load();
+      setShowAdd(false);setNu(EMPTY_NU);load();
     };
     const deleteUser=async id=>{if(!window.confirm('ลบผู้ใช้นี้?'))return;await db.from('worktrack_users').delete().eq('id',id);load();};
     const updatePin=async(id,pin)=>{await db.from('worktrack_users').update({pin}).eq('id',id);load();};
     const updateName=async(id,name)=>{await db.from('worktrack_users').update({name}).eq('id',id);load();};
-    const togglePerm=async(id,key,val)=>{
+    const togglePerm=async(id,type,key,val)=>{
       const u=users.find(u=>u.id===id);
-      const perms={...(u?.permissions||{}),[key]:val};
-      await db.from('worktrack_users').update({permissions:perms}).eq('id',id);load();
+      if(type==='perm'){
+        const perms={...(u?.permissions||{}),[key]:val};
+        await db.from('worktrack_users').update({permissions:perms}).eq('id',id);
+      } else {
+        const tp={...DEFAULT_TAB_PERMS,...(u?.tab_perms||{}),[key]:val};
+        await db.from('worktrack_users').update({tab_perms:tp}).eq('id',id);
+      }
+      load();
     };
     if(loading) return <div style={{padding:40,textAlign:'center',color:'#64748b'}}>กำลังโหลด...</div>;
     return <div style={{padding:'24px',maxWidth:800,margin:'0 auto'}}>
@@ -4683,7 +4708,9 @@ window.__dataReady.then(data => {
     const logout=()=>{sessionStorage.removeItem('wt_user');setCurrentUser(null);};
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
-    const tabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
+    const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'}];
+    const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
         <div className="topbar__brand">
