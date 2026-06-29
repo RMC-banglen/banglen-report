@@ -4240,8 +4240,9 @@ window.__dataReady.then(data => {
     };
     const setStatus = (id,status) => {
       const task=tasks.find(t=>t.id===id);
-      setTasks(prev=>prev.map(t=>t.id===id?{...t,status}:t));
-      db.from('worktrack_tasks').update({status}).eq('id',id).then(()=>{});
+      const updates = status==='done' ? {status,stage:'เสร็จแล้ว'} : {status};
+      setTasks(prev=>prev.map(t=>t.id===id?{...t,...updates}:t));
+      db.from('worktrack_tasks').update(updates).eq('id',id).then(()=>{});
       if(status==='done'&&task&&task.title){
         if(task.title.startsWith('ซ่อมแพที่')){
           const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
