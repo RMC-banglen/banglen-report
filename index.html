@@ -4771,7 +4771,7 @@ window.__dataReady.then(data => {
     };
     const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
-    const login=user=>{sessionStorage.setItem('wt_user',JSON.stringify(user));setCurrentUser(user);};
+    const login=user=>{sessionStorage.setItem('wt_user',JSON.stringify(user));setCurrentUser(user);setTab(getFirstTab(user));};
     const logout=()=>{sessionStorage.removeItem('wt_user');setCurrentUser(null);};
     React.useEffect(()=>{
       if(!currentUser) return;
