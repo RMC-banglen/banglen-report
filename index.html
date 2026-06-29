@@ -4030,38 +4030,79 @@ window.__dataReady.then(data => {
   const PILE_I_SEC = PILE_SEC;
 
   function WorkTrackTab(){
-    const loadTasks = () => { try{ return JSON.parse(localStorage.getItem(WT_KEY)||'[]'); }catch{ return []; } };
-    const [tasks,setTasks]   = React.useState(loadTasks);
+    const db = React.useMemo(()=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY),[]);
+    const [loading,setLoading] = React.useState(true);
+    const [tasks,setTasks]   = React.useState([]);
     const [dept,setDept]     = React.useState('production');
     const [typeFilter,setTypeFilter] = React.useState('ALL');
     const [showForm,setShowForm]     = React.useState(false);
     const [editTask,setEditTask]     = React.useState(null);
     const [form,setForm]     = React.useState({title:'',type:'',dept:'production',status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''});
 
-    const loadRaft = () => { try{ return JSON.parse(localStorage.getItem(RAFT_KEY)||'{}'); }catch{ return {}; } };
-    const [raftData,setRaftData] = React.useState(loadRaft);
-    const toggleRaftPart = (raftIdx,part) => {
-      setRaftData(prev => {
-        const key = `${raftIdx}__${part}`;
-        const next = {...prev,[key]: prev[key]==='bad'?'ok':'bad'};
-        localStorage.setItem(RAFT_KEY,JSON.stringify(next));
-        return next;
-      });
-    };
-    const getRaftStatus = (raftIdx,part) => raftData[`${raftIdx}__${part}`]||'ok';
-
-    const loadRaftInfo = () => { try{ return JSON.parse(localStorage.getItem(RAFT_INFO_KEY)||'{}'); }catch{ return {}; } };
-    const [raftInfo,setRaftInfo] = React.useState(loadRaftInfo);
+    const [raftData,setRaftData] = React.useState({});
+    const [raftInfo,setRaftInfo] = React.useState({});
     const [raftChangeModal,setRaftChangeModal] = React.useState(null);
     const [raftChangeForm,setRaftChangeForm] = React.useState({pileType:'S',section:'22'});
+
+    // Load all from Supabase on mount
+    React.useEffect(()=>{
+      Promise.all([
+        db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}),
+        db.from('worktrack_raft_parts').select('*'),
+        db.from('worktrack_raft_info').select('*'),
+      ]).then(([tRes,pRes,iRes])=>{
+        setTasks(tRes.data||[]);
+        const rd={};
+        (pRes.data||[]).forEach(p=>{ if(p.bad) rd[`${p.raft_num}__${p.part}`]='bad'; });
+        setRaftData(rd);
+        const ri={};
+        (iRes.data||[]).forEach(r=>{ ri[r.raft_num]={pileType:r.pile_type,section:r.section,changing:r.changing,waiting:r.waiting,pendingType:r.pending_type,pendingSection:r.pending_section}; });
+        setRaftInfo(ri);
+        setLoading(false);
+      });
+    },[]);
+
+    const getRaftStatus = (raftIdx,part) => raftData[`${raftIdx}__${part}`]||'ok';
+
     const RAFT_SPECIAL = {4:{customLabel:'เลนเดี่ยว',noChange:true}};
     const getRaftInfo = num => ({pileType:'S',section:'22',changing:false,waiting:num===9,...(RAFT_SPECIAL[num]||{}),...(raftInfo[num]||{})});
-    const updateRaftInfo = (num,updates) => setRaftInfo(prev=>{
-      const cur={pileType:'S',section:'22',changing:false,...(prev[num]||{})};
-      const next={...prev,[num]:{...cur,...updates}};
-      localStorage.setItem(RAFT_INFO_KEY,JSON.stringify(next));
-      return next;
-    });
+
+    // Raft part helpers
+    const toggleRaftPart = (raftIdx,part) => {
+      const key=`${raftIdx}__${part}`;
+      const isBad=raftData[key]==='bad';
+      setRaftData(prev=>{ const next={...prev}; if(isBad) delete next[key]; else next[key]='bad'; return next; });
+      if(isBad) db.from('worktrack_raft_parts').delete().eq('raft_num',raftIdx).eq('part',part).then(()=>{});
+      else db.from('worktrack_raft_parts').upsert({raft_num:raftIdx,part,bad:true}).then(()=>{});
+    };
+    const clearRaftPart = (num,part) => {
+      setRaftData(prev=>{ const next={...prev}; delete next[`${num}__${part}`]; return next; });
+      db.from('worktrack_raft_parts').delete().eq('raft_num',num).eq('part',part).then(()=>{});
+    };
+    const clearAllRaftParts = (num) => {
+      setRaftData(prev=>{ const next={...prev}; RAFT_PARTS.forEach(p=>delete next[`${num}__${p}`]); return next; });
+      db.from('worktrack_raft_parts').delete().eq('raft_num',num).then(()=>{});
+    };
+
+    // Raft info helper
+    const updateRaftInfo = (num,updates) => {
+      let merged;
+      setRaftInfo(prev=>{
+        const cur={pileType:'S',section:'22',changing:false,waiting:false,...(prev[num]||{})};
+        merged={...cur,...updates};
+        return {...prev,[num]:merged};
+      });
+      setTimeout(()=>{
+        if(!merged) return;
+        db.from('worktrack_raft_info').upsert({
+          raft_num:num, pile_type:merged.pileType, section:merged.section,
+          changing:!!merged.changing, waiting:!!merged.waiting,
+          pending_type:merged.pendingType||'', pending_section:merged.pendingSection||'',
+          updated_at:new Date().toISOString()
+        }).then(()=>{});
+      },0);
+    };
+
     const openRaftChange = num => {
       const info=getRaftInfo(num);
       setRaftChangeForm({pileType:info.pileType,section:info.section});
@@ -4072,15 +4113,14 @@ window.__dataReady.then(data => {
       const info=getRaftInfo(num);
       const oldLabel=`${info.pileType}${info.section}`;
       const newLabel=`${raftChangeForm.pileType}${raftChangeForm.section}`;
-      const newTask={id:Date.now()+'',title:`เปลี่ยนแพที่ ${num}: ${oldLabel} → ${newLabel}`,type:`เปลี่ยนแพผลิต — แพที่ ${num}`,dept:'production',status:'todo',priority:'high',pct:0,due:'',stage:'',note:''};
-      saveUpd(prev=>[newTask,...prev]);
+      const newTask={id:Date.now()+'',title:`เปลี่ยนแพที่ ${num}: ${oldLabel} → ${newLabel}`,type:`เปลี่ยนแพผลิต — แพที่ ${num}`,dept:'production',status:'todo',priority:'high',pct:0,due:'',stage:'',note:'',created_at:new Date().toISOString()};
+      setTasks(prev=>[newTask,...prev]);
+      db.from('worktrack_tasks').upsert(newTask).then(()=>{});
       updateRaftInfo(num,{changing:true,pendingType:raftChangeForm.pileType,pendingSection:raftChangeForm.section});
       setRaftChangeModal(null);
     };
 
-    const save = ts => { setTasks(ts); localStorage.setItem(WT_KEY,JSON.stringify(ts)); };
-    const saveUpd = fn => { setTasks(prev=>{ const next=fn(prev); localStorage.setItem(WT_KEY,JSON.stringify(next)); return next; }); };
-
+    // Task helpers
     const [fromRaft,setFromRaft] = React.useState(false);
     const [raftTarget,setRaftTarget] = React.useState(null);
     const openAdd = () => { setForm({title:'',type:'',dept,status:'todo',priority:'normal',pct:0,due:'',stage:'',note:''}); setEditTask(null); setFromRaft(false); setRaftTarget(null); setShowForm(true); };
@@ -4091,11 +4131,19 @@ window.__dataReady.then(data => {
     };
     const saveForm = () => {
       if(!form.title.trim()) return;
-      if(editTask){ saveUpd(prev=>prev.map(t=>t.id===editTask?{...form,id:editTask}:t)); }
-      else { saveUpd(prev=>[{...form,id:Date.now()+''},...prev]); }
+      const ts=new Date().toISOString();
+      if(editTask){
+        const updated={...form,id:editTask};
+        setTasks(prev=>prev.map(t=>t.id===editTask?updated:t));
+        db.from('worktrack_tasks').upsert(updated).then(()=>{});
+      } else {
+        const newTask={...form,id:Date.now()+'',created_at:ts};
+        setTasks(prev=>[newTask,...prev]);
+        db.from('worktrack_tasks').upsert(newTask).then(()=>{});
+      }
       setShowForm(false);
       if(fromRaft){
-        if(raftTarget) toggleRaftPart(raftTarget.num, raftTarget.part);
+        if(raftTarget) toggleRaftPart(raftTarget.num,raftTarget.part);
         setDept('production'); setFromRaft(false); setRaftTarget(null);
       }
     };
@@ -4105,39 +4153,32 @@ window.__dataReady.then(data => {
       if(task&&task.title){
         if(task.title.startsWith('ซ่อมแพที่')){
           const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
-          if(m){ const num=Number(m[1]),part=m[2].trim(); setRaftData(prev=>{ const next={...prev}; delete next[`${num}__${part}`]; localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; }); }
+          if(m) clearRaftPart(Number(m[1]),m[2].trim());
         }
         if(task.title.startsWith('เปลี่ยนแพที่')){
           const m=task.title.match(/เปลี่ยนแพที่\s*(\d+):/);
-          if(m){ const num=Number(m[1]); updateRaftInfo(num,{changing:false,pendingType:undefined,pendingSection:undefined}); setRaftData(prev=>{ const next={...prev}; RAFT_PARTS.forEach(p=>delete next[`${num}__${p}`]); localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; }); }
+          if(m){ const num=Number(m[1]); updateRaftInfo(num,{changing:false,pendingType:'',pendingSection:''}); clearAllRaftParts(num); }
         }
       }
-      saveUpd(prev=>prev.filter(t=>t.id!==id));
+      setTasks(prev=>prev.filter(t=>t.id!==id));
+      db.from('worktrack_tasks').delete().eq('id',id).then(()=>{});
     };
     const setStatus = (id,status) => {
-      saveUpd(prev=>prev.map(t=>t.id===id?{...t,status}:t));
-      if(status==='done'){
-        const task=tasks.find(t=>t.id===id);
-        if(task&&task.title){
-          if(task.title.startsWith('ซ่อมแพที่')){
-            const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
-            if(m){
-              const num=Number(m[1]),part=m[2].trim();
-              setRaftData(prev=>{ const next={...prev}; delete next[`${num}__${part}`]; localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; });
-            }
-          }
-          if(task.title.startsWith('เปลี่ยนแพที่')){
-            const m=task.title.match(/เปลี่ยนแพที่\s*(\d+):/);
-            if(m){
-              const num=Number(m[1]);
-              setRaftInfo(prev=>{
-                const cur={pileType:'S',section:'22',changing:false,...(prev[num]||{})};
-                const next={...prev,[num]:{...cur,pileType:cur.pendingType||cur.pileType,section:cur.pendingSection||cur.section,changing:false,pendingType:undefined,pendingSection:undefined}};
-                localStorage.setItem(RAFT_INFO_KEY,JSON.stringify(next));
-                return next;
-              });
-              setRaftData(prev=>{ const next={...prev}; RAFT_PARTS.forEach(p=>delete next[`${num}__${p}`]); localStorage.setItem(RAFT_KEY,JSON.stringify(next)); return next; });
-            }
+      const task=tasks.find(t=>t.id===id);
+      setTasks(prev=>prev.map(t=>t.id===id?{...t,status}:t));
+      db.from('worktrack_tasks').update({status}).eq('id',id).then(()=>{});
+      if(status==='done'&&task&&task.title){
+        if(task.title.startsWith('ซ่อมแพที่')){
+          const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
+          if(m) clearRaftPart(Number(m[1]),m[2].trim());
+        }
+        if(task.title.startsWith('เปลี่ยนแพที่')){
+          const m=task.title.match(/เปลี่ยนแพที่\s*(\d+):/);
+          if(m){
+            const num=Number(m[1]);
+            const info=getRaftInfo(num);
+            updateRaftInfo(num,{pileType:info.pendingType||info.pileType,section:info.pendingSection||info.section,changing:false,pendingType:'',pendingSection:''});
+            clearAllRaftParts(num);
           }
         }
       }
@@ -4158,6 +4199,7 @@ window.__dataReady.then(data => {
       return pd!==0 ? pd : (b.pct||0)-(a.pct||0);
     });
 
+    if(loading) return <div style={{padding:'60px',textAlign:'center',color:'#64748b',fontSize:16}}>⏳ กำลังโหลดข้อมูล...</div>;
     return <div style={{padding:'20px 24px',minHeight:600}}>
       {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}}>
