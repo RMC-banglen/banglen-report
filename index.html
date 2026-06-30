@@ -4478,10 +4478,10 @@ window.__dataReady.then(data => {
                 </div>}
                 {t.note&&<div style={{fontSize:15,color:'#64748b',marginTop:6,lineHeight:1.7}}>{t.note}</div>}
                 <div style={{marginTop:12,display:'flex',alignItems:'center',gap:10}} onClick={e=>e.stopPropagation()}>
-                  <div style={{flex:1,height:12,background:'#e2e8f0',borderRadius:6,overflow:'hidden'}}>
-                    <div style={{height:'100%',borderRadius:6,background:t.pct>=100?'#16a34a':t.pct>=50?'#0f766e':'#0369a1',width:`${t.pct||0}%`,transition:'width .3s'}}/>
+                  {(()=>{const dp=t.status==='done'?100:(t.pct||0);return<><div style={{flex:1,height:12,background:'#e2e8f0',borderRadius:6,overflow:'hidden'}}>
+                    <div style={{height:'100%',borderRadius:6,background:dp>=100?'#16a34a':dp>=50?'#0f766e':'#0369a1',width:`${dp}%`,transition:'width .3s'}}/>
                   </div>
-                  <span style={{fontSize:17,fontWeight:800,color:'#0f766e',flexShrink:0,minWidth:40}}>{t.pct||0}%</span>
+                  <span style={{fontSize:17,fontWeight:800,color:'#0f766e',flexShrink:0,minWidth:40}}>{dp}%</span></>;})()
                 </div>
               </div>
               {/* Right */}
