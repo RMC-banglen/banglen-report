@@ -4747,8 +4747,8 @@ window.__dataReady.then(data => {
         </table>
       </div>
       {/* Modal */}
-      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setShowForm(false)}>
-        <div style={{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bdDown=true;}} onClick={e=>{if(e.currentTarget._bdDown){e.currentTarget._bdDown=false;setShowForm(false);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
           <div style={{fontSize:18,fontWeight:800,color:'#1e293b',marginBottom:20}}>{editId?'✏️ แก้ไขรายการ':'➕ เพิ่มเครื่องมือ'}</div>
           {[{label:'ชื่อเครื่องมือ *',key:'name',ph:'เช่น เวอร์เนียร์ #1'},{label:'ผู้รับผิดชอบ',key:'responsible',ph:'ชื่อผู้รับผิดชอบ'},{label:'หมายเหตุ',key:'note',ph:'รายละเอียดเพิ่มเติม'}].map(f=><div key={f.key} style={{marginBottom:14}}>
             <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>{f.label}</label>
