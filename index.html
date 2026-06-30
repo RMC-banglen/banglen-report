@@ -4572,7 +4572,7 @@ window.__dataReady.then(data => {
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
   const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'}];
-  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'}];
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'Cal เครื่องมือ'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
@@ -4653,6 +4653,137 @@ window.__dataReady.then(data => {
           </div>
         </div>}
       </div>
+    </div>;
+  }
+
+  function CalibrationTab({currentUser}){
+    const db=DB;
+    const EMPTY={name:'',category:'เครื่องวัด',interval_type:'month',interval_value:12,last_cal_date:'',responsible:'',note:''};
+    const CATS=['เครื่องวัด','เครื่องมือกล','ยานพาหนะ','อุปกรณ์ความปลอดภัย','อื่นๆ'];
+    const [items,setItems]=useState([]);
+    const [loading,setLoading]=useState(true);
+    const [showForm,setShowForm]=useState(false);
+    const [editId,setEditId]=useState(null);
+    const [form,setForm]=useState(EMPTY);
+    const [filterCat,setFilterCat]=useState('ALL');
+    const [filterSt,setFilterSt]=useState('ALL');
+    useEffect(()=>{db.from('calibration_items').select('*').order('name').then(({data})=>{setItems(data||[]);setLoading(false);});},[]);
+    const calcNext=(last,type,val)=>{if(!last)return null;const d=new Date(last);if(type==='day')d.setDate(d.getDate()+val);else if(type==='month')d.setMonth(d.getMonth()+val);else d.setFullYear(d.getFullYear()+val);return d.toISOString().slice(0,10);};
+    const daysUntil=next=>{if(!next)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(next)-t)/(864e5));};
+    const getSt=item=>{const d=daysUntil(item.next_cal_date);if(d===null)return'unset';if(d<0)return'overdue';if(d<=30)return'soon';return'ok';};
+    const SI={overdue:{label:'เกินกำหนด',color:'#dc2626',bg:'#fef2f2',bdr:'#fca5a5'},soon:{label:'ใกล้ถึงกำหนด',color:'#d97706',bg:'#fffbeb',bdr:'#fde68a'},ok:{label:'ปกติ',color:'#16a34a',bg:'#f0fdf4',bdr:'#86efac'},unset:{label:'ไม่ระบุ',color:'#94a3b8',bg:'#f8fafc',bdr:'#e2e8f0'}};
+    const fmtDate=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return`${p[2]}/${p[1]}/${Number(p[0])+543}`;};
+    const intLabel=item=>{const n=item.interval_value,t=item.interval_type;return t==='day'?`ทุก ${n} วัน`:t==='month'?`ทุก ${n} เดือน`:`ทุก ${n} ปี`;};
+    const canEdit=currentUser?.role==='admin'||currentUser?.role==='editor';
+    const handleSave=async()=>{
+      const next=calcNext(form.last_cal_date,form.interval_type,Number(form.interval_value));
+      const row={...form,interval_value:Number(form.interval_value),next_cal_date:next,updated_at:new Date().toISOString()};
+      if(editId){await db.from('calibration_items').update(row).eq('id',editId);setItems(prev=>prev.map(x=>x.id===editId?{...x,...row}:x));}
+      else{const{data}=await db.from('calibration_items').insert({...row,created_at:new Date().toISOString()}).select().single();if(data)setItems(prev=>[...prev,data]);}
+      setShowForm(false);setEditId(null);setForm(EMPTY);
+    };
+    const handleDel=async id=>{if(!confirm('ลบรายการนี้?'))return;await db.from('calibration_items').delete().eq('id',id);setItems(prev=>prev.filter(x=>x.id!==id));};
+    const openEdit=item=>{setForm({name:item.name,category:item.category||'เครื่องวัด',interval_type:item.interval_type||'month',interval_value:item.interval_value||12,last_cal_date:item.last_cal_date||'',responsible:item.responsible||'',note:item.note||''});setEditId(item.id);setShowForm(true);};
+    const allCats=[...new Set(items.map(x=>x.category).filter(Boolean))];
+    const counts={total:items.length,overdue:items.filter(x=>getSt(x)==='overdue').length,soon:items.filter(x=>getSt(x)==='soon').length,ok:items.filter(x=>getSt(x)==='ok').length};
+    const filtered=[...items].filter(x=>filterCat==='ALL'||x.category===filterCat).filter(x=>filterSt==='ALL'||getSt(x)===filterSt).sort((a,b)=>({overdue:0,soon:1,unset:2,ok:3}[getSt(a)]??2)-({overdue:0,soon:1,unset:2,ok:3}[getSt(b)]??2));
+    const inp={width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:14,outline:'none',boxSizing:'border-box'};
+    if(loading)return<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>กำลังโหลด...</div>;
+    return<div style={{padding:'24px 0'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
+        <div><div style={{fontSize:22,fontWeight:800,color:'#1e293b'}}>🔧 ตารางงาน Calibration เครื่องมือ</div>
+          <div style={{fontSize:13,color:'#64748b',marginTop:2}}>ติดตามรอบการสอบเทียบเครื่องมือทั้งหมด</div></div>
+        {canEdit&&<button onClick={()=>{setForm(EMPTY);setEditId(null);setShowForm(true);}} style={{padding:'10px 20px',borderRadius:10,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>+ เพิ่มเครื่องมือ</button>}
+      </div>
+      {/* Summary Cards */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:12,marginBottom:24}}>
+        {[{label:'ทั้งหมด',val:counts.total,stKey:'ALL',color:'#2f5fd0',bg:'#eef3fc',bdr:'#bfdbfe'},{label:'เกินกำหนด',val:counts.overdue,stKey:'overdue',color:'#dc2626',bg:'#fef2f2',bdr:'#fca5a5'},{label:'ใกล้ถึงกำหนด',val:counts.soon,stKey:'soon',color:'#d97706',bg:'#fffbeb',bdr:'#fde68a'},{label:'ปกติ',val:counts.ok,stKey:'ok',color:'#16a34a',bg:'#f0fdf4',bdr:'#86efac'}].map(c=>(
+          <div key={c.label} onClick={()=>setFilterSt(filterSt===c.stKey?'ALL':c.stKey)} style={{background:c.bg,border:`2px solid ${filterSt===c.stKey?c.color:c.bdr}`,borderRadius:14,padding:'16px 18px',cursor:'pointer',transition:'border .2s'}}>
+            <div style={{fontSize:13,fontWeight:600,color:c.color,marginBottom:6}}>{c.label}</div>
+            <div style={{fontSize:40,fontWeight:900,color:'#1e293b',lineHeight:1}}>{c.val}</div>
+            <div style={{fontSize:12,color:'#94a3b8',marginTop:4}}>รายการ</div>
+          </div>
+        ))}
+      </div>
+      {/* Category Filter */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16,alignItems:'center'}}>
+        <span style={{fontSize:13,color:'#64748b',fontWeight:600}}>หมวดหมู่:</span>
+        {['ALL',...allCats].map(c=><button key={c} onClick={()=>setFilterCat(c)} style={{padding:'5px 14px',borderRadius:20,border:`1.5px solid ${filterCat===c?'#2f5fd0':'#e2e8f0'}`,background:filterCat===c?'#2f5fd0':'#fff',color:filterCat===c?'#fff':'#334155',fontSize:13,fontWeight:filterCat===c?700:400,cursor:'pointer'}}>{c==='ALL'?'ทั้งหมด':c}</button>)}
+      </div>
+      {/* Table */}
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+          <thead><tr style={{background:'#f8fafc'}}>
+            {['เครื่องมือ','หมวด','รอบ Cal','Cal ล่าสุด','ครั้งถัดไป','สถานะ','ผู้รับผิดชอบ',''].map((h,i)=><th key={i} style={{padding:'12px '+(i===0?'16px':'8px'),textAlign:i===0?'left':'center',color:'#64748b',fontWeight:600,borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {filtered.length===0&&<tr><td colSpan={8} style={{padding:32,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีรายการ — กด "+ เพิ่มเครื่องมือ" เพื่อเริ่ม</td></tr>}
+            {filtered.map((item,i)=>{
+              const st=getSt(item),si=SI[st],days=daysUntil(item.next_cal_date);
+              return<tr key={item.id} style={{background:i%2===0?'#fff':'#fafafa',borderLeft:`4px solid ${si.bdr}`}}>
+                <td style={{padding:'12px 16px',fontWeight:600,color:'#1e293b'}}>
+                  {item.name}
+                  {item.note&&<div style={{fontSize:12,color:'#94a3b8',fontWeight:400,marginTop:2}}>{item.note}</div>}
+                </td>
+                <td style={{padding:'12px 8px',textAlign:'center'}}><span style={{fontSize:12,padding:'3px 10px',borderRadius:12,background:'#f1f5f9',color:'#475569',fontWeight:600}}>{item.category||'–'}</span></td>
+                <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',whiteSpace:'nowrap'}}>{intLabel(item)}</td>
+                <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',whiteSpace:'nowrap'}}>{fmtDate(item.last_cal_date)}</td>
+                <td style={{padding:'12px 8px',textAlign:'center',fontWeight:600,whiteSpace:'nowrap',color:st==='overdue'?'#dc2626':st==='soon'?'#d97706':'#475569'}}>{fmtDate(item.next_cal_date)}</td>
+                <td style={{padding:'12px 8px',textAlign:'center',whiteSpace:'nowrap'}}>
+                  <span style={{fontSize:12,padding:'4px 12px',borderRadius:12,background:si.bg,color:si.color,fontWeight:700,border:`1px solid ${si.bdr}`}}>
+                    {st==='overdue'&&days!==null?`เกิน ${Math.abs(days)} วัน`:st==='soon'?`อีก ${days} วัน`:si.label}
+                  </span>
+                </td>
+                <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',fontSize:13}}>{item.responsible||'–'}</td>
+                <td style={{padding:'12px 8px',textAlign:'center'}}>
+                  {canEdit&&<div style={{display:'flex',gap:6,justifyContent:'center'}}>
+                    <button onClick={()=>openEdit(item)} style={{fontSize:12,padding:'5px 12px',borderRadius:8,border:'1px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer'}}>แก้ไข</button>
+                    <button onClick={()=>handleDel(item.id)} style={{fontSize:12,padding:'5px 12px',borderRadius:8,border:'1px solid #fecaca',background:'#fff',color:'#dc2626',cursor:'pointer'}}>ลบ</button>
+                  </div>}
+                </td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+      {/* Modal */}
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setShowForm(false)}>
+        <div style={{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:18,fontWeight:800,color:'#1e293b',marginBottom:20}}>{editId?'✏️ แก้ไขรายการ':'➕ เพิ่มเครื่องมือ'}</div>
+          {[{label:'ชื่อเครื่องมือ *',key:'name',ph:'เช่น เวอร์เนียร์ #1'},{label:'ผู้รับผิดชอบ',key:'responsible',ph:'ชื่อผู้รับผิดชอบ'},{label:'หมายเหตุ',key:'note',ph:'รายละเอียดเพิ่มเติม'}].map(f=><div key={f.key} style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>{f.label}</label>
+            <input value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})} placeholder={f.ph} style={inp}/>
+          </div>)}
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>หมวดหมู่</label>
+            <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} style={{...inp,background:'#fff'}}>
+              {CATS.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>รอบการ Cal</label>
+            <div style={{display:'flex',gap:8}}>
+              <input type="number" min={1} value={form.interval_value} onChange={e=>setForm({...form,interval_value:e.target.value})} style={{width:90,padding:'10px 12px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:14}}/>
+              <select value={form.interval_type} onChange={e=>setForm({...form,interval_type:e.target.value})} style={{flex:1,padding:'10px 12px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:14,background:'#fff'}}>
+                <option value="day">วัน</option>
+                <option value="month">เดือน</option>
+                <option value="year">ปี</option>
+              </select>
+            </div>
+          </div>
+          <div style={{marginBottom:20}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>วันที่ Cal ล่าสุด</label>
+            <input type="date" value={form.last_cal_date} onChange={e=>setForm({...form,last_cal_date:e.target.value})} style={inp}/>
+            {form.last_cal_date&&<div style={{fontSize:12,color:'#0369a1',marginTop:6,background:'#e0f2fe',padding:'6px 10px',borderRadius:6}}>
+              📅 ครั้งถัดไป: <b>{fmtDate(calcNext(form.last_cal_date,form.interval_type,Number(form.interval_value)))}</b>
+            </div>}
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>{setShowForm(false);setEditId(null);}} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={handleSave} disabled={!form.name} style={{padding:'10px 20px',borderRadius:8,border:'none',background:form.name?'#2f5fd0':'#94a3b8',color:'#fff',fontSize:14,fontWeight:700,cursor:form.name?'pointer':'default'}}>บันทึก</button>
+          </div>
+        </div>
+      </div>}
     </div>;
   }
 
@@ -4800,7 +4931,7 @@ window.__dataReady.then(data => {
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
     const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
-    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'}];
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'Cal เครื่องมือ'}];
     const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
@@ -4833,6 +4964,7 @@ window.__dataReady.then(data => {
         {tab==='damage'&&<DamageDetailTab currentUser={currentUser}/>}
         {tab==='concrete'&&<ConcreteView year={year}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
+        {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
