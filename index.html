@@ -4659,7 +4659,7 @@ window.__dataReady.then(data => {
   function CalibrationTab({currentUser}){
     const db=DB;
     const EMPTY={name:'',category:'เครื่องวัด',interval_type:'month',interval_value:12,last_cal_date:'',responsible:'',note:''};
-    const CATS=['เครื่องวัด','เครื่องมือกล','ยานพาหนะ','อุปกรณ์ความปลอดภัย','อื่นๆ'];
+    const CATS=['เครื่องวัด','เครื่องมือกล','ยานพาหนะ','อุปกรณ์ความปลอดภัย','เปลี่ยนเมื่อชำรุด','อื่นๆ'];
     const [items,setItems]=useState([]);
     const [loading,setLoading]=useState(true);
     const [showForm,setShowForm]=useState(false);
