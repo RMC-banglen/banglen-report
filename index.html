@@ -4931,7 +4931,7 @@ window.__dataReady.then(data => {
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
     const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
-    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'PM เครื่องมือ'}];
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'}];
     const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
