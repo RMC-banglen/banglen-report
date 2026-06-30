@@ -3267,7 +3267,7 @@ window.__dataReady.then(data => {
       setPendingFiles([]); setPreviewUrls([]); setShowForm(true);
     }
 
-    function closeForm(){setShowForm(false);setEditId(null);setPendingFiles([]);setPreviewUrls([]);}
+    function closeForm(){setShowForm(false);setEditId(null);setPendingFiles([]);setPreviewUrls([]);if(prevSubTab){setSubTab(prevSubTab);setPrevSubTab(null);}}
 
     const ceYear=selYear-543;
     const allYearReps=reports.filter(r=>new Date(r.report_date).getFullYear()===ceYear);
