@@ -4719,20 +4719,24 @@ window.__dataReady.then(data => {
           <tbody>
             {filtered.length===0&&<tr><td colSpan={8} style={{padding:32,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีรายการ — กด "+ เพิ่มเครื่องมือ" เพื่อเริ่ม</td></tr>}
             {filtered.map((item,i)=>{
-              const st=getSt(item),si=SI[st],days=daysUntil(item.next_cal_date);
-              return<tr key={item.id} style={{background:i%2===0?'#fff':'#fafafa',borderLeft:`4px solid ${si.bdr}`}}>
+              const isBroken=item.category==='เปลี่ยนเมื่อชำรุด';
+              const st=isBroken?'ok':getSt(item),si=SI[st],days=daysUntil(item.next_cal_date);
+              const rowBdr=isBroken?'#cbd5e1':si.bdr;
+              return<tr key={item.id} style={{background:i%2===0?'#fff':'#fafafa',borderLeft:`4px solid ${rowBdr}`}}>
                 <td style={{padding:'12px 16px',fontWeight:600,color:'#1e293b'}}>
                   {item.name}
                   {item.note&&<div style={{fontSize:12,color:'#94a3b8',fontWeight:400,marginTop:2}}>{item.note}</div>}
                 </td>
                 <td style={{padding:'12px 8px',textAlign:'center'}}><span style={{fontSize:12,padding:'3px 10px',borderRadius:12,background:'#f1f5f9',color:'#475569',fontWeight:600}}>{item.category||'–'}</span></td>
-                <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',whiteSpace:'nowrap'}}>{intLabel(item)}</td>
+                <td style={{padding:'12px 8px',textAlign:'center',color:'#94a3b8',whiteSpace:'nowrap'}}>{isBroken?'–':intLabel(item)}</td>
                 <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',whiteSpace:'nowrap'}}>{fmtDate(item.last_cal_date)}</td>
-                <td style={{padding:'12px 8px',textAlign:'center',fontWeight:600,whiteSpace:'nowrap',color:st==='overdue'?'#dc2626':st==='soon'?'#d97706':'#475569'}}>{fmtDate(item.next_cal_date)}</td>
+                <td style={{padding:'12px 8px',textAlign:'center',fontWeight:600,whiteSpace:'nowrap',color:'#94a3b8'}}>{isBroken?'–':fmtDate(item.next_cal_date)}</td>
                 <td style={{padding:'12px 8px',textAlign:'center',whiteSpace:'nowrap'}}>
-                  <span style={{fontSize:12,padding:'4px 12px',borderRadius:12,background:si.bg,color:si.color,fontWeight:700,border:`1px solid ${si.bdr}`}}>
-                    {st==='overdue'&&days!==null?`เกิน ${Math.abs(days)} วัน`:st==='soon'?`อีก ${days} วัน`:si.label}
-                  </span>
+                  {isBroken
+                    ?<span style={{fontSize:12,padding:'4px 12px',borderRadius:12,background:'#f1f5f9',color:'#64748b',fontWeight:700,border:'1px solid #cbd5e1'}}>ใช้งานอยู่</span>
+                    :<span style={{fontSize:12,padding:'4px 12px',borderRadius:12,background:si.bg,color:si.color,fontWeight:700,border:`1px solid ${si.bdr}`}}>
+                      {st==='overdue'&&days!==null?`เกิน ${Math.abs(days)} วัน`:st==='soon'?`อีก ${days} วัน`:si.label}
+                    </span>}
                 </td>
                 <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',fontSize:13}}>{item.responsible||'–'}</td>
                 <td style={{padding:'12px 8px',textAlign:'center'}}>
