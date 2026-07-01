@@ -3874,10 +3874,12 @@ window.__dataReady.then(data => {
     const THAI_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const THAI_M_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
     const [pending,setPending]=useState(null);
+    const [pendingHistory,setPendingHistory]=useState([]);
+    const [showPendingHist,setShowPendingHist]=useState(false);
     useEffect(()=>{
       const db=DB;
-      db.from('pending_work').select('*').order('updated_date',{ascending:false}).limit(1)
-        .then(({data})=>{ if(data&&data.length>0) setPending(data[0]); });
+      db.from('pending_work').select('*').order('updated_date',{ascending:false})
+        .then(({data})=>{ if(data&&data.length>0){setPending(data[0]);setPendingHistory(data);} });
     },[]);
     const realYears=Object.keys(D.years).map(Number).filter(y=>yearData(y).real).sort((a,b)=>b-a);
     const thisYear=realYears[0];
@@ -3941,7 +3943,16 @@ window.__dataReady.then(data => {
                 <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
                   {fmt(pending.value_m3,0)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
                 </span>
-                <span style={{fontSize:15,fontWeight:700,color:'#fff',background:'#2f5fd0',borderRadius:8,padding:'4px 14px',marginTop:12,display:'inline-block'}}>อัพเดท {(()=>{const p=String(pending.updated_date).slice(0,10).split('-');return p[2]+'/'+p[1]+'/'+(Number(p[0])+543);})()}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginTop:12,flexWrap:'wrap'}}>
+                  <span style={{fontSize:15,fontWeight:700,color:'#fff',background:'#2f5fd0',borderRadius:8,padding:'4px 14px',display:'inline-block'}}>อัพเดท {(()=>{const p=String(pending.updated_date).slice(0,10).split('-');return p[2]+'/'+p[1]+'/'+(Number(p[0])+543);})()}</span>
+                  {pendingHistory.length>1&&<button onClick={()=>setShowPendingHist(v=>!v)} style={{fontSize:13,padding:'4px 12px',borderRadius:8,border:'1px solid #bfdbfe',background:'#eff6ff',color:'#2f5fd0',cursor:'pointer',fontWeight:600}}>{showPendingHist?'▲ ซ่อน':'▼ ดูย้อนหลัง'}</button>}
+                </div>
+                {showPendingHist&&<div style={{marginTop:10,borderTop:'1px solid #e2e8f0',paddingTop:10,maxHeight:200,overflowY:'auto'}}>
+                  {pendingHistory.slice(1).map((h,i)=>{const p=String(h.updated_date).slice(0,10).split('-');const d=p[2]+'/'+p[1]+'/'+(Number(p[0])+543);return<div key={i} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #f1f5f9',fontSize:14}}>
+                    <span style={{color:'#64748b'}}>{d}</span>
+                    <span style={{fontWeight:700,color:'#1e293b'}}>{fmt(h.value_m3,0)} m³</span>
+                  </div>;})}
+                </div>}
               </>
             : <span style={{fontSize:48,color:'#cbd5e1',fontWeight:700}}>–</span>
           }
