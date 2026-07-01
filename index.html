@@ -4862,6 +4862,9 @@ window.__dataReady.then(data => {
     const rowTotal=item=>secRows.filter(r=>r.line_item===item).reduce((s,r)=>s+(r.amount||0),0);
     const colTotal=m=>secRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.amount||0),0);
     const secGrand=secRows.reduce((s,r)=>s+(r.amount||0),0);
+    const prevSecRows=prevRows.filter(r=>r.section===selSec);
+    const rowTotalPrev=item=>prevSecRows.filter(r=>r.line_item===item).reduce((s,r)=>s+(r.amount||0),0);
+    const prevSecGrand=prevSecRows.reduce((s,r)=>s+(r.amount||0),0);
 
     function openAdd(){setForm({id:null,year:selYear,section:selSec,line_item:'',sort_order:(items.length+1),amounts:{}});setShowForm(true);}
     function openEdit(item){
@@ -4961,15 +4964,17 @@ window.__dataReady.then(data => {
                 <th style={{textAlign:'left',padding:'10px 14px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',minWidth:180}}>รายการ</th>
                 {months.map(m=><th key={m} style={{textAlign:'right',padding:'10px 12px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
                 <th style={{textAlign:'right',padding:'10px 14px',color:SCOLOR[selSec],fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
+                <th style={{textAlign:'right',padding:'10px 14px',color:'#94a3b8',fontWeight:700,borderBottom:'2px solid #e2e8f0',background:'#f8fafc',whiteSpace:'nowrap'}}>รวมปี {selYear-1}</th>
                 {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
               </tr>
             </thead>
             <tbody>
-              {items.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:24,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
+              {items.length===0&&<tr><td colSpan={months.length+3+(canEdit?1:0)} style={{padding:24,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
               {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                 <td style={{padding:'8px 14px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9'}}>{it.name}</td>
                 {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'8px 12px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt2(v):'–'}</td>;})}
                 <td style={{textAlign:'right',padding:'8px 14px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc'}}>{fmt2(rowTotal(it.name))}</td>
+                <td style={{textAlign:'right',padding:'8px 14px',color:'#94a3b8',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{rowTotalPrev(it.name)?fmt2(rowTotalPrev(it.name)):'–'}</td>
                 {canEdit&&<td style={{padding:'6px 8px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                   <button onClick={()=>openEdit(it.name)} style={{padding:'2px 8px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:11,color:'#2f5fd0',marginRight:4}}>แก้</button>
                   <button onClick={()=>setConfirmDel(it.name)} style={{padding:'2px 8px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:11,color:'#dc2626'}}>ลบ</button>
@@ -4981,6 +4986,7 @@ window.__dataReady.then(data => {
                 <td style={{padding:'11px 14px',position:'sticky',left:0,background:'#f1f5f9',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>รวม {selSec}</td>
                 {months.map(m=><td key={m} style={{textAlign:'right',padding:'11px 12px',color:'#1e293b',borderTop:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{fmt2(colTotal(m))}</td>)}
                 <td style={{textAlign:'right',padding:'11px 14px',color:'#fff',background:SCOLOR[selSec],borderTop:'2px solid #e2e8f0'}}>{fmt2(secGrand)}</td>
+                <td style={{textAlign:'right',padding:'11px 14px',color:'#64748b',borderTop:'2px solid #e2e8f0'}}>{prevSecGrand?fmt2(prevSecGrand):'–'}</td>
                 {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
               </tr>
             </tfoot>
