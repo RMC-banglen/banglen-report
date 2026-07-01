@@ -4838,6 +4838,7 @@ window.__dataReady.then(data => {
     const [saving,setSaving]=useState(false);
     const [confirmDel,setConfirmDel]=useState(null);
     const [showCompare,setShowCompare]=useState(false);
+    const [period,setPeriod]=useState('year');
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     useEffect(()=>{fetch();},[]);
     function fetch(){setLoading(true);DB.from('repair_line_items').select('*').order('year').order('section').order('sort_order').order('line_item').then(({data})=>{setRows(data||[]);setLoading(false);});}
@@ -4884,6 +4885,14 @@ window.__dataReady.then(data => {
     const genTotal=secTot(yearRows,'ซ่อมรถทั่วไป'),genPrev=secTot(prevRows,'ซ่อมรถทั่วไป');
     const CAT_COMPARE=[{label:'เครื่องจักร',bang:'เครื่องจักรบางเลน',bo:'เครื่องจักรบ่อตะกั่ว'},{label:'เครนรถ',bang:'เครนรถบางเลน',bo:'เครนรถบ่อตะกั่ว'},{label:'ซ่อมรถ',bang:'ซ่อมรถบางเลน',bo:'ซ่อมรถบ่อตะกั่ว'}];
     const cmpMax=Math.max(1,...CAT_COMPARE.flatMap(c=>[secTot(yearRows,c.bang),secTot(yearRows,c.bo)]));
+
+    // ===== เทียบปีนี้ vs ปีก่อน แบบไตรมาส/ครึ่งปี/ทั้งปี =====
+    const PERIODS=[{k:'q1',label:'Q1 (ม.ค.-มี.ค.)',months:[1,2,3]},{k:'q2',label:'Q2 (เม.ย.-มิ.ย.)',months:[4,5,6]},{k:'q3',label:'Q3 (ก.ค.-ก.ย.)',months:[7,8,9]},{k:'q4',label:'Q4 (ต.ค.-ธ.ค.)',months:[10,11,12]},{k:'h1',label:'ครึ่งปีแรก (ม.ค.-มิ.ย.)',months:[1,2,3,4,5,6]},{k:'h2',label:'ครึ่งปีหลัง (ก.ค.-ธ.ค.)',months:[7,8,9,10,11,12]},{k:'year',label:'ทั้งปี',months:[1,2,3,4,5,6,7,8,9,10,11,12]}];
+    const curPeriod=PERIODS.find(p=>p.k===period)||PERIODS[6];
+    const periodTot=(data,sec)=>data.filter(r=>r.section===sec&&curPeriod.months.includes(r.month)).reduce((s,r)=>s+(r.amount||0),0);
+    const periodTotAll=data=>SECTIONS.reduce((s,sec)=>s+periodTot(data,sec),0);
+    const pThis=periodTotAll(yearRows),pPrev=periodTotAll(prevRows);
+    const pDiff=pThis-pPrev,pPct=pPrev>0?(pDiff/pPrev*100):null;
 
     return<div style={{padding:'24px 0'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
@@ -4936,6 +4945,55 @@ window.__dataReady.then(data => {
           </div>;
         })}
       </div>}
+
+      {/* เทียบปีนี้ vs ปีก่อน แบบไตรมาส/ครึ่งปี/ทั้งปี */}
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
+        <div style={{fontSize:15,fontWeight:800,color:'#1e293b',marginBottom:12}}>📊 เทียบปี {selYear} กับปี {selYear-1}</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:16}}>
+          {PERIODS.map(p=><button key={p.k} onClick={()=>setPeriod(p.k)} style={{padding:'6px 12px',border:`1.5px solid ${period===p.k?'#1e293b':'#e2e8f0'}`,borderRadius:8,background:period===p.k?'#1e293b':'#fff',color:period===p.k?'#fff':'#64748b',fontSize:12,fontWeight:700,cursor:'pointer'}}>{p.label}</button>)}
+        </div>
+        <div style={{display:'flex',gap:20,alignItems:'center',flexWrap:'wrap',justifyContent:'center',padding:'8px 0'}}>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:12,color:'#94a3b8',fontWeight:600,marginBottom:4}}>ปี {selYear-1} ({curPeriod.label})</div>
+            <div style={{fontSize:26,fontWeight:900,color:'#64748b'}}>{fmt(pPrev)} ฿</div>
+          </div>
+          <div style={{fontSize:24,color:'#cbd5e1'}}>→</div>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:12,color:'#94a3b8',fontWeight:600,marginBottom:4}}>ปี {selYear} ({curPeriod.label})</div>
+            <div style={{fontSize:26,fontWeight:900,color:'#1e293b'}}>{fmt(pThis)} ฿</div>
+          </div>
+          <div style={{background:pDiff>0?'#fef2f2':pDiff<0?'#f0fdf4':'#f1f5f9',border:`2px solid ${pDiff>0?'#fecaca':pDiff<0?'#bbf7d0':'#e2e8f0'}`,borderRadius:14,padding:'12px 24px',textAlign:'center',minWidth:170}}>
+            <div style={{fontSize:12,color:'#64748b',fontWeight:600,marginBottom:4}}>ส่วนต่าง</div>
+            <div style={{fontSize:24,fontWeight:900,color:pDiff>0?'#dc2626':pDiff<0?'#16a34a':'#64748b',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+              <span style={{fontSize:22}}>{pDiff>0?'🔺':pDiff<0?'🔻':'➖'}</span>{fmt(Math.abs(pDiff))} ฿
+            </div>
+            {pPct!=null&&<div style={{fontSize:13,fontWeight:700,color:pDiff>0?'#dc2626':pDiff<0?'#16a34a':'#64748b',marginTop:2}}>{pDiff>0?'เพิ่มขึ้น':pDiff<0?'ลดลง':'เท่าเดิม'} {Math.abs(pPct).toFixed(1)}%</div>}
+          </div>
+        </div>
+        {/* แยกตามหมวดในช่วงที่เลือก */}
+        <div style={{marginTop:18,borderTop:'1px solid #f1f5f9',paddingTop:14}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{color:'#94a3b8',fontSize:12}}>
+              <th style={{textAlign:'left',padding:'4px 8px',fontWeight:700}}>หมวด</th>
+              <th style={{textAlign:'right',padding:'4px 8px',fontWeight:700}}>ปี {selYear-1}</th>
+              <th style={{textAlign:'right',padding:'4px 8px',fontWeight:700}}>ปี {selYear}</th>
+              <th style={{textAlign:'right',padding:'4px 8px',fontWeight:700}}>ส่วนต่าง</th>
+            </tr></thead>
+            <tbody>
+              {SECTIONS.map(sec=>{
+                const th=periodTot(yearRows,sec),pv=periodTot(prevRows,sec),df=th-pv;
+                if(th===0&&pv===0)return null;
+                return<tr key={sec} style={{borderTop:'1px solid #f8fafc'}}>
+                  <td style={{padding:'7px 8px',color:'#334155',fontWeight:600}}>{sec}</td>
+                  <td style={{padding:'7px 8px',textAlign:'right',color:'#94a3b8'}}>{fmt(pv)}</td>
+                  <td style={{padding:'7px 8px',textAlign:'right',color:'#1e293b',fontWeight:700}}>{fmt(th)}</td>
+                  <td style={{padding:'7px 8px',textAlign:'right',fontWeight:700,color:df>0?'#dc2626':df<0?'#16a34a':'#94a3b8'}}>{df>0?'▲':df<0?'▼':'–'} {fmt(Math.abs(df))}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Section selector — แบ่งเป็นฝั่งบางเลน / บ่อตะกั่ว ชัดเจน */}
       <div style={{display:'flex',gap:14,marginBottom:14,flexWrap:'wrap',alignItems:'stretch'}}>
