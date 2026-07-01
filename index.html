@@ -4906,9 +4906,17 @@ window.__dataReady.then(data => {
         })}
       </div>
 
-      {/* Section selector — grouped by สถานที่ */}
+      {/* Section selector — แบ่งเป็นฝั่งบางเลน / บ่อตะกั่ว ชัดเจน */}
+      <div style={{display:'flex',gap:14,marginBottom:14,flexWrap:'wrap',alignItems:'stretch'}}>
+        {LOC_GROUPS.filter(g=>g.loc!=='ทั่วไป').map(g=><div key={g.loc} style={{flex:1,minWidth:240,background:g.bg,border:`2px solid ${g.color}30`,borderRadius:14,padding:'12px 14px'}}>
+          <div style={{fontSize:14,fontWeight:900,color:g.color,marginBottom:8}}>📍 {g.loc}</div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {g.sections.map(sec=>{const t=secTot(yearRows,sec);const active=selSec===sec;return<button key={sec} onClick={()=>setSelSec(sec)} style={{textAlign:'left',padding:'9px 14px',border:`1.5px solid ${active?g.color:g.color+'50'}`,borderRadius:10,background:active?g.color:'#fff',color:active?'#fff':g.color,fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',justifyContent:'space-between'}}><span>{shortLabel(sec,g.loc)}</span><span style={{opacity:0.85,fontWeight:600}}>{fmt(t)}</span></button>;})}
+          </div>
+        </div>)}
+      </div>
       <div style={{marginBottom:14}}>
-        {LOC_GROUPS.map(g=><div key={g.loc} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+        {LOC_GROUPS.filter(g=>g.loc==='ทั่วไป').map(g=><div key={g.loc} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <div style={{fontSize:12,fontWeight:800,color:g.color,background:g.bg,padding:'6px 12px',borderRadius:8,minWidth:76,textAlign:'center',border:`1px solid ${g.color}30`}}>{g.loc}</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {g.sections.map(sec=>{const t=secTot(yearRows,sec);return<button key={sec} onClick={()=>setSelSec(sec)} style={{padding:'8px 14px',border:`1.5px solid ${selSec===sec?g.color:g.color+'40'}`,borderRadius:10,background:selSec===sec?g.color:g.bg,color:selSec===sec?'#fff':g.color,fontSize:13,fontWeight:700,cursor:'pointer'}}>{shortLabel(sec,g.loc)} <span style={{opacity:0.85,fontWeight:600}}>({fmt(t)})</span></button>;})}
