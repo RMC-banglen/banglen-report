@@ -4836,6 +4836,7 @@ window.__dataReady.then(data => {
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({id:null,year:2569,section:'เครื่องจักรบางเลน',line_item:'',sort_order:0,amounts:{}});
     const [saving,setSaving]=useState(false);
+    const [confirmDel,setConfirmDel]=useState(null);
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     useEffect(()=>{fetch();},[]);
     function fetch(){setLoading(true);DB.from('repair_line_items').select('*').order('year').order('section').order('sort_order').order('line_item').then(({data})=>{setRows(data||[]);setLoading(false);});}
@@ -4874,7 +4875,7 @@ window.__dataReady.then(data => {
       if(ins.length)await DB.from('repair_line_items').insert(ins);
       setSaving(false);setShowForm(false);fetch();
     }
-    async function handleDelete(item){if(!confirm('ลบรายการ '+item+'?'))return;await DB.from('repair_line_items').delete().eq('year',selYear).eq('section',selSec).eq('line_item',item);fetch();}
+    async function handleDelete(item){await DB.from('repair_line_items').delete().eq('year',selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
 
     return<div style={{padding:'24px 0'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
@@ -4939,7 +4940,7 @@ window.__dataReady.then(data => {
                 <td style={{textAlign:'right',padding:'8px 14px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc'}}>{fmt2(rowTotal(it.name))}</td>
                 {canEdit&&<td style={{padding:'6px 8px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                   <button onClick={()=>openEdit(it.name)} style={{padding:'2px 8px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:11,color:'#2f5fd0',marginRight:4}}>แก้</button>
-                  <button onClick={()=>handleDelete(it.name)} style={{padding:'2px 8px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:11,color:'#dc2626'}}>ลบ</button>
+                  <button onClick={()=>setConfirmDel(it.name)} style={{padding:'2px 8px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:11,color:'#dc2626'}}>ลบ</button>
                 </td>}
               </tr>)}
             </tbody>
@@ -4973,6 +4974,17 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={handleSave} disabled={saving||!form.line_item} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:(saving||!form.line_item)?0.5:1}}>{saving?'กำลังบันทึก...':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+      {confirmDel&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setConfirmDel(null);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:360,textAlign:'center'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
+          <div style={{fontSize:16,fontWeight:700,color:'#1e293b',marginBottom:6}}>ยืนยันการลบรายการ</div>
+          <div style={{fontSize:14,color:'#64748b',marginBottom:20}}>ต้องการลบ "<b style={{color:'#1e293b'}}>{confirmDel}</b>" ({selSec} ปี {selYear}) ใช่หรือไม่? ข้อมูลทุกเดือนของรายการนี้จะถูกลบทั้งหมด</div>
+          <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+            <button onClick={()=>setConfirmDel(null)} style={{padding:'9px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={()=>handleDelete(confirmDel)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
           </div>
         </div>
       </div>}
