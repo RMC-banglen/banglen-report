@@ -4874,7 +4874,7 @@ window.__dataReady.then(data => {
       await DB.from('repair_line_items').delete().eq('year',Number(form.year)).eq('section',form.section).eq('line_item',form.line_item);
       const ins=Object.entries(form.amounts).filter(([m,v])=>Number(v)).map(([m,v])=>({year:Number(form.year),month:Number(m),section:form.section,line_item:form.line_item,sort_order:Number(form.sort_order)||0,amount:Number(v)}));
       if(ins.length)await DB.from('repair_line_items').insert(ins);
-      setSaving(false);setShowForm(false);fetch();
+      setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
     async function handleDelete(item){await DB.from('repair_line_items').delete().eq('year',selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
 
@@ -4998,8 +4998,9 @@ window.__dataReady.then(data => {
       {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowForm(false);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>{form.id?'แก้ไขรายการ':'+ เพิ่มรายการ'}</div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{form.section} · ปี {form.year}</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{form.section}</div>
           <div style={{marginBottom:12,display:'flex',gap:8}}>
+            <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ปี (พ.ศ.)</div><input type="number" value={form.year} onChange={e=>setForm(f=>({...f,year:e.target.value}))} style={inp}/></div>
             <div style={{flex:3}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อรายการ</div><input type="text" value={form.line_item} onChange={e=>setForm(f=>({...f,line_item:e.target.value}))} placeholder="เช่น แพล้นท์คอนกรีต" style={inp}/></div>
             <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ลำดับ</div><input type="number" value={form.sort_order} onChange={e=>setForm(f=>({...f,sort_order:e.target.value}))} style={inp}/></div>
           </div>
