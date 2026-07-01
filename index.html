@@ -5074,7 +5074,7 @@ window.__dataReady.then(data => {
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>{form.id?'แก้ไขรายการ':'+ เพิ่มรายการ'}</div>
           <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{form.section}</div>
           <div style={{marginBottom:12,display:'flex',gap:8}}>
-            <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ปี (พ.ศ.)</div><input type="number" value={form.year} onChange={e=>setForm(f=>({...f,year:e.target.value}))} style={inp}/></div>
+            <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ปี (พ.ศ.)</div><input type="number" value={form.year} disabled={!!form.id} onChange={e=>setForm(f=>({...f,year:e.target.value}))} style={{...inp,...(form.id?{background:'#f1f5f9',color:'#94a3b8',cursor:'not-allowed'}:{})}}/></div>
             <div style={{flex:3}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อรายการ</div><input type="text" value={form.line_item} onChange={e=>setForm(f=>({...f,line_item:e.target.value}))} placeholder="เช่น แพล้นท์คอนกรีต" style={inp}/></div>
             <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ลำดับ</div><input type="number" value={form.sort_order} onChange={e=>setForm(f=>({...f,sort_order:e.target.value}))} style={inp}/></div>
           </div>
