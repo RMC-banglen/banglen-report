@@ -4818,8 +4818,14 @@ window.__dataReady.then(data => {
 
   function RepairExpenseTab({canEdit}){
     const SECTIONS=['เครื่องจักรบางเลน','เครื่องจักรบ่อตะกั่ว','เครนรถบางเลน','เครนรถบ่อตะกั่ว','ซ่อมรถบางเลน','ซ่อมรถบ่อตะกั่ว','ซ่อมรถทั่วไป'];
-    const SCOLOR={'เครื่องจักรบางเลน':'#2f5fd0','เครื่องจักรบ่อตะกั่ว':'#0f766e','เครนรถบางเลน':'#d97706','เครนรถบ่อตะกั่ว':'#92400e','ซ่อมรถบางเลน':'#dc2626','ซ่อมรถบ่อตะกั่ว':'#9f1239','ซ่อมรถทั่วไป':'#7c3aed'};
+    const SCOLOR={'เครื่องจักรบางเลน':'#2563eb','เครื่องจักรบ่อตะกั่ว':'#0d9488','เครนรถบางเลน':'#2563eb','เครนรถบ่อตะกั่ว':'#0d9488','ซ่อมรถบางเลน':'#2563eb','ซ่อมรถบ่อตะกั่ว':'#0d9488','ซ่อมรถทั่วไป':'#7c3aed'};
     const GROUPS=[{label:'เครื่องจักร',sections:['เครื่องจักรบางเลน','เครื่องจักรบ่อตะกั่ว'],color:'#2f5fd0',bg:'#eff6ff'},{label:'เครนรถ',sections:['เครนรถบางเลน','เครนรถบ่อตะกั่ว'],color:'#d97706',bg:'#fffbeb'},{label:'ซ่อมรถ',sections:['ซ่อมรถบางเลน','ซ่อมรถบ่อตะกั่ว','ซ่อมรถทั่วไป'],color:'#dc2626',bg:'#fff1f2'}];
+    const LOC_GROUPS=[
+      {loc:'บางเลน',color:'#2563eb',bg:'#eff6ff',sections:['เครื่องจักรบางเลน','เครนรถบางเลน','ซ่อมรถบางเลน']},
+      {loc:'บ่อตะกั่ว',color:'#0d9488',bg:'#f0fdfa',sections:['เครื่องจักรบ่อตะกั่ว','เครนรถบ่อตะกั่ว','ซ่อมรถบ่อตะกั่ว']},
+      {loc:'ทั่วไป',color:'#7c3aed',bg:'#faf5ff',sections:['ซ่อมรถทั่วไป']},
+    ];
+    const shortLabel=(sec,loc)=>sec.replace(loc,'').trim()||sec;
     const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const fmt=n=>n==null||n===''||n===0?'–':Number(n).toLocaleString('th-TH',{maximumFractionDigits:0});
     const fmt2=n=>n==null||n===''?'0':Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4899,9 +4905,14 @@ window.__dataReady.then(data => {
         })}
       </div>
 
-      {/* Section selector */}
-      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
-        {SECTIONS.map(sec=>{const t=secTot(yearRows,sec);return<button key={sec} onClick={()=>setSelSec(sec)} style={{padding:'8px 14px',border:`1.5px solid ${selSec===sec?SCOLOR[sec]:'#e2e8f0'}`,borderRadius:10,background:selSec===sec?SCOLOR[sec]:'#fff',color:selSec===sec?'#fff':'#475569',fontSize:13,fontWeight:700,cursor:'pointer'}}>{sec} <span style={{opacity:0.8,fontWeight:600}}>({fmt(t)})</span></button>;})}
+      {/* Section selector — grouped by สถานที่ */}
+      <div style={{marginBottom:14}}>
+        {LOC_GROUPS.map(g=><div key={g.loc} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+          <div style={{fontSize:12,fontWeight:800,color:g.color,background:g.bg,padding:'6px 12px',borderRadius:8,minWidth:76,textAlign:'center',border:`1px solid ${g.color}30`}}>{g.loc}</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {g.sections.map(sec=>{const t=secTot(yearRows,sec);return<button key={sec} onClick={()=>setSelSec(sec)} style={{padding:'8px 14px',border:`1.5px solid ${selSec===sec?g.color:g.color+'40'}`,borderRadius:10,background:selSec===sec?g.color:g.bg,color:selSec===sec?'#fff':g.color,fontSize:13,fontWeight:700,cursor:'pointer'}}>{shortLabel(sec,g.loc)} <span style={{opacity:0.85,fontWeight:600}}>({fmt(t)})</span></button>;})}
+          </div>
+        </div>)}
       </div>
 
       {/* Pivot table */}
