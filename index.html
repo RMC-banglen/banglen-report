@@ -3154,7 +3154,7 @@ window.__dataReady.then(data => {
     useEffect(()=>{if(subTab==='kpi'){setTimeout(()=>{if(kpiReturnId){const el=document.getElementById(kpiReturnId);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});return;}}window.scrollTo({top:prevScrollY.current,behavior:'smooth'});},100);}},[subTab]);
     const [pendingFiles,setPendingFiles]=useState([]);
     const [previewUrls,setPreviewUrls]=useState([]);
-    const [form,setForm]=useState({title:'',report_date:'',type:'คุณภาพผลิตภัณฑ์',sub_type:'',sub_type_other:'',description:'',status:'open',fix_note:'',exclude_kpi:false});
+    const [form,setForm]=useState({title:'',report_date:'',type:'คุณภาพผลิตภัณฑ์',sub_type:'',sub_type_other:'',description:'',status:'open',fix_note:'',exclude_kpi:false,pile_spec:'',pile_qty:''});
     const fileRef=React.useRef(null);
     const db=DB;
 
@@ -3219,12 +3219,12 @@ window.__dataReady.then(data => {
         let repId=editId;
         if(!editId){
           const finalSubType=form.sub_type==='อื่นๆ'?(form.sub_type_other||'อื่นๆ'):form.sub_type||null;
-          const {data,error}=await db.from('quality_reports').insert({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:finalSubType,description:form.description,status:form.status,fix_note:form.fix_note,exclude_kpi:form.exclude_kpi}).select().single();
+          const {data,error}=await db.from('quality_reports').insert({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:finalSubType,description:form.description,status:form.status,fix_note:form.fix_note,exclude_kpi:form.exclude_kpi,pile_spec:form.pile_spec||null,pile_qty:form.pile_qty?Number(form.pile_qty):null}).select().single();
           if(error)throw error;
           repId=data.id;
         } else {
           const finalSubType=form.sub_type==='อื่นๆ'?(form.sub_type_other||'อื่นๆ'):form.sub_type||null;
-          const {error}=await db.from('quality_reports').update({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:finalSubType,description:form.description,status:form.status,fix_note:form.fix_note,exclude_kpi:form.exclude_kpi}).eq('id',editId);
+          const {error}=await db.from('quality_reports').update({title:form.title,customer_name:form.customer_name||null,department:form.department||null,report_date:form.report_date,type:form.type,sub_type:finalSubType,description:form.description,status:form.status,fix_note:form.fix_note,exclude_kpi:form.exclude_kpi,pile_spec:form.pile_spec||null,pile_qty:form.pile_qty?Number(form.pile_qty):null}).eq('id',editId);
           if(error)throw error;
         }
         for(const file of pendingFiles){
@@ -3256,7 +3256,7 @@ window.__dataReady.then(data => {
     function openAdd(){
       setEditId(null);
       const n=new Date();
-      setForm({title:'',customer_name:'',department:'',report_date:n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'),type:'คุณภาพผลิตภัณฑ์',sub_type:'',sub_type_other:'',description:'',status:'open',fix_note:'',exclude_kpi:false});
+      setForm({title:'',customer_name:'',department:'',report_date:n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'),type:'คุณภาพผลิตภัณฑ์',sub_type:'',sub_type_other:'',description:'',status:'open',fix_note:'',exclude_kpi:false,pile_spec:'',pile_qty:''});
       setPendingFiles([]); setPreviewUrls([]); setShowForm(true);
     }
 
@@ -3265,7 +3265,7 @@ window.__dataReady.then(data => {
       const storedSub=r.sub_type||'';
       const knownSubs=SUB_TYPES[r.type]||[];
       const isKnown=knownSubs.includes(storedSub)||storedSub==='';
-      setForm({title:r.title,customer_name:r.customer_name||'',department:r.department||'',report_date:String(r.report_date).slice(0,10),type:r.type,sub_type:isKnown?storedSub:'อื่นๆ',sub_type_other:isKnown?'':storedSub,description:r.description||'',status:r.status,fix_note:r.fix_note||'',exclude_kpi:r.exclude_kpi||false});
+      setForm({title:r.title,customer_name:r.customer_name||'',department:r.department||'',report_date:String(r.report_date).slice(0,10),type:r.type,sub_type:isKnown?storedSub:'อื่นๆ',sub_type_other:isKnown?'':storedSub,description:r.description||'',status:r.status,fix_note:r.fix_note||'',exclude_kpi:r.exclude_kpi||false,pile_spec:r.pile_spec||'',pile_qty:r.pile_qty||''});
       setPendingFiles([]); setPreviewUrls([]); setShowForm(true);
     }
 
@@ -3373,6 +3373,7 @@ window.__dataReady.then(data => {
                 <span style={{fontSize:15,padding:'4px 12px',borderRadius:6,background:TB[r.type]||'#f1f5f9',color:TC[r.type]||'#64748b',fontWeight:600}}>{r.type}{r.sub_type?<span style={{fontWeight:400,opacity:0.8}}> › {r.sub_type}</span>:null}</span>
                 {r.customer_name&&<span style={{fontSize:15,padding:'4px 12px',borderRadius:6,background:'#f1f5f9',color:'#334155',fontWeight:600}}>👤 {r.customer_name}</span>}
                 {r.department&&<span style={{fontSize:15,padding:'4px 12px',borderRadius:6,background:'#eef3fc',color:'#2f5fd0',fontWeight:600}}>{r.department}</span>}
+                {r.pile_spec&&<span style={{fontSize:15,padding:'4px 12px',borderRadius:6,background:'#f0fdf4',color:'#166534',fontWeight:600}}>🪵 {r.pile_spec}{r.pile_qty?` × ${r.pile_qty} ต้น`:''}</span>}
                 <span style={{fontSize:15,color:'#94a3b8',marginLeft:2}}>{fmtDate(r.report_date)}</span>
               </div>
               {r.description&&<div style={{fontSize:17,color:'#334155',lineHeight:1.8,marginBottom:14}}>{r.description}</div>}
@@ -3791,6 +3792,16 @@ window.__dataReady.then(data => {
               <input type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit'}}/>
             </div>
           ))}
+          <div style={{marginBottom:12,display:'flex',gap:8}}>
+            <div style={{flex:2}}>
+              <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>รายการเสาเข็ม</div>
+              <input type="text" placeholder="เช่น I22x11.00m" value={form.pile_spec} onChange={e=>setForm(f=>({...f,pile_spec:e.target.value}))} style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>จำนวน (ต้น)</div>
+              <input type="number" min={1} placeholder="0" value={form.pile_qty} onChange={e=>setForm(f=>({...f,pile_qty:e.target.value}))} style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
+            </div>
+          </div>
           <div style={{marginBottom:12}}>
             <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ประเภทปัญหา</div>
             <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value,sub_type:''}))} style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,background:'#fff',outline:'none',fontFamily:'inherit'}}>
