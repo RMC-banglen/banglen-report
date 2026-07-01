@@ -4837,6 +4837,7 @@ window.__dataReady.then(data => {
     const [form,setForm]=useState({id:null,year:2569,section:'เครื่องจักรบางเลน',line_item:'',sort_order:0,amounts:{}});
     const [saving,setSaving]=useState(false);
     const [confirmDel,setConfirmDel]=useState(null);
+    const [showCompare,setShowCompare]=useState(false);
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     useEffect(()=>{fetch();},[]);
     function fetch(){setLoading(true);DB.from('repair_line_items').select('*').order('year').order('section').order('sort_order').order('line_item').then(({data})=>{setRows(data||[]);setLoading(false);});}
@@ -4877,6 +4878,13 @@ window.__dataReady.then(data => {
     }
     async function handleDelete(item){await DB.from('repair_line_items').delete().eq('year',selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
 
+    const locTotal=(data,loc)=>SECTIONS.filter(s=>s.includes(loc)&&s!=='ซ่อมรถทั่วไป').reduce((s,sec)=>s+secTot(data,sec),0);
+    const bangTotal=locTotal(yearRows,'บางเลน'),bangPrev=locTotal(prevRows,'บางเลน');
+    const boTotal=locTotal(yearRows,'บ่อตะกั่ว'),boPrev=locTotal(prevRows,'บ่อตะกั่ว');
+    const genTotal=secTot(yearRows,'ซ่อมรถทั่วไป'),genPrev=secTot(prevRows,'ซ่อมรถทั่วไป');
+    const CAT_COMPARE=[{label:'เครื่องจักร',bang:'เครื่องจักรบางเลน',bo:'เครื่องจักรบ่อตะกั่ว'},{label:'เครนรถ',bang:'เครนรถบางเลน',bo:'เครนรถบ่อตะกั่ว'},{label:'ซ่อมรถ',bang:'ซ่อมรถบางเลน',bo:'ซ่อมรถบ่อตะกั่ว'}];
+    const cmpMax=Math.max(1,...CAT_COMPARE.flatMap(c=>[secTot(yearRows,c.bang),secTot(yearRows,c.bo)]));
+
     return<div style={{padding:'24px 0'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
         <div>
@@ -4888,23 +4896,46 @@ window.__dataReady.then(data => {
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div style={{display:'flex',gap:14,marginBottom:20,flexWrap:'wrap'}}>
+      {/* Summary cards — แยกตามสถานที่ */}
+      <div style={{display:'flex',gap:14,marginBottom:12,flexWrap:'wrap'}}>
         <div style={{flex:1,minWidth:180,background:'#fff',border:'2px solid #e2e8f0',borderRadius:14,padding:'16px 20px'}}>
           <div style={{fontSize:13,color:'#64748b',fontWeight:600,marginBottom:6}}>รวมทั้งหมด ปี {selYear}</div>
           <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{fmt(grand)} <span style={{fontSize:15,color:'#94a3b8'}}>฿</span></div>
           {prevGrand>0&&<div style={{fontSize:12,marginTop:6,color:'#64748b'}}>ปีก่อน: {fmt(prevGrand)} ฿ <span style={{fontWeight:700,color:(grand-prevGrand)<0?'#16a34a':'#dc2626'}}>{(grand-prevGrand)<0?'▼':'▲'} {fmt(Math.abs(grand-prevGrand))}</span></div>}
         </div>
-        {GROUPS.map(g=>{
-          const tot=g.sections.reduce((s,sec)=>s+secTot(yearRows,sec),0);
-          const prev=g.sections.reduce((s,sec)=>s+secTot(prevRows,sec),0);const diff=tot-prev;
+        {[{label:'📍 บางเลน',tot:bangTotal,prev:bangPrev,color:'#2563eb',bg:'#eff6ff'},{label:'📍 บ่อตะกั่ว',tot:boTotal,prev:boPrev,color:'#0d9488',bg:'#f0fdfa'},{label:'ทั่วไป',tot:genTotal,prev:genPrev,color:'#7c3aed',bg:'#faf5ff'}].map(g=>{
+          const diff=g.tot-g.prev;
           return<div key={g.label} style={{flex:1,minWidth:150,background:g.bg,border:`2px solid ${g.color}30`,borderRadius:14,padding:'16px 20px'}}>
             <div style={{fontSize:13,color:g.color,fontWeight:700,marginBottom:6}}>{g.label}</div>
-            <div style={{fontSize:26,fontWeight:900,color:'#1e293b'}}>{fmt(tot)} <span style={{fontSize:13,color:'#94a3b8'}}>฿</span></div>
-            {prev>0&&<div style={{fontSize:12,marginTop:4,color:'#64748b'}}>ปีก่อน: {fmt(prev)} <span style={{fontWeight:700,color:diff<0?'#16a34a':'#dc2626'}}>{diff<0?'▼':'▲'}{fmt(Math.abs(diff))}</span></div>}
+            <div style={{fontSize:26,fontWeight:900,color:'#1e293b'}}>{fmt(g.tot)} <span style={{fontSize:13,color:'#94a3b8'}}>฿</span></div>
+            {g.prev>0&&<div style={{fontSize:12,marginTop:4,color:'#64748b'}}>ปีก่อน: {fmt(g.prev)} <span style={{fontWeight:700,color:diff<0?'#16a34a':'#dc2626'}}>{diff<0?'▼':'▲'}{fmt(Math.abs(diff))}</span></div>}
           </div>;
         })}
       </div>
+
+      <button onClick={()=>setShowCompare(v=>!v)} style={{marginBottom:14,padding:'8px 16px',borderRadius:10,border:'1.5px solid #cbd5e1',background:showCompare?'#1e293b':'#fff',color:showCompare?'#fff':'#475569',fontSize:13,fontWeight:700,cursor:'pointer'}}>🔍 เทียบ บางเลน ↔ บ่อตะกั่ว {showCompare?'▲':'▼'}</button>
+
+      {showCompare&&<div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:12,fontWeight:700,color:'#94a3b8',marginBottom:14}}>
+          <span>🔵 บางเลน</span><span>ปี {selYear}</span><span>🟢 บ่อตะกั่ว</span>
+        </div>
+        {CAT_COMPARE.map(c=>{
+          const b=secTot(yearRows,c.bang),o=secTot(yearRows,c.bo);
+          const bPct=(b/cmpMax)*100,oPct=(o/cmpMax)*100;
+          return<div key={c.label} style={{marginBottom:16}}>
+            <div style={{textAlign:'center',fontSize:13,fontWeight:800,color:'#1e293b',marginBottom:6}}>{c.label}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 90px 1fr',gap:10,alignItems:'center'}}>
+              <div style={{display:'flex',justifyContent:'flex-end'}}>
+                <div style={{height:20,width:`${bPct}%`,minWidth:b>0?4:0,background:'#2563eb',borderRadius:'6px 0 0 6px'}}/>
+              </div>
+              <div style={{textAlign:'center',fontSize:12,fontWeight:800,color:'#1e293b'}}>{fmt(b)}<br/><span style={{color:'#94a3b8',fontWeight:600}}>vs</span><br/>{fmt(o)}</div>
+              <div style={{display:'flex'}}>
+                <div style={{height:20,width:`${oPct}%`,minWidth:o>0?4:0,background:'#0d9488',borderRadius:'0 6px 6px 0'}}/>
+              </div>
+            </div>
+          </div>;
+        })}
+      </div>}
 
       {/* Section selector — แบ่งเป็นฝั่งบางเลน / บ่อตะกั่ว ชัดเจน */}
       <div style={{display:'flex',gap:14,marginBottom:14,flexWrap:'wrap',alignItems:'stretch'}}>
