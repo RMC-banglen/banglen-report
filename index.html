@@ -4861,9 +4861,7 @@ window.__dataReady.then(data => {
     const latestYear=years.length?Math.max(...years):selYear;
     const latestSecRows=rows.filter(r=>r.year===latestYear&&r.section===selSec);
     const items=[];
-    latestSecRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order});});
-    secRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order+1000});});
-    prevSecRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order+1000});});
+    [...latestSecRows,...secRows,...prevSecRows].forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order});});
     const orderOf=name=>{
       const it=items.find(i=>i.name===name);
       return it?it.order:9999;
