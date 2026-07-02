@@ -4880,6 +4880,13 @@ window.__dataReady.then(data => {
       const ins=Object.entries(form.amounts).filter(([m,v])=>Number(v)).map(([m,v])=>({year:Number(form.year),month:Number(m),section:form.section,line_item:form.line_item,sort_order:Number(form.sort_order)||0,amount:Number(v)}));
       if(ins.length===0){alert('กรุณากรอกจำนวนเงินอย่างน้อย 1 เดือน ก่อนบันทึก');return;}
       setSaving(true);
+      const targetOrder=Number(form.sort_order)||0;
+      const yrRows=rows.filter(r=>r.year===Number(form.year)&&r.section===form.section&&r.line_item!==form.line_item);
+      const conflicting=[...new Set(yrRows.filter(r=>r.sort_order>=targetOrder).map(r=>r.line_item))]
+        .map(item=>({item,order:yrRows.find(r=>r.line_item===item).sort_order}));
+      for(const c of conflicting){
+        await DB.from('repair_line_items').update({sort_order:c.order+1}).eq('year',Number(form.year)).eq('section',form.section).eq('line_item',c.item);
+      }
       // delete existing rows for this line_item/section/year then insert fresh per-month
       const {error:delErr}=await DB.from('repair_line_items').delete().eq('year',Number(form.year)).eq('section',form.section).eq('line_item',form.line_item);
       const {error:insErr}=await DB.from('repair_line_items').insert(ins);
