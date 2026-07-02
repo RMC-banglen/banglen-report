@@ -5283,6 +5283,8 @@ window.__dataReady.then(data => {
     const [selDayMonth,setSelDayMonth]=useState(new Date().getMonth()+1);
     const [dayForm,setDayForm]=useState({driver_name:'',days:{}});
     const [showDayForm,setShowDayForm]=useState(false);
+    const [showAddDriver,setShowAddDriver]=useState(false);
+    const [addDriverName,setAddDriverName]=useState('');
     const [savingDay,setSavingDay]=useState(false);
     const daysInMonth=(beYear,m)=>new Date(beYear-543,m,0).getDate();
     const dLen=daysInMonth(selYear,selDayMonth);
@@ -5299,7 +5301,9 @@ window.__dataReady.then(data => {
     async function handleSaveDay(){
       if(!dayForm.driver_name)return;
       setSavingDay(true);
-      const ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:(items.find(i=>i.name===dayForm.driver_name)?.order)||0,trips:Number(v)||0}));
+      const existingOrder=items.find(i=>i.name===dayForm.driver_name)?.order;
+      const dayOrder=existingOrder!=null?existingOrder:(items.length+1);
+      const ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
       const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',selType).eq('driver_name',dayForm.driver_name).not('day','is',null);
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
@@ -5496,6 +5500,7 @@ window.__dataReady.then(data => {
             {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
           </select>
           {canEdit&&<>
+            <button onClick={()=>{setAddDriverName('');setShowAddDriver(true);}} style={{padding:'6px 14px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มคนขับ/ทะเบียนรถ</button>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleFile}/>
             <button onClick={()=>fileInputRef.current.click()} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${curType.color}`,background:'#fff',color:curType.color,fontSize:12,fontWeight:700,cursor:'pointer'}}>📤 นำเข้าจาก Excel</button>
           </>}
@@ -5555,6 +5560,19 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowDayForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={handleSaveDay} disabled={savingDay} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDay?0.5:1}}>{savingDay?'กำลังบันทึก...':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+
+      {showAddDriver&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowAddDriver(false);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>+ เพิ่มคนขับ/ทะเบียนรถ</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{selType}</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อคนขับ/ทะเบียนรถ</div>
+          <input type="text" autoFocus value={addDriverName} onChange={e=>setAddDriverName(e.target.value)} placeholder="เช่น 89-8038 จรูญ" style={{...inp,marginBottom:16}} onKeyDown={e=>{if(e.key==='Enter'&&addDriverName.trim()){setShowAddDriver(false);setDayForm({driver_name:addDriverName.trim(),days:{}});setShowDayForm(true);}}}/>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>setShowAddDriver(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={()=>{if(!addDriverName.trim())return;setShowAddDriver(false);setDayForm({driver_name:addDriverName.trim(),days:{}});setShowDayForm(true);}} disabled={!addDriverName.trim()} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:addDriverName.trim()?1:0.5}}>ถัดไป → กรอกเที่ยว</button>
           </div>
         </div>
       </div>}
