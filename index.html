@@ -4976,9 +4976,14 @@ window.__dataReady.then(data => {
 
       {/* Pivot table */}
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:20}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${SCOLOR[selSec]}0a`}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${SCOLOR[selSec]}0a`,flexWrap:'wrap',gap:10}}>
           <div style={{fontSize:16,fontWeight:800,color:SCOLOR[selSec]}}>{selSec} · ปี {selYear}</div>
-          {canEdit&&<button onClick={openAdd} style={{padding:'6px 14px',borderRadius:8,border:'none',background:SCOLOR[selSec],color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{display:'flex',gap:4}}>
+              {(years.length?years:[2569]).map(y=><button key={y} onClick={()=>setSelYear(y)} style={{padding:'5px 12px',border:'none',borderRadius:8,background:selYear===y?SCOLOR[selSec]:'#fff',color:selYear===y?'#fff':'#475569',fontWeight:700,cursor:'pointer',fontSize:12}}>ปี {y}</button>)}
+            </div>
+            {canEdit&&<button onClick={openAdd} style={{padding:'6px 14px',borderRadius:8,border:'none',background:SCOLOR[selSec],color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
+          </div>
         </div>
         <div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',width:'100%',fontSize:11.5,tableLayout:'auto'}}>
