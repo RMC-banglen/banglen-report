@@ -4856,16 +4856,15 @@ window.__dataReady.then(data => {
 
     // pivot for selected section
     const secRows=yearRows.filter(r=>r.section===selSec);
-    const items=[];
-    secRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order});});
-    // ยึดลำดับตามปีล่าสุดเสมอ เพื่อให้เทียบปีต่อปีดูง่าย
+    // ยึดลำดับ+รายการตามปีล่าสุดเสมอ เพื่อให้เทียบปีต่อปีดูง่าย (ถ้าปีล่าสุดมีแต่ปีที่ดูอยู่ไม่มี ก็ให้ขึ้นเป็น 0 ด้วย)
     const latestYear=years.length?Math.max(...years):selYear;
     const latestSecRows=rows.filter(r=>r.year===latestYear&&r.section===selSec);
+    const items=[];
+    latestSecRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order});});
+    secRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order+1000});});
     const orderOf=name=>{
-      const latest=latestSecRows.find(r=>r.line_item===name);
-      if(latest)return latest.sort_order;
-      const cur=items.find(i=>i.name===name);
-      return (cur?cur.order:0)+1000;
+      const it=items.find(i=>i.name===name);
+      return it?it.order:9999;
     };
     items.sort((a,b)=>orderOf(a.name)-orderOf(b.name)||a.name.localeCompare(b.name,'th'));
     const cell=(item,m)=>secRows.filter(r=>r.line_item===item&&r.month===m).reduce((s,r)=>s+(r.amount||0),0);
