@@ -4882,8 +4882,8 @@ window.__dataReady.then(data => {
       const dataRows=(y===selYear?yearRows:prevRows).filter(r=>r.section===selSec&&r.line_item===item);
       const amounts={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const v=dataRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.amount||0),0);if(v)amounts[m]=v;});
       const so=dataRows[0];
-      const fallbackOrder=items.find(i=>i.name===item)?.order;
-      setForm({id:'edit',year:y,section:selSec,line_item:item,sort_order:so?so.sort_order:(fallbackOrder!=null?fallbackOrder:0),amounts});
+      const fallbackRow=latestSecRows.find(r=>r.line_item===item)||prevSecRows.find(r=>r.line_item===item)||secRows.find(r=>r.line_item===item);
+      setForm({id:'edit',year:y,section:selSec,line_item:item,sort_order:so?so.sort_order:(fallbackRow?fallbackRow.sort_order:(items.length+1)),amounts});
       setShowForm(true);
     }
     async function handleSave(){
