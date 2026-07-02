@@ -4869,7 +4869,7 @@ window.__dataReady.then(data => {
       return it?it.order:9999;
     };
     items.sort((a,b)=>orderOf(a.name)-orderOf(b.name)||a.name.localeCompare(b.name,'th'));
-    const cell=(item,m)=>{const matched=secRows.filter(r=>r.line_item===item&&r.month===m);return matched.length?matched.reduce((s,r)=>s+(r.amount||0),0):undefined;};
+    const cell=(item,m)=>secRows.filter(r=>r.line_item===item&&r.month===m).reduce((s,r)=>s+(r.amount||0),0);
     const rowTotal=item=>secRows.filter(r=>r.line_item===item).reduce((s,r)=>s+(r.amount||0),0);
     const colTotal=m=>secRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.amount||0),0);
     const secGrand=secRows.reduce((s,r)=>s+(r.amount||0),0);
@@ -4880,7 +4880,7 @@ window.__dataReady.then(data => {
     function openEdit(item,yr){
       const y=yr||selYear;
       const dataRows=(y===selYear?yearRows:prevRows).filter(r=>r.section===selSec&&r.line_item===item);
-      const amounts={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const matched=dataRows.filter(r=>r.month===m);if(matched.length)amounts[m]=matched.reduce((s,r)=>s+(r.amount||0),0);});
+      const amounts={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const v=dataRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.amount||0),0);if(v)amounts[m]=v;});
       const so=dataRows[0];
       setForm({id:'edit',year:y,section:selSec,line_item:item,sort_order:so?so.sort_order:0,amounts});
       setShowForm(true);
@@ -5001,7 +5001,7 @@ window.__dataReady.then(data => {
               {items.length===0&&<tr><td colSpan={months.length+3+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
               {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                 <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v!==undefined?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v!==undefined?fmt2(v):'–'}</td>;})}
+                {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt2(v):'–'}</td>;})}
                 <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
                   {canEdit?<span onClick={()=>openEdit(it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt2(rowTotal(it.name))}</span>:fmt2(rowTotal(it.name))}
                 </td>
