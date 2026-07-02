@@ -5309,7 +5309,7 @@ window.__dataReady.then(data => {
         <div className="topbar__actions">
           {tab!=='compare'&&tab!=='damage'&&tab!=='concrete'&&tab!=='meeting'&&tab!=='quality'&&<div className="yearpick">
             <span className="yearpick__lbl">ปี</span>
-            <Segmented value={year} onChange={setYear} options={Object.keys(D.years).map(Number).sort((a,b)=>a-b).map(y=>({value:y,label:String(y)}))}/>
+            <Segmented value={year} onChange={setYear} options={Object.keys(D.years).map(Number).sort((a,b)=>b-a).map(y=>({value:y,label:String(y)}))}/>
             {!yearData(year).real&&<span className="badge-sample">ข้อมูลตัวอย่าง</span>}
           </div>}
           <div style={{display:'flex',alignItems:'center',gap:10,marginLeft:12}}>
