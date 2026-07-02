@@ -5011,11 +5011,12 @@ window.__dataReady.then(data => {
                 {months.map(m=><th key={m} style={{textAlign:'right',padding:'7px 6px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
                 <th style={{textAlign:'right',padding:'7px 8px',color:SCOLOR[selSec],fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
                 <th style={{textAlign:'right',padding:'7px 8px',color:'#94a3b8',fontWeight:700,borderBottom:'2px solid #e2e8f0',background:'#f8fafc',whiteSpace:'nowrap'}}>ปี {selYear-1}</th>
+                <th style={{textAlign:'right',padding:'7px 8px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',background:'#f8fafc',whiteSpace:'nowrap'}}>ส่วนต่าง</th>
                 {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
               </tr>
             </thead>
             <tbody>
-              {items.length===0&&<tr><td colSpan={months.length+3+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
+              {items.length===0&&<tr><td colSpan={months.length+4+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
               {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                 <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
                 {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt2(v):'–'}</td>;})}
@@ -5027,6 +5028,9 @@ window.__dataReady.then(data => {
                     <span onClick={()=>openEdit(it.name,selYear-1)} title="แก้ไขปีก่อน" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt2(rowTotalPrev(it.name))}</span>
                   :(rowTotalPrev(it.name)?fmt2(rowTotalPrev(it.name)):'–')}
                 </td>
+                {(()=>{const cur=rowTotal(it.name),prev=rowTotalPrev(it.name),d=cur-prev;return<td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',fontWeight:700,color:!prev?'#cbd5e1':d>0?'#c0392b':'#3B6D11'}}>
+                  {!prev?'–':d===0?<span style={{color:'#94a3b8'}}>–</span>:<>{d>0?'▲ +':'▼ '}{fmt2(Math.abs(d))}</>}
+                </td>;})()}
                 {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                   <button onClick={()=>setConfirmDel({item:it.name,year:selYear})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
                 </td>}
@@ -5038,6 +5042,9 @@ window.__dataReady.then(data => {
                 {months.map(m=><td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#1e293b',borderTop:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{fmt2(colTotal(m))}</td>)}
                 <td style={{textAlign:'right',padding:'7px 8px',color:'#fff',background:SCOLOR[selSec],borderTop:'2px solid #e2e8f0'}}>{fmt2(secGrand)}</td>
                 <td style={{textAlign:'right',padding:'7px 8px',color:'#64748b',borderTop:'2px solid #e2e8f0'}}>{prevSecGrand?fmt2(prevSecGrand):'–'}</td>
+                {(()=>{const d=secGrand-prevSecGrand;return<td style={{textAlign:'right',padding:'7px 8px',fontWeight:800,borderTop:'2px solid #e2e8f0',color:!prevSecGrand?'#cbd5e1':d>0?'#c0392b':'#3B6D11',whiteSpace:'nowrap'}}>
+                  {!prevSecGrand?'–':d===0?'–':<>{d>0?'▲ +':'▼ '}{fmt2(Math.abs(d))}</>}
+                </td>;})()}
                 {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
               </tr>
             </tfoot>
