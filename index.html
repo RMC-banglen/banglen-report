@@ -4848,7 +4848,7 @@ window.__dataReady.then(data => {
     const years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a);
     const yearRows=rows.filter(r=>r.year===selYear);
     const prevRows=rows.filter(r=>r.year===selYear-1);
-    const monthsAll=[...new Set(yearRows.filter(r=>r.amount!==0).map(r=>r.month))].sort((a,b)=>a-b);
+    const monthsAll=[...new Set(yearRows.filter(r=>r.section===selSec&&r.amount!==0).map(r=>r.month))].sort((a,b)=>a-b);
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
     const secTot=(data,sec)=>data.filter(r=>r.section===sec).reduce((s,r)=>s+(r.amount||0),0);
     const grand=SECTIONS.reduce((s,sec)=>s+secTot(yearRows,sec),0);
