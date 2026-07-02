@@ -5306,9 +5306,9 @@ window.__dataReady.then(data => {
       let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
       const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',selType).eq('driver_name',dayForm.driver_name).not('day','is',null);
       if(ins.length===0){
-        // ยังไม่มียอด แต่อยากให้ชื่อคนขับเข้าระบบไว้ก่อน -> ถ้ายังไม่เคยมีอยู่เลย สร้างแถวตั้งต้น 0 เที่ยวไว้
-        const existsAnywhere=rows.some(r=>r.vehicle_type===selType&&r.driver_name===dayForm.driver_name);
-        if(!existsAnywhere)ins=[{year:selYear,month:selDayMonth,day:1,vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:0}];
+        // ยังไม่มียอดเดือนนี้ -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
+        const existsElsewhere=rows.some(r=>r.vehicle_type===selType&&r.driver_name===dayForm.driver_name&&!(r.year===selYear&&r.month===selDayMonth));
+        if(!existsElsewhere)ins=[{year:selYear,month:selDayMonth,day:1,vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:0}];
       }
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
