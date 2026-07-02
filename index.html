@@ -234,6 +234,7 @@
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <!-- ============================================================
      CONFIG — แก้ 2 บรรทัดนี้หลังสมัคร Supabase
@@ -5262,14 +5263,21 @@ window.__dataReady.then(data => {
     items.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'th'));
     const monthRows=typeRows.filter(r=>r.day==null);
     const dayRows=typeRows.filter(r=>r.day!=null);
-    const monthsAll=[...new Set(monthRows.filter(r=>r.trips>0).map(r=>r.month))].sort((a,b)=>a-b);
+    // ยอดรายเดือน: ถ้ามีข้อมูลรายวันของเดือนนั้นให้ดึงมารวมใช้เอง ไม่ต้องกรอกยอดรวมเดือนซ้ำ
+    const monthValue=(name,m)=>{
+      const dSum=dayRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+      if(dSum>0)return dSum;
+      return monthRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+    };
+    const ALL_MONTHS=[1,2,3,4,5,6,7,8,9,10,11,12];
+    const monthsAll=ALL_MONTHS.filter(m=>items.some(it=>monthValue(it.name,m)>0));
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
-    const cell=(name,m)=>monthRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-    const rowTotal=name=>monthRows.filter(r=>r.driver_name===name).reduce((s,r)=>s+(r.trips||0),0);
-    const colTotal=m=>monthRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-    const typeGrand=monthRows.reduce((s,r)=>s+(r.trips||0),0);
-    const monthTotal=(name,m)=>monthRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-    const monthGrand=monthRows.filter(r=>r.month===selMonth).reduce((s,r)=>s+(r.trips||0),0);
+    const cell=monthValue;
+    const rowTotal=name=>ALL_MONTHS.reduce((s,m)=>s+monthValue(name,m),0);
+    const colTotal=m=>items.reduce((s,it)=>s+monthValue(it.name,m),0);
+    const typeGrand=items.reduce((s,it)=>s+rowTotal(it.name),0);
+    const monthTotal=monthValue;
+    const monthGrand=colTotal(selMonth);
     const monthItems=items.map(it=>({...it,trips:monthTotal(it.name,selMonth)})).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
     // ===== รายวัน =====
     const [selDayMonth,setSelDayMonth]=useState(new Date().getMonth()+1);
@@ -5298,6 +5306,61 @@ window.__dataReady.then(data => {
       setSavingDay(false);
       if(delErr||insErr){alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
       setShowDayForm(false);fetch();
+    }
+
+    // ===== นำเข้า Excel (รายวัน) =====
+    const [showImport,setShowImport]=useState(false);
+    const [importRows,setImportRows]=useState([]); // [{driver_name, days:{1:2,2:0,...}}]
+    const [importing,setImporting]=useState(false);
+    const fileInputRef=React.useRef(null);
+    function handleFile(e){
+      const file=e.target.files[0];
+      if(!file)return;
+      const reader=new FileReader();
+      reader.onload=evt=>{
+        try{
+          const wb=XLSX.read(evt.target.result,{type:'array'});
+          const sheet=wb.Sheets[wb.SheetNames[0]];
+          const data=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+          if(!data.length){alert('ไม่พบข้อมูลในไฟล์');return;}
+          const header=data[0];
+          // หาคอลัมน์ที่เป็นตัวเลขวันที่ (1-31)
+          const dayCols=[];
+          header.forEach((h,ci)=>{if(ci>0){const n=Number(h);if(n>=1&&n<=31)dayCols.push({ci,day:n});}});
+          if(dayCols.length===0){alert('ไม่พบคอลัมน์วันที่ (1-31) ในแถวหัวตาราง กรุณาตรวจสอบไฟล์');return;}
+          const parsed=[];
+          for(let ri=1;ri<data.length;ri++){
+            const row=data[ri];
+            const name=String(row[0]||'').trim();
+            if(!name)continue;
+            const days={};
+            dayCols.forEach(({ci,day})=>{const v=Number(row[ci]);if(v>0)days[day]=v;});
+            parsed.push({driver_name:name,days});
+          }
+          if(parsed.length===0){alert('ไม่พบแถวข้อมูลคนขับ/ทะเบียนรถในไฟล์');return;}
+          setImportRows(parsed);setShowImport(true);
+        }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
+      };
+      reader.readAsArrayBuffer(file);
+      e.target.value='';
+    }
+    async function confirmImport(){
+      setImporting(true);
+      // ลบข้อมูลรายวันเดิมของเดือน/ปี/ประเภทรถนี้ทั้งหมด แล้วนำเข้าใหม่
+      await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',selType).not('day','is',null);
+      const ins=[];
+      importRows.forEach((r,idx)=>{
+        const existingOrder=items.find(i=>i.name===r.driver_name)?.order;
+        const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
+        Object.entries(r.days).forEach(([d,v])=>{
+          ins.push({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:r.driver_name,sort_order:sortOrder,trips:Number(v)});
+        });
+      });
+      let insErr=null;
+      if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
+      setImporting(false);
+      if(insErr){alert('นำเข้าไม่สำเร็จ: '+insErr.message);return;}
+      setShowImport(false);setImportRows([]);fetch();
     }
 
     function openAdd(){setForm({id:null,year:selYear,vehicle_type:selType,driver_name:'',sort_order:(items.length+1),trips:{}});setShowForm(true);}
@@ -5428,9 +5491,15 @@ window.__dataReady.then(data => {
       {view==='daily'&&<>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
         <div style={{fontSize:15,fontWeight:800,color:curType.color}}>📆 รายวัน {selType} · ปี {selYear}</div>
-        <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
-          {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
-        </select>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
+            {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
+          </select>
+          {canEdit&&<>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleFile}/>
+            <button onClick={()=>fileInputRef.current.click()} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${curType.color}`,background:'#fff',color:curType.color,fontSize:12,fontWeight:700,cursor:'pointer'}}>📤 นำเข้าจาก Excel</button>
+          </>}
+        </div>
       </div>
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 20px',marginBottom:20}}>
         <div style={{fontSize:13,color:'#64748b',fontWeight:600,marginBottom:6}}>รวมเที่ยว {MO[selDayMonth-1]} {selYear}</div>
@@ -5486,6 +5555,34 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowDayForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={handleSaveDay} disabled={savingDay} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDay?0.5:1}}>{savingDay?'กำลังบันทึก...':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+
+      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:640,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>{selType} · {MO[selDayMonth-1]} {selYear} · พบ {importRows.length} คนขับ/ทะเบียนรถ</div>
+          <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลรายวันเดิม</b>ของ {selType} เดือน {MO[selDayMonth-1]} ปี {selYear} ทั้งหมด แล้วแทนที่ด้วยข้อมูลจากไฟล์นี้</div>
+          <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
+              <thead><tr style={{background:'#f8fafc'}}>
+                <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
+                <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
+                <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
+              </tr></thead>
+              <tbody>
+                {importRows.map((r,i)=>{const tot=Object.values(r.days).reduce((s,v)=>s+Number(v||0),0);return<tr key={i} style={{background:i%2?'#fcfcfd':'#fff'}}>
+                  <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{r.driver_name}</td>
+                  <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{tot}</td>
+                  <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{Object.keys(r.days).length}</td>
+                </tr>;})}
+              </tbody>
+            </table>
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>{setShowImport(false);setImportRows([]);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
           </div>
         </div>
       </div>}
