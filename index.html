@@ -4868,10 +4868,12 @@ window.__dataReady.then(data => {
     const prevSecGrand=prevSecRows.reduce((s,r)=>s+(r.amount||0),0);
 
     function openAdd(){setForm({id:null,year:selYear,section:selSec,line_item:'',sort_order:(items.length+1),amounts:{}});setShowForm(true);}
-    function openEdit(item){
-      const amounts={};months.forEach(m=>{const v=cell(item,m);if(v)amounts[m]=v;});
-      const so=secRows.find(r=>r.line_item===item);
-      setForm({id:'edit',year:selYear,section:selSec,line_item:item,sort_order:so?so.sort_order:0,amounts});
+    function openEdit(item,yr){
+      const y=yr||selYear;
+      const dataRows=(y===selYear?yearRows:prevRows).filter(r=>r.section===selSec&&r.line_item===item);
+      const amounts={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const v=dataRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.amount||0),0);if(v)amounts[m]=v;});
+      const so=dataRows[0];
+      setForm({id:'edit',year:y,section:selSec,line_item:item,sort_order:so?so.sort_order:0,amounts});
       setShowForm(true);
     }
     async function handleSave(){
@@ -4882,7 +4884,7 @@ window.__dataReady.then(data => {
       if(ins.length)await DB.from('repair_line_items').insert(ins);
       setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
-    async function handleDelete(item){await DB.from('repair_line_items').delete().eq('year',selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
+    async function handleDelete(item,yr){await DB.from('repair_line_items').delete().eq('year',yr||selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
 
     const locTotal=(data,loc)=>SECTIONS.filter(s=>s.includes(loc)&&s!=='ซ่อมรถทั่วไป').reduce((s,sec)=>s+secTot(data,sec),0);
     const bangTotal=locTotal(yearRows,'บางเลน'),bangPrev=locTotal(prevRows,'บางเลน');
@@ -4978,10 +4980,16 @@ window.__dataReady.then(data => {
                 <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
                 {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt2(v):'–'}</td>;})}
                 <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt2(rowTotal(it.name))}</td>
-                <td style={{textAlign:'right',padding:'5px 8px',color:'#94a3b8',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{rowTotalPrev(it.name)?fmt2(rowTotalPrev(it.name)):'–'}</td>
+                <td style={{textAlign:'right',padding:'5px 8px',color:'#94a3b8',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
+                  {rowTotalPrev(it.name)?fmt2(rowTotalPrev(it.name)):'–'}
+                  {canEdit&&<span style={{marginLeft:6}}>
+                    <button onClick={()=>openEdit(it.name,selYear-1)} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0',marginRight:3}}>แก้</button>
+                    <button onClick={()=>setConfirmDel({item:it.name,year:selYear-1})} style={{padding:'1px 5px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
+                  </span>}
+                </td>
                 {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                   <button onClick={()=>openEdit(it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0',marginRight:3}}>แก้</button>
-                  <button onClick={()=>setConfirmDel(it.name)} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
+                  <button onClick={()=>setConfirmDel({item:it.name,year:selYear})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
                 </td>}
               </tr>)}
             </tbody>
@@ -5095,10 +5103,10 @@ window.__dataReady.then(data => {
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:360,textAlign:'center'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
           <div style={{fontSize:16,fontWeight:700,color:'#1e293b',marginBottom:6}}>ยืนยันการลบรายการ</div>
-          <div style={{fontSize:14,color:'#64748b',marginBottom:20}}>ต้องการลบ "<b style={{color:'#1e293b'}}>{confirmDel}</b>" ({selSec} ปี {selYear}) ใช่หรือไม่? ข้อมูลทุกเดือนของรายการนี้จะถูกลบทั้งหมด</div>
+          <div style={{fontSize:14,color:'#64748b',marginBottom:20}}>ต้องการลบ "<b style={{color:'#1e293b'}}>{confirmDel&&confirmDel.item}</b>" ({selSec} ปี {confirmDel&&confirmDel.year}) ใช่หรือไม่? ข้อมูลทุกเดือนของรายการนี้จะถูกลบทั้งหมด</div>
           <div style={{display:'flex',gap:10,justifyContent:'center'}}>
             <button onClick={()=>setConfirmDel(null)} style={{padding:'9px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={()=>handleDelete(confirmDel)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
+            <button onClick={()=>handleDelete(confirmDel.item,confirmDel.year)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
           </div>
         </div>
       </div>}
