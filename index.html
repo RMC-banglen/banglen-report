@@ -5332,21 +5332,35 @@ window.__dataReady.then(data => {
           const sheet=wb.Sheets[wb.SheetNames[0]];
           const data=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
           if(!data.length){alert('ไม่พบข้อมูลในไฟล์');return;}
-          const header=data[0];
-          // หาคอลัมน์ที่เป็นตัวเลขวันที่ (1-31)
-          const dayCols=[];
-          header.forEach((h,ci)=>{if(ci>0){const n=Number(h);if(n>=1&&n<=31)dayCols.push({ci,day:n});}});
-          if(dayCols.length===0){alert('ไม่พบคอลัมน์วันที่ (1-31) ในแถวหัวตาราง กรุณาตรวจสอบไฟล์');return;}
-          const parsed=[];
-          for(let ri=1;ri<data.length;ri++){
+          // รูปแบบ "รายงานใบส่งของ": บล็อกซ้ำๆ ต่อคนขับ -> [รหัส, ชื่อคนขับ] แล้วตามด้วยแถวรายการ [วันที่, เลขบิล, ...] จนถึงแถว "รวม N รายการ"
+          const isDateStr=s=>/^\d{1,2}\/\d{1,2}\/\d{3,4}$/.test(String(s).trim());
+          const counts={}; // key: driver|y|m|d -> จำนวนเที่ยว(บิล)ของวันนั้น
+          let currentGroup=null;
+          for(let ri=0;ri<data.length;ri++){
             const row=data[ri];
-            const name=String(row[0]||'').trim();
-            if(!name)continue;
-            const days={};
-            dayCols.forEach(({ci,day})=>{const v=Number(row[ci]);if(v>0)days[day]=v;});
-            parsed.push({driver_name:name,days});
+            const colA=String(row[0]||'').trim();
+            const colB=String(row[1]||'').trim();
+            const colC=String(row[2]||'').trim();
+            if(/^รวม\s*\d+\s*รายการ/.test(colC))continue; // แถวสรุปย่อย ไม่ต้องใช้ (นับเองจากแถวรายการ)
+            if(isDateStr(colA)){
+              if(colB&&currentGroup){
+                const [d,m,y]=colA.split('/').map(Number);
+                const key=currentGroup+'|'+y+'|'+m+'|'+d;
+                counts[key]=(counts[key]||0)+1;
+              }
+              continue;
+            }
+            if(!colA&&!colB)continue; // แถวเว้นวรรค
+            if(colA==='C1'||colA==='รหัสโครงการ'||colA==='วันที่เอกสาร')continue; // แถวหัวตารางของไฟล์
+            currentGroup=colB||colA; // แถวขึ้นกลุ่มคนขับใหม่ (ชื่ออยู่คอลัมน์ B ปกติ, ถ้าไม่มีโครงการใช้คอลัมน์ A)
           }
-          if(parsed.length===0){alert('ไม่พบแถวข้อมูลคนขับ/ทะเบียนรถในไฟล์');return;}
+          const parsed=Object.entries(counts).map(([key,trips])=>{
+            const parts=key.split('|');
+            const y=Number(parts[parts.length-3]),m=Number(parts[parts.length-2]),d=Number(parts[parts.length-1]);
+            const driver_name=parts.slice(0,parts.length-3).join('|');
+            return {driver_name,year:y,month:m,day:d,trips};
+          }).sort((a,b)=>a.year-b.year||a.month-b.month||a.day-b.day||a.driver_name.localeCompare(b.driver_name,'th'));
+          if(parsed.length===0){alert('ไม่พบข้อมูลรายการขนส่งในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์ (ควรเป็นรายงานใบส่งของแยกตามคนขับ)');return;}
           setImportRows(parsed);setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
@@ -5355,15 +5369,16 @@ window.__dataReady.then(data => {
     }
     async function confirmImport(){
       setImporting(true);
-      // ลบข้อมูลรายวันเดิมของเดือน/ปี/ประเภทรถนี้ทั้งหมด แล้วนำเข้าใหม่
-      await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',selType).not('day','is',null);
-      const ins=[];
-      importRows.forEach((r,idx)=>{
+      // ลบข้อมูลรายวันเดิมของเดือน/ปีที่ปรากฏในไฟล์ (เฉพาะประเภทรถที่เลือกอยู่) แล้วนำเข้าใหม่
+      const months=[...new Set(importRows.map(r=>`${r.year}-${r.month}`))];
+      for(const key of months){
+        const [y,m]=key.split('-').map(Number);
+        await DB.from('transport_trips').delete().eq('year',y).eq('month',m).eq('vehicle_type',selType).not('day','is',null);
+      }
+      const ins=importRows.map((r,idx)=>{
         const existingOrder=items.find(i=>i.name===r.driver_name)?.order;
         const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
-        Object.entries(r.days).forEach(([d,v])=>{
-          ins.push({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:r.driver_name,sort_order:sortOrder,trips:Number(v)});
-        });
+        return {year:r.year,month:r.month,day:r.day,vehicle_type:selType,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips};
       });
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
@@ -5585,24 +5600,32 @@ window.__dataReady.then(data => {
       {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:640,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>{selType} · {MO[selDayMonth-1]} {selYear} · พบ {importRows.length} คนขับ/ทะเบียนรถ</div>
-          <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลรายวันเดิม</b>ของ {selType} เดือน {MO[selDayMonth-1]} ปี {selYear} ทั้งหมด แล้วแทนที่ด้วยข้อมูลจากไฟล์นี้</div>
-          <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
-            <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
-              <thead><tr style={{background:'#f8fafc'}}>
-                <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
-                <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
-                <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
-              </tr></thead>
-              <tbody>
-                {importRows.map((r,i)=>{const tot=Object.values(r.days).reduce((s,v)=>s+Number(v||0),0);return<tr key={i} style={{background:i%2?'#fcfcfd':'#fff'}}>
-                  <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{r.driver_name}</td>
-                  <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{tot}</td>
-                  <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{Object.keys(r.days).length}</td>
-                </tr>;})}
-              </tbody>
-            </table>
-          </div>
+          {(()=>{
+            const byDriver={};
+            importRows.forEach(r=>{if(!byDriver[r.driver_name])byDriver[r.driver_name]={total:0,days:0};byDriver[r.driver_name].total+=r.trips;byDriver[r.driver_name].days+=1;});
+            const drivers=Object.entries(byDriver);
+            const monthsFound=[...new Set(importRows.map(r=>`${MO[r.month-1]} ${r.year}`))];
+            return<>
+              <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>{selType} · {monthsFound.join(', ')} · พบ {drivers.length} คนขับ/ทะเบียนรถ · {importRows.length} วัน-เที่ยว</div>
+              <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลรายวันเดิม</b>ของ {selType} เดือน {monthsFound.join(', ')} ทั้งหมด แล้วแทนที่ด้วยข้อมูลจากไฟล์นี้</div>
+              <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
+                <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
+                  <thead><tr style={{background:'#f8fafc'}}>
+                    <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
+                    <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
+                    <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
+                  </tr></thead>
+                  <tbody>
+                    {drivers.map(([name,d],i)=><tr key={name} style={{background:i%2?'#fcfcfd':'#fff'}}>
+                      <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{name}</td>
+                      <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
+                      <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
+                    </tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </>;
+          })()}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>{setShowImport(false);setImportRows([]);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
