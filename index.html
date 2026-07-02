@@ -4856,12 +4856,14 @@ window.__dataReady.then(data => {
 
     // pivot for selected section
     const secRows=yearRows.filter(r=>r.section===selSec);
-    // ยึดลำดับ+รายการตามปีล่าสุดเสมอ เพื่อให้เทียบปีต่อปีดูง่าย (ถ้าปีล่าสุดมีแต่ปีที่ดูอยู่ไม่มี ก็ให้ขึ้นเป็น 0 ด้วย)
+    const prevSecRows=prevRows.filter(r=>r.section===selSec);
+    // รวมรายการจากทั้งปีนี้และปีก่อน (ปีไหนไม่มีก็ขึ้น 0 ให้เทียบ KPI ได้) เรียงลำดับตามปีล่าสุด
     const latestYear=years.length?Math.max(...years):selYear;
     const latestSecRows=rows.filter(r=>r.year===latestYear&&r.section===selSec);
     const items=[];
     latestSecRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order});});
     secRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order+1000});});
+    prevSecRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order+1000});});
     const orderOf=name=>{
       const it=items.find(i=>i.name===name);
       return it?it.order:9999;
@@ -4871,7 +4873,6 @@ window.__dataReady.then(data => {
     const rowTotal=item=>secRows.filter(r=>r.line_item===item).reduce((s,r)=>s+(r.amount||0),0);
     const colTotal=m=>secRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.amount||0),0);
     const secGrand=secRows.reduce((s,r)=>s+(r.amount||0),0);
-    const prevSecRows=prevRows.filter(r=>r.section===selSec);
     const rowTotalPrev=item=>prevSecRows.filter(r=>r.line_item===item).reduce((s,r)=>s+(r.amount||0),0);
     const prevSecGrand=prevSecRows.reduce((s,r)=>s+(r.amount||0),0);
 
