@@ -4858,7 +4858,16 @@ window.__dataReady.then(data => {
     const secRows=yearRows.filter(r=>r.section===selSec);
     const items=[];
     secRows.forEach(r=>{if(!items.find(i=>i.name===r.line_item))items.push({name:r.line_item,order:r.sort_order});});
-    items.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'th'));
+    // ยึดลำดับตามปีล่าสุดเสมอ เพื่อให้เทียบปีต่อปีดูง่าย
+    const latestYear=years.length?Math.max(...years):selYear;
+    const latestSecRows=rows.filter(r=>r.year===latestYear&&r.section===selSec);
+    const orderOf=name=>{
+      const latest=latestSecRows.find(r=>r.line_item===name);
+      if(latest)return latest.sort_order;
+      const cur=items.find(i=>i.name===name);
+      return (cur?cur.order:0)+1000;
+    };
+    items.sort((a,b)=>orderOf(a.name)-orderOf(b.name)||a.name.localeCompare(b.name,'th'));
     const cell=(item,m)=>secRows.filter(r=>r.line_item===item&&r.month===m).reduce((s,r)=>s+(r.amount||0),0);
     const rowTotal=item=>secRows.filter(r=>r.line_item===item).reduce((s,r)=>s+(r.amount||0),0);
     const colTotal=m=>secRows.filter(r=>r.month===m).reduce((s,r)=>s+(r.amount||0),0);
