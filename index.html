@@ -4889,11 +4889,12 @@ window.__dataReady.then(data => {
       const ins=Object.entries(form.amounts).filter(([m,v])=>v!==''&&v!=null).map(([m,v])=>({year:Number(form.year),month:Number(m),section:form.section,line_item:form.line_item,sort_order:Number(form.sort_order)||0,amount:Number(v)||0}));
       setSaving(true);
       const targetOrder=Number(form.sort_order)||0;
-      const yrRows=rows.filter(r=>r.year===Number(form.year)&&r.section===form.section&&r.line_item!==form.line_item);
-      const conflicting=[...new Set(yrRows.filter(r=>r.sort_order>=targetOrder).map(r=>r.line_item))]
-        .map(item=>({item,order:yrRows.find(r=>r.line_item===item).sort_order}));
+      // จัดลำดับแบบรวมทุกปีในหมวดนี้ (ไม่แยกปี) เพื่อไม่ให้เลขลำดับชนกันข้ามปี
+      const secAllRows=rows.filter(r=>r.section===form.section&&r.line_item!==form.line_item);
+      const conflicting=[...new Set(secAllRows.filter(r=>r.sort_order>=targetOrder).map(r=>r.line_item))]
+        .map(item=>({item,order:secAllRows.find(r=>r.line_item===item).sort_order}));
       for(const c of conflicting){
-        await DB.from('repair_line_items').update({sort_order:c.order+1}).eq('year',Number(form.year)).eq('section',form.section).eq('line_item',c.item);
+        await DB.from('repair_line_items').update({sort_order:c.order+1}).eq('section',form.section).eq('line_item',c.item);
       }
       if(ins.length===0){
         // ปีนี้ไม่มีค่าใช้จ่ายให้บันทึก แต่ยังอยากปรับลำดับ -> อัปเดต sort_order ของรายการนี้ในทุกปีที่มีอยู่แทน
