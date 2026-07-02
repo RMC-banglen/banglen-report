@@ -4915,6 +4915,8 @@ window.__dataReady.then(data => {
       const {error:delErr}=await DB.from('repair_line_items').delete().eq('year',Number(form.year)).eq('section',form.section).eq('line_item',form.line_item);
       const {error:insErr}=await DB.from('repair_line_items').insert(ins);
       if(delErr||insErr){setSaving(false);alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
+      // sync sort_order ให้ตรงกันทุกปีของรายการนี้
+      await DB.from('repair_line_items').update({sort_order:targetOrder}).eq('section',form.section).eq('line_item',form.line_item);
       setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
     async function handleDelete(item,yr){await DB.from('repair_line_items').delete().eq('year',yr||selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
