@@ -4841,6 +4841,10 @@ window.__dataReady.then(data => {
     const [period,setPeriod]=useState('year');
     const [view,setView]=useState('table');
     const [expandSec,setExpandSec]=useState(null);
+    const [detailModal,setDetailModal]=useState(null); // {item,month,year}
+    const [details,setDetails]=useState([]);
+    const [detailLoading,setDetailLoading]=useState(false);
+    const [newDetail,setNewDetail]=useState({description:'',amount:''});
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     useEffect(()=>{fetch();},[]);
     function fetch(){setLoading(true);DB.from('repair_line_items').select('*').order('year').order('section').order('sort_order').order('line_item').then(({data})=>{setRows(data||[]);setLoading(false);});}
@@ -4874,6 +4878,37 @@ window.__dataReady.then(data => {
     const rowTotalPrev=item=>prevSecRows.filter(r=>r.line_item===item).reduce((s,r)=>s+(r.amount||0),0);
     const prevSecGrand=prevSecRows.reduce((s,r)=>s+(r.amount||0),0);
 
+    function fetchDetails(item,month,year){
+      setDetailLoading(true);
+      DB.from('repair_expense_details').select('*').eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item).order('created_at').then(({data})=>{setDetails(data||[]);setDetailLoading(false);});
+    }
+    function openDetailModal(item,month){
+      setDetailModal({item,month,year:selYear});
+      setNewDetail({description:'',amount:''});
+      fetchDetails(item,month,selYear);
+    }
+    async function addDetail(){
+      if(!newDetail.description){alert('กรอกรายละเอียด');return;}
+      if(!newDetail.amount||isNaN(Number(newDetail.amount))){alert('กรอกจำนวนเงิน');return;}
+      const {item,month,year}=detailModal;
+      await DB.from('repair_expense_details').insert([{year,month,section:selSec,line_item:item,description:newDetail.description,amount:Number(newDetail.amount)}]);
+      const {data}=await DB.from('repair_expense_details').select('*').eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);
+      const nd=data||[];setDetails(nd);setNewDetail({description:'',amount:''});
+      const total=nd.reduce((s,r)=>s+(r.amount||0),0);
+      const existing=rows.find(r=>r.year===year&&r.month===month&&r.section===selSec&&r.line_item===item);
+      if(existing){await DB.from('repair_line_items').update({amount:total}).eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);}
+      else{const so=rows.find(r=>r.section===selSec&&r.line_item===item);await DB.from('repair_line_items').insert([{year,month,section:selSec,line_item:item,amount:total,sort_order:so?so.sort_order:(items.length+1)}]);}
+      fetch();
+    }
+    async function deleteDetail(id){
+      const {item,month,year}=detailModal;
+      await DB.from('repair_expense_details').delete().eq('id',id);
+      const {data}=await DB.from('repair_expense_details').select('*').eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);
+      const nd=data||[];setDetails(nd);
+      const total=nd.reduce((s,r)=>s+(r.amount||0),0);
+      await DB.from('repair_line_items').update({amount:total}).eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);
+      fetch();
+    }
     function openAdd(){setForm({id:null,year:selYear,section:selSec,line_item:'',sort_order:(items.length+1),amounts:{}});setShowForm(true);}
     function openEdit(item,yr){
       const y=yr||selYear;
@@ -5019,7 +5054,7 @@ window.__dataReady.then(data => {
               {items.length===0&&<tr><td colSpan={months.length+4+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
               {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                 <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                {months.map(m=>{const v=cell(it.name,m);return<td key={m} onClick={canEdit?()=>openEdit(it.name):undefined} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:canEdit?'pointer':'default'}} title={canEdit?'คลิกเพื่อแก้ไข':undefined}>{v?fmt2(v):'–'}</td>;})}
+                {months.map(m=>{const v=cell(it.name,m);return<td key={m} onClick={canEdit?()=>openDetailModal(it.name,m):undefined} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:canEdit?'pointer':'default'}} title={canEdit?'คลิกเพื่อดูรายละเอียด':undefined}>{v?fmt2(v):'–'}</td>;})}
                 <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
                   {canEdit?<span onClick={()=>openEdit(it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt2(rowTotal(it.name))}</span>:fmt2(rowTotal(it.name))}
                 </td>
@@ -5153,6 +5188,51 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'center'}}>
             <button onClick={()=>setConfirmDel(null)} style={{padding:'9px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={()=>handleDelete(confirmDel.item,confirmDel.year)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
+          </div>
+        </div>
+      </div>}
+      {loading&&<div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>กำลังโหลด...</div>}
+      {detailModal&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={e=>{if(e.target===e.currentTarget)setDetailModal(null);}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'80vh',display:'flex',flexDirection:'column'}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:800,color:'#1e293b'}}>{detailModal.item}</div>
+              <div style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{MO[detailModal.month-1]} · ปี {detailModal.year} · {selSec}</div>
+            </div>
+            <button onClick={()=>setDetailModal(null)} style={{fontSize:18,background:'none',border:'none',cursor:'pointer',color:'#94a3b8',lineHeight:1}}>✕</button>
+          </div>
+          <div style={{flex:1,overflowY:'auto',marginBottom:16}}>
+            {detailLoading?<div style={{textAlign:'center',padding:20,color:'#94a3b8'}}>กำลังโหลด...</div>
+            :details.length===0?<div style={{textAlign:'center',padding:20,color:'#cbd5e1',fontSize:13}}>ยังไม่มีรายละเอียด</div>
+            :<table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+              <thead><tr style={{background:'#f8fafc'}}>
+                <th style={{textAlign:'left',padding:'6px 8px',color:'#475569',fontWeight:700,borderBottom:'1.5px solid #e2e8f0'}}>รายละเอียด</th>
+                <th style={{textAlign:'right',padding:'6px 8px',color:'#475569',fontWeight:700,borderBottom:'1.5px solid #e2e8f0'}}>จำนวนเงิน</th>
+                <th style={{borderBottom:'1.5px solid #e2e8f0',width:32}}></th>
+              </tr></thead>
+              <tbody>
+                {details.map((d,i)=><tr key={d.id} style={{background:i%2?'#fcfcfd':'#fff'}}>
+                  <td style={{padding:'6px 8px',borderBottom:'1px solid #f1f5f9',color:'#334155'}}>{d.description}</td>
+                  <td style={{padding:'6px 8px',borderBottom:'1px solid #f1f5f9',textAlign:'right',fontWeight:600,color:'#1e293b'}}>{fmt2(d.amount)}</td>
+                  <td style={{padding:'4px 4px',borderBottom:'1px solid #f1f5f9',textAlign:'center'}}>
+                    <button onClick={()=>deleteDetail(d.id)} style={{fontSize:11,padding:'2px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',color:'#dc2626'}}>ลบ</button>
+                  </td>
+                </tr>)}
+              </tbody>
+              <tfoot><tr style={{background:'#f1f5f9',fontWeight:800}}>
+                <td style={{padding:'6px 8px',borderTop:'2px solid #e2e8f0',color:'#1e293b'}}>รวม</td>
+                <td style={{padding:'6px 8px',borderTop:'2px solid #e2e8f0',textAlign:'right',color:'#2f5fd0'}}>{fmt2(details.reduce((s,d)=>s+(d.amount||0),0))}</td>
+                <td style={{borderTop:'2px solid #e2e8f0'}}></td>
+              </tr></tfoot>
+            </table>}
+          </div>
+          <div style={{borderTop:'1.5px solid #e2e8f0',paddingTop:14}}>
+            <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:8}}>เพิ่มรายการ</div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <input placeholder="รายละเอียด เช่น ค่าแรง, ค่าอะไหล่" value={newDetail.description} onChange={e=>setNewDetail({...newDetail,description:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addDetail()} style={{flex:1,padding:'8px 10px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,outline:'none'}}/>
+              <input type="number" placeholder="จำนวนเงิน" value={newDetail.amount} onChange={e=>setNewDetail({...newDetail,amount:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addDetail()} style={{width:110,padding:'8px 10px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,outline:'none'}}/>
+              <button onClick={addDetail} style={{padding:'8px 16px',background:'#2f5fd0',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>+ เพิ่ม</button>
+            </div>
           </div>
         </div>
       </div>}
