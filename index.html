@@ -4889,12 +4889,12 @@ window.__dataReady.then(data => {
       const ins=Object.entries(form.amounts).filter(([m,v])=>v!==''&&v!=null).map(([m,v])=>({year:Number(form.year),month:Number(m),section:form.section,line_item:form.line_item,sort_order:Number(form.sort_order)||0,amount:Number(v)||0}));
       setSaving(true);
       const targetOrder=Number(form.sort_order)||0;
-      // จัดลำดับแบบรวมทุกปีในหมวดนี้ (ไม่แยกปี) เพื่อไม่ให้เลขลำดับชนกันข้ามปี
+      // swap: รายการที่ order ตรงกับ targetOrder ให้รับ order เดิมของรายการนี้แทน
       const secAllRows=rows.filter(r=>r.section===form.section&&r.line_item!==form.line_item);
-      const conflicting=[...new Set(secAllRows.filter(r=>r.sort_order>=targetOrder).map(r=>r.line_item))]
-        .map(item=>({item,order:secAllRows.find(r=>r.line_item===item).sort_order}));
-      for(const c of conflicting){
-        await DB.from('repair_line_items').update({sort_order:c.order+1}).eq('section',form.section).eq('line_item',c.item);
+      const myOldOrder=(rows.find(r=>r.section===form.section&&r.line_item===form.line_item)||{}).sort_order??targetOrder;
+      const swapItem=[...new Set(secAllRows.filter(r=>r.sort_order===targetOrder).map(r=>r.line_item))][0];
+      if(swapItem){
+        await DB.from('repair_line_items').update({sort_order:myOldOrder}).eq('section',form.section).eq('line_item',swapItem);
       }
       if(ins.length===0){
         const existingItemRows=rows.filter(r=>r.section===form.section&&r.line_item===form.line_item);
