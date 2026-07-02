@@ -4897,10 +4897,18 @@ window.__dataReady.then(data => {
         await DB.from('repair_line_items').update({sort_order:c.order+1}).eq('section',form.section).eq('line_item',c.item);
       }
       if(ins.length===0){
-        // ปีนี้ไม่มีค่าใช้จ่ายให้บันทึก แต่ยังอยากปรับลำดับ -> อัปเดต sort_order ของรายการนี้ในทุกปีที่มีอยู่แทน
-        const {error:updErr}=await DB.from('repair_line_items').update({sort_order:targetOrder}).eq('section',form.section).eq('line_item',form.line_item);
-        setSaving(false);
-        if(updErr){alert('บันทึกไม่สำเร็จ: '+updErr.message);return;}
+        const existingItemRows=rows.filter(r=>r.section===form.section&&r.line_item===form.line_item);
+        if(existingItemRows.length>0){
+          // ปีนี้ไม่มีค่าใช้จ่ายให้บันทึก แต่รายการนี้มีอยู่ในปีอื่น -> อัปเดต sort_order ของรายการนี้ในทุกปีที่มีอยู่แทน
+          const {error:updErr}=await DB.from('repair_line_items').update({sort_order:targetOrder}).eq('section',form.section).eq('line_item',form.line_item);
+          setSaving(false);
+          if(updErr){alert('บันทึกไม่สำเร็จ: '+updErr.message);return;}
+        } else {
+          // รายการใหม่ล้วนๆ ไม่มีข้อมูลปีไหนเลย -> สร้างแถวตั้งต้น (0 บาท) ไว้ก่อน เพื่อให้รายการมีตัวตนและจัดลำดับได้
+          const {error:insErr}=await DB.from('repair_line_items').insert([{year:Number(form.year),month:1,section:form.section,line_item:form.line_item,sort_order:targetOrder,amount:0}]);
+          setSaving(false);
+          if(insErr){alert('บันทึกไม่สำเร็จ: '+insErr.message);return;}
+        }
         setShowForm(false);fetch();return;
       }
       // delete existing rows for this line_item/section/year then insert fresh per-month
