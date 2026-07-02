@@ -5334,7 +5334,22 @@ window.__dataReady.then(data => {
           if(!data.length){alert('ไม่พบข้อมูลในไฟล์');return;}
           // รูปแบบ "รายงานใบส่งของ": บล็อกซ้ำๆ ต่อคนขับ -> [รหัส, ชื่อคนขับ] แล้วตามด้วยแถวรายการ [วันที่, เลขบิล, ...] จนถึงแถว "รวม N รายการ"
           const isDateStr=s=>/^\d{1,2}\/\d{1,2}\/\d{3,4}$/.test(String(s).trim());
-          const counts={}; // key: driver|y|m|d -> จำนวนเที่ยว(บิล)ของวันนั้น
+          // ทุกชื่อ+ประเภทรถที่มีอยู่แล้วในระบบ (ทั้ง 2 ประเภท) ไว้จับคู่ชื่อจากไฟล์
+          const existingList=[...new Set(rows.map(r=>r.driver_name+' '+r.vehicle_type))].map(s=>{const [name,vt]=s.split(' ');return{name,vt};});
+          const aliasOf=n=>n.split('/')[0].trim();
+          function resolveTarget(rawName){
+            if(rawName==='ไม่ระบุโครงการ'||rawName.startsWith('รับเอง')){
+              const found=existingList.find(e=>e.name==='รับเอง'||aliasOf(e.name)==='รับเอง');
+              return found?{name:found.name,vt:found.vt}:{name:'รับเอง',vt:selType};
+            }
+            const exact=existingList.find(e=>e.name===rawName);
+            if(exact)return{name:exact.name,vt:exact.vt};
+            const byAlias=existingList.find(e=>aliasOf(e.name)===rawName);
+            if(byAlias)return{name:byAlias.name,vt:byAlias.vt};
+            const fallback=existingList.find(e=>e.name==='รถบ่อตะกั่ว'||aliasOf(e.name)==='รถบ่อตะกั่ว');
+            return fallback?{name:fallback.name,vt:fallback.vt}:{name:'รถบ่อตะกั่ว',vt:selType};
+          }
+          const counts={}; // key: vt|driver|y|m|d -> จำนวนเที่ยว(บิล)ของวันนั้น
           let currentGroup=null;
           for(let ri=0;ri<data.length;ri++){
             const row=data[ri];
@@ -5344,8 +5359,9 @@ window.__dataReady.then(data => {
             if(/^รวม\s*\d+\s*รายการ/.test(colC))continue; // แถวสรุปย่อย ไม่ต้องใช้ (นับเองจากแถวรายการ)
             if(isDateStr(colA)){
               if(colB&&currentGroup){
+                const {name,vt}=resolveTarget(currentGroup);
                 const [d,m,y]=colA.split('/').map(Number);
-                const key=currentGroup+'|'+y+'|'+m+'|'+d;
+                const key=vt+'|'+name+'|'+y+'|'+m+'|'+d;
                 counts[key]=(counts[key]||0)+1;
               }
               continue;
@@ -5355,10 +5371,8 @@ window.__dataReady.then(data => {
             currentGroup=colB||colA; // แถวขึ้นกลุ่มคนขับใหม่ (ชื่ออยู่คอลัมน์ B ปกติ, ถ้าไม่มีโครงการใช้คอลัมน์ A)
           }
           const parsed=Object.entries(counts).map(([key,trips])=>{
-            const parts=key.split('|');
-            const y=Number(parts[parts.length-3]),m=Number(parts[parts.length-2]),d=Number(parts[parts.length-1]);
-            const driver_name=parts.slice(0,parts.length-3).join('|');
-            return {driver_name,year:y,month:m,day:d,trips};
+            const [vt,driver_name,y,m,d]=key.split('|');
+            return {vehicle_type:vt,driver_name,year:Number(y),month:Number(m),day:Number(d),trips};
           }).sort((a,b)=>a.year-b.year||a.month-b.month||a.day-b.day||a.driver_name.localeCompare(b.driver_name,'th'));
           if(parsed.length===0){alert('ไม่พบข้อมูลรายการขนส่งในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์ (ควรเป็นรายงานใบส่งของแยกตามคนขับ)');return;}
           setImportRows(parsed);setShowImport(true);
@@ -5369,16 +5383,16 @@ window.__dataReady.then(data => {
     }
     async function confirmImport(){
       setImporting(true);
-      // ลบข้อมูลรายวันเดิมของเดือน/ปีที่ปรากฏในไฟล์ (เฉพาะประเภทรถที่เลือกอยู่) แล้วนำเข้าใหม่
-      const months=[...new Set(importRows.map(r=>`${r.year}-${r.month}`))];
-      for(const key of months){
-        const [y,m]=key.split('-').map(Number);
-        await DB.from('transport_trips').delete().eq('year',y).eq('month',m).eq('vehicle_type',selType).not('day','is',null);
+      // ลบข้อมูลรายวันเดิมของเดือน/ปี/ประเภทรถที่ปรากฏในไฟล์ทั้งหมด แล้วนำเข้าใหม่
+      const combos=[...new Set(importRows.map(r=>`${r.year}-${r.month}-${r.vehicle_type}`))];
+      for(const key of combos){
+        const [y,m,vt]=key.split('-');
+        await DB.from('transport_trips').delete().eq('year',Number(y)).eq('month',Number(m)).eq('vehicle_type',vt).not('day','is',null);
       }
       const ins=importRows.map((r,idx)=>{
-        const existingOrder=items.find(i=>i.name===r.driver_name)?.order;
+        const existingOrder=rows.find(x=>x.vehicle_type===r.vehicle_type&&x.driver_name===r.driver_name)?.sort_order;
         const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
-        return {year:r.year,month:r.month,day:r.day,vehicle_type:selType,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips};
+        return {year:r.year,month:r.month,day:r.day,vehicle_type:r.vehicle_type,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips};
       });
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
@@ -5602,22 +5616,25 @@ window.__dataReady.then(data => {
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
           {(()=>{
             const byDriver={};
-            importRows.forEach(r=>{if(!byDriver[r.driver_name])byDriver[r.driver_name]={total:0,days:0};byDriver[r.driver_name].total+=r.trips;byDriver[r.driver_name].days+=1;});
-            const drivers=Object.entries(byDriver);
+            importRows.forEach(r=>{const key=r.vehicle_type+'|'+r.driver_name;if(!byDriver[key])byDriver[key]={vt:r.vehicle_type,name:r.driver_name,total:0,days:0};byDriver[key].total+=r.trips;byDriver[key].days+=1;});
+            const drivers=Object.values(byDriver).sort((a,b)=>a.vt.localeCompare(b.vt,'th')||b.total-a.total);
             const monthsFound=[...new Set(importRows.map(r=>`${MO[r.month-1]} ${r.year}`))];
+            const typesFound=[...new Set(importRows.map(r=>r.vehicle_type))];
             return<>
-              <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>{selType} · {monthsFound.join(', ')} · พบ {drivers.length} คนขับ/ทะเบียนรถ · {importRows.length} วัน-เที่ยว</div>
-              <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลรายวันเดิม</b>ของ {selType} เดือน {monthsFound.join(', ')} ทั้งหมด แล้วแทนที่ด้วยข้อมูลจากไฟล์นี้</div>
+              <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>{typesFound.join(', ')} · {monthsFound.join(', ')} · พบ {drivers.length} คนขับ/ทะเบียนรถ · {importRows.length} วัน-เที่ยว</div>
+              <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลรายวันเดิม</b>ของ {typesFound.join(', ')} เดือน {monthsFound.join(', ')} ทั้งหมด แล้วแทนที่ด้วยข้อมูลจากไฟล์นี้ (ชื่อที่ตรงกับที่มีอยู่แล้วจะเข้าคนนั้น ชื่อที่ไม่ระบุ/รับเองจะเข้า "รับเอง" ชื่อที่ไม่พบในระบบจะเข้า "รถบ่อตะกั่ว")</div>
               <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
                 <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
                   <thead><tr style={{background:'#f8fafc'}}>
+                    <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ประเภทรถ</th>
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
                   </tr></thead>
                   <tbody>
-                    {drivers.map(([name,d],i)=><tr key={name} style={{background:i%2?'#fcfcfd':'#fff'}}>
-                      <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{name}</td>
+                    {drivers.map((d,i)=><tr key={d.vt+d.name} style={{background:i%2?'#fcfcfd':'#fff'}}>
+                      <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
+                      <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name}</td>
                       <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
                       <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
                     </tr>)}
