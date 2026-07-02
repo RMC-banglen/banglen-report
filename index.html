@@ -4981,11 +4981,10 @@ window.__dataReady.then(data => {
                 {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt2(v):'–'}</td>;})}
                 <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt2(rowTotal(it.name))}</td>
                 <td style={{textAlign:'right',padding:'5px 8px',color:'#94a3b8',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
-                  {rowTotalPrev(it.name)?fmt2(rowTotalPrev(it.name)):'–'}
-                  {canEdit&&<span style={{marginLeft:6}}>
-                    <button onClick={()=>openEdit(it.name,selYear-1)} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0',marginRight:3}}>แก้</button>
-                    <button onClick={()=>setConfirmDel({item:it.name,year:selYear-1})} style={{padding:'1px 5px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
-                  </span>}
+                  {canEdit&&rowTotalPrev(it.name)?<>
+                    <span onClick={()=>openEdit(it.name,selYear-1)} title="แก้ไขปีก่อน" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt2(rowTotalPrev(it.name))}</span>
+                    <span onClick={()=>setConfirmDel({item:it.name,year:selYear-1})} title="ลบปีก่อน" style={{cursor:'pointer',color:'#fca5a5',marginLeft:4,fontSize:10}}>✕</span>
+                  </>:(rowTotalPrev(it.name)?fmt2(rowTotalPrev(it.name)):'–')}
                 </td>
                 {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                   <button onClick={()=>openEdit(it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0',marginRight:3}}>แก้</button>
