@@ -4894,20 +4894,12 @@ window.__dataReady.then(data => {
       await DB.from('repair_expense_details').insert([{year,month,section:selSec,line_item:item,description:newDetail.description,amount:Number(newDetail.amount)}]);
       const {data}=await DB.from('repair_expense_details').select('*').eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);
       const nd=data||[];setDetails(nd);setNewDetail({description:'',amount:''});
-      const total=nd.reduce((s,r)=>s+(r.amount||0),0);
-      const existing=rows.find(r=>r.year===year&&r.month===month&&r.section===selSec&&r.line_item===item);
-      if(existing){await DB.from('repair_line_items').update({amount:total}).eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);}
-      else{const so=rows.find(r=>r.section===selSec&&r.line_item===item);await DB.from('repair_line_items').insert([{year,month,section:selSec,line_item:item,amount:total,sort_order:so?so.sort_order:(items.length+1)}]);}
-      fetch();
     }
     async function deleteDetail(id){
       const {item,month,year}=detailModal;
       await DB.from('repair_expense_details').delete().eq('id',id);
       const {data}=await DB.from('repair_expense_details').select('*').eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);
       const nd=data||[];setDetails(nd);
-      const total=nd.reduce((s,r)=>s+(r.amount||0),0);
-      await DB.from('repair_line_items').update({amount:total}).eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);
-      fetch();
     }
     function openAdd(){setForm({id:null,year:selYear,section:selSec,line_item:'',sort_order:(items.length+1),amounts:{}});setShowForm(true);}
     function openEdit(item,yr){
