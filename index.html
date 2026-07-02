@@ -5357,8 +5357,8 @@ window.__dataReady.then(data => {
 
       {/* Sub-tab: รายเดือน / สรุปทั้งปี */}
       <div style={{display:'flex',gap:6,marginBottom:16,borderBottom:'2px solid #f1f5f9'}}>
-        <button onClick={()=>setView('monthly')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='monthly'?curType.color:'transparent'}`,background:'transparent',color:view==='monthly'?curType.color:'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📅 รายเดือน</button>
         <button onClick={()=>setView('daily')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='daily'?curType.color:'transparent'}`,background:'transparent',color:view==='daily'?curType.color:'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📆 รายวัน</button>
+        <button onClick={()=>setView('monthly')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='monthly'?curType.color:'transparent'}`,background:'transparent',color:view==='monthly'?curType.color:'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📅 รายเดือน</button>
         <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?curType.color:'transparent'}`,background:'transparent',color:view==='summary'?curType.color:'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
       </div>
 
