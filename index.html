@@ -5316,6 +5316,15 @@ window.__dataReady.then(data => {
       if(delErr||insErr){alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
       setShowDayForm(false);fetch();
     }
+    async function moveDriver(name,dir){
+      const idx=items.findIndex(i=>i.name===name);
+      const swapIdx=idx+dir;
+      if(idx<0||swapIdx<0||swapIdx>=items.length)return;
+      const a=items[idx],b=items[swapIdx];
+      await DB.from('transport_trips').update({sort_order:b.order}).eq('vehicle_type',selType).eq('driver_name',a.name);
+      await DB.from('transport_trips').update({sort_order:a.order}).eq('vehicle_type',selType).eq('driver_name',b.name);
+      fetch();
+    }
 
     // ===== นำเข้า Excel (รายวัน) =====
     const [showImport,setShowImport]=useState(false);
@@ -5565,6 +5574,8 @@ window.__dataReady.then(data => {
                 {dayList.map(d=>{const v=dayCell(it.name,d);return<td key={d} style={{textAlign:'right',padding:'4px 3px',color:v?'#334155':'#e2e8f0',borderBottom:'1px solid #f1f5f9'}}>{v||'·'}</td>;})}
                 <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:curType.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
                 {canEdit&&<td style={{padding:'2px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
+                  <button onClick={()=>moveDriver(it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
+                  <button onClick={()=>moveDriver(it.name,1)} disabled={idx===items.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===items.length-1?'default':'pointer',fontSize:10,color:idx===items.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
                   <button onClick={()=>openDayForm(it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0'}}>แก้</button>
                 </td>}
               </tr>)}
