@@ -5019,7 +5019,7 @@ window.__dataReady.then(data => {
               {items.length===0&&<tr><td colSpan={months.length+4+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
               {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                 <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt2(v):'–'}</td>;})}
+                {months.map(m=>{const v=cell(it.name,m);return<td key={m} onClick={canEdit?()=>openEdit(it.name):undefined} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:canEdit?'pointer':'default'}} title={canEdit?'คลิกเพื่อแก้ไข':undefined}>{v?fmt2(v):'–'}</td>;})}
                 <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
                   {canEdit?<span onClick={()=>openEdit(it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt2(rowTotal(it.name))}</span>:fmt2(rowTotal(it.name))}
                 </td>
