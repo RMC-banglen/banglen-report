@@ -5303,8 +5303,13 @@ window.__dataReady.then(data => {
       setSavingDay(true);
       const existingOrder=items.find(i=>i.name===dayForm.driver_name)?.order;
       const dayOrder=existingOrder!=null?existingOrder:(items.length+1);
-      const ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
+      let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
       const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',selType).eq('driver_name',dayForm.driver_name).not('day','is',null);
+      if(ins.length===0){
+        // ยังไม่มียอด แต่อยากให้ชื่อคนขับเข้าระบบไว้ก่อน -> ถ้ายังไม่เคยมีอยู่เลย สร้างแถวตั้งต้น 0 เที่ยวไว้
+        const existsAnywhere=rows.some(r=>r.vehicle_type===selType&&r.driver_name===dayForm.driver_name);
+        if(!existsAnywhere)ins=[{year:selYear,month:selDayMonth,day:1,vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:0}];
+      }
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
       setSavingDay(false);
