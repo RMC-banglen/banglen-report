@@ -4886,8 +4886,8 @@ window.__dataReady.then(data => {
       setShowForm(true);
     }
     async function handleSave(){
+      if(!form.line_item){alert('กรุณากรอกชื่อรายการ');return;}
       const ins=Object.entries(form.amounts).filter(([m,v])=>v!==''&&v!=null).map(([m,v])=>({year:Number(form.year),month:Number(m),section:form.section,line_item:form.line_item,sort_order:Number(form.sort_order)||0,amount:Number(v)||0}));
-      if(ins.length===0){alert('กรุณากรอกจำนวนเงินอย่างน้อย 1 เดือน ก่อนบันทึก (ใส่ 0 ได้ถ้าไม่มีค่าใช้จ่ายเดือนนั้น)');return;}
       setSaving(true);
       const targetOrder=Number(form.sort_order)||0;
       const yrRows=rows.filter(r=>r.year===Number(form.year)&&r.section===form.section&&r.line_item!==form.line_item);
