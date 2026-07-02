@@ -4883,7 +4883,7 @@ window.__dataReady.then(data => {
       DB.from('repair_expense_details').select('*').eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item).order('created_at').then(({data})=>{setDetails(data||[]);setDetailLoading(false);});
     }
     function openDetailModal(item,month){
-      setDetailModal({item,month,year:selYear});
+      setDetailModal({item,month,year:selYear,cellAmt:cell(item,month)});
       setNewDetail({description:'',amount:''});
       fetchDetails(item,month,selYear);
     }
@@ -5226,6 +5226,9 @@ window.__dataReady.then(data => {
               </tr></tfoot>
             </table>}
           </div>
+          {(()=>{const detTotal=details.reduce((s,d)=>s+(d.amount||0),0);const orig=detailModal.cellAmt||0;const diff=detTotal-orig;return(details.length>0&&diff!==0)?<div style={{background:'#fffbeb',border:'1.5px solid #fbbf24',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#92400e',display:'flex',alignItems:'center',gap:8}}>
+            ⚠️ ยอดรายละเอียดรวม <b>{fmt2(detTotal)}</b> {diff>0?'มากกว่า':'น้อยกว่า'}ยอดในตาราง <b>{fmt2(orig)}</b> อยู่ <b>{fmt2(Math.abs(diff))}</b> บาท
+          </div>:null;})()}
           <div style={{borderTop:'1.5px solid #e2e8f0',paddingTop:14}}>
             <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:8}}>เพิ่มรายการ</div>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
