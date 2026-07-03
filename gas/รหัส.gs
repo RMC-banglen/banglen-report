@@ -164,6 +164,42 @@ function syncConcrete() {
 // ============================================================
 // ลบแถวซ้ำ
 // ============================================================
+function syncMaterials() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('วัตถุดิบ');
+  if (!sh) { SpreadsheetApp.getUi().alert('❌ ไม่พบ Sheet วัตถุดิบ'); return; }
+
+  var rows = sh.getDataRange().getValues();
+  var records = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+    return {
+      mat_label:    String(r[0]),
+      cement_total: Number(r[1]) || null,
+      cement_large: Number(r[2]) || null,
+      cement_18:    Number(r[3]) || null,
+      stone_34:     Number(r[4]) || null,
+      stone_1:      Number(r[5]) || null,
+      sand:         Number(r[6]) || null
+    };
+  });
+
+  // ลบข้อมูลเก่าก่อน
+  UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/materials_daily?id=gte.0', {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    muteHttpExceptions: true
+  });
+
+  // แทรกใหม่
+  UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/materials_daily', {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+    payload: JSON.stringify(records),
+    muteHttpExceptions: true
+  });
+
+  SpreadsheetApp.getUi().alert('✅ Sync วัตถุดิบสำเร็จ ' + records.length + ' แถว');
+}
+
 function removeDuplicates() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sh) return;
@@ -208,7 +244,8 @@ function onOpen() {
   menu.addToUi();
 
   ui.createMenu('Sync Dashboard')
-    .addItem('🔄 Sync ทั้งหมดไป Dashboard', 'syncConcrete')
+    .addItem('🔄 Sync ผลคอนกรีตไป Dashboard', 'syncConcrete')
+    .addItem('🧱 Sync วัตถุดิบไป Dashboard', 'syncMaterials')
     .addItem('🗑️ ลบแถวซ้ำ', 'removeDuplicates')
     .addToUi();
 }
