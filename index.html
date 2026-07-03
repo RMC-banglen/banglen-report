@@ -947,10 +947,10 @@ window.__dataReady.then(data => {
         <LineChart categories={labels} unit="ksc" decimals={0} showValues yMin={420} dangerBelow={450} series={[{label:'Strength',color:PALETTE.strength,data:strength}]} targets={[{value:450,color:PALETTE.cancel,label:'ขั้นต่ำ'},{value:Math.round(avg(strength)),color:'#3f9a4f',label:'เฉลี่ย'}]} height={300}/>
       </ChartCard>
       <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide" right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
-        <LineChart categories={labels} unit="kg/m³" decimals={1} series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,data:cementBig},{label:'I18',color:'#7b61c4',data:cementI18}]} height={300}/>
+        <LineChart categories={labels} unit="kg/m³" decimals={1} series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,data:cementBig},{label:'I18',color:'#7b61c4',data:cementI18}]} height={300} padRight={130}/>
       </ChartCard>
       <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide" right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
-        <LineChart categories={labels} unit="kg/m³" decimals={0} yMin={250} yMax={1000} series={[{label:'หิน 3/4″',color:PALETTE.transport,data:rock34},{label:'หิน 1″',color:'#7b61c4',data:rock1},{label:'ทราย',color:PALETTE.stock,data:sand}]} targets={[{value:T.rock34,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1,color:'#7b61c4',label:'สูตรหิน1″'}]} height={320}/>
+        <LineChart categories={labels} unit="kg/m³" decimals={0} yMin={250} yMax={1000} series={[{label:'หิน 3/4″',color:PALETTE.transport,data:rock34},{label:'หิน 1″',color:'#7b61c4',data:rock1},{label:'ทราย',color:PALETTE.stock,data:sand}]} targets={[{value:T.rock34,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1,color:'#7b61c4',label:'สูตรหิน1″'}]} height={320} padRight={130}/>
       </ChartCard>
       <ChartCard title="ตารางค่าเฉลี่ยทุก 10 วัน" subtitle={`ปี ${year}`} span="full">
         <div className="table-wrap"><table className="dt">
