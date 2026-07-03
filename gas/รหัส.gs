@@ -200,6 +200,45 @@ function syncMaterials() {
   SpreadsheetApp.getUi().alert('✅ Sync วัตถุดิบสำเร็จ ' + records.length + ' แถว');
 }
 
+function syncMaterials() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('วัตถุดิบ');
+  if (!sh) { SpreadsheetApp.getUi().alert('❌ ไม่พบ Sheet วัตถุดิบ'); return; }
+
+  var rows = sh.getDataRange().getValues();
+  var records = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+    return {
+      mat_label:    String(r[0]),
+      cement_total: r[1] !== '' ? Number(r[1]) : null,
+      cement_big:   r[2] !== '' ? Number(r[2]) : null,
+      cement_i18:   r[3] !== '' ? Number(r[3]) : null,
+      rock34:       r[4] !== '' ? Number(r[4]) : null,
+      rock1:        r[5] !== '' ? Number(r[5]) : null,
+      sand:         r[6] !== '' ? Number(r[6]) : null
+    };
+  });
+
+  UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/materials_daily?id=gte.0', {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    muteHttpExceptions: true
+  });
+
+  UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/materials_daily', {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+    payload: JSON.stringify(records),
+    muteHttpExceptions: true
+  });
+
+  SpreadsheetApp.getUi().alert('✅ Sync วัตถุดิบสำเร็จ ' + records.length + ' แถว');
+}
+
+function syncAll() {
+  syncConcrete();
+  syncMaterials();
+}
+
 function removeDuplicates() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sh) return;
@@ -244,8 +283,9 @@ function onOpen() {
   menu.addToUi();
 
   ui.createMenu('Sync Dashboard')
-    .addItem('🔄 Sync ผลคอนกรีตไป Dashboard', 'syncConcrete')
-    .addItem('🧱 Sync วัตถุดิบไป Dashboard', 'syncMaterials')
+    .addItem('🔄 Sync ทั้งหมด (คอนกรีต + วัตถุดิบ)', 'syncAll')
+    .addItem('🧪 Sync เฉพาะผลคอนกรีต', 'syncConcrete')
+    .addItem('🧱 Sync เฉพาะวัตถุดิบ', 'syncMaterials')
     .addItem('🗑️ ลบแถวซ้ำ', 'removeDuplicates')
     .addToUi();
 }
