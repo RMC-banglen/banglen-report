@@ -4255,9 +4255,9 @@ window.__dataReady.then(data => {
         setDept('production'); setFromRaft(false); setRaftTarget(null);
       }
     };
-    const deleteTask = id => {
+    const deleteTask = (id,skipConfirm=false) => {
       const task=tasks.find(t=>t.id===id);
-      if(!confirm('ลบงานนี้?')) return;
+      if(!skipConfirm&&!confirm('ลบงานนี้?')) return;
       if(task&&task.title){
         if(task.title.startsWith('ซ่อมแพที่')){
           const m=task.title.match(/ซ่อมแพที่\s*(\d+)\s*[—-]\s*(.+)/);
@@ -4520,7 +4520,7 @@ window.__dataReady.then(data => {
                 <span style={{fontSize:15,fontWeight:700,padding:'7px 18px',borderRadius:20,background:si.bg,color:si.color}}>{si.label}</span>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}}>
                   {canEdit&&deptPerm(t.dept)&&(t.status==='done'
-                    ? <button onClick={()=>{if(window.confirm('รายงานผลและลบงานนี้ออกจากระบบ?'))deleteTask(t.id);}} style={{fontSize:14,padding:'7px 16px',borderRadius:10,border:'none',background:'#16a34a',color:'#fff',cursor:'pointer',fontWeight:700}}>✓ รายงานผลเสร็จแล้ว</button>
+                    ? <button onClick={()=>{if(window.confirm('รายงานผลและลบงานนี้ออกจากระบบ?'))deleteTask(t.id,true);}} style={{fontSize:14,padding:'7px 16px',borderRadius:10,border:'none',background:'#16a34a',color:'#fff',cursor:'pointer',fontWeight:700}}>✓ รายงานผลเสร็จแล้ว</button>
                     : WT_STATUS.filter(s=>s.id!==t.status).map(s=>(
                         <button key={s.id} onClick={()=>setStatus(t.id,s.id)} style={{fontSize:14,padding:'6px 14px',borderRadius:10,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#334155',cursor:'pointer',fontWeight:600}}>{s.label}</button>
                       ))
