@@ -4163,7 +4163,11 @@ window.__dataReady.then(data => {
           });
         })
         .subscribe();
-      return ()=>{ db.removeChannel(channel); };
+      const refetchTasks=()=>{ db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setTasks(data); }); };
+      const onVisible=()=>{ if(document.visibilityState==='visible') refetchTasks(); };
+      document.addEventListener('visibilitychange',onVisible);
+      const poll=setInterval(refetchTasks,30000);
+      return ()=>{ db.removeChannel(channel); document.removeEventListener('visibilitychange',onVisible); clearInterval(poll); };
     },[]);
 
     const getRaftStatus = (raftIdx,part) => raftData[`${raftIdx}__${part}`]||'ok';
