@@ -4836,7 +4836,7 @@ window.__dataReady.then(data => {
     const [selYear,setSelYear]=useState(2569);
     const [selSec,setSelSec]=useState('เครื่องจักรบางเลน');
     const [showForm,setShowForm]=useState(false);
-    const [form,setForm]=useState({id:null,year:2569,section:'เครื่องจักรบางเลน',line_item:'',sort_order:0,amounts:{}});
+    const [form,setForm]=useState({id:null,year:2569,section:'เครื่องจักรบางเลน',line_item:'',originalName:'',sort_order:0,amounts:{}});
     const [saving,setSaving]=useState(false);
     const [confirmDel,setConfirmDel]=useState(null);
     const [showCompare,setShowCompare]=useState(true);
@@ -4904,49 +4904,49 @@ window.__dataReady.then(data => {
       const {data}=await DB.from('repair_expense_details').select('*').eq('year',year).eq('month',month).eq('section',selSec).eq('line_item',item);
       const nd=data||[];setDetails(nd);
     }
-    function openAdd(){setForm({id:null,year:selYear,section:selSec,line_item:'',sort_order:(items.length+1),amounts:{}});setShowForm(true);}
+    function openAdd(){setForm({id:null,year:selYear,section:selSec,line_item:'',originalName:'',sort_order:(items.length+1),amounts:{}});setShowForm(true);}
     function openEdit(item,yr){
       const y=yr||selYear;
-      const dataRows=(y===selYear?yearRows:prevRows).filter(r=>r.section===selSec&&r.line_item===item);
-      const amounts={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const matched=dataRows.filter(r=>r.month===m);if(matched.length)amounts[m]=matched.reduce((s,r)=>s+(r.amount||0),0);});
+      const dataRows=rows.filter(r=>r.year===y&&r.section===selSec&&r.line_item===item);
+      const amounts={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const matched=dataRows.filter(r=>r.month===m);if(matched.length)amounts[m]=matched.reduce((s,r)=>s+(r.amount||0),0);else amounts[m]='';});
       const so=dataRows[0];
       const fallbackRow=latestSecRows.find(r=>r.line_item===item)||prevSecRows.find(r=>r.line_item===item)||secRows.find(r=>r.line_item===item);
-      setForm({id:'edit',year:y,section:selSec,line_item:item,sort_order:so?so.sort_order:(fallbackRow?fallbackRow.sort_order:(items.length+1)),amounts});
+      setForm({id:'edit',year:y,section:selSec,line_item:item,originalName:item,sort_order:so?so.sort_order:(fallbackRow?fallbackRow.sort_order:(items.length+1)),amounts});
       setShowForm(true);
     }
     async function handleSave(){
       if(!form.line_item){alert('กรุณากรอกชื่อรายการ');return;}
-      const ins=Object.entries(form.amounts).filter(([m,v])=>v!==''&&v!=null).map(([m,v])=>({year:Number(form.year),month:Number(m),section:form.section,line_item:form.line_item,sort_order:Number(form.sort_order)||0,amount:Number(v)||0}));
+      const isEdit=form.id==='edit';
+      const nameChanged=isEdit&&form.line_item.trim()!==form.originalName;
       setSaving(true);
-      const targetOrder=Number(form.sort_order)||0;
-      // swap: รายการที่ order ตรงกับ targetOrder ให้รับ order เดิมของรายการนี้แทน
-      const secAllRows=rows.filter(r=>r.section===form.section&&r.line_item!==form.line_item);
-      const myOldOrder=(rows.find(r=>r.section===form.section&&r.line_item===form.line_item)||{}).sort_order??targetOrder;
-      const swapItem=[...new Set(secAllRows.filter(r=>r.sort_order===targetOrder).map(r=>r.line_item))][0];
-      if(swapItem){
-        await DB.from('repair_line_items').update({sort_order:myOldOrder}).eq('section',form.section).eq('line_item',swapItem);
+      // ถ้าเปลี่ยนชื่อ → rename ทุก row ของรายการนี้ (ทุกปี ทุกเดือน)
+      if(nameChanged){
+        const {error:rnErr}=await DB.from('repair_line_items').update({line_item:form.line_item.trim()}).eq('section',form.section).eq('line_item',form.originalName);
+        if(rnErr){setSaving(false);alert('เปลี่ยนชื่อไม่สำเร็จ: '+rnErr.message);return;}
+        await DB.from('repair_expense_details').update({line_item:form.line_item.trim()}).eq('section',form.section).eq('line_item',form.originalName);
       }
+      const curName=form.line_item.trim();
+      const ins=Object.entries(form.amounts).filter(([m,v])=>v!==''&&v!=null&&v!==0&&Number(v)!==0).map(([m,v])=>({year:Number(form.year),month:Number(m),section:form.section,line_item:curName,sort_order:Number(form.sort_order)||0,amount:Number(v)||0}));
+      const targetOrder=Number(form.sort_order)||0;
+      const secAllRows=rows.filter(r=>r.section===form.section&&r.line_item!==curName&&r.line_item!==form.originalName);
+      const myOldOrder=(rows.find(r=>r.section===form.section&&(r.line_item===curName||r.line_item===form.originalName))||{}).sort_order??targetOrder;
+      const swapItem=[...new Set(secAllRows.filter(r=>r.sort_order===targetOrder).map(r=>r.line_item))][0];
+      if(swapItem) await DB.from('repair_line_items').update({sort_order:myOldOrder}).eq('section',form.section).eq('line_item',swapItem);
       if(ins.length===0){
-        const existingItemRows=rows.filter(r=>r.section===form.section&&r.line_item===form.line_item);
+        const existingItemRows=rows.filter(r=>r.section===form.section&&(r.line_item===curName||r.line_item===form.originalName));
         if(existingItemRows.length>0){
-          // ปีนี้ไม่มีค่าใช้จ่ายให้บันทึก แต่รายการนี้มีอยู่ในปีอื่น -> อัปเดต sort_order ของรายการนี้ในทุกปีที่มีอยู่แทน
-          const {error:updErr}=await DB.from('repair_line_items').update({sort_order:targetOrder}).eq('section',form.section).eq('line_item',form.line_item);
-          setSaving(false);
-          if(updErr){alert('บันทึกไม่สำเร็จ: '+updErr.message);return;}
+          const {error:updErr}=await DB.from('repair_line_items').update({sort_order:targetOrder}).eq('section',form.section).eq('line_item',curName);
+          setSaving(false);if(updErr){alert('บันทึกไม่สำเร็จ: '+updErr.message);return;}
         } else {
-          // รายการใหม่ล้วนๆ ไม่มีข้อมูลปีไหนเลย -> สร้างแถวตั้งต้น (0 บาท) ไว้ก่อน เพื่อให้รายการมีตัวตนและจัดลำดับได้
-          const {error:insErr}=await DB.from('repair_line_items').insert([{year:Number(form.year),month:1,section:form.section,line_item:form.line_item,sort_order:targetOrder,amount:0}]);
-          setSaving(false);
-          if(insErr){alert('บันทึกไม่สำเร็จ: '+insErr.message);return;}
+          const {error:insErr}=await DB.from('repair_line_items').insert([{year:Number(form.year),month:1,section:form.section,line_item:curName,sort_order:targetOrder,amount:0}]);
+          setSaving(false);if(insErr){alert('บันทึกไม่สำเร็จ: '+insErr.message);return;}
         }
         setShowForm(false);fetch();return;
       }
-      // delete existing rows for this line_item/section/year then insert fresh per-month
-      const {error:delErr}=await DB.from('repair_line_items').delete().eq('year',Number(form.year)).eq('section',form.section).eq('line_item',form.line_item);
+      const {error:delErr}=await DB.from('repair_line_items').delete().eq('year',Number(form.year)).eq('section',form.section).eq('line_item',curName);
       const {error:insErr}=await DB.from('repair_line_items').insert(ins);
       if(delErr||insErr){setSaving(false);alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
-      // sync sort_order ให้ตรงกันทุกปีของรายการนี้
-      await DB.from('repair_line_items').update({sort_order:targetOrder}).eq('section',form.section).eq('line_item',form.line_item);
+      await DB.from('repair_line_items').update({sort_order:targetOrder}).eq('section',form.section).eq('line_item',curName);
       setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
     async function handleDelete(item,yr){await DB.from('repair_line_items').delete().eq('year',yr||selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
@@ -5158,7 +5158,14 @@ window.__dataReady.then(data => {
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>{form.id?'แก้ไขรายการ':'+ เพิ่มรายการ'}</div>
           <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{form.section}</div>
           <div style={{marginBottom:12,display:'flex',gap:8}}>
-            <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ปี (พ.ศ.)</div><input type="number" value={form.year} disabled={!!form.id} onChange={e=>setForm(f=>({...f,year:e.target.value}))} style={{...inp,...(form.id?{background:'#f1f5f9',color:'#94a3b8',cursor:'not-allowed'}:{})}}/></div>
+            <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ปี (พ.ศ.)</div>
+              {form.id
+                ?<select value={form.year} onChange={e=>{const y=Number(e.target.value);const dataRows=rows.filter(r=>r.year===y&&r.section===form.section&&r.line_item===(form.originalName||form.line_item));const amounts={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const matched=dataRows.filter(r=>r.month===m);amounts[m]=matched.length?matched.reduce((s,r)=>s+(r.amount||0),0):'';});setForm(f=>({...f,year:y,amounts}));}} style={inp}>
+                  {[...new Set([...years,selYear])].sort((a,b)=>b-a).map(y=><option key={y} value={y}>ปี {y}</option>)}
+                </select>
+                :<input type="number" value={form.year} onChange={e=>setForm(f=>({...f,year:e.target.value}))} style={inp}/>
+              }
+            </div>
             <div style={{flex:3}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อรายการ</div><input type="text" value={form.line_item} onChange={e=>setForm(f=>({...f,line_item:e.target.value}))} placeholder="เช่น แพล้นท์คอนกรีต" style={inp}/></div>
             <div style={{flex:1}}><div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ลำดับ</div><input type="number" value={form.sort_order} onChange={e=>setForm(f=>({...f,sort_order:e.target.value}))} style={inp}/></div>
           </div>
