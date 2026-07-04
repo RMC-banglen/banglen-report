@@ -4950,6 +4950,18 @@ window.__dataReady.then(data => {
       setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
     async function handleDelete(item,yr){await DB.from('repair_line_items').delete().eq('year',yr||selYear).eq('section',selSec).eq('line_item',item);setConfirmDel(null);fetch();}
+    async function moveItem(name,dir){
+      const idx=items.findIndex(i=>i.name===name);
+      const targetIdx=dir==='up'?idx-1:idx+1;
+      if(targetIdx<0||targetIdx>=items.length)return;
+      const other=items[targetIdx];
+      const myOrder=items[idx].order,otherOrder=other.order;
+      await Promise.all([
+        DB.from('repair_line_items').update({sort_order:otherOrder}).eq('section',selSec).eq('line_item',name),
+        DB.from('repair_line_items').update({sort_order:myOrder}).eq('section',selSec).eq('line_item',other.name),
+      ]);
+      fetch();
+    }
 
     const locTotal=(data,loc)=>SECTIONS.filter(s=>s.includes(loc)&&s!=='ซ่อมรถทั่วไป').reduce((s,sec)=>s+secTot(data,sec),0);
     const bangTotal=locTotal(yearRows,'บางเลน'),bangPrev=locTotal(prevRows,'บางเลน');
@@ -5048,7 +5060,7 @@ window.__dataReady.then(data => {
             <tbody>
               {items.length===0&&<tr><td colSpan={months.length+4+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
               {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
+                <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{canEdit&&<span style={{display:'inline-flex',flexDirection:'column',marginRight:4,gap:0,verticalAlign:'middle'}}><button onClick={()=>moveItem(it.name,'up')} disabled={idx===0} style={{padding:'0 3px',border:'none',background:'transparent',cursor:idx===0?'default':'pointer',color:idx===0?'#e2e8f0':'#94a3b8',fontSize:9,lineHeight:1.1,fontWeight:700}}>▲</button><button onClick={()=>moveItem(it.name,'down')} disabled={idx===items.length-1} style={{padding:'0 3px',border:'none',background:'transparent',cursor:idx===items.length-1?'default':'pointer',color:idx===items.length-1?'#e2e8f0':'#94a3b8',fontSize:9,lineHeight:1.1,fontWeight:700}}>▼</button></span>}{it.name}</td>
                 {months.map(m=>{const v=cell(it.name,m);return<td key={m} onClick={canEdit?()=>openDetailModal(it.name,m):undefined} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:canEdit?'pointer':'default'}} title={canEdit?'คลิกเพื่อดูรายละเอียด':undefined}>{v?fmt2(v):'–'}</td>;})}
                 <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:SCOLOR[selSec],borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
                   {canEdit?<span onClick={()=>openEdit(it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt2(rowTotal(it.name))}</span>:fmt2(rowTotal(it.name))}
