@@ -2025,14 +2025,16 @@ window.__dataReady.then(data => {
         const pctDiff      = (dmgPct!=null&&prevPct!=null) ? dmgPct-prevPct : null;
         const prevLabel    = prevMNum ? `${MONTHS_TH_SHORT[prevMNum-1]}-${String(prevYearNum).slice(-2)}` : '–';
 
-        const allRebRobId=rawItems.filter(r=>(r.code_type==='REB'||r.code_type==='ROB'||r.code_type==='ID')&&(dmgYear==='ALL'||r.year===Number(dmgYear))&&(dmgMonth==='ALL'||r.month===Number(dmgMonth)));
-        const rebRobGood=allRebRobId.filter(r=>/รับคืนสินค้าใช้ได้/i.test(r.cause||''));
-        const rebRobBad=allRebRobId.filter(r=>!/รับคืนสินค้าใช้ได้/i.test(r.cause||''));
-        const rebRobTotal=allRebRobId.reduce((a,r)=>a+(r.amount||0),0);
+        const rebRobRaw=rawItems.filter(r=>(r.code_type==='REB'||r.code_type==='ROB')&&(dmgYear==='ALL'||r.year===Number(dmgYear))&&(dmgMonth==='ALL'||r.month===Number(dmgMonth)));
+        const idRaw=rawItems.filter(r=>r.code_type==='ID'&&(dmgYear==='ALL'||r.year===Number(dmgYear))&&(dmgMonth==='ALL'||r.month===Number(dmgMonth)));
+        const rebRobGood=rebRobRaw.filter(r=>/รับคืนสินค้าใช้ได้/i.test(r.cause||''));
+        const rebRobBad=rebRobRaw.filter(r=>!/รับคืนสินค้าใช้ได้/i.test(r.cause||''));
+        const rebRobTotal=rebRobRaw.reduce((a,r)=>a+(r.amount||0),0);
         const rebRobGoodAmt=rebRobGood.reduce((a,r)=>a+(r.amount||0),0);
         const rebRobBadAmt=rebRobBad.reduce((a,r)=>a+(r.amount||0),0);
-        const boardDiff=rebRobBadAmt-dmgTotal;
-        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(6,1fr)'}}>
+        const idTotal=idRaw.reduce((a,r)=>a+(r.amount||0),0);
+        const boardDiff=(rebRobBadAmt+idTotal)-dmgTotal;
+        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(7,1fr)'}}>
           <KpiCard label={`เสียหายรวม ${dmgLabel}`} value={bahtFmt(dmgTotal)} unit=" ฿"
             sub={`ยอดขาย: ${dmgSales?bahtFmt(dmgSales)+' ฿':'ไม่มีข้อมูล'}`} accent={PALETTE.cancel}/>
           <KpiCard label={`% เสียหาย ${dmgLabel}`} value={dmgPct!=null?dmgPct.toFixed(3):'–'} unit="%"
@@ -2061,15 +2063,12 @@ window.__dataReady.then(data => {
           <KpiCard label="รายการเสียหาย" value={dmgItems.length} unit=" รายการ"
             sub={`${[...new Set(dmgItems.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
             accent='#7b61c4'/>
-          {(()=>{
-            const rebRobOnly=allRebRobId.filter(r=>r.code_type==='REB'||r.code_type==='ROB');
-            const idOnly=allRebRobId.filter(r=>r.code_type==='ID');
-            const rebRobOnlyAmt=rebRobOnly.reduce((a,r)=>a+(r.amount||0),0);
-            const idOnlyAmt=idOnly.reduce((a,r)=>a+(r.amount||0),0);
-            return <KpiCard label={`REB+ROB+ID รวมทั้งหมด ${dmgLabel}`} value={bahtFmt(rebRobTotal)} unit=" ฿"
-              sub={`REB+ROB ${bahtFmt(rebRobOnlyAmt)} ฿ | ID ${bahtFmt(idOnlyAmt)} ฿ | เสาดี ${bahtFmt(rebRobGoodAmt)} ฿ | เสาเสีย ${bahtFmt(rebRobBadAmt)} ฿ | ${boardDiff>=0?'+':''}${bahtFmt(boardDiff)} ฿ vs หน้ากระดาน`}
-              accent='#d98a2b'/>;
-          })()}
+          <KpiCard label={`REB+ROB รับคืน ${dmgLabel}`} value={bahtFmt(rebRobTotal)} unit=" ฿"
+            sub={`เสาดี ${bahtFmt(rebRobGoodAmt)} ฿ (${rebRobGood.length} รายการ) | เสาเสีย ${bahtFmt(rebRobBadAmt)} ฿ (${rebRobBad.length} รายการ)`}
+            accent={CODE_COLOR.ROB}/>
+          <KpiCard label={`ID เสียหายในโรงงาน ${dmgLabel}`} value={bahtFmt(idTotal)} unit=" ฿"
+            sub={`${idRaw.length} รายการ | เสาเสียรวม (ROB+REB+ID): ${bahtFmt(rebRobBadAmt+idTotal)} ฿ | ${boardDiff>=0?'+':''}${bahtFmt(boardDiff)} ฿ vs หน้ากระดาน`}
+            accent={CODE_COLOR.ID}/>
         </div>;
       })() : view==='summary'
         ? (()=>{
