@@ -2061,9 +2061,15 @@ window.__dataReady.then(data => {
           <KpiCard label="รายการเสียหาย" value={dmgItems.length} unit=" รายการ"
             sub={`${[...new Set(dmgItems.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
             accent='#7b61c4'/>
-          <KpiCard label={`REB+ROB+ID รวมทั้งหมด ${dmgLabel}`} value={bahtFmt(rebRobTotal)} unit=" ฿"
-            sub={`เสาดี ${bahtFmt(rebRobGoodAmt)} ฿ | เสาเสีย ${bahtFmt(rebRobBadAmt)} ฿ | ${boardDiff>=0?'+':''}${bahtFmt(boardDiff)} ฿ vs หน้ากระดาน`}
-            accent='#d98a2b'/>
+          {(()=>{
+            const rebRobOnly=allRebRobId.filter(r=>r.code_type==='REB'||r.code_type==='ROB');
+            const idOnly=allRebRobId.filter(r=>r.code_type==='ID');
+            const rebRobOnlyAmt=rebRobOnly.reduce((a,r)=>a+(r.amount||0),0);
+            const idOnlyAmt=idOnly.reduce((a,r)=>a+(r.amount||0),0);
+            return <KpiCard label={`REB+ROB+ID รวมทั้งหมด ${dmgLabel}`} value={bahtFmt(rebRobTotal)} unit=" ฿"
+              sub={`REB+ROB ${bahtFmt(rebRobOnlyAmt)} ฿ | ID ${bahtFmt(idOnlyAmt)} ฿ | เสาดี ${bahtFmt(rebRobGoodAmt)} ฿ | เสาเสีย ${bahtFmt(rebRobBadAmt)} ฿ | ${boardDiff>=0?'+':''}${bahtFmt(boardDiff)} ฿ vs หน้ากระดาน`}
+              accent='#d98a2b'/>;
+          })()}
         </div>;
       })() : view==='summary'
         ? (()=>{
