@@ -2025,10 +2025,7 @@ window.__dataReady.then(data => {
         const pctDiff      = (dmgPct!=null&&prevPct!=null) ? dmgPct-prevPct : null;
         const prevLabel    = prevMNum ? `${MONTHS_TH_SHORT[prevMNum-1]}-${String(prevYearNum).slice(-2)}` : '–';
 
-        const robTotal=dmgItems.filter(r=>r.code_type==='ROB').reduce((a,r)=>a+(r.amount||0),0);
-        const rebTotal=dmgItems.filter(r=>r.code_type==='REB').reduce((a,r)=>a+(r.amount||0),0);
-        const idTotal=dmgItems.filter(r=>r.code_type==='ID').reduce((a,r)=>a+(r.amount||0),0);
-        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(7,1fr)'}}>
+        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
           <KpiCard label={`เสียหายรวม ${dmgLabel}`} value={bahtFmt(dmgTotal)} unit=" ฿"
             sub={`ยอดขาย: ${dmgSales?bahtFmt(dmgSales)+' ฿':'ไม่มีข้อมูล'}`} accent={PALETTE.cancel}/>
           <KpiCard label={`% เสียหาย ${dmgLabel}`} value={dmgPct!=null?dmgPct.toFixed(3):'–'} unit="%"
@@ -2057,10 +2054,6 @@ window.__dataReady.then(data => {
           <KpiCard label="รายการเสียหาย" value={dmgItems.length} unit=" รายการ"
             sub={`${[...new Set(dmgItems.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
             accent='#7b61c4'/>
-          <KpiCard label={`ROB ${dmgLabel}`} value={bahtFmt(robTotal)} unit=" ฿"
-            sub={`${dmgItems.filter(r=>r.code_type==='ROB').length} รายการ`} accent={CODE_COLOR.ROB}/>
-          <KpiCard label={`REB ${dmgLabel}`} value={bahtFmt(rebTotal)} unit=" ฿"
-            sub={`${dmgItems.filter(r=>r.code_type==='REB').length} รายการ`} accent={CODE_COLOR.REB}/>
         </div>;
       })() : view==='summary'
         ? (()=>{
