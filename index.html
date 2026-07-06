@@ -3960,6 +3960,41 @@ window.__dataReady.then(data => {
           }
         </div>
       </div>
+      {(()=>{
+        const ytdThis=thisMonths.filter(r=>r.m<=cur.m).reduce((s,r)=>s+(r.produced||0),0);
+        const ytdLast=lastMonths.filter(r=>r.m<=cur.m).reduce((s,r)=>s+(r.produced||0),0);
+        const ytdDiff=ytdThis-ytdLast;
+        const ytdUp=ytdDiff>=0;
+        const cumCats=lineMonthNums.map(m=>THAI_M[m-1]);
+        const cumThis=lineMonthNums.reduce((acc,m)=>{const r=thisMonths.find(x=>x.m===m);acc.push((acc.length?acc[acc.length-1]:0)+(r?r.produced:0));return acc;},[]);
+        const cumLast=lineMonthNums.reduce((acc,m)=>{const r=lastMonths.find(x=>x.m===m);acc.push((acc.length?acc[acc.length-1]:0)+(r?r.produced:0));return acc;},[]);
+        return <>
+          <div style={{background:'#fff',border:'2.5px solid '+PALETTE.produced,borderRadius:16,padding:'18px 28px',marginBottom:20,display:'flex',alignItems:'center',gap:32,flexWrap:'wrap',boxShadow:'0 2px 12px rgba(47,150,80,0.10)'}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:'#64748b',marginBottom:4}}>ยอดสะสม ม.ค.–{THAI_M[cur.m-1]} {thisYear}</div>
+              <span style={{fontSize:42,fontWeight:900,color:PALETTE.produced,lineHeight:1}}>{fmt(ytdThis,0)}</span>
+              <span style={{fontSize:18,color:'#64748b',marginLeft:6}}>m³</span>
+            </div>
+            <div style={{fontSize:28,color:'#e2e8f0'}}>vs</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:'#64748b',marginBottom:4}}>ยอดสะสม ม.ค.–{THAI_M[cur.m-1]} {lastYear}</div>
+              <span style={{fontSize:42,fontWeight:900,color:'#94a3b8',lineHeight:1}}>{fmt(ytdLast,0)}</span>
+              <span style={{fontSize:18,color:'#94a3b8',marginLeft:6}}>m³</span>
+            </div>
+            <div style={{borderLeft:'2px solid #f1f5f9',paddingLeft:28}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#64748b',marginBottom:4}}>ส่วนต่าง</div>
+              <span style={{fontSize:36,fontWeight:900,color:ytdUp?'#3f7d2b':'#c0392b'}}>{ytdUp?'▲':'▼'} {fmt(Math.abs(ytdDiff),0)}</span>
+              <span style={{fontSize:16,color:'#64748b',marginLeft:6}}>m³</span>
+              {ytdLast>0&&<div style={{fontSize:13,color:ytdUp?'#3f7d2b':'#c0392b',fontWeight:600,marginTop:2}}>{ytdUp?'+':''}{fmt(ytdDiff/ytdLast*100,1)}%</div>}
+            </div>
+          </div>
+          <div style={{marginBottom:20}}>
+            <ChartCard title={`ยอดสะสมคิวผลิตรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle={`สะสมตั้งแต่ ม.ค. ถึง ${THAI_M[cur.m-1]} • หน่วย: m³`} span="full">
+              <LineChart categories={cumCats} series={[{label:`ปี ${thisYear}`,color:PALETTE.produced,data:cumThis},{label:`ปี ${lastYear}`,color:PALETTE.prev,data:cumLast,dashed:true,showLabel:true}]} height={280} unit="m³" decimals={0} showValues={true} boxedLabels={true}/>
+            </ChartCard>
+          </div>
+        </>;
+      })()}
       <div className="grid" style={{marginBottom:20}}>
         <ChartCard title="คิวผลิตจริง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
           <GroupedBarChart
