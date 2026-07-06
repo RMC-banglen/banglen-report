@@ -2063,12 +2063,32 @@ window.__dataReady.then(data => {
           <KpiCard label="รายการเสียหาย" value={dmgItems.length} unit=" รายการ"
             sub={`${[...new Set(dmgItems.filter(r=>r.customer_name).map(r=>r.customer_name))].length} ลูกค้า`}
             accent='#7b61c4'/>
-          <KpiCard label={`REB+ROB รับคืน ${dmgLabel}`} value={bahtFmt(rebRobTotal)} unit=" ฿"
-            sub={`เสาดี ${bahtFmt(rebRobGoodAmt)} ฿ (${rebRobGood.length} รายการ) | เสาเสีย ${bahtFmt(rebRobBadAmt)} ฿ (${rebRobBad.length} รายการ)`}
-            accent={CODE_COLOR.ROB}/>
-          <KpiCard label={`ID เสียหายในโรงงาน ${dmgLabel}`} value={bahtFmt(idTotal)} unit=" ฿"
-            sub={`${idRaw.length} รายการ | เสาเสียรวม (ROB+REB+ID): ${bahtFmt(rebRobBadAmt+idTotal)} ฿ | ${boardDiff>=0?'+':''}${bahtFmt(boardDiff)} ฿ vs หน้ากระดาน`}
-            accent={CODE_COLOR.ID}/>
+          <div className="kpi">
+            <div className="kpi__label">{`REB+ROB รับคืน ${dmgLabel}`}</div>
+            <div className="kpi__value" style={{color:CODE_COLOR.ROB}}>{bahtFmt(rebRobTotal)}<span className="kpi__unit"> ฿</span></div>
+            <div style={{display:'flex',gap:6,marginTop:6}}>
+              <div style={{flex:1,border:'2px solid #16a34a',borderRadius:8,padding:'5px 8px',background:'#f0fdf4'}}>
+                <div style={{fontSize:11,color:'#16a34a',fontWeight:700}}>เสาดี</div>
+                <div style={{fontSize:13,fontWeight:800,color:'#15803d'}}>{bahtFmt(rebRobGoodAmt)} ฿</div>
+                <div style={{fontSize:10,color:'#86efac'}}>{rebRobGood.length} รายการ</div>
+              </div>
+              <div style={{flex:1,border:'2px solid #dc2626',borderRadius:8,padding:'5px 8px',background:'#fef2f2'}}>
+                <div style={{fontSize:11,color:'#dc2626',fontWeight:700}}>เสาเสีย</div>
+                <div style={{fontSize:13,fontWeight:800,color:'#b91c1c'}}>{bahtFmt(rebRobBadAmt)} ฿</div>
+                <div style={{fontSize:10,color:'#fca5a5'}}>{rebRobBad.length} รายการ</div>
+              </div>
+            </div>
+          </div>
+          <div className="kpi">
+            <div className="kpi__label">{`ID เสียหายในโรงงาน ${dmgLabel}`}</div>
+            <div className="kpi__value" style={{color:CODE_COLOR.ID}}>{bahtFmt(idTotal)}<span className="kpi__unit"> ฿</span></div>
+            <div style={{fontSize:11,color:'#64748b',marginTop:4}}>{idRaw.length} รายการ</div>
+            <div style={{marginTop:6,borderTop:'1px solid #f1f5f9',paddingTop:6}}>
+              <div style={{fontSize:11,color:'#64748b'}}>เสาเสียรวม (REB+ROB+ID)</div>
+              <div style={{fontSize:13,fontWeight:800,color:'#b91c1c'}}>{bahtFmt(rebRobBadAmt+idTotal)} ฿</div>
+              <div style={{fontSize:11,fontWeight:700,color:boardDiff===0?'#64748b':boardDiff>0?'#dc2626':'#16a34a'}}>{boardDiff>=0?'+':''}{bahtFmt(boardDiff)} ฿ vs หน้ากระดาน</div>
+            </div>
+          </div>
         </div>;
       })() : view==='summary'
         ? (()=>{
