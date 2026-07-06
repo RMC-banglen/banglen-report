@@ -2069,18 +2069,17 @@ window.__dataReady.then(data => {
             <div style={{display:'flex',gap:6,marginTop:6}}>
               <div style={{flex:1,border:'2px solid #16a34a',borderRadius:8,padding:'5px 8px',background:'#f0fdf4'}}>
                 <div style={{fontSize:11,color:'#16a34a',fontWeight:700}}>เสาดี</div>
-                <div style={{fontSize:13,fontWeight:800,color:'#15803d'}}>{bahtFmt(rebRobGoodAmt)} ฿</div>
+                <div style={{fontSize:13,fontWeight:800,color:'#15803d',whiteSpace:'nowrap'}}>{bahtFmt(rebRobGoodAmt)} ฿</div>
               </div>
               <div style={{flex:1,border:'2px solid #dc2626',borderRadius:8,padding:'5px 8px',background:'#fef2f2'}}>
                 <div style={{fontSize:11,color:'#dc2626',fontWeight:700}}>เสาเสีย</div>
-                <div style={{fontSize:13,fontWeight:800,color:'#b91c1c'}}>{bahtFmt(rebRobBadAmt)} ฿</div>
+                <div style={{fontSize:13,fontWeight:800,color:'#b91c1c',whiteSpace:'nowrap'}}>{bahtFmt(rebRobBadAmt)} ฿</div>
               </div>
             </div>
           </div>
           <div className="kpi">
             <div className="kpi__label">{`ID เสียหายในโรงงาน ${dmgLabel}`}</div>
-            <div className="kpi__value" style={{color:CODE_COLOR.ID}}>{bahtFmt(idTotal)}<span className="kpi__unit"> ฿</span></div>
-            <div style={{fontSize:11,color:'#64748b',marginTop:4}}>{idRaw.length} รายการ</div>
+            <div className="kpi__value" style={{color:CODE_COLOR.ID,whiteSpace:'nowrap'}}>{bahtFmt(idTotal)}<span className="kpi__unit"> ฿</span></div>
             <div style={{marginTop:6,borderTop:'1px solid #f1f5f9',paddingTop:6}}>
               <div style={{fontSize:11,color:'#64748b'}}>เสาเสียรวม (REB+ROB+ID)</div>
               <div style={{fontSize:13,fontWeight:800,color:'#b91c1c'}}>{bahtFmt(rebRobBadAmt+idTotal)} ฿</div>
