@@ -3960,6 +3960,22 @@ window.__dataReady.then(data => {
           }
         </div>
       </div>
+      <div className="grid" style={{marginBottom:20}}>
+        <ChartCard title="คิวผลิตจริง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
+          <GroupedBarChart
+            categories={barCats}
+            series={[{label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]}]}
+            barColors={ci=>ci===0?PALETTE.produced:PALETTE.prev}
+            height={240} unit="m³" decimals={0}/>
+        </ChartCard>
+        <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)">
+          <GroupedBarChart
+            categories={barCats}
+            series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[cp(cur),cp(prev)]:[cp(cur)]}]}
+            barColors={ci=>ci===0?'#5a8f3c':PALETTE.prev}
+            height={240} unit="%" decimals={1}/>
+        </ChartCard>
+      </div>
       {(()=>{
         const ytdThis=thisMonths.filter(r=>r.m<=cur.m).reduce((s,r)=>s+(r.produced||0),0);
         const ytdLast=lastMonths.filter(r=>r.m<=cur.m).reduce((s,r)=>s+(r.produced||0),0);
@@ -3995,22 +4011,6 @@ window.__dataReady.then(data => {
           </div>
         </>;
       })()}
-      <div className="grid" style={{marginBottom:20}}>
-        <ChartCard title="คิวผลิตจริง" subtitle={`${curLabel}${prevLabel?' เทียบกับ '+prevLabel:''} • หน่วย: m³`}>
-          <GroupedBarChart
-            categories={barCats}
-            series={[{label:'คิวผลิต',color:PALETTE.produced,data:prev?[cur.produced,prev.produced]:[cur.produced]}]}
-            barColors={ci=>ci===0?PALETTE.produced:PALETTE.prev}
-            height={240} unit="m³" decimals={0}/>
-        </ChartCard>
-        <ChartCard title="เปอร์เซ็นต์ผลิต" subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)">
-          <GroupedBarChart
-            categories={barCats}
-            series={[{label:'%ผลิต',color:'#5a8f3c',data:prev?[cp(cur),cp(prev)]:[cp(cur)]}]}
-            barColors={ci=>ci===0?'#5a8f3c':PALETTE.prev}
-            height={240} unit="%" decimals={1}/>
-        </ChartCard>
-      </div>
       <div style={{marginBottom:20}}>
         <ChartCard title={`คิวผลิตจริงรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle={`เฉพาะเดือนที่มีข้อมูลปี ${thisYear} • หน่วย: m³`} span="full">
           <LineChart
