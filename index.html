@@ -5657,20 +5657,22 @@ window.__dataReady.then(data => {
         </div>;
       })}
 
+      {view==='daily'&&<div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:8}}>
+        <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
+        </select>
+        {canEdit&&<>
+          <button onClick={()=>{setAddDriverType('เทรลเลอร์');setAddDriverName('');setShowAddDriver(true);}} style={{padding:'6px 14px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มคนขับ/ทะเบียนรถ</button>
+          <button onClick={()=>{setImportType('เทรลเลอร์');fileInputRef.current.click();}} style={{padding:'6px 14px',borderRadius:8,border:'1.5px solid #2f5fd0',background:'#fff',color:'#2f5fd0',fontSize:12,fontWeight:700,cursor:'pointer'}}>📤 นำเข้าจาก Excel</button>
+        </>}
+      </div>}
+
       {view==='daily'&&TYPES.map(t=>{
         const {items,dayCell,dayRowTotal,dayColTotal,dayGrand}=getTypeData(t.k);
         return<div key={t.k} style={{marginBottom:32}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
-            <div style={{fontSize:15,fontWeight:800,color:t.color,display:'flex',alignItems:'center',gap:6}}><span>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>รายวัน {t.k} · ปี {selYear}</div>
-            <div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
-                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
-              </select>
-              {canEdit&&<>
-                <button onClick={()=>{setAddDriverType(t.k);setAddDriverName('');setShowAddDriver(true);}} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มคนขับ/ทะเบียนรถ</button>
-                <button onClick={()=>{setImportType(t.k);fileInputRef.current.click();}} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${t.color}`,background:'#fff',color:t.color,fontSize:12,fontWeight:700,cursor:'pointer'}}>📤 นำเข้าจาก Excel</button>
-              </>}
-            </div>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14}}>
+            <span style={{fontSize:15}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
+            <div style={{fontSize:15,fontWeight:800,color:t.color}}>รายวัน {t.k} · ปี {selYear}</div>
           </div>
           <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 20px',marginBottom:14}}>
             <div style={{fontSize:13,color:'#64748b',fontWeight:600,marginBottom:6}}>รวมเที่ยว {MO[selDayMonth-1]} {selYear}</div>
@@ -5737,8 +5739,11 @@ window.__dataReady.then(data => {
 
       {showAddDriver&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowAddDriver(false);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
-          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>+ เพิ่มคนขับ/ทะเบียนรถ</div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{addDriverType}</div>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:12}}>+ เพิ่มคนขับ/ทะเบียนรถ</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ประเภทรถ</div>
+          <div style={{display:'flex',gap:8,marginBottom:16}}>
+            {TYPES.map(t=><button key={t.k} onClick={()=>setAddDriverType(t.k)} style={{flex:1,padding:'8px 12px',border:`2px solid ${addDriverType===t.k?t.color:'#e2e8f0'}`,borderRadius:8,background:addDriverType===t.k?t.color:'#fff',color:addDriverType===t.k?'#fff':t.color,fontSize:13,fontWeight:700,cursor:'pointer'}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'} {t.k}</button>)}
+          </div>
           <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อคนขับ/ทะเบียนรถ</div>
           <input type="text" autoFocus value={addDriverName} onChange={e=>setAddDriverName(e.target.value)} placeholder="เช่น 89-8038 จรูญ" style={{...inp,marginBottom:16}} onKeyDown={e=>{if(e.key==='Enter'&&addDriverName.trim()){setShowAddDriver(false);setDayForm({vehicle_type:addDriverType,driver_name:addDriverName.trim(),days:{}});setShowDayForm(true);}}}/>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
