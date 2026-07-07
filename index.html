@@ -5667,16 +5667,22 @@ window.__dataReady.then(data => {
         </>}
       </div>}
 
+      {view==='daily'&&<div style={{display:'flex',gap:14,marginBottom:20,flexWrap:'wrap'}}>
+        {TYPES.map(t=>{
+          const {dayGrand}=getTypeData(t.k);
+          return<div key={t.k} style={{flex:1,minWidth:200,background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 20px'}}>
+            <div style={{fontSize:13,color:t.color,fontWeight:700,marginBottom:6,display:'flex',alignItems:'center',gap:6}}><span>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>{t.k} · รวมเที่ยว {MO[selDayMonth-1]} {selYear}</div>
+            <div style={{fontSize:26,fontWeight:900,color:'#1e293b'}}>{fmt(dayGrand)} <span style={{fontSize:13,color:'#94a3b8'}}>เที่ยว</span></div>
+          </div>;
+        })}
+      </div>}
+
       {view==='daily'&&TYPES.map(t=>{
         const {items,dayCell,dayRowTotal,dayColTotal,dayGrand}=getTypeData(t.k);
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14}}>
             <span style={{fontSize:15}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
             <div style={{fontSize:15,fontWeight:800,color:t.color}}>รายวัน {t.k} · ปี {selYear}</div>
-          </div>
-          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 20px',marginBottom:14}}>
-            <div style={{fontSize:13,color:'#64748b',fontWeight:600,marginBottom:6}}>รวมเที่ยว {MO[selDayMonth-1]} {selYear}</div>
-            <div style={{fontSize:26,fontWeight:900,color:'#1e293b'}}>{fmt(dayGrand)} <span style={{fontSize:13,color:'#94a3b8'}}>เที่ยว</span></div>
           </div>
           <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:8}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
