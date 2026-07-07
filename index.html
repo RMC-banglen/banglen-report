@@ -4669,7 +4669,7 @@ window.__dataReady.then(data => {
   }
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
-  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'}];
+  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'}];
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
@@ -4889,7 +4889,7 @@ window.__dataReady.then(data => {
     </div>;
   }
 
-  function RepairExpenseTab({canEdit}){
+  function RepairExpenseTab({canEditBL,canEditBT}){
     const SECTIONS=['เครื่องจักรบางเลน','เครื่องจักรบ่อตะกั่ว','เครนรถบางเลน','เครนรถบ่อตะกั่ว','ซ่อมรถบางเลน','ซ่อมรถบ่อตะกั่ว','ซ่อมรถทั่วไป'];
     const SCOLOR={'เครื่องจักรบางเลน':'#2563eb','เครื่องจักรบ่อตะกั่ว':'#0d9488','เครนรถบางเลน':'#2563eb','เครนรถบ่อตะกั่ว':'#0d9488','ซ่อมรถบางเลน':'#2563eb','ซ่อมรถบ่อตะกั่ว':'#0d9488','ซ่อมรถทั่วไป':'#7c3aed'};
     const GROUPS=[{label:'เครื่องจักร',sections:['เครื่องจักรบางเลน','เครื่องจักรบ่อตะกั่ว'],color:'#2f5fd0',bg:'#eff6ff'},{label:'เครนรถ',sections:['เครนรถบางเลน','เครนรถบ่อตะกั่ว'],color:'#d97706',bg:'#fffbeb'},{label:'ซ่อมรถ',sections:['ซ่อมรถบางเลน','ซ่อมรถบ่อตะกั่ว','ซ่อมรถทั่วไป'],color:'#dc2626',bg:'#fff1f2'}];
@@ -4906,6 +4906,7 @@ window.__dataReady.then(data => {
     const [loading,setLoading]=useState(true);
     const [selYear,setSelYear]=useState(2569);
     const [selSec,setSelSec]=useState('เครื่องจักรบางเลน');
+    const canEdit=selSec.includes('บ่อตะกั่ว')?canEditBT:canEditBL;
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({id:null,year:2569,section:'เครื่องจักรบางเลน',line_item:'',originalName:'',sort_order:0,amounts:{}});
     const [saving,setSaving]=useState(false);
@@ -5990,7 +5991,7 @@ window.__dataReady.then(data => {
         {tab==='concrete'&&<ConcreteView year={year}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
         {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
-        {tab==='repair'&&<RepairExpenseTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).repair)}/>}
+        {tab==='repair'&&<RepairExpenseTab canEditBL={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_banglen||(currentUser.permissions||{}).repair))} canEditBT={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_bottakua||(currentUser.permissions||{}).repair))}/>}
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
