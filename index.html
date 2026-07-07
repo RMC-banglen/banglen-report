@@ -5367,7 +5367,7 @@ window.__dataReady.then(data => {
 
     // ===== รายวัน (shared calendar helpers) =====
     const [selDayMonth,setSelDayMonth]=useState(new Date().getMonth()+1);
-    const [dayForm,setDayForm]=useState({vehicle_type:'เทรลเลอร์',driver_name:'',days:{}});
+    const [dayForm,setDayForm]=useState({vehicle_type:'เทรลเลอร์',driver_name:'',original_name:'',days:{}});
     const [showDayForm,setShowDayForm]=useState(false);
     const [showAddDriver,setShowAddDriver]=useState(false);
     const [addDriverType,setAddDriverType]=useState('เทรลเลอร์');
@@ -5416,13 +5416,18 @@ window.__dataReady.then(data => {
     function openDayForm(type,name){
       const {dayRows}=getTypeData(type);
       const days={};dayList.forEach(d=>{const matched=dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
-      setDayForm({vehicle_type:type,driver_name:name,days});
+      setDayForm({vehicle_type:type,driver_name:name,original_name:name,days});
       setShowDayForm(true);
     }
     async function handleSaveDay(){
       if(!dayForm.driver_name)return;
       setSavingDay(true);
       const type=dayForm.vehicle_type;
+      // ถ้าเปลี่ยนชื่อคนขับ -> เปลี่ยนชื่อในทุกแถวของคนขับคนนี้ (ทุกปี/เดือน) ก่อน
+      if(dayForm.original_name&&dayForm.driver_name!==dayForm.original_name){
+        const {error:renameErr}=await DB.from('transport_trips').update({driver_name:dayForm.driver_name}).eq('vehicle_type',type).eq('driver_name',dayForm.original_name);
+        if(renameErr){setSavingDay(false);alert('เปลี่ยนชื่อไม่สำเร็จ: '+renameErr.message);return;}
+      }
       const {items}=getTypeData(type);
       const existingOrder=items.find(i=>i.name===dayForm.driver_name)?.order;
       const dayOrder=existingOrder!=null?existingOrder:(items.length+1);
@@ -5728,17 +5733,22 @@ window.__dataReady.then(data => {
 
       {showDayForm&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowDayForm(false);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:520,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
-          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>แก้ไขรายวัน</div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{dayForm.driver_name} · {dayForm.vehicle_type} · {MO[selDayMonth-1]} {selYear}</div>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:12}}>แก้ไขรายวัน</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อคนขับ/ทะเบียนรถ</div>
+          <input type="text" value={dayForm.driver_name} onChange={e=>setDayForm(f=>({...f,driver_name:e.target.value}))} style={{...inp,marginBottom:8}}/>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{dayForm.vehicle_type} · {MO[selDayMonth-1]} {selYear}</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:8,marginBottom:16}}>
             {dayList.map(d=><div key={d}>
               <div style={{fontSize:11,color:'#94a3b8',marginBottom:2}}>วันที่ {d}</div>
               <input type="number" value={dayForm.days[d]!=null?dayForm.days[d]:''} onChange={e=>setDayForm(f=>({...f,days:{...f.days,[d]:e.target.value}}))} placeholder="0" style={{...inp,padding:'6px 6px',fontSize:12}}/>
             </div>)}
           </div>
-          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={()=>setShowDayForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={handleSaveDay} disabled={savingDay} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDay?0.5:1}}>{savingDay?'กำลังบันทึก...':'บันทึก'}</button>
+          <div style={{display:'flex',gap:10,justifyContent:'space-between'}}>
+            <button onClick={()=>{setShowDayForm(false);setConfirmDel({type:dayForm.vehicle_type,name:dayForm.original_name});}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #fecaca',background:'#fff',color:'#dc2626',fontSize:14,cursor:'pointer'}}>ลบทั้งหมด</button>
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>setShowDayForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+              <button onClick={handleSaveDay} disabled={savingDay} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDay?0.5:1}}>{savingDay?'กำลังบันทึก...':'บันทึก'}</button>
+            </div>
           </div>
         </div>
       </div>}
