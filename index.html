@@ -5500,27 +5500,21 @@ window.__dataReady.then(data => {
     }
     async function confirmImport(){
       setImporting(true);
-      // นำเข้าแบบสะสม (บวกเพิ่ม) ไม่ลบของเดิม -> ถ้าวัน/คนขับตรงกับที่มีอยู่แล้ว ให้บวกจำนวนเที่ยวเพิ่มเข้าไป
-      const toInsert=[];
-      const toUpdate=[]; // {id, trips}
-      importRows.forEach((r,idx)=>{
-        const existing=rows.find(x=>x.year===r.year&&x.month===r.month&&x.day===r.day&&x.vehicle_type===r.vehicle_type&&x.driver_name===r.driver_name);
-        if(existing){
-          toUpdate.push({id:existing.id,trips:(existing.trips||0)+r.trips});
-        }else{
-          const existingOrder=rows.find(x=>x.vehicle_type===r.vehicle_type&&x.driver_name===r.driver_name)?.sort_order;
-          const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
-          toInsert.push({year:r.year,month:r.month,day:r.day,vehicle_type:r.vehicle_type,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips});
-        }
-      });
-      let err=null;
-      for(const u of toUpdate){
-        const {error}=await DB.from('transport_trips').update({trips:u.trips}).eq('id',u.id);
-        if(error){err=error;break;}
+      // ลบข้อมูลรายวันเดิมของเดือน/ปี/ประเภทรถที่ปรากฏในไฟล์ทั้งหมด แล้วนำเข้าใหม่
+      const combos=[...new Set(importRows.map(r=>`${r.year}-${r.month}-${r.vehicle_type}`))];
+      for(const key of combos){
+        const [y,m,vt]=key.split('-');
+        await DB.from('transport_trips').delete().eq('year',Number(y)).eq('month',Number(m)).eq('vehicle_type',vt).not('day','is',null);
       }
-      if(!err&&toInsert.length)({error:err}=await DB.from('transport_trips').insert(toInsert));
+      const ins=importRows.map((r,idx)=>{
+        const existingOrder=rows.find(x=>x.vehicle_type===r.vehicle_type&&x.driver_name===r.driver_name)?.sort_order;
+        const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
+        return {year:r.year,month:r.month,day:r.day,vehicle_type:r.vehicle_type,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips};
+      });
+      let insErr=null;
+      if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
       setImporting(false);
-      if(err){alert('นำเข้าไม่สำเร็จ: '+err.message);return;}
+      if(insErr){alert('นำเข้าไม่สำเร็จ: '+insErr.message);return;}
       setShowImport(false);setImportRows([]);fetch();
     }
 
@@ -5747,7 +5741,7 @@ window.__dataReady.then(data => {
             const typesFound=[...new Set(importRows.map(r=>r.vehicle_type))];
             return<>
               <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>{typesFound.join(', ')} · {monthsFound.join(', ')} · พบ {drivers.length} คนขับ/ทะเบียนรถ · {importRows.length} วัน-เที่ยว</div>
-              <div style={{fontSize:12,color:'#0f766e',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:8,padding:'8px 12px',marginBottom:14}}>ℹ️ การนำเข้าจะ<b>บวกจำนวนเที่ยวเพิ่ม</b>เข้ากับข้อมูลเดิมของวันนั้น (ไม่ลบของเดิม) — เหมาะกับกรณีมีไฟล์บิลหลายเลขที่ (เช่น BLV คนละชุด) แล้วนำเข้าหลายไฟล์สำหรับเดือนเดียวกัน (ชื่อที่ตรงกับที่มีอยู่แล้วจะเข้าคนนั้น ชื่อที่ไม่ระบุ/รับเองจะเข้า "รับเอง" ชื่อที่ไม่พบในระบบจะเข้า "รถบ่อตะกั่ว")</div>
+              <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลรายวันเดิม</b>ของ {typesFound.join(', ')} เดือน {monthsFound.join(', ')} ทั้งหมด แล้วแทนที่ด้วยข้อมูลจากไฟล์นี้ (ชื่อที่ตรงกับที่มีอยู่แล้วจะเข้าคนนั้น ชื่อที่ไม่ระบุ/รับเองจะเข้า "รับเอง" ชื่อที่ไม่พบในระบบจะเข้า "รถบ่อตะกั่ว")</div>
               <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
                 <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
                   <thead><tr style={{background:'#f8fafc'}}>
