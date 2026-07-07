@@ -5352,71 +5352,86 @@ window.__dataReady.then(data => {
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
     const [selYear,setSelYear]=useState(2569);
-    const [selType,setSelType]=useState('เทรลเลอร์');
     const [view,setView]=useState('daily');
     const [selMonth,setSelMonth]=useState(new Date().getMonth()+1);
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({id:null,year:2569,vehicle_type:'เทรลเลอร์',driver_name:'',sort_order:0,trips:{}});
     const [saving,setSaving]=useState(false);
-    const [confirmDel,setConfirmDel]=useState(null);
+    const [confirmDel,setConfirmDel]=useState(null); // {type,name}
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     useEffect(()=>{fetch();},[]);
     function fetch(){setLoading(true);DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name').then(({data})=>{setRows(data||[]);setLoading(false);});}
 
     const years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a);
     const yearRows=rows.filter(r=>r.year===selYear);
-    const typeRows=yearRows.filter(r=>r.vehicle_type===selType);
-    const items=[];
-    typeRows.forEach(r=>{if(!items.find(i=>i.name===r.driver_name))items.push({name:r.driver_name,order:r.sort_order});});
-    items.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'th'));
-    const monthRows=typeRows.filter(r=>r.day==null);
-    const dayRows=typeRows.filter(r=>r.day!=null);
-    // ยอดรายเดือน: ถ้ามีข้อมูลรายวันของเดือนนั้นให้ดึงมารวมใช้เอง ไม่ต้องกรอกยอดรวมเดือนซ้ำ
-    const monthValue=(name,m)=>{
-      const dSum=dayRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-      if(dSum>0)return dSum;
-      return monthRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-    };
-    const ALL_MONTHS=[1,2,3,4,5,6,7,8,9,10,11,12];
-    const monthsAll=ALL_MONTHS.filter(m=>items.some(it=>monthValue(it.name,m)>0));
-    const months=monthsAll.length?monthsAll:[1,2,3,4,5];
-    const cell=monthValue;
-    const rowTotal=name=>ALL_MONTHS.reduce((s,m)=>s+monthValue(name,m),0);
-    const colTotal=m=>items.reduce((s,it)=>s+monthValue(it.name,m),0);
-    const typeGrand=items.reduce((s,it)=>s+rowTotal(it.name),0);
-    const monthTotal=monthValue;
-    const monthGrand=colTotal(selMonth);
-    const monthItems=items.map(it=>({...it,trips:monthTotal(it.name,selMonth)})).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
-    // ===== รายวัน =====
+
+    // ===== รายวัน (shared calendar helpers) =====
     const [selDayMonth,setSelDayMonth]=useState(new Date().getMonth()+1);
-    const [dayForm,setDayForm]=useState({driver_name:'',days:{}});
+    const [dayForm,setDayForm]=useState({vehicle_type:'เทรลเลอร์',driver_name:'',days:{}});
     const [showDayForm,setShowDayForm]=useState(false);
     const [showAddDriver,setShowAddDriver]=useState(false);
+    const [addDriverType,setAddDriverType]=useState('เทรลเลอร์');
     const [addDriverName,setAddDriverName]=useState('');
     const [savingDay,setSavingDay]=useState(false);
     const daysInMonth=(beYear,m)=>new Date(beYear-543,m,0).getDate();
     const dLen=daysInMonth(selYear,selDayMonth);
     const dayList=Array.from({length:dLen},(_,i)=>i+1);
-    const dayCell=(name,d)=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-    const dayRowTotal=name=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-    const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-    const dayGrand=dayRows.filter(r=>r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-    function openDayForm(name){
+
+    // ===== นำเข้า Excel (รายวัน) =====
+    const [showImport,setShowImport]=useState(false);
+    const [importRows,setImportRows]=useState([]);
+    const [importing,setImporting]=useState(false);
+    const [importType,setImportType]=useState('เทรลเลอร์');
+    const fileInputRef=React.useRef(null);
+
+    // ===== คำนวณข้อมูลแยกตามประเภทรถ =====
+    function getTypeData(typeKey){
+      const typeRows=yearRows.filter(r=>r.vehicle_type===typeKey);
+      const items=[];
+      typeRows.forEach(r=>{if(!items.find(i=>i.name===r.driver_name))items.push({name:r.driver_name,order:r.sort_order});});
+      items.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'th'));
+      const monthRows=typeRows.filter(r=>r.day==null);
+      const dayRows=typeRows.filter(r=>r.day!=null);
+      const monthValue=(name,m)=>{
+        const dSum=dayRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+        if(dSum>0)return dSum;
+        return monthRows.filter(r=>r.driver_name===name&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+      };
+      const ALL_MONTHS=[1,2,3,4,5,6,7,8,9,10,11,12];
+      const monthsAll=ALL_MONTHS.filter(m=>items.some(it=>monthValue(it.name,m)>0));
+      const months=monthsAll.length?monthsAll:[1,2,3,4,5];
+      const cell=monthValue;
+      const rowTotal=name=>ALL_MONTHS.reduce((s,m)=>s+monthValue(name,m),0);
+      const colTotal=m=>items.reduce((s,it)=>s+monthValue(it.name,m),0);
+      const typeGrand=items.reduce((s,it)=>s+rowTotal(it.name),0);
+      const monthGrand=colTotal(selMonth);
+      const monthItems=items.map(it=>({...it,trips:monthValue(it.name,selMonth)})).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
+      const dayCell=(name,d)=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
+      const dayRowTotal=name=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
+      const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
+      const dayGrand=dayRows.filter(r=>r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
+      return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayRowTotal,dayColTotal,dayGrand};
+    }
+
+    function openDayForm(type,name){
+      const {dayRows}=getTypeData(type);
       const days={};dayList.forEach(d=>{const matched=dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
-      setDayForm({driver_name:name,days});
+      setDayForm({vehicle_type:type,driver_name:name,days});
       setShowDayForm(true);
     }
     async function handleSaveDay(){
       if(!dayForm.driver_name)return;
       setSavingDay(true);
+      const type=dayForm.vehicle_type;
+      const {items}=getTypeData(type);
       const existingOrder=items.find(i=>i.name===dayForm.driver_name)?.order;
       const dayOrder=existingOrder!=null?existingOrder:(items.length+1);
-      let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
-      const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',selType).eq('driver_name',dayForm.driver_name).not('day','is',null);
+      let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
+      const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).not('day','is',null);
       if(ins.length===0){
         // ยังไม่มียอดเดือนนี้ -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
-        const existsElsewhere=rows.some(r=>r.vehicle_type===selType&&r.driver_name===dayForm.driver_name&&!(r.year===selYear&&r.month===selDayMonth));
-        if(!existsElsewhere)ins=[{year:selYear,month:selDayMonth,day:1,vehicle_type:selType,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:0}];
+        const existsElsewhere=rows.some(r=>r.vehicle_type===type&&r.driver_name===dayForm.driver_name&&!(r.year===selYear&&r.month===selDayMonth));
+        if(!existsElsewhere)ins=[{year:selYear,month:selDayMonth,day:1,vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:0}];
       }
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
@@ -5424,21 +5439,17 @@ window.__dataReady.then(data => {
       if(delErr||insErr){alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
       setShowDayForm(false);fetch();
     }
-    async function moveDriver(name,dir){
+    async function moveDriver(type,name,dir){
+      const {items}=getTypeData(type);
       const idx=items.findIndex(i=>i.name===name);
       const swapIdx=idx+dir;
       if(idx<0||swapIdx<0||swapIdx>=items.length)return;
       const a=items[idx],b=items[swapIdx];
-      await DB.from('transport_trips').update({sort_order:b.order}).eq('vehicle_type',selType).eq('driver_name',a.name);
-      await DB.from('transport_trips').update({sort_order:a.order}).eq('vehicle_type',selType).eq('driver_name',b.name);
+      await DB.from('transport_trips').update({sort_order:b.order}).eq('vehicle_type',type).eq('driver_name',a.name);
+      await DB.from('transport_trips').update({sort_order:a.order}).eq('vehicle_type',type).eq('driver_name',b.name);
       fetch();
     }
 
-    // ===== นำเข้า Excel (รายวัน) =====
-    const [showImport,setShowImport]=useState(false);
-    const [importRows,setImportRows]=useState([]); // [{driver_name, days:{1:2,2:0,...}}]
-    const [importing,setImporting]=useState(false);
-    const fileInputRef=React.useRef(null);
     function handleFile(e){
       const file=e.target.files[0];
       if(!file)return;
@@ -5452,19 +5463,19 @@ window.__dataReady.then(data => {
           // รูปแบบ "รายงานใบส่งของ": บล็อกซ้ำๆ ต่อคนขับ -> [รหัส, ชื่อคนขับ] แล้วตามด้วยแถวรายการ [วันที่, เลขบิล, ...] จนถึงแถว "รวม N รายการ"
           const isDateStr=s=>/^\d{1,2}\/\d{1,2}\/\d{3,4}$/.test(String(s).trim());
           // ทุกชื่อ+ประเภทรถที่มีอยู่แล้วในระบบ (ทั้ง 2 ประเภท) ไว้จับคู่ชื่อจากไฟล์
-          const existingList=[...new Set(rows.map(r=>r.driver_name+' '+r.vehicle_type))].map(s=>{const [name,vt]=s.split(' ');return{name,vt};});
+          const existingList=[...new Set(rows.map(r=>r.driver_name+' '+r.vehicle_type))].map(s=>{const [name,vt]=s.split(' ');return{name,vt};});
           const aliasOf=n=>n.split('/')[0].trim();
           function resolveTarget(rawName){
             if(rawName==='ไม่ระบุโครงการ'||rawName.startsWith('รับเอง')){
               const found=existingList.find(e=>e.name==='รับเอง'||aliasOf(e.name)==='รับเอง');
-              return found?{name:found.name,vt:found.vt}:{name:'รับเอง',vt:selType};
+              return found?{name:found.name,vt:found.vt}:{name:'รับเอง',vt:importType};
             }
             const exact=existingList.find(e=>e.name===rawName);
             if(exact)return{name:exact.name,vt:exact.vt};
             const byAlias=existingList.find(e=>aliasOf(e.name)===rawName);
             if(byAlias)return{name:byAlias.name,vt:byAlias.vt};
             const fallback=existingList.find(e=>e.name==='รถบ่อตะกั่ว'||aliasOf(e.name)==='รถบ่อตะกั่ว');
-            return fallback?{name:fallback.name,vt:fallback.vt}:{name:'รถบ่อตะกั่ว',vt:selType};
+            return fallback?{name:fallback.name,vt:fallback.vt}:{name:'รถบ่อตะกั่ว',vt:importType};
           }
           const counts={}; // key: vt|driver|y|m|d|prefix -> จำนวนเที่ยว(บิล)ของวันนั้น แยกตามชุดเลขที่บิล (เช่น BLV, BLF)
           let currentGroup=null;
@@ -5509,6 +5520,7 @@ window.__dataReady.then(data => {
         await DB.from('transport_trips').delete().eq('year',Number(y)).eq('month',Number(m)).eq('vehicle_type',vt).eq('note',src).not('day','is',null);
       }
       const ins=importRows.map((r,idx)=>{
+        const {items}=getTypeData(r.vehicle_type);
         const existingOrder=rows.find(x=>x.vehicle_type===r.vehicle_type&&x.driver_name===r.driver_name)?.sort_order;
         const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
         return {year:r.year,month:r.month,day:r.day,vehicle_type:r.vehicle_type,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips,note:r.source};
@@ -5520,11 +5532,12 @@ window.__dataReady.then(data => {
       setShowImport(false);setImportRows([]);fetch();
     }
 
-    function openAdd(){setForm({id:null,year:selYear,vehicle_type:selType,driver_name:'',sort_order:(items.length+1),trips:{}});setShowForm(true);}
-    function openEdit(name){
+    function openAdd(type){const {items}=getTypeData(type);setForm({id:null,year:selYear,vehicle_type:type,driver_name:'',sort_order:(items.length+1),trips:{}});setShowForm(true);}
+    function openEdit(type,name){
+      const {typeRows,items}=getTypeData(type);
       const trips={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const matched=typeRows.filter(r=>r.driver_name===name&&r.month===m);if(matched.length)trips[m]=matched.reduce((s,r)=>s+(r.trips||0),0);});
       const so=typeRows.find(r=>r.driver_name===name);
-      setForm({id:'edit',year:selYear,vehicle_type:selType,driver_name:name,sort_order:so?so.sort_order:(items.length+1),trips});
+      setForm({id:'edit',year:selYear,vehicle_type:type,driver_name:name,sort_order:so?so.sort_order:(items.length+1),trips});
       setShowForm(true);
     }
     async function handleSave(){
@@ -5556,9 +5569,8 @@ window.__dataReady.then(data => {
       if(delErr||insErr){setSaving(false);alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
       setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
-    async function handleDelete(name){await DB.from('transport_trips').delete().eq('year',selYear).eq('vehicle_type',selType).eq('driver_name',name);setConfirmDel(null);fetch();}
+    async function handleDelete(type,name){await DB.from('transport_trips').delete().eq('year',selYear).eq('vehicle_type',type).eq('driver_name',name);setConfirmDel(null);fetch();}
 
-    const curType=TYPES.find(t=>t.k===selType);
     return<div style={{padding:'24px 0'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
         <div>
@@ -5570,142 +5582,146 @@ window.__dataReady.then(data => {
         </div>
       </div>
 
-      {/* ประเภทรถ */}
-      <div style={{display:'flex',gap:8,marginBottom:14}}>
-        {TYPES.map(t=><button key={t.k} onClick={()=>setSelType(t.k)} style={{padding:'10px 20px',border:`2px solid ${selType===t.k?t.color:'#e2e8f0'}`,borderRadius:12,background:selType===t.k?t.color:'#fff',color:selType===t.k?'#fff':t.color,fontSize:14,fontWeight:800,cursor:'pointer'}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'} {t.k}</button>)}
+      {/* Sub-tab: รายวัน / รายเดือน / สรุปทั้งปี */}
+      <div style={{display:'flex',gap:6,marginBottom:20,borderBottom:'2px solid #f1f5f9'}}>
+        <button onClick={()=>setView('daily')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='daily'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='daily'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📆 รายวัน</button>
+        <button onClick={()=>setView('monthly')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='monthly'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='monthly'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📅 รายเดือน</button>
+        <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='summary'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
       </div>
 
-      {/* Sub-tab: รายเดือน / สรุปทั้งปี */}
-      <div style={{display:'flex',gap:6,marginBottom:16,borderBottom:'2px solid #f1f5f9'}}>
-        <button onClick={()=>setView('daily')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='daily'?curType.color:'transparent'}`,background:'transparent',color:view==='daily'?curType.color:'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📆 รายวัน</button>
-        <button onClick={()=>setView('monthly')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='monthly'?curType.color:'transparent'}`,background:'transparent',color:view==='monthly'?curType.color:'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📅 รายเดือน</button>
-        <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?curType.color:'transparent'}`,background:'transparent',color:view==='summary'?curType.color:'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
-      </div>
-
-      {view==='monthly'&&<>
-      {/* เลือกเดือนดูสรุปเร็ว */}
-      <div style={{display:'flex',gap:14,marginBottom:20,flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:180,background:curType.bg,border:`2px solid ${curType.color}30`,borderRadius:14,padding:'16px 20px'}}>
-          <div style={{fontSize:13,color:curType.color,fontWeight:700,marginBottom:6}}>รวมทั้งปี {selYear} · {selType}</div>
-          <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{fmt(typeGrand)} <span style={{fontSize:14,color:'#94a3b8'}}>เที่ยว</span></div>
-        </div>
-        <div style={{flex:1,minWidth:220,background:'#fff',border:'2px solid #e2e8f0',borderRadius:14,padding:'16px 20px'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div style={{fontSize:13,color:'#64748b',fontWeight:700}}>ดูสรุปเดือน</div>
-            <select value={selMonth} onChange={e=>setSelMonth(Number(e.target.value))} style={{fontSize:13,padding:'4px 8px',border:'1px solid #e2e8f0',borderRadius:6}}>
-              {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
-            </select>
+      {view==='monthly'&&TYPES.map(t=>{
+        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems}=getTypeData(t.k);
+        return<div key={t.k} style={{marginBottom:32}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+            <span style={{fontSize:18}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
+            <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k}</div>
           </div>
-          <div style={{fontSize:22,fontWeight:900,color:'#1e293b'}}>{fmt(monthGrand)} <span style={{fontSize:13,color:'#94a3b8'}}>เที่ยว ({monthItems.length} คัน/คน)</span></div>
-          {monthItems.length>0&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
-            {monthItems.slice(0,5).map(it=><div key={it.name} style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#475569'}}><span>{it.name}</span><b>{it.trips} เที่ยว</b></div>)}
-          </div>}
-        </div>
-      </div>
+          <div style={{display:'flex',gap:14,marginBottom:20,flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:180,background:t.bg,border:`2px solid ${t.color}30`,borderRadius:14,padding:'16px 20px'}}>
+              <div style={{fontSize:13,color:t.color,fontWeight:700,marginBottom:6}}>รวมทั้งปี {selYear} · {t.k}</div>
+              <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{fmt(typeGrand)} <span style={{fontSize:14,color:'#94a3b8'}}>เที่ยว</span></div>
+            </div>
+            <div style={{flex:1,minWidth:220,background:'#fff',border:'2px solid #e2e8f0',borderRadius:14,padding:'16px 20px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <div style={{fontSize:13,color:'#64748b',fontWeight:700}}>ดูสรุปเดือน</div>
+                <select value={selMonth} onChange={e=>setSelMonth(Number(e.target.value))} style={{fontSize:13,padding:'4px 8px',border:'1px solid #e2e8f0',borderRadius:6}}>
+                  {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
+                </select>
+              </div>
+              <div style={{fontSize:22,fontWeight:900,color:'#1e293b'}}>{fmt(monthGrand)} <span style={{fontSize:13,color:'#94a3b8'}}>เที่ยว ({monthItems.length} คัน/คน)</span></div>
+              {monthItems.length>0&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
+                {monthItems.slice(0,5).map(it=><div key={it.name} style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#475569'}}><span>{it.name}</span><b>{it.trips} เที่ยว</b></div>)}
+              </div>}
+            </div>
+          </div>
 
-      {/* Pivot table */}
-      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:20}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${curType.color}0a`}}>
-          <div style={{fontSize:16,fontWeight:800,color:curType.color}}>{selType} · ปี {selYear}</div>
-          {canEdit&&<button onClick={openAdd} style={{padding:'6px 14px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
-        </div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{borderCollapse:'collapse',width:'100%',fontSize:11.5}}>
-            <thead>
-              <tr style={{background:'#f8fafc'}}>
-                <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
-                {months.map(m=><th key={m} style={{textAlign:'right',padding:'7px 6px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
-                <th style={{textAlign:'right',padding:'7px 8px',color:curType.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
-                {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {items.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-              {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
-                <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:curType.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
-                  {canEdit?<span onClick={()=>openEdit(it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(rowTotal(it.name))}</span>:fmt(rowTotal(it.name))}
-                </td>
-                {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
-                  <button onClick={()=>setConfirmDel(it.name)} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
-                </td>}
-              </tr>)}
-            </tbody>
-            <tfoot>
-              <tr style={{background:'#f1f5f9',fontWeight:800}}>
-                <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#f1f5f9',color:'#1e293b',borderTop:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>รวม</td>
-                {months.map(m=><td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#1e293b',borderTop:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{fmt(colTotal(m))}</td>)}
-                <td style={{textAlign:'right',padding:'7px 8px',color:'#fff',background:curType.color,borderTop:'2px solid #e2e8f0'}}>{fmt(typeGrand)}</td>
-                {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-      </>}
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
+              <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · ปี {selYear}</div>
+              {canEdit&&<button onClick={()=>openAdd(t.k)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{borderCollapse:'collapse',width:'100%',fontSize:11.5}}>
+                <thead>
+                  <tr style={{background:'#f8fafc'}}>
+                    <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
+                    {months.map(m=><th key={m} style={{textAlign:'right',padding:'7px 6px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
+                    <th style={{textAlign:'right',padding:'7px 8px',color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
+                    {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
+                  {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
+                    <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
+                    {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
+                    <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
+                      {canEdit?<span onClick={()=>openEdit(t.k,it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(rowTotal(it.name))}</span>:fmt(rowTotal(it.name))}
+                    </td>
+                    {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
+                      <button onClick={()=>setConfirmDel({type:t.k,name:it.name})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
+                    </td>}
+                  </tr>)}
+                </tbody>
+                <tfoot>
+                  <tr style={{background:'#f1f5f9',fontWeight:800}}>
+                    <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#f1f5f9',color:'#1e293b',borderTop:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>รวม</td>
+                    {months.map(m=><td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#1e293b',borderTop:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{fmt(colTotal(m))}</td>)}
+                    <td style={{textAlign:'right',padding:'7px 8px',color:'#fff',background:t.color,borderTop:'2px solid #e2e8f0'}}>{fmt(typeGrand)}</td>
+                    {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>;
+      })}
 
-      {view==='daily'&&<>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
-        <div style={{fontSize:15,fontWeight:800,color:curType.color}}>📆 รายวัน {selType} · ปี {selYear}</div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
-            {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
-          </select>
-          {canEdit&&<>
-            <button onClick={()=>{setAddDriverName('');setShowAddDriver(true);}} style={{padding:'6px 14px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มคนขับ/ทะเบียนรถ</button>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleFile}/>
-            <button onClick={()=>fileInputRef.current.click()} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${curType.color}`,background:'#fff',color:curType.color,fontSize:12,fontWeight:700,cursor:'pointer'}}>📤 นำเข้าจาก Excel</button>
-          </>}
-        </div>
-      </div>
-      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 20px',marginBottom:20}}>
-        <div style={{fontSize:13,color:'#64748b',fontWeight:600,marginBottom:6}}>รวมเที่ยว {MO[selDayMonth-1]} {selYear}</div>
-        <div style={{fontSize:26,fontWeight:900,color:'#1e293b'}}>{fmt(dayGrand)} <span style={{fontSize:13,color:'#94a3b8'}}>เที่ยว</span></div>
-      </div>
-      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:20}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${curType.color}0a`}}>
-          <div style={{fontSize:14,fontWeight:800,color:curType.color}}>{selType} · {MO[selDayMonth-1]} {selYear} (รายวัน 1-{dLen})</div>
-        </div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
-            <thead>
-              <tr style={{background:'#f8fafc'}}>
-                <th style={{textAlign:'left',padding:'6px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
-                {dayList.map(d=><th key={d} style={{textAlign:'right',padding:'6px 4px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{d}</th>)}
-                <th style={{textAlign:'right',padding:'6px 8px',color:curType.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
-                {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {items.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-              {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                {dayList.map(d=>{const v=dayCell(it.name,d);return<td key={d} style={{textAlign:'right',padding:'4px 3px',color:v?'#334155':'#e2e8f0',borderBottom:'1px solid #f1f5f9'}}>{v||'·'}</td>;})}
-                <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:curType.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
-                {canEdit&&<td style={{padding:'2px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
-                  <button onClick={()=>moveDriver(it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
-                  <button onClick={()=>moveDriver(it.name,1)} disabled={idx===items.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===items.length-1?'default':'pointer',fontSize:10,color:idx===items.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
-                  <button onClick={()=>openDayForm(it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0'}}>แก้</button>
-                </td>}
-              </tr>)}
-            </tbody>
-            <tfoot>
-              <tr style={{background:'#f1f5f9',fontWeight:800}}>
-                <td style={{padding:'6px 8px',position:'sticky',left:0,background:'#f1f5f9',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>รวม</td>
-                {dayList.map(d=><td key={d} style={{textAlign:'right',padding:'6px 3px',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{dayColTotal(d)||''}</td>)}
-                <td style={{textAlign:'right',padding:'6px 8px',color:'#fff',background:curType.color,borderTop:'2px solid #e2e8f0'}}>{fmt(dayGrand)}</td>
-                {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+      {view==='daily'&&TYPES.map(t=>{
+        const {items,dayCell,dayRowTotal,dayColTotal,dayGrand}=getTypeData(t.k);
+        return<div key={t.k} style={{marginBottom:32}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div style={{fontSize:15,fontWeight:800,color:t.color,display:'flex',alignItems:'center',gap:6}}><span>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>รายวัน {t.k} · ปี {selYear}</div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
+              </select>
+              {canEdit&&<>
+                <button onClick={()=>{setAddDriverType(t.k);setAddDriverName('');setShowAddDriver(true);}} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มคนขับ/ทะเบียนรถ</button>
+                <button onClick={()=>{setImportType(t.k);fileInputRef.current.click();}} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${t.color}`,background:'#fff',color:t.color,fontSize:12,fontWeight:700,cursor:'pointer'}}>📤 นำเข้าจาก Excel</button>
+              </>}
+            </div>
+          </div>
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 20px',marginBottom:14}}>
+            <div style={{fontSize:13,color:'#64748b',fontWeight:600,marginBottom:6}}>รวมเที่ยว {MO[selDayMonth-1]} {selYear}</div>
+            <div style={{fontSize:26,fontWeight:900,color:'#1e293b'}}>{fmt(dayGrand)} <span style={{fontSize:13,color:'#94a3b8'}}>เที่ยว</span></div>
+          </div>
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
+              <div style={{fontSize:14,fontWeight:800,color:t.color}}>{t.k} · {MO[selDayMonth-1]} {selYear} (รายวัน 1-{dLen})</div>
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
+                <thead>
+                  <tr style={{background:'#f8fafc'}}>
+                    <th style={{textAlign:'left',padding:'6px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
+                    {dayList.map(d=><th key={d} style={{textAlign:'right',padding:'6px 4px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{d}</th>)}
+                    <th style={{textAlign:'right',padding:'6px 8px',color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
+                    {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
+                  {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
+                    <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
+                    {dayList.map(d=>{const v=dayCell(it.name,d);return<td key={d} style={{textAlign:'right',padding:'4px 3px',color:v?'#334155':'#e2e8f0',borderBottom:'1px solid #f1f5f9'}}>{v||'·'}</td>;})}
+                    <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
+                    {canEdit&&<td style={{padding:'2px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
+                      <button onClick={()=>moveDriver(t.k,it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
+                      <button onClick={()=>moveDriver(t.k,it.name,1)} disabled={idx===items.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===items.length-1?'default':'pointer',fontSize:10,color:idx===items.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
+                      <button onClick={()=>openDayForm(t.k,it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0'}}>แก้</button>
+                    </td>}
+                  </tr>)}
+                </tbody>
+                <tfoot>
+                  <tr style={{background:'#f1f5f9',fontWeight:800}}>
+                    <td style={{padding:'6px 8px',position:'sticky',left:0,background:'#f1f5f9',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>รวม</td>
+                    {dayList.map(d=><td key={d} style={{textAlign:'right',padding:'6px 3px',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{dayColTotal(d)||''}</td>)}
+                    <td style={{textAlign:'right',padding:'6px 8px',color:'#fff',background:t.color,borderTop:'2px solid #e2e8f0'}}>{fmt(dayGrand)}</td>
+                    {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>;
+      })}
+      {view==='daily'&&<input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleFile}/>}
 
       {showDayForm&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowDayForm(false);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:520,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>แก้ไขรายวัน</div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{dayForm.driver_name} · {selType} · {MO[selDayMonth-1]} {selYear}</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{dayForm.driver_name} · {dayForm.vehicle_type} · {MO[selDayMonth-1]} {selYear}</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:8,marginBottom:16}}>
             {dayList.map(d=><div key={d}>
               <div style={{fontSize:11,color:'#94a3b8',marginBottom:2}}>วันที่ {d}</div>
@@ -5714,7 +5730,7 @@ window.__dataReady.then(data => {
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowDayForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={handleSaveDay} disabled={savingDay} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDay?0.5:1}}>{savingDay?'กำลังบันทึก...':'บันทึก'}</button>
+            <button onClick={handleSaveDay} disabled={savingDay} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDay?0.5:1}}>{savingDay?'กำลังบันทึก...':'บันทึก'}</button>
           </div>
         </div>
       </div>}
@@ -5722,12 +5738,12 @@ window.__dataReady.then(data => {
       {showAddDriver&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowAddDriver(false);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>+ เพิ่มคนขับ/ทะเบียนรถ</div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{selType}</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{addDriverType}</div>
           <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อคนขับ/ทะเบียนรถ</div>
-          <input type="text" autoFocus value={addDriverName} onChange={e=>setAddDriverName(e.target.value)} placeholder="เช่น 89-8038 จรูญ" style={{...inp,marginBottom:16}} onKeyDown={e=>{if(e.key==='Enter'&&addDriverName.trim()){setShowAddDriver(false);setDayForm({driver_name:addDriverName.trim(),days:{}});setShowDayForm(true);}}}/>
+          <input type="text" autoFocus value={addDriverName} onChange={e=>setAddDriverName(e.target.value)} placeholder="เช่น 89-8038 จรูญ" style={{...inp,marginBottom:16}} onKeyDown={e=>{if(e.key==='Enter'&&addDriverName.trim()){setShowAddDriver(false);setDayForm({vehicle_type:addDriverType,driver_name:addDriverName.trim(),days:{}});setShowDayForm(true);}}}/>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowAddDriver(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={()=>{if(!addDriverName.trim())return;setShowAddDriver(false);setDayForm({driver_name:addDriverName.trim(),days:{}});setShowDayForm(true);}} disabled={!addDriverName.trim()} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:addDriverName.trim()?1:0.5}}>ถัดไป → กรอกเที่ยว</button>
+            <button onClick={()=>{if(!addDriverName.trim())return;setShowAddDriver(false);setDayForm({vehicle_type:addDriverType,driver_name:addDriverName.trim(),days:{}});setShowDayForm(true);}} disabled={!addDriverName.trim()} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:addDriverName.trim()?1:0.5}}>ถัดไป → กรอกเที่ยว</button>
           </div>
         </div>
       </div>}
@@ -5767,34 +5783,36 @@ window.__dataReady.then(data => {
           })()}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>{setShowImport(false);setImportRows([]);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
+            <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
           </div>
         </div>
       </div>}
-      </>}
 
-      {view==='summary'&&<div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
-        <div style={{fontSize:15,fontWeight:800,color:'#1e293b',marginBottom:14}}>📊 สรุปทั้งปี {selYear} · {selType}</div>
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {items.map(it=>{
-            const tot=rowTotal(it.name);
-            const pct=typeGrand>0?(tot/typeGrand*100):0;
-            return<div key={it.name}>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
-                <span style={{fontWeight:600,color:'#334155'}}>{it.name}</span>
-                <span style={{fontWeight:800,color:curType.color}}>{fmt(tot)} เที่ยว <span style={{color:'#94a3b8',fontWeight:600}}>({pct.toFixed(1)}%)</span></span>
-              </div>
-              <div style={{height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:curType.color,borderRadius:4}}/>
-              </div>
-            </div>;
-          })}
-          {items.length===0&&<div style={{textAlign:'center',color:'#94a3b8',padding:20}}>ยังไม่มีข้อมูล</div>}
-        </div>
-        <div style={{marginTop:16,paddingTop:14,borderTop:'2px solid #f1f5f9',display:'flex',justifyContent:'space-between',fontWeight:800,fontSize:15}}>
-          <span>รวมทั้งหมด</span><span style={{color:curType.color}}>{fmt(typeGrand)} เที่ยว</span>
-        </div>
-      </div>}
+      {view==='summary'&&TYPES.map(t=>{
+        const {items,rowTotal,typeGrand}=getTypeData(t.k);
+        return<div key={t.k} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
+          <div style={{fontSize:15,fontWeight:800,color:t.color,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><span>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>สรุปทั้งปี {selYear} · {t.k}</div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {items.map(it=>{
+              const tot=rowTotal(it.name);
+              const pct=typeGrand>0?(tot/typeGrand*100):0;
+              return<div key={it.name}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
+                  <span style={{fontWeight:600,color:'#334155'}}>{it.name}</span>
+                  <span style={{fontWeight:800,color:t.color}}>{fmt(tot)} เที่ยว <span style={{color:'#94a3b8',fontWeight:600}}>({pct.toFixed(1)}%)</span></span>
+                </div>
+                <div style={{height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${pct}%`,background:t.color,borderRadius:4}}/>
+                </div>
+              </div>;
+            })}
+            {items.length===0&&<div style={{textAlign:'center',color:'#94a3b8',padding:20}}>ยังไม่มีข้อมูล</div>}
+          </div>
+          <div style={{marginTop:16,paddingTop:14,borderTop:'2px solid #f1f5f9',display:'flex',justifyContent:'space-between',fontWeight:800,fontSize:15}}>
+            <span>รวมทั้งหมด</span><span style={{color:t.color}}>{fmt(typeGrand)} เที่ยว</span>
+          </div>
+        </div>;
+      })}
 
       {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowForm(false);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:480,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
@@ -5814,7 +5832,7 @@ window.__dataReady.then(data => {
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={handleSave} disabled={saving||!form.driver_name} style={{padding:'9px 18px',borderRadius:8,border:'none',background:curType.color,color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:(saving||!form.driver_name)?0.5:1}}>{saving?'กำลังบันทึก...':'บันทึก'}</button>
+            <button onClick={handleSave} disabled={saving||!form.driver_name} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:(saving||!form.driver_name)?0.5:1}}>{saving?'กำลังบันทึก...':'บันทึก'}</button>
           </div>
         </div>
       </div>}
@@ -5823,10 +5841,10 @@ window.__dataReady.then(data => {
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:360,textAlign:'center'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
           <div style={{fontSize:16,fontWeight:700,color:'#1e293b',marginBottom:6}}>ยืนยันการลบรายการ</div>
-          <div style={{fontSize:14,color:'#64748b',marginBottom:20}}>ต้องการลบ "<b style={{color:'#1e293b'}}>{confirmDel}</b>" ({selType} ปี {selYear}) ใช่หรือไม่? ข้อมูลทุกเดือนของรายการนี้จะถูกลบทั้งหมด</div>
+          <div style={{fontSize:14,color:'#64748b',marginBottom:20}}>ต้องการลบ "<b style={{color:'#1e293b'}}>{confirmDel&&confirmDel.name}</b>" ({confirmDel&&confirmDel.type} ปี {selYear}) ใช่หรือไม่? ข้อมูลทุกเดือนของรายการนี้จะถูกลบทั้งหมด</div>
           <div style={{display:'flex',gap:10,justifyContent:'center'}}>
             <button onClick={()=>setConfirmDel(null)} style={{padding:'9px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={()=>handleDelete(confirmDel)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
+            <button onClick={()=>handleDelete(confirmDel.type,confirmDel.name)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
           </div>
         </div>
       </div>}
