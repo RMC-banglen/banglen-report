@@ -4687,8 +4687,8 @@ window.__dataReady.then(data => {
   }
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
-  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'}];
-  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'}];
+  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'}];
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
@@ -5876,6 +5876,157 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  function PlateUsageTab({canEdit}){
+    const PILE_TYPES=[
+      {k:'I-18มอก.',cap:2},{k:'I-22มอก.',cap:2},{k:'I-26มอก.',cap:4},{k:'I-30มอก.',cap:2},{k:'I-35มอก.',cap:1},{k:'I-40มอก.',cap:0.5},
+      {k:'S-18',cap:1},{k:'S-22',cap:1},{k:'S-26',cap:1},{k:'S-30',cap:1},{k:'S-35',cap:1},{k:'S-40',cap:1},
+      {k:'I-30โรงงาน',cap:2},
+    ];
+    const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const QUARTERS=[{k:'Q1',months:[1,2,3]},{k:'Q2',months:[4,5,6]},{k:'Q3',months:[7,8,9]},{k:'Q4',months:[10,11,12]}];
+    const fmtPct=n=>n==null?'–':(n*100).toFixed(1)+'%';
+    const pctColor=n=>{if(n==null)return'#cbd5e1';if(n>=0.7)return'#0d9488';if(n>=0.5)return'#2563eb';if(n>=0.3)return'#d97706';return'#94a3b8';};
+    const [rows,setRows]=useState([]);
+    const [loading,setLoading]=useState(true);
+    const [selYear,setSelYear]=useState(2569);
+    const [showForm,setShowForm]=useState(false);
+    const [form,setForm]=useState({pile_type:'',month:1,plates_used:'',production_days:''});
+    const [saving,setSaving]=useState(false);
+    const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
+    useEffect(()=>{fetch();},[]);
+    function fetch(){setLoading(true);DB.from('plate_usage').select('*').order('year').order('month').then(({data})=>{setRows(data||[]);setLoading(false);});}
+
+    const years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a);
+    const yearRows=rows.filter(r=>r.year===selYear);
+    const monthsAll=[...new Set(yearRows.map(r=>r.month))].sort((a,b)=>a-b);
+    const months=monthsAll.length?monthsAll:[1,2,3,4,5];
+    const cellUtil=(pileType,m)=>{
+      const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
+      if(!r||!r.production_days)return null;
+      const cap=PILE_TYPES.find(p=>p.k===pileType).cap;
+      return r.plates_used/(cap*r.production_days);
+    };
+    const quarterUtil=(pileType,qMonths)=>{
+      const vals=qMonths.map(m=>cellUtil(pileType,m)).filter(v=>v!=null);
+      if(!vals.length)return null;
+      return vals.reduce((s,v)=>s+v,0)/vals.length;
+    };
+    const yearUtil=pileType=>{
+      const vals=months.map(m=>cellUtil(pileType,m)).filter(v=>v!=null);
+      if(!vals.length)return null;
+      return vals.reduce((s,v)=>s+v,0)/vals.length;
+    };
+
+    function openEdit(pileType,m){
+      const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
+      setForm({pile_type:pileType,month:m,plates_used:r?r.plates_used:'',production_days:r?r.production_days:''});
+      setShowForm(true);
+    }
+    async function handleSave(){
+      const payload={year:selYear,month:Number(form.month),pile_type:form.pile_type,plates_used:Number(form.plates_used)||0,production_days:Number(form.production_days)||0};
+      setSaving(true);
+      const {error}=await DB.from('plate_usage').upsert(payload,{onConflict:'year,month,pile_type'});
+      setSaving(false);
+      if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
+      setShowForm(false);fetch();
+    }
+
+    return<div style={{padding:'24px 0'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:800,color:'#1e293b'}}>🏗️ ภาพรวมการใช้แพผลิต</div>
+          <div style={{fontSize:13,color:'#64748b',marginTop:2}}>% การใช้กำลังผลิต = จำนวนแพที่ลงผลิต ÷ (จำนวนแพที่มี × วันที่มีผลิต) รายเดือน (ดึงจาก Supabase)</div>
+        </div>
+        <div style={{display:'flex',gap:4}}>
+          {(years.length?years:[2569]).map(y=><button key={y} onClick={()=>setSelYear(y)} style={{padding:'6px 16px',border:'none',borderRadius:8,background:selYear===y?'#2f5fd0':'#f1f5f9',color:selYear===y?'#fff':'#475569',fontWeight:700,cursor:'pointer',fontSize:13}}>ปี {y}</button>)}
+        </div>
+      </div>
+
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:20}}>
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:12}}>
+            <thead>
+              <tr style={{background:'#f8fafc'}}>
+                <th style={{textAlign:'left',padding:'9px 12px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>สินค้า</th>
+                {QUARTERS.map(q=><th key={q.k} style={{textAlign:'center',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{q.k}</th>)}
+                <th style={{textAlign:'center',padding:'9px 10px',color:'#2f5fd0',fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#eff6ff'}}>รวม {months.length} เดือน</th>
+                <th style={{textAlign:'center',padding:'9px 10px',color:'#64748b',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>แพที่มี</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PILE_TYPES.map((p,idx)=>{
+                const yUtil=yearUtil(p.k);
+                return<tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
+                  <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{p.k}</td>
+                  {QUARTERS.map(q=>{
+                    const v=quarterUtil(p.k,q.months);
+                    return<td key={q.k} style={{textAlign:'center',padding:'8px 10px',borderBottom:'1px solid #f1f5f9'}}>
+                      {v!=null?<span style={{background:pctColor(v)+'22',color:pctColor(v),fontWeight:700,padding:'3px 10px',borderRadius:6}}>{fmtPct(v)}</span>:<span style={{color:'#cbd5e1'}}>–</span>}
+                    </td>;
+                  })}
+                  <td style={{textAlign:'center',padding:'8px 10px',borderBottom:'1px solid #f1f5f9',background:'#fafbff'}}>
+                    {yUtil!=null?<span style={{color:pctColor(yUtil),fontWeight:800}}>{fmtPct(yUtil)}</span>:<span style={{color:'#cbd5e1'}}>–</span>}
+                  </td>
+                  <td style={{textAlign:'center',padding:'8px 10px',color:'#64748b',borderBottom:'1px solid #f1f5f9'}}>{p.cap}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ตารางกรอกข้อมูลรายเดือน */}
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:20}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc'}}>
+          <div style={{fontSize:15,fontWeight:800,color:'#1e293b'}}>กรอกข้อมูลรายเดือน · ปี {selYear}</div>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:11.5}}>
+            <thead>
+              <tr style={{background:'#f8fafc'}}>
+                <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>สินค้า</th>
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><th key={m} style={{textAlign:'center',padding:'7px 6px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {PILE_TYPES.map((p,idx)=><tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
+                <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{p.k}</td>
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{
+                  const v=cellUtil(p.k,m);
+                  return<td key={m} style={{textAlign:'center',padding:'4px 4px',borderBottom:'1px solid #f1f5f9'}}>
+                    {canEdit?
+                      <span onClick={()=>openEdit(p.k,m)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted',color:v!=null?pctColor(v):'#cbd5e1',fontWeight:v!=null?700:400}}>{v!=null?fmtPct(v):'–'}</span>
+                      :(v!=null?<span style={{color:pctColor(v),fontWeight:700}}>{fmtPct(v)}</span>:<span style={{color:'#cbd5e1'}}>–</span>)}
+                  </td>;
+                })}
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowForm(false);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>แก้ไขข้อมูล</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{form.pile_type} · {MO[form.month-1]} {selYear}</div>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>จำนวนแพที่ลงผลิตรวมทั้งเดือน</div>
+            <input type="number" value={form.plates_used} onChange={e=>setForm(f=>({...f,plates_used:e.target.value}))} placeholder="0" style={inp}/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>จำนวนวันที่มีผลิตในเดือนนี้</div>
+            <input type="number" value={form.production_days} onChange={e=>setForm(f=>({...f,production_days:e.target.value}))} placeholder="0" style={inp}/>
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>setShowForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={handleSave} disabled={saving} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:saving?0.5:1}}>{saving?'กำลังบันทึก...':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+      {loading&&<div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>กำลังโหลด...</div>}
+    </div>;
+  }
+
   function UserManagementTab({currentUser,onUpdateSession}){
     const db=DB;
     const [users,setUsers]=React.useState([]);
@@ -6020,7 +6171,7 @@ window.__dataReady.then(data => {
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
     const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
-    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'}];
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'}];
     const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
@@ -6056,6 +6207,7 @@ window.__dataReady.then(data => {
         {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
         {tab==='repair'&&<RepairExpenseTab canEditBL={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_banglen||(currentUser.permissions||{}).repair))} canEditBT={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_bottakua||(currentUser.permissions||{}).repair))}/>}
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
+        {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
