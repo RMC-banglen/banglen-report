@@ -5912,6 +5912,8 @@ window.__dataReady.then(data => {
     const daysOf=m=>{const r=yearDayRows.find(x=>x.month===m);return r?r.production_days:null;};
     const monthsAll=[...new Set([...yearRows.map(r=>r.month),...yearDayRows.map(r=>r.month)])].sort((a,b)=>a-b);
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
+    // นับจำนวนเดือนรวมแบบสะสมตามไตรมาส (มีข้อมูลถึง Q ไหน ก็รวม Q นั้น x 3 เดือน)
+    const quarterMonthCount=QUARTERS.reduce((max,q,i)=>q.months.some(m=>months.includes(m))?(i+1)*3:max,0);
     const cellUtil=(pileType,m)=>{
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
       const pd=daysOf(m);
@@ -5974,7 +5976,7 @@ window.__dataReady.then(data => {
               <tr style={{background:'#f8fafc'}}>
                 <th style={{textAlign:'left',padding:'9px 12px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>สินค้า</th>
                 {QUARTERS.map(q=><th key={q.k} style={{textAlign:'center',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{q.k}</th>)}
-                <th style={{textAlign:'center',padding:'9px 10px',color:'#2f5fd0',fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#eff6ff'}}>รวม {months.length} เดือน</th>
+                <th style={{textAlign:'center',padding:'9px 10px',color:'#2f5fd0',fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#eff6ff'}}>รวม {quarterMonthCount} เดือน</th>
                 <th style={{textAlign:'center',padding:'9px 10px',color:'#64748b',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>แพที่มี</th>
               </tr>
             </thead>
