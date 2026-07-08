@@ -1632,20 +1632,36 @@ window.__dataReady.then(data => {
                           <span style={{fontSize:'11px',color:'#2f5fd0'}}>{isOpen?'▲':'▼'}</span>
                         </div>
                       </div>
-                      {isOpen && <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:4,paddingLeft:8}}>
-                        {custRows.map((r,ri)=>(
-                          <div key={ri} style={{background:'#f0f4ff',borderRadius:7,border:'1px solid #c6d3f5',padding:'7px 10px'}}>
-                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
-                              <span style={{padding:'1px 6px',borderRadius:6,fontSize:'10px',fontWeight:700,
-                                background:'#dbeafe',color:'#1d4ed8'}}>{r.code_type}</span>
-                              <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
-                                {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
-                              </span>
+                      {isOpen && <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:6,paddingLeft:8}}>
+                        {(()=>{
+                          // จัดกลุ่มรายการตามเดือน พร้อมยอดรวมของเดือน
+                          const byMonth={};
+                          custRows.forEach(r=>{const k=`${r.year}-${String(r.month||1).padStart(2,'0')}`;if(!byMonth[k])byMonth[k]={year:r.year,month:r.month||1,rows:[],sum:0};byMonth[k].rows.push(r);byMonth[k].sum+=r.amount||0;});
+                          return Object.values(byMonth).sort((a,b)=>a.year-b.year||a.month-b.month).map((g,gi)=>(
+                            <div key={gi}>
+                              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 10px',background:'#e0e7ff',borderRadius:7,marginBottom:4}}>
+                                <span style={{fontSize:'12px',fontWeight:800,color:'#1d4ed8'}}>{MONTHS_TH_SHORT[g.month-1]}-{String(g.year).slice(-2)}</span>
+                                <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:800,color:'#c0392b'}}>
+                                  {Number(g.sum).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                                </span>
+                              </div>
+                              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                                {g.rows.map((r,ri)=>(
+                                  <div key={ri} style={{background:'#f0f4ff',borderRadius:7,border:'1px solid #c6d3f5',padding:'7px 10px'}}>
+                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
+                                      <span style={{padding:'1px 6px',borderRadius:6,fontSize:'10px',fontWeight:700,
+                                        background:'#dbeafe',color:'#1d4ed8'}}>{r.code_type}</span>
+                                      <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
+                                        {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                                      </span>
+                                    </div>
+                                    {r.reason && <div style={{fontSize:'11px',color:'#374151'}}>{r.reason}</div>}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            {r.reason && <div style={{fontSize:'11px',color:'#374151',marginBottom:2}}>{r.reason}</div>}
-                            <div style={{fontSize:'10px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>}
                     </div>;
                   })
