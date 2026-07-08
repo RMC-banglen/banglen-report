@@ -5944,7 +5944,7 @@ window.__dataReady.then(data => {
     const yearRows=rows.filter(r=>r.year===selYear);
     const yearDayRows=dayRows.filter(r=>r.year===selYear);
     const daysOf=m=>{const r=yearDayRows.find(x=>x.month===m);return r?r.production_days:null;};
-    const monthsAll=[...new Set([...yearRows.map(r=>r.month),...yearDayRows.filter(r=>r.production_days>0).map(r=>r.month)])].sort((a,b)=>a-b);
+    const monthsAll=[...new Set(yearDayRows.filter(r=>r.production_days>0).map(r=>r.month))].sort((a,b)=>a-b);
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
     // นับจำนวนเดือนรวมแบบสะสมตามไตรมาส (มีข้อมูลถึง Q ไหน ก็รวม Q นั้น x 3 เดือน)
     const quarterMonthCount=monthsAll.length?Math.max(...monthsAll):0;
