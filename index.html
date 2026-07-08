@@ -5940,7 +5940,7 @@ window.__dataReady.then(data => {
       fetch();
     }
 
-    const years=[...new Set([...rows.map(r=>r.year),...dayRows.map(r=>r.year)])].sort((a,b)=>b-a);
+    const years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a);
     const yearRows=rows.filter(r=>r.year===selYear);
     const yearDayRows=dayRows.filter(r=>r.year===selYear);
     const daysOf=m=>{const r=yearDayRows.find(x=>x.month===m);return r?r.production_days:null;};
