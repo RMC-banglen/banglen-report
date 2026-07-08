@@ -5678,7 +5678,7 @@ window.__dataReady.then(data => {
               {canEdit&&<button onClick={()=>openAdd(t.k)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
             </div>
             <div style={{overflowX:'auto'}}>
-              <table style={{borderCollapse:'collapse',width:'100%',fontSize:11.5}}>
+              <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
                 <thead>
                   <tr style={{background:'#f8fafc'}}>
                     <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
@@ -5714,25 +5714,25 @@ window.__dataReady.then(data => {
                     const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
                     const wdTotal=months.reduce((s,m)=>s+(workdaysOf(m)||0),0);
                     return<>
-                      <tr style={{background:'#fffbeb',fontWeight:700}}>
-                        <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>จำนวนวันทำงาน</td>
-                        {months.map(m=>{const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#b45309',whiteSpace:'nowrap'}}>
+                      <tr style={{background:'#fffbeb',fontWeight:700,fontSize:13}}>
+                        <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap',borderTop:'2px solid #fde68a'}}>จำนวนวันทำงาน</td>
+                        {months.map(m=>{const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'9px 6px',color:'#b45309',whiteSpace:'nowrap',borderTop:'2px solid #fde68a'}}>
                           {canEdit?<span onClick={()=>editWorkdays(m)} title="แก้ไขจำนวนวันทำงาน" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{d!=null?d:'–'}</span>:(d!=null?d:'–')}
                         </td>;})}
-                        <td style={{textAlign:'right',padding:'7px 8px',color:'#b45309',background:'#fef3c7'}}>{wdTotal||'–'}</td>
+                        <td style={{textAlign:'right',padding:'9px 8px',color:'#b45309',background:'#fef3c7',borderTop:'2px solid #fde68a'}}>{wdTotal||'–'}</td>
+                        {canEdit&&<td style={{background:'#fffbeb',borderTop:'2px solid #fde68a'}}></td>}
+                      </tr>
+                      <tr style={{background:'#fffbeb',fontWeight:800,fontSize:14}}>
+                        <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>จำนวนเที่ยวรถบริษัท</td>
+                        {months.map(m=>{const v=companyCol(m);return<td key={m} style={{textAlign:'right',padding:'9px 6px',color:'#b45309',whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
+                        <td style={{textAlign:'right',padding:'9px 8px',color:'#fff',background:'#d97706'}}>{companyGrand?fmt(companyGrand):'–'}</td>
                         {canEdit&&<td style={{background:'#fffbeb'}}></td>}
                       </tr>
-                      <tr style={{background:'#fffbeb',fontWeight:700}}>
-                        <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>จำนวนเที่ยวรถบริษัท</td>
-                        {months.map(m=>{const v=companyCol(m);return<td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#b45309',whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
-                        <td style={{textAlign:'right',padding:'7px 8px',color:'#b45309',background:'#fef3c7'}}>{companyGrand?fmt(companyGrand):'–'}</td>
-                        {canEdit&&<td style={{background:'#fffbeb'}}></td>}
-                      </tr>
-                      <tr style={{background:'#fffbeb',fontWeight:700}}>
-                        <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>เฉลี่ยเที่ยว/วัน (รถ 6 คัน)</td>
-                        {months.map(m=>{const v=companyCol(m);const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#b45309',whiteSpace:'nowrap'}}>{v&&d?(v/d/6).toFixed(2):'–'}</td>;})}
-                        <td style={{textAlign:'right',padding:'7px 8px',color:'#b45309',background:'#fef3c7'}}>{companyGrand&&wdTotal?(companyGrand/wdTotal/6).toFixed(2):'–'}</td>
-                        {canEdit&&<td style={{background:'#fffbeb'}}></td>}
+                      <tr style={{background:'#fef3c7',fontWeight:900,fontSize:15}}>
+                        <td style={{padding:'11px 8px',position:'sticky',left:0,background:'#fef3c7',color:'#92400e',whiteSpace:'nowrap',borderTop:'2px solid #fde68a'}}>เฉลี่ยเที่ยว/วัน (รถ 6 คัน)</td>
+                        {months.map(m=>{const v=companyCol(m);const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'11px 6px',color:'#92400e',whiteSpace:'nowrap',borderTop:'2px solid #fde68a'}}>{v&&d?(v/d/6).toFixed(2):'–'}</td>;})}
+                        <td style={{textAlign:'right',padding:'11px 8px',color:'#fff',background:'#b45309',fontSize:16,borderTop:'2px solid #fde68a'}}>{companyGrand&&wdTotal?(companyGrand/wdTotal/6).toFixed(2):'–'}</td>
+                        {canEdit&&<td style={{background:'#fef3c7',borderTop:'2px solid #fde68a'}}></td>}
                       </tr>
                     </>;
                   })()}
