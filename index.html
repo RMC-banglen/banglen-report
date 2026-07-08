@@ -6160,6 +6160,16 @@ window.__dataReady.then(data => {
                 </tr>;
               })}
             </tbody>
+            <tfoot>
+              <tr style={{background:'#f8fafc'}}>
+                <td style={{padding:'8px 12px',position:'sticky',left:0,background:'#f8fafc',fontWeight:800,color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>รวม</td>
+                {QUARTERS.map(q=><td key={q.k} style={{borderTop:'2px solid #e2e8f0'}}/>)}
+                <td style={{borderTop:'2px solid #e2e8f0'}}/>
+                <td style={{textAlign:'center',padding:'8px 10px',fontWeight:800,color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{PILE_TYPES.reduce((s,p)=>s+getCap(p.k),0)}</td>
+                <td style={{textAlign:'center',padding:'8px 10px',fontWeight:800,color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{PILE_TYPES.reduce((s,p)=>s+yearPlatesUsed(p.k),0)}</td>
+                <td style={{borderTop:'2px solid #e2e8f0'}}/>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
