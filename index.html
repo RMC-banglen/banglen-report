@@ -5938,7 +5938,7 @@ window.__dataReady.then(data => {
                 <thead>
                   <tr style={{background:'#f8fafc'}}>
                     <th style={{textAlign:'left',padding:'6px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
-                    {dayList.map(d=><th key={d} style={{textAlign:'right',padding:'6px 4px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{d}</th>)}
+                    {dayList.map(d=><th key={d} style={{textAlign:'center',padding:'6px 4px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{d}</th>)}
                     <th style={{textAlign:'right',padding:'6px 8px',color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
                     {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
                   </tr>
@@ -5950,10 +5950,13 @@ window.__dataReady.then(data => {
                     {dayList.map(d=>{
                       const v=dayCell(it.name,d);
                       const note=v?null:dayNoteOf(t.k,it.name,d);
-                      return<td key={d} style={{textAlign:v?'right':'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9'}}>
+                      const clickable=!v&&canEdit;
+                      return<td key={d} onClick={clickable?()=>editDayNote(t.k,it.name,d):undefined}
+                        title={note?note:clickable?'คลิกเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย':undefined}
+                        style={{textAlign:'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
                         {v?v
-                          :note?<span title={note} onClick={canEdit?()=>editDayNote(t.k,it.name,d):undefined} style={{cursor:canEdit?'pointer':'default',fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</span>
-                          :canEdit?<span onClick={()=>editDayNote(t.k,it.name,d)} title="คลิกเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย" style={{cursor:'pointer'}}>·</span>:'·'}
+                          :note?<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</span>
+                          :'·'}
                       </td>;
                     })}
                     <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
@@ -5967,7 +5970,7 @@ window.__dataReady.then(data => {
                 <tfoot>
                   <tr style={{background:'#f1f5f9',fontWeight:800}}>
                     <td style={{padding:'6px 8px',position:'sticky',left:0,background:'#f1f5f9',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>รวม</td>
-                    {dayList.map(d=><td key={d} style={{textAlign:'right',padding:'6px 3px',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{dayColTotal(d)||''}</td>)}
+                    {dayList.map(d=><td key={d} style={{textAlign:'center',padding:'6px 3px',color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{dayColTotal(d)||''}</td>)}
                     <td style={{textAlign:'right',padding:'6px 8px',color:'#fff',background:t.color,borderTop:'2px solid #e2e8f0'}}>{fmt(dayGrand)}</td>
                     {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
                   </tr>
