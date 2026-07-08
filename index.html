@@ -5958,14 +5958,101 @@ window.__dataReady.then(data => {
       setShowDaysForm(false);fetch();
     }
 
+    // ===== นำเข้า Excel (ไฟล์คิวคำนวณ ที่มีชีทแยกตามเดือน 1-12) =====
+    const [showImport,setShowImport]=useState(false);
+    const [importData,setImportData]=useState({plates:[],days:[],skipped:[]}); // plates:[{month,pile_type,plates_used}] days:[{month,production_days}]
+    const [importYear,setImportYear]=useState(2569);
+    const [importing,setImporting]=useState(false);
+    const fileInputRef=React.useRef(null);
+    function normalizePileHeader(h){
+      h=String(h||'').trim();
+      let m;
+      if(m=h.match(/^ไอ\s*0?\.?(\d+)$/))return`I-${m[1]}โรงงาน`;
+      if(m=h.match(/^ไอ\s*(\d+)\s*มอก\.?$/))return`I-${m[1]}มอก.`;
+      if(m=h.match(/^I\s*[- ]?\s*(\d+)\s*มอก\.?$/i))return`I-${m[1]}มอก.`;
+      if(m=h.match(/^S\s*[- ]?\s*(\d+)\s*มอก\.?$/i))return`S-${m[1]}`;
+      if(m=h.match(/^S\s*[- ]?\s*(\d+)$/i))return`S-${m[1]}`;
+      return null;
+    }
+    function handleFile(e){
+      const file=e.target.files[0];
+      if(!file)return;
+      const reader=new FileReader();
+      reader.onload=evt=>{
+        try{
+          const wb=XLSX.read(evt.target.result,{type:'array'});
+          const monthSheets=wb.SheetNames.filter(n=>/^\d{1,2}$/.test(n.trim()));
+          if(monthSheets.length===0){alert('ไม่พบชีทที่ตั้งชื่อเป็นเลขเดือน (1-12) ในไฟล์นี้');return;}
+          const plates=[],days=[],skipped=new Set();
+          monthSheets.forEach(sheetName=>{
+            const month=Number(sheetName);
+            if(month<1||month>12)return;
+            const data=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
+            let headerRowIdx=data.findIndex(r=>String(r[1]||'').trim()==='ขนาดเสาเข็ม');
+            if(headerRowIdx<0)headerRowIdx=2;
+            const headerRow=data[headerRowIdx]||[];
+            const colMap={};
+            for(let ci=2;ci<headerRow.length;ci++){
+              const name=normalizePileHeader(headerRow[ci]);
+              if(name)colMap[ci]=name;
+            }
+            const plateRowIdxs=[];
+            for(let ri=headerRowIdx+1;ri<data.length;ri++){
+              if(String(data[ri][1]||'').trim()==='จำนวนแพผลิต')plateRowIdxs.push(ri);
+            }
+            if(plateRowIdxs.length===0)return;
+            const summaryIdx=plateRowIdxs[plateRowIdxs.length-1];
+            const dailyIdxs=plateRowIdxs.slice(0,-1);
+            let prodDays=0;
+            dailyIdxs.forEach(ri=>{
+              let sum=0;
+              Object.keys(colMap).forEach(ci=>{sum+=Number(data[ri][ci])||0;});
+              if(sum>0)prodDays++;
+            });
+            days.push({month,production_days:prodDays});
+            Object.entries(colMap).forEach(([ci,name])=>{
+              const val=Number(data[summaryIdx][ci])||0;
+              if(PILE_TYPES.find(p=>p.k===name))plates.push({month,pile_type:name,plates_used:val});
+              else if(val>0)skipped.add(name);
+            });
+          });
+          setImportData({plates,days,skipped:[...skipped]});
+          setShowImport(true);
+        }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
+      };
+      reader.readAsArrayBuffer(file);
+      e.target.value='';
+    }
+    async function confirmImportPlates(){
+      setImporting(true);
+      let err=null;
+      for(const d of importData.days){
+        const {error}=await DB.from('plate_usage_days').upsert({year:importYear,month:d.month,production_days:d.production_days},{onConflict:'year,month'});
+        if(error){err=error;break;}
+      }
+      if(!err)for(const p of importData.plates){
+        const {error}=await DB.from('plate_usage').upsert({year:importYear,month:p.month,pile_type:p.pile_type,plates_used:p.plates_used},{onConflict:'year,month,pile_type'});
+        if(error){err=error;break;}
+      }
+      setImporting(false);
+      if(err){alert('นำเข้าไม่สำเร็จ: '+err.message);return;}
+      setShowImport(false);fetch();
+    }
+
     return<div style={{padding:'24px 0'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
         <div>
           <div style={{fontSize:22,fontWeight:800,color:'#1e293b'}}>🏗️ ภาพรวมการใช้แพผลิต</div>
           <div style={{fontSize:13,color:'#64748b',marginTop:2}}>% การใช้กำลังผลิต = จำนวนแพที่ลงผลิต ÷ (จำนวนแพที่มี × วันที่มีผลิต) รายเดือน (ดึงจาก Supabase)</div>
         </div>
-        <div style={{display:'flex',gap:4}}>
-          {(years.length?years:[2569]).map(y=><button key={y} onClick={()=>setSelYear(y)} style={{padding:'6px 16px',border:'none',borderRadius:8,background:selYear===y?'#2f5fd0':'#f1f5f9',color:selYear===y?'#fff':'#475569',fontWeight:700,cursor:'pointer',fontSize:13}}>ปี {y}</button>)}
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:4}}>
+            {(years.length?years:[2569]).map(y=><button key={y} onClick={()=>setSelYear(y)} style={{padding:'6px 16px',border:'none',borderRadius:8,background:selYear===y?'#2f5fd0':'#f1f5f9',color:selYear===y?'#fff':'#475569',fontWeight:700,cursor:'pointer',fontSize:13}}>ปี {y}</button>)}
+          </div>
+          {canEdit&&<>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleFile}/>
+            <button onClick={()=>{setImportYear(selYear);fileInputRef.current.click();}} style={{padding:'8px 16px',borderRadius:8,border:'1.5px solid #2f5fd0',background:'#fff',color:'#2f5fd0',fontSize:13,fontWeight:700,cursor:'pointer'}}>📤 นำเข้าจาก Excel</button>
+          </>}
         </div>
       </div>
 
@@ -6078,6 +6165,41 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowDaysForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={handleSaveDays} disabled={savingDays} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#d97706',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDays?0.5:1}}>{savingDays?'กำลังบันทึก...':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+
+      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:640,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>นำเข้าเป็นปี (พ.ศ.)</div>
+            <input type="number" value={importYear} onChange={e=>setImportYear(Number(e.target.value)||selYear)} style={{...inp,maxWidth:140}}/>
+          </div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>พบข้อมูล {importData.days.length} เดือน · {importData.plates.length} รายการแพ</div>
+          {importData.skipped.length>0&&<div style={{fontSize:12,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ พบรุ่นแพที่ยังไม่มีในระบบ (ข้ามไป ไม่นำเข้า): {importData.skipped.join(', ')}</div>}
+          <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
+              <thead><tr style={{background:'#f8fafc'}}>
+                <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>เดือน</th>
+                <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>วันที่มีผลิต</th>
+                <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รายการแพ (รุ่น=จำนวน)</th>
+              </tr></thead>
+              <tbody>
+                {importData.days.sort((a,b)=>a.month-b.month).map((d,i)=>{
+                  const plates=importData.plates.filter(p=>p.month===d.month&&p.plates_used>0);
+                  return<tr key={d.month} style={{background:i%2?'#fcfcfd':'#fff'}}>
+                    <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:600}}>{MO[d.month-1]}</td>
+                    <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.production_days}</td>
+                    <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{plates.map(p=>`${p.pile_type}=${p.plates_used}`).join(', ')||'–'}</td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>setShowImport(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={confirmImportPlates} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
           </div>
         </div>
       </div>}
