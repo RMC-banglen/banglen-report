@@ -5359,8 +5359,24 @@ window.__dataReady.then(data => {
     const [saving,setSaving]=useState(false);
     const [confirmDel,setConfirmDel]=useState(null); // {type,name}
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
+    const [workdays,setWorkdays]=useState([]); // transport_workdays: {year,month,days}
     useEffect(()=>{fetch();},[]);
-    function fetch(){setLoading(true);DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name').then(({data})=>{setRows(data||[]);setLoading(false);});}
+    function fetch(){
+      setLoading(true);
+      Promise.all([
+        DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name'),
+        DB.from('transport_workdays').select('*'),
+      ]).then(([a,b])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setLoading(false);});
+    }
+    const workdaysOf=m=>{const r=workdays.find(x=>x.year===selYear&&x.month===m);return r?r.days:null;};
+    async function editWorkdays(m){
+      const cur=workdaysOf(m);
+      const v=window.prompt(`จำนวนวันทำงาน ${MO[m-1]} ${selYear}`,cur!=null?cur:'');
+      if(v==null)return;
+      const {error}=await DB.from('transport_workdays').upsert({year:selYear,month:m,days:Number(v)||0},{onConflict:'year,month'});
+      if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
+      fetch();
+    }
 
     const years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a);
     const yearRows=rows.filter(r=>r.year===selYear);
@@ -5696,12 +5712,23 @@ window.__dataReady.then(data => {
                     const companyItems=items.filter(i=>!i.name.includes('รถร่วม'));
                     const companyCol=m=>companyItems.reduce((s,it)=>s+cell(it.name,m),0);
                     const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
-                    return<tr style={{background:'#fffbeb',fontWeight:700}}>
-                      <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>เฉลี่ยรถบริษัท/คัน (÷{NUM_COMPANY_TRUCKS} ไม่รวมรถร่วม)</td>
-                      {months.map(m=>{const v=companyCol(m);return<td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#b45309',whiteSpace:'nowrap'}}>{v?(v/NUM_COMPANY_TRUCKS).toFixed(1):'–'}</td>;})}
-                      <td style={{textAlign:'right',padding:'7px 8px',color:'#b45309',background:'#fef3c7'}}>{companyGrand?(companyGrand/NUM_COMPANY_TRUCKS).toFixed(1):'–'}</td>
-                      {canEdit&&<td style={{background:'#fffbeb'}}></td>}
-                    </tr>;
+                    const wdTotal=months.reduce((s,m)=>s+(workdaysOf(m)||0),0);
+                    return<>
+                      <tr style={{background:'#fffbeb',fontWeight:700}}>
+                        <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>จำนวนวันทำงาน</td>
+                        {months.map(m=>{const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#b45309',whiteSpace:'nowrap'}}>
+                          {canEdit?<span onClick={()=>editWorkdays(m)} title="แก้ไขจำนวนวันทำงาน" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{d!=null?d:'–'}</span>:(d!=null?d:'–')}
+                        </td>;})}
+                        <td style={{textAlign:'right',padding:'7px 8px',color:'#b45309',background:'#fef3c7'}}>{wdTotal||'–'}</td>
+                        {canEdit&&<td style={{background:'#fffbeb'}}></td>}
+                      </tr>
+                      <tr style={{background:'#fffbeb',fontWeight:700}}>
+                        <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>เฉลี่ย/คัน/วัน (÷{NUM_COMPANY_TRUCKS} ไม่รวมรถร่วม ÷วันทำงาน)</td>
+                        {months.map(m=>{const v=companyCol(m);const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#b45309',whiteSpace:'nowrap'}}>{v&&d?(v/NUM_COMPANY_TRUCKS/d).toFixed(2):'–'}</td>;})}
+                        <td style={{textAlign:'right',padding:'7px 8px',color:'#b45309',background:'#fef3c7'}}>{companyGrand&&wdTotal?(companyGrand/NUM_COMPANY_TRUCKS/wdTotal).toFixed(2):'–'}</td>
+                        {canEdit&&<td style={{background:'#fffbeb'}}></td>}
+                      </tr>
+                    </>;
                   })()}
                 </tfoot>
               </table>
