@@ -5914,6 +5914,7 @@ window.__dataReady.then(data => {
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
     // นับจำนวนเดือนรวมแบบสะสมตามไตรมาส (มีข้อมูลถึง Q ไหน ก็รวม Q นั้น x 3 เดือน)
     const quarterMonthCount=monthsAll.length?Math.max(...monthsAll):0;
+    const pileLabel=pileType=>yearRows.some(r=>r.pile_type===pileType&&r.note==='factory_merged')?`${pileType} (+โรงงาน)`:pileType;
     const cellUtil=(pileType,m)=>{
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
       const pd=daysOf(m);
@@ -6013,17 +6014,19 @@ window.__dataReady.then(data => {
             const plateMap={}; // pile_type -> รวมค่าของเดือนนี้ (รวมโรงงาน+มอก.เข้าด้วยกันถ้าไม่มี capacity แยก)
             Object.entries(colMap).forEach(([ci,name])=>{
               const val=Number(data[summaryIdx][ci])||0;
-              let target=name;
+              let target=name,isFactory=false;
               if(!PILE_TYPES.find(p=>p.k===name)){
                 if(name.endsWith('โรงงาน')){
                   const mogName=name.replace('โรงงาน','มอก.');
-                  if(PILE_TYPES.find(p=>p.k===mogName))target=mogName;
+                  if(PILE_TYPES.find(p=>p.k===mogName)){target=mogName;isFactory=true;}
                   else{if(val>0)skipped.add(name);return;}
                 }else{if(val>0)skipped.add(name);return;}
               }
-              plateMap[target]=(plateMap[target]||0)+val;
+              if(!plateMap[target])plateMap[target]={plates_used:0,merged:false};
+              plateMap[target].plates_used+=val;
+              if(isFactory&&val>0)plateMap[target].merged=true;
             });
-            Object.entries(plateMap).forEach(([pile_type,plates_used])=>{plates.push({month,pile_type,plates_used});});
+            Object.entries(plateMap).forEach(([pile_type,d])=>{plates.push({month,pile_type,plates_used:d.plates_used,merged:d.merged});});
           });
           setImportData({plates,days,skipped:[...skipped]});
           setShowImport(true);
@@ -6040,7 +6043,7 @@ window.__dataReady.then(data => {
         if(error){err=error;break;}
       }
       if(!err)for(const p of importData.plates){
-        const {error}=await DB.from('plate_usage').upsert({year:importYear,month:p.month,pile_type:p.pile_type,plates_used:p.plates_used},{onConflict:'year,month,pile_type'});
+        const {error}=await DB.from('plate_usage').upsert({year:importYear,month:p.month,pile_type:p.pile_type,plates_used:p.plates_used,note:p.merged?'factory_merged':null},{onConflict:'year,month,pile_type'});
         if(error){err=error;break;}
       }
       setImporting(false);
@@ -6081,7 +6084,7 @@ window.__dataReady.then(data => {
               {[...PILE_TYPES].map(p=>({...p,yUtil:yearUtil(p.k)})).sort((a,b)=>(b.yUtil??-1)-(a.yUtil??-1)).map((p,idx)=>{
                 const yUtil=p.yUtil;
                 return<tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                  <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{p.k}</td>
+                  <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{pileLabel(p.k)}</td>
                   {QUARTERS.map(q=>{
                     const v=quarterUtil(p.k,q.months);
                     return<td key={q.k} style={{textAlign:'center',padding:'8px 10px',borderBottom:'1px solid #f1f5f9'}}>
@@ -6133,7 +6136,7 @@ window.__dataReady.then(data => {
                 })}
               </tr>
               {PILE_TYPES.map((p,idx)=><tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{p.k}</td>
+                <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{pileLabel(p.k)}</td>
                 {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{
                   const v=cellUtil(p.k,m);
                   return<td key={m} style={{textAlign:'center',padding:'4px 4px',borderBottom:'1px solid #f1f5f9'}}>
