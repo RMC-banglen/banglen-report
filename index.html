@@ -1567,10 +1567,12 @@ window.__dataReady.then(data => {
     // ลูกค้าในสาเหตุที่เลือก (พร้อม rows สำหรับขยายดูรายละเอียด)
     const causeCustomers = selCause ? (() => {
       const map = {};
-      items.filter(r=>(r.cause||'ไม่ระบุ')===selCause&&r.customer_name).forEach(r=>{
-        if(!map[r.customer_name]) map[r.customer_name]={name:r.customer_name,value:0,rows:[]};
-        map[r.customer_name].value += r.amount||0;
-        map[r.customer_name].rows.push(r);
+      items.filter(r=>(r.cause||'ไม่ระบุ')===selCause).forEach(r=>{
+        // รายการที่ไม่มีชื่อลูกค้า (เช่น เสียหายในโรงงาน) ให้จัดกลุ่มตามรหัส ID แทน
+        const key = r.customer_name || `รหัส ${r.code_type||'ไม่ระบุ'}`;
+        if(!map[key]) map[key]={name:key,value:0,rows:[]};
+        map[key].value += r.amount||0;
+        map[key].rows.push(r);
       });
       return Object.values(map).sort((a,b)=>b.value-a.value);
     })() : [];
@@ -1617,7 +1619,7 @@ window.__dataReady.then(data => {
                   ? <div style={{color:'var(--muted-text)',fontSize:'13px'}}>ไม่มีข้อมูลลูกค้า</div>
                   : causeCustomers.map((c,i)=>{
                     const isOpen = selCustInCause===c.name;
-                    const custRows = items.filter(r=>(r.cause||'ไม่ระบุ')===selCause&&r.customer_name===c.name);
+                    const custRows = c.rows;
                     return <div key={i}>
                       <div onClick={()=>setSelCustInCause(isOpen?null:c.name)}
                         style={{background: isOpen?'#eef3fc':'#fff',borderRadius:8,border:`1.5px solid ${isOpen?'#2f5fd0':'#e0e7ff'}`,
