@@ -5933,6 +5933,22 @@ window.__dataReady.then(data => {
       return vals.reduce((s,v)=>s+v,0)/vals.length;
     };
     const yearPlatesUsed=pileType=>yearRows.filter(x=>x.pile_type===pileType).reduce((s,r)=>s+(Number(r.plates_used)||0),0);
+    const cellAvgPlates=(pileType,m)=>{
+      const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
+      const pd=daysOf(m);
+      if(!r||!pd)return null;
+      return r.plates_used/pd;
+    };
+    const quarterAvgPlates=(pileType,qMonths)=>{
+      const vals=qMonths.map(m=>cellAvgPlates(pileType,m)).filter(v=>v!=null);
+      if(!vals.length)return null;
+      return vals.reduce((s,v)=>s+v,0)/vals.length;
+    };
+    const yearAvgPlates=pileType=>{
+      const vals=months.map(m=>cellAvgPlates(pileType,m)).filter(v=>v!=null);
+      if(!vals.length)return null;
+      return vals.reduce((s,v)=>s+v,0)/vals.length;
+    };
 
     function openEdit(pileType,m){
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
@@ -6094,12 +6110,13 @@ window.__dataReady.then(data => {
                   <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{pileLabel(p.k)}</td>
                   {QUARTERS.map(q=>{
                     const v=quarterUtil(p.k,q.months);
+                    const avg=quarterAvgPlates(p.k,q.months);
                     return<td key={q.k} style={{textAlign:'center',padding:'8px 10px',borderBottom:'1px solid #f1f5f9'}}>
-                      {v!=null?<span style={{background:pctColor(v)+'22',color:pctColor(v),fontWeight:700,padding:'3px 10px',borderRadius:6}}>{fmtPct(v)}</span>:<span style={{color:'#cbd5e1'}}>–</span>}
+                      {avg!=null?<span style={{background:pctColor(v)+'22',color:pctColor(v),fontWeight:700,padding:'3px 10px',borderRadius:6}}>{avg.toFixed(2)} แพ</span>:<span style={{color:'#cbd5e1'}}>–</span>}
                     </td>;
                   })}
                   <td style={{textAlign:'center',padding:'8px 10px',borderBottom:'1px solid #f1f5f9',background:'#fafbff'}}>
-                    {yUtil!=null?<span style={{color:pctColor(yUtil),fontWeight:800}}>{fmtPct(yUtil)}</span>:<span style={{color:'#cbd5e1'}}>–</span>}
+                    {yUtil!=null?<span style={{color:pctColor(yUtil),fontWeight:800}}>{yearAvgPlates(p.k).toFixed(2)} แพ</span>:<span style={{color:'#cbd5e1'}}>–</span>}
                   </td>
                   <td style={{textAlign:'center',padding:'8px 10px',color:'#64748b',borderBottom:'1px solid #f1f5f9'}}>{p.cap}</td>
                   <td style={{textAlign:'center',padding:'8px 10px',color:'#1e293b',fontWeight:700,borderBottom:'1px solid #f1f5f9'}}>{yearPlatesUsed(p.k)}</td>
