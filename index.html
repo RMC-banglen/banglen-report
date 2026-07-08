@@ -6093,6 +6093,13 @@ window.__dataReady.then(data => {
         <div>
           <div style={{fontSize:22,fontWeight:800,color:'#1e293b'}}>🏗️ ภาพรวมการใช้แพผลิต</div>
           <div style={{fontSize:13,color:'#64748b',marginTop:2}}>% การใช้กำลังผลิต = จำนวนแพที่ลงผลิต ÷ (จำนวนแพที่มี × วันที่มีผลิต) รายเดือน (ดึงจาก Supabase)</div>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:8}}>
+            {[{c:'#0d9488',t:'≥ 70%'},{c:'#2563eb',t:'50–69.9%'},{c:'#d97706',t:'30–49.9%'},{c:'#94a3b8',t:'< 30%'}].map(x=>
+              <div key={x.t} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#475569'}}>
+                <span style={{width:10,height:10,borderRadius:3,background:x.c,display:'inline-block'}}/>{x.t}
+              </div>
+            )}
+          </div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           <div style={{display:'flex',gap:4}}>
