@@ -5383,12 +5383,14 @@ window.__dataReady.then(data => {
     const [importing,setImporting]=useState(false);
     const [importType,setImportType]=useState('เทรลเลอร์');
     const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ขับรถสำรองแทน (หักจากคนขับ ไปเข้ารถสำรอง ไม่ว่าจะเป็นประเภทรถเดียวกันหรือไม่)
-    // หาปลายทางรถสำรองให้เหมาะกับคนขับต้นทาง: ถ้าเป็นกลุ่ม "บ่อตะกั่ว" ให้ไปรถสำรองบ่อตะกั่ว ไม่งั้นไปรถสำรองปกติ
-    const spareTargetFor=driverName=>{
-      const isBotakua=driverName.includes('บ่อตะกั่ว');
-      const candidates=rows.filter(r=>r.driver_name.includes('สำรอง'));
-      const match=candidates.find(r=>r.driver_name.includes('บ่อตะกั่ว')===isBotakua);
-      return match?{name:match.driver_name,vt:match.vehicle_type}:null;
+    // หาปลายทางรถสำรองให้เหมาะกับคนขับต้นทาง: ถ้าเป็นกลุ่ม "บ่อตะกั่ว" ให้ไปรถบ่อตะกั่วของ 10ล้อ-12ล้อ ไม่งั้นไปรถสำรองปกติ
+    const spareTargetFor=(driverName,vt)=>{
+      if(driverName.includes('บ่อตะกั่ว')){
+        const m=rows.find(r=>r.vehicle_type!==vt&&r.driver_name.includes('บ่อตะกั่ว'));
+        return m?{name:m.driver_name,vt:m.vehicle_type}:null;
+      }
+      const m=rows.find(r=>r.driver_name.includes('สำรอง')&&!r.driver_name.includes('บ่อตะกั่ว'));
+      return m?{name:m.driver_name,vt:m.vehicle_type}:null;
     };
     const fileInputRef=React.useRef(null);
 
@@ -5530,7 +5532,7 @@ window.__dataReady.then(data => {
         amount=Number(amount)||0;
         if(amount<=0)return;
         const [vt,name]=key.split('|');
-        const spare=spareTargetFor(name);
+        const spare=spareTargetFor(name,vt);
         if(!spare)return;
         let remaining=amount;
         const driverRows=list.filter(r=>r.vehicle_type===vt&&r.driver_name===name).sort((a,b)=>b.trips-a.trips);
@@ -5827,7 +5829,7 @@ window.__dataReady.then(data => {
                   </tr></thead>
                   <tbody>
                     {drivers.map((d,i)=>{
-                      const spare=spareTargetFor(d.name);
+                      const spare=spareTargetFor(d.name,d.vt);
                       const key=d.vt+'|'+d.name;
                       const checked=(spareAssign[key]||0)>0;
                       const canSpare=spare&&!(d.vt===spare.vt&&d.name===spare.name);
