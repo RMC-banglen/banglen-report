@@ -5948,6 +5948,7 @@ window.__dataReady.then(data => {
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
     // นับจำนวนเดือนรวมแบบสะสมตามไตรมาส (มีข้อมูลถึง Q ไหน ก็รวม Q นั้น x 3 เดือน)
     const quarterMonthCount=monthsAll.length?Math.max(...monthsAll):0;
+    const activeQuarters=QUARTERS.filter(q=>q.months.some(m=>monthsAll.includes(m)));
     const pileLabel=pileType=>yearRows.some(r=>r.pile_type===pileType&&r.note==='factory_merged')?`${pileType} (+โรงงาน)`:pileType;
     const cellUtil=(pileType,m)=>{
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
@@ -6118,7 +6119,7 @@ window.__dataReady.then(data => {
             <thead>
               <tr style={{background:'#f8fafc'}}>
                 <th style={{textAlign:'left',padding:'9px 12px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>สินค้า</th>
-                {QUARTERS.map(q=>{
+                {activeQuarters.map(q=>{
                   const qDays=q.months.reduce((s,m)=>s+(daysOf(m)||0),0);
                   return<th key={q.k} style={{textAlign:'center',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>
                     {q.k}<div style={{fontSize:10,fontWeight:600,color:'#94a3b8',marginTop:2}}>{qDays>0?`รวม ${qDays} วัน`:'–'}</div>
@@ -6135,7 +6136,7 @@ window.__dataReady.then(data => {
                 const yUtil=p.yUtil;
                 return<tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                   <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{pileLabel(p.k)}</td>
-                  {QUARTERS.map(q=>{
+                  {activeQuarters.map(q=>{
                     const v=quarterUtil(p.k,q.months);
                     const avg=quarterAvgPlates(p.k,q.months);
                     return<td key={q.k} style={{textAlign:'center',padding:'8px 10px',borderBottom:'1px solid #f1f5f9'}}>
@@ -6163,7 +6164,7 @@ window.__dataReady.then(data => {
             <tfoot>
               <tr style={{background:'#f8fafc'}}>
                 <td style={{padding:'8px 12px',position:'sticky',left:0,background:'#f8fafc',fontWeight:800,color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>รวม</td>
-                {QUARTERS.map(q=><td key={q.k} style={{borderTop:'2px solid #e2e8f0'}}/>)}
+                {activeQuarters.map(q=><td key={q.k} style={{borderTop:'2px solid #e2e8f0'}}/>)}
                 <td style={{borderTop:'2px solid #e2e8f0'}}/>
                 <td style={{textAlign:'center',padding:'8px 10px',fontWeight:800,color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{PILE_TYPES.reduce((s,p)=>s+getCap(p.k),0)}</td>
                 <td style={{textAlign:'center',padding:'8px 10px',fontWeight:800,color:'#1e293b',borderTop:'2px solid #e2e8f0'}}>{PILE_TYPES.reduce((s,p)=>s+yearPlatesUsed(p.k),0)}</td>
