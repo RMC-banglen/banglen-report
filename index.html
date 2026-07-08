@@ -5887,16 +5887,13 @@ window.__dataReady.then(data => {
     const fmtPct=n=>n==null?'–':(n*100).toFixed(1)+'%';
     const pctColor=n=>{if(n==null)return'#cbd5e1';if(n>=0.7)return'#0d9488';if(n>=0.5)return'#2563eb';if(n>=0.3)return'#d97706';return'#94a3b8';};
     const [rows,setRows]=useState([]);
-    const [dayRows,setDayRows]=useState([]); // plate_usage_days: {year,month,production_days}
+    const [dayRows,setDayRows]=useState([]); // จำนวนวันผลิต ดึงจาก production_monthly: {year,month,production_days}
     const [capRows,setCapRows]=useState([]); // plate_capacities: {pile_type,cap}
     const [loading,setLoading]=useState(true);
     const [selYear,setSelYear]=useState(2569);
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({pile_type:'',month:1,plates_used:''});
     const [saving,setSaving]=useState(false);
-    const [showDaysForm,setShowDaysForm]=useState(false);
-    const [daysForm,setDaysForm]=useState({month:1,production_days:''});
-    const [savingDays,setSavingDays]=useState(false);
     const [showCapForm,setShowCapForm]=useState(false);
     const [capForm,setCapForm]=useState({pile_type:'',cap:''});
     const [savingCap,setSavingCap]=useState(false);
@@ -5906,9 +5903,9 @@ window.__dataReady.then(data => {
       setLoading(true);
       Promise.all([
         DB.from('plate_usage').select('*').order('year').order('month'),
-        DB.from('plate_usage_days').select('*').order('year').order('month'),
+        DB.from('production_monthly').select('year,month,days').order('year').order('month'),
         DB.from('plate_capacities').select('*'),
-      ]).then(([a,b,c])=>{setRows(a.data||[]);setDayRows(b.data||[]);setCapRows(c.data||[]);setLoading(false);});
+      ]).then(([a,b,c])=>{setRows(a.data||[]);setDayRows((b.data||[]).map(r=>({year:r.year,month:r.month,production_days:r.days})));setCapRows(c.data||[]);setLoading(false);});
     }
     const getCap=pileType=>{
       const c=capRows.find(x=>x.pile_type===pileType);
@@ -5983,18 +5980,6 @@ window.__dataReady.then(data => {
       setSaving(false);
       if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
       setShowForm(false);fetch();
-    }
-    function openDaysEdit(m){
-      setDaysForm({month:m,production_days:daysOf(m)!=null?daysOf(m):''});
-      setShowDaysForm(true);
-    }
-    async function handleSaveDays(){
-      const payload={year:selYear,month:Number(daysForm.month),production_days:Number(daysForm.production_days)||0};
-      setSavingDays(true);
-      const {error}=await DB.from('plate_usage_days').upsert(payload,{onConflict:'year,month'});
-      setSavingDays(false);
-      if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
-      setShowDaysForm(false);fetch();
     }
 
     // ===== นำเข้า Excel (ไฟล์คิวคำนวณ ที่มีชีทแยกตามเดือน 1-12) =====
@@ -6076,11 +6061,7 @@ window.__dataReady.then(data => {
     async function confirmImportPlates(){
       setImporting(true);
       let err=null;
-      for(const d of importData.days){
-        const {error}=await DB.from('plate_usage_days').upsert({year:importYear,month:d.month,production_days:d.production_days},{onConflict:'year,month'});
-        if(error){err=error;break;}
-      }
-      if(!err)for(const p of importData.plates){
+      for(const p of importData.plates){
         const {error}=await DB.from('plate_usage').upsert({year:importYear,month:p.month,pile_type:p.pile_type,plates_used:p.plates_used,note:p.merged?'factory_merged':null},{onConflict:'year,month,pile_type'});
         if(error){err=error;break;}
       }
@@ -6173,13 +6154,11 @@ window.__dataReady.then(data => {
             </thead>
             <tbody>
               <tr style={{background:'#fffbeb'}}>
-                <td style={{padding:'5px 8px',position:'sticky',left:0,background:'#fffbeb',fontWeight:700,color:'#b45309',borderBottom:'2px solid #fde68a',whiteSpace:'nowrap'}}>จำนวนวันที่มีผลิต</td>
+                <td style={{padding:'5px 8px',position:'sticky',left:0,background:'#fffbeb',fontWeight:700,color:'#b45309',borderBottom:'2px solid #fde68a',whiteSpace:'nowrap'}} title="ดึงจากตารางสรุปการผลิตรายเดือน">จำนวนวันที่มีผลิต</td>
                 {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{
                   const d=daysOf(m);
                   return<td key={m} style={{textAlign:'center',padding:'4px 4px',borderBottom:'2px solid #fde68a'}}>
-                    {canEdit?
-                      <span onClick={()=>openDaysEdit(m)} title="แก้ไขจำนวนวัน" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted',color:'#b45309',fontWeight:700}}>{d!=null?d:'–'}</span>
-                      :<span style={{color:'#b45309',fontWeight:700}}>{d!=null?d:'–'}</span>}
+                    <span style={{color:'#b45309',fontWeight:700}}>{d!=null?d:'–'}</span>
                   </td>;
                 })}
               </tr>
@@ -6211,21 +6190,6 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={handleSave} disabled={saving} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:saving?0.5:1}}>{saving?'กำลังบันทึก...':'บันทึก'}</button>
-          </div>
-        </div>
-      </div>}
-
-      {showDaysForm&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowDaysForm(false);}}}>
-        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
-          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>จำนวนวันที่มีผลิต</div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{MO[daysForm.month-1]} {selYear} · ใช้ร่วมกันทุกรุ่นแพในเดือนนี้</div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>จำนวนวันที่มีผลิตในเดือนนี้</div>
-            <input type="number" value={daysForm.production_days} onChange={e=>setDaysForm(f=>({...f,production_days:e.target.value}))} placeholder="0" style={inp}/>
-          </div>
-          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={()=>setShowDaysForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={handleSaveDays} disabled={savingDays} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#d97706',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDays?0.5:1}}>{savingDays?'กำลังบันทึก...':'บันทึก'}</button>
           </div>
         </div>
       </div>}
