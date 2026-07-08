@@ -5913,7 +5913,7 @@ window.__dataReady.then(data => {
     const monthsAll=[...new Set([...yearRows.map(r=>r.month),...yearDayRows.map(r=>r.month)])].sort((a,b)=>a-b);
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
     // นับจำนวนเดือนรวมแบบสะสมตามไตรมาส (มีข้อมูลถึง Q ไหน ก็รวม Q นั้น x 3 เดือน)
-    const quarterMonthCount=QUARTERS.reduce((max,q,i)=>q.months.some(m=>months.includes(m))?(i+1)*3:max,0);
+    const quarterMonthCount=months.length?Math.max(...months):0;
     const cellUtil=(pileType,m)=>{
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
       const pd=daysOf(m);
