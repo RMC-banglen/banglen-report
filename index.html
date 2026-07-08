@@ -1558,6 +1558,7 @@ window.__dataReady.then(data => {
   function CauseView({items, totalAll}){
     const [selCause, setSelCause] = useState(null);
     const [selCustInCause, setSelCustInCause] = useState(null);
+    const [openMonthKey, setOpenMonthKey] = useState(null); // เดือนที่กดขยายดูรายละเอียดในกลุ่มลูกค้า/รหัส
 
     const causeSorted = Object.entries(
       items.reduce((acc,r)=>{ const k=r.cause||'ไม่ระบุ'; acc[k]=(acc[k]||0)+(r.amount||0); return acc; },{})
@@ -1634,18 +1635,23 @@ window.__dataReady.then(data => {
                       </div>
                       {isOpen && <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:6,paddingLeft:8}}>
                         {(()=>{
-                          // จัดกลุ่มรายการตามเดือน พร้อมยอดรวมของเดือน
+                          // จัดกลุ่มรายการตามเดือน พร้อมยอดรวมของเดือน — กดที่เดือนเพื่อดูรายละเอียดของเดือนนั้น
                           const byMonth={};
-                          custRows.forEach(r=>{const k=`${r.year}-${String(r.month||1).padStart(2,'0')}`;if(!byMonth[k])byMonth[k]={year:r.year,month:r.month||1,rows:[],sum:0};byMonth[k].rows.push(r);byMonth[k].sum+=r.amount||0;});
-                          return Object.values(byMonth).sort((a,b)=>a.year-b.year||a.month-b.month).map((g,gi)=>(
-                            <div key={gi}>
-                              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 10px',background:'#e0e7ff',borderRadius:7,marginBottom:4}}>
-                                <span style={{fontSize:'12px',fontWeight:800,color:'#1d4ed8'}}>{MONTHS_TH_SHORT[g.month-1]}-{String(g.year).slice(-2)}</span>
-                                <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:800,color:'#c0392b'}}>
-                                  {Number(g.sum).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                          custRows.forEach(r=>{const k=`${r.year}-${String(r.month||1).padStart(2,'0')}`;if(!byMonth[k])byMonth[k]={key:k,year:r.year,month:r.month||1,rows:[],sum:0};byMonth[k].rows.push(r);byMonth[k].sum+=r.amount||0;});
+                          return Object.values(byMonth).sort((a,b)=>a.year-b.year||a.month-b.month).map((g)=>{
+                            const mOpen=openMonthKey===c.name+'|'+g.key;
+                            return<div key={g.key}>
+                              <div onClick={()=>setOpenMonthKey(mOpen?null:c.name+'|'+g.key)}
+                                style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 10px',background:mOpen?'#c7d2fe':'#e0e7ff',borderRadius:7,marginBottom:4,cursor:'pointer'}}>
+                                <span style={{fontSize:'12px',fontWeight:800,color:'#1d4ed8'}}>{MONTHS_TH_SHORT[g.month-1]}-{String(g.year).slice(-2)} <span style={{fontWeight:600,color:'#64748b'}}>({g.rows.length} รายการ)</span></span>
+                                <span style={{display:'flex',alignItems:'center',gap:6}}>
+                                  <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:800,color:'#c0392b'}}>
+                                    {Number(g.sum).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                                  </span>
+                                  <span style={{fontSize:'10px',color:'#1d4ed8'}}>{mOpen?'▲':'▼'}</span>
                                 </span>
                               </div>
-                              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                              {mOpen&&<div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:4}}>
                                 {g.rows.map((r,ri)=>(
                                   <div key={ri} style={{background:'#f0f4ff',borderRadius:7,border:'1px solid #c6d3f5',padding:'7px 10px'}}>
                                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
@@ -1658,9 +1664,9 @@ window.__dataReady.then(data => {
                                     {r.reason && <div style={{fontSize:'11px',color:'#374151'}}>{r.reason}</div>}
                                   </div>
                                 ))}
-                              </div>
-                            </div>
-                          ));
+                              </div>}
+                            </div>;
+                          });
                         })()}
                       </div>}
                     </div>;
