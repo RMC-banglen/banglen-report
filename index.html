@@ -5383,7 +5383,13 @@ window.__dataReady.then(data => {
     const [importing,setImporting]=useState(false);
     const [importType,setImportType]=useState('เทรลเลอร์');
     const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ขับรถสำรองแทน (หักจากคนขับ ไปเข้ารถสำรอง ไม่ว่าจะเป็นประเภทรถเดียวกันหรือไม่)
-    const spareRow=()=>{const r=rows.find(x=>x.driver_name.trim().startsWith('สำรอง'));return r?{name:r.driver_name,vt:r.vehicle_type}:null;};
+    // หาปลายทางรถสำรองให้เหมาะกับคนขับต้นทาง: ถ้าเป็นกลุ่ม "บ่อตะกั่ว" ให้ไปรถสำรองบ่อตะกั่ว ไม่งั้นไปรถสำรองปกติ
+    const spareTargetFor=driverName=>{
+      const isBotakua=driverName.includes('บ่อตะกั่ว');
+      const candidates=rows.filter(r=>r.driver_name.includes('สำรอง'));
+      const match=candidates.find(r=>r.driver_name.includes('บ่อตะกั่ว')===isBotakua);
+      return match?{name:match.driver_name,vt:match.vehicle_type}:null;
+    };
     const fileInputRef=React.useRef(null);
 
     // ===== คำนวณข้อมูลแยกตามประเภทรถ =====
@@ -5520,11 +5526,12 @@ window.__dataReady.then(data => {
     function buildAdjustedImportRows(){
       // หักเที่ยวที่คนขับไปขับรถสำรองแทน ออกจากยอดของคนขับ แล้วย้ายไปเข้ารถสำรอง (ไม่ว่าคนขับจะเป็นประเภทรถใด)
       const list=importRows.map(r=>({...r}));
-      const spare=spareRow();
       Object.entries(spareAssign).forEach(([key,amount])=>{
         amount=Number(amount)||0;
-        if(amount<=0||!spare)return;
+        if(amount<=0)return;
         const [vt,name]=key.split('|');
+        const spare=spareTargetFor(name);
+        if(!spare)return;
         let remaining=amount;
         const driverRows=list.filter(r=>r.vehicle_type===vt&&r.driver_name===name).sort((a,b)=>b.trips-a.trips);
         for(const r of driverRows){
@@ -5820,7 +5827,7 @@ window.__dataReady.then(data => {
                   </tr></thead>
                   <tbody>
                     {drivers.map((d,i)=>{
-                      const spare=spareRow();
+                      const spare=spareTargetFor(d.name);
                       const key=d.vt+'|'+d.name;
                       const checked=(spareAssign[key]||0)>0;
                       const canSpare=spare&&!(d.vt===spare.vt&&d.name===spare.name);
@@ -5830,7 +5837,7 @@ window.__dataReady.then(data => {
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
                         <td style={{textAlign:'center',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
-                          {canSpare?<input type="checkbox" checked={checked} onChange={e=>setSpareAssign(s=>{const n={...s};if(e.target.checked)n[key]=n[key]||1;else delete n[key];return n;})}/>:'–'}
+                          {canSpare?<input type="checkbox" checked={checked} title={`เข้า ${spare.name}`} onChange={e=>setSpareAssign(s=>{const n={...s};if(e.target.checked)n[key]=n[key]||1;else delete n[key];return n;})}/>:'–'}
                         </td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
                           {canSpare&&checked?<input type="number" min="0" max={d.total} value={spareAssign[key]} onChange={e=>setSpareAssign(s=>({...s,[key]:e.target.value}))} style={{width:60,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>:'–'}
