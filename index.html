@@ -5382,6 +5382,8 @@ window.__dataReady.then(data => {
     const [importRows,setImportRows]=useState([]);
     const [importing,setImporting]=useState(false);
     const [importType,setImportType]=useState('เทรลเลอร์');
+    const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ขับรถสำรองแทน (หักจากคนขับ ไปเข้ารถสำรอง)
+    const spareNameOf=vt=>{const r=rows.find(x=>x.vehicle_type===vt&&x.driver_name.trim().startsWith('สำรอง'));return r?r.driver_name:null;};
     const fileInputRef=React.useRef(null);
 
     // ===== คำนวณข้อมูลแยกตามประเภทรถ =====
@@ -5509,22 +5511,44 @@ window.__dataReady.then(data => {
             return {vehicle_type:vt,driver_name,year:Number(y),month:Number(m),day:Number(d),trips,source:prefix};
           }).sort((a,b)=>a.year-b.year||a.month-b.month||a.day-b.day||a.driver_name.localeCompare(b.driver_name,'th'));
           if(parsed.length===0){alert('ไม่พบข้อมูลรายการขนส่งในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์ (ควรเป็นรายงานใบส่งของแยกตามคนขับ)');return;}
-          setImportRows(parsed);setShowImport(true);
+          setImportRows(parsed);setSpareAssign({});setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
       reader.readAsArrayBuffer(file);
       e.target.value='';
     }
+    function buildAdjustedImportRows(){
+      // หักเที่ยวที่คนขับไปขับรถสำรองแทน ออกจากยอดของคนขับ แล้วย้ายไปเข้ารถสำรองของประเภทรถนั้น
+      const list=importRows.map(r=>({...r}));
+      Object.entries(spareAssign).forEach(([key,amount])=>{
+        amount=Number(amount)||0;
+        if(amount<=0)return;
+        const [vt,name]=key.split('|');
+        const spareName=spareNameOf(vt);
+        if(!spareName)return;
+        let remaining=amount;
+        const driverRows=list.filter(r=>r.vehicle_type===vt&&r.driver_name===name).sort((a,b)=>b.trips-a.trips);
+        for(const r of driverRows){
+          if(remaining<=0)break;
+          const take=Math.min(r.trips,remaining);
+          r.trips-=take;
+          remaining-=take;
+          if(take>0)list.push({vehicle_type:vt,driver_name:spareName,year:r.year,month:r.month,day:r.day,trips:take,source:r.source});
+        }
+      });
+      return list.filter(r=>r.trips>0);
+    }
     async function confirmImport(){
       setImporting(true);
+      const adjustedRows=buildAdjustedImportRows();
       // ลบเฉพาะข้อมูลเดิมที่มาจาก "ชุดเลขที่บิลเดียวกัน" (source เดียวกัน เช่น BLV) ของเดือน/ปี/ประเภทรถนี้ แล้วนำเข้าใหม่แทนที่
       // ชุดเลขที่บิลอื่น (เช่น BLF) จะไม่ถูกลบ -> ยอดรวมของวันนั้นจะบวกกันจากหลายชุด ไม่ทับกัน
-      const combos=[...new Set(importRows.map(r=>`${r.year}|${r.month}|${r.vehicle_type}|${r.source}`))];
+      const combos=[...new Set(adjustedRows.map(r=>`${r.year}|${r.month}|${r.vehicle_type}|${r.source}`))];
       for(const key of combos){
         const [y,m,vt,src]=key.split('|');
         await DB.from('transport_trips').delete().eq('year',Number(y)).eq('month',Number(m)).eq('vehicle_type',vt).eq('note',src).not('day','is',null);
       }
-      const ins=importRows.map((r,idx)=>{
+      const ins=adjustedRows.map((r,idx)=>{
         const {items}=getTypeData(r.vehicle_type);
         const existingOrder=rows.find(x=>x.vehicle_type===r.vehicle_type&&x.driver_name===r.driver_name)?.sort_order;
         const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
@@ -5534,7 +5558,7 @@ window.__dataReady.then(data => {
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
       setImporting(false);
       if(insErr){alert('นำเข้าไม่สำเร็จ: '+insErr.message);return;}
-      setShowImport(false);setImportRows([]);fetch();
+      setShowImport(false);setImportRows([]);setSpareAssign({});fetch();
     }
 
     function openAdd(type){const {items}=getTypeData(type);setForm({id:null,year:selYear,vehicle_type:type,driver_name:'',sort_order:(items.length+1),trips:{}});setShowForm(true);}
@@ -5772,7 +5796,7 @@ window.__dataReady.then(data => {
         </div>
       </div>}
 
-      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);}}}>
+      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);setSpareAssign({});}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:640,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
           {(()=>{
@@ -5792,21 +5816,35 @@ window.__dataReady.then(data => {
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
+                    <th style={{textAlign:'center',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ขับรถสำรอง</th>
+                    <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>เที่ยวที่ขับรถสำรอง</th>
                   </tr></thead>
                   <tbody>
-                    {drivers.map((d,i)=><tr key={d.vt+d.name} style={{background:i%2?'#fcfcfd':'#fff'}}>
-                      <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
-                      <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name}</td>
-                      <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
-                      <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
-                    </tr>)}
+                    {drivers.map((d,i)=>{
+                      const spareName=spareNameOf(d.vt);
+                      const key=d.vt+'|'+d.name;
+                      const checked=(spareAssign[key]||0)>0;
+                      const canSpare=spareName&&d.name!==spareName;
+                      return<tr key={key} style={{background:i%2?'#fcfcfd':'#fff'}}>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name}</td>
+                        <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
+                        <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
+                        <td style={{textAlign:'center',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
+                          {canSpare?<input type="checkbox" checked={checked} onChange={e=>setSpareAssign(s=>{const n={...s};if(e.target.checked)n[key]=n[key]||1;else delete n[key];return n;})}/>:'–'}
+                        </td>
+                        <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
+                          {canSpare&&checked?<input type="number" min="0" max={d.total} value={spareAssign[key]} onChange={e=>setSpareAssign(s=>({...s,[key]:e.target.value}))} style={{width:60,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>:'–'}
+                        </td>
+                      </tr>;
+                    })}
                   </tbody>
                 </table>
               </div>
             </>;
           })()}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={()=>{setShowImport(false);setImportRows([]);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
           </div>
         </div>
