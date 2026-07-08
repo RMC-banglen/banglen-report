@@ -5978,11 +5978,12 @@ window.__dataReady.then(data => {
                 {QUARTERS.map(q=><th key={q.k} style={{textAlign:'center',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{q.k}</th>)}
                 <th style={{textAlign:'center',padding:'9px 10px',color:'#2f5fd0',fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#eff6ff'}}>รวม {quarterMonthCount} เดือน</th>
                 <th style={{textAlign:'center',padding:'9px 10px',color:'#64748b',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>แพที่มี</th>
+                <th style={{textAlign:'left',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>% ใช้กำลังผลิตต่อ cap/วัน</th>
               </tr>
             </thead>
             <tbody>
-              {PILE_TYPES.map((p,idx)=>{
-                const yUtil=yearUtil(p.k);
+              {[...PILE_TYPES].map(p=>({...p,yUtil:yearUtil(p.k)})).sort((a,b)=>(b.yUtil??-1)-(a.yUtil??-1)).map((p,idx)=>{
+                const yUtil=p.yUtil;
                 return<tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                   <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{p.k}</td>
                   {QUARTERS.map(q=>{
@@ -5995,6 +5996,14 @@ window.__dataReady.then(data => {
                     {yUtil!=null?<span style={{color:pctColor(yUtil),fontWeight:800}}>{fmtPct(yUtil)}</span>:<span style={{color:'#cbd5e1'}}>–</span>}
                   </td>
                   <td style={{textAlign:'center',padding:'8px 10px',color:'#64748b',borderBottom:'1px solid #f1f5f9'}}>{p.cap}</td>
+                  <td style={{padding:'8px 10px',borderBottom:'1px solid #f1f5f9'}}>
+                    {yUtil!=null?<div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <div style={{flex:1,height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden',minWidth:60,maxWidth:140}}>
+                        <div style={{height:'100%',width:`${Math.min(100,yUtil*100)}%`,background:pctColor(yUtil),borderRadius:4}}/>
+                      </div>
+                      <span style={{color:pctColor(yUtil),fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{fmtPct(yUtil)}</span>
+                    </div>:<span style={{color:'#cbd5e1'}}>–</span>}
+                  </td>
                 </tr>;
               })}
             </tbody>
