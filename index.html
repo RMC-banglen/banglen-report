@@ -6718,7 +6718,7 @@ window.__dataReady.then(data => {
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const getFirstTab=(user)=>{
       const tp={...DEFAULT_TAB_PERMS,...(user?.tab_perms||{})};
-      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack'];
+      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','calibration','repair','transport','plateusage'];
       return user?.role==='admin'?'meeting':(ordered.find(k=>tp[k]!==false)||'meeting');
     };
     const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
