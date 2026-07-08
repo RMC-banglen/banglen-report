@@ -6164,10 +6164,11 @@ window.__dataReady.then(data => {
                 <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{pileLabel(p.k)}</td>
                 {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{
                   const v=cellUtil(p.k,m);
+                  const avg=cellAvgPlates(p.k,m);
                   return<td key={m} style={{textAlign:'center',padding:'4px 4px',borderBottom:'1px solid #f1f5f9'}}>
                     {canEdit?
-                      <span onClick={()=>openEdit(p.k,m)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted',color:v!=null?pctColor(v):'#cbd5e1',fontWeight:v!=null?700:400}}>{v!=null?fmtPct(v):'–'}</span>
-                      :(v!=null?<span style={{color:pctColor(v),fontWeight:700}}>{fmtPct(v)}</span>:<span style={{color:'#cbd5e1'}}>–</span>)}
+                      <span onClick={()=>openEdit(p.k,m)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted',color:v!=null?pctColor(v):'#cbd5e1',fontWeight:v!=null?700:400}}>{avg!=null?avg.toFixed(2)+' แพ':'–'}</span>
+                      :(avg!=null?<span style={{color:pctColor(v),fontWeight:700}}>{avg.toFixed(2)} แพ</span>:<span style={{color:'#cbd5e1'}}>–</span>)}
                   </td>;
                 })}
               </tr>)}
