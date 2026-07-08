@@ -1569,13 +1569,18 @@ window.__dataReady.then(data => {
     const causeCustomers = selCause ? (() => {
       const map = {};
       items.filter(r=>(r.cause||'ไม่ระบุ')===selCause).forEach(r=>{
-        // รายการที่ไม่มีชื่อลูกค้า (เช่น เสียหายในโรงงาน) ให้จัดกลุ่มตามรหัส ID แทน
-        const key = r.customer_name || `รหัส ${r.code_type||'ไม่ระบุ'}`;
-        if(!map[key]) map[key]={name:key,value:0,rows:[]};
+        // รายการที่ไม่มีชื่อลูกค้า (เช่น เสียหายในโรงงาน) ให้จัดกลุ่มเป็นเดือนๆ แทน
+        const isMonth = !r.customer_name;
+        const key = isMonth ? `${MONTHS_TH_SHORT[(r.month||1)-1]}-${String(r.year).slice(-2)}` : r.customer_name;
+        if(!map[key]) map[key]={name:key,value:0,rows:[],isMonth,monthSort:isMonth?(r.year*100+(r.month||1)):0};
         map[key].value += r.amount||0;
         map[key].rows.push(r);
       });
-      return Object.values(map).sort((a,b)=>b.value-a.value);
+      const all=Object.values(map);
+      return [
+        ...all.filter(e=>!e.isMonth).sort((a,b)=>b.value-a.value),
+        ...all.filter(e=>e.isMonth).sort((a,b)=>a.monthSort-b.monthSort),
+      ];
     })() : [];
 
     return <>
@@ -1635,6 +1640,19 @@ window.__dataReady.then(data => {
                       </div>
                       {isOpen && <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:6,paddingLeft:8}}>
                         {(()=>{
+                          // กลุ่มที่เป็นเดือนอยู่แล้ว: แสดงรายการตรงๆ ไม่ต้องซ้อนหัวเดือนอีกชั้น
+                          if(c.isMonth)return c.rows.map((r,ri)=>(
+                            <div key={ri} style={{background:'#f0f4ff',borderRadius:7,border:'1px solid #c6d3f5',padding:'7px 10px'}}>
+                              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
+                                <span style={{padding:'1px 6px',borderRadius:6,fontSize:'10px',fontWeight:700,
+                                  background:'#dbeafe',color:'#1d4ed8'}}>{r.code_type}</span>
+                                <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>
+                                  {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
+                                </span>
+                              </div>
+                              {r.reason && <div style={{fontSize:'11px',color:'#374151'}}>{r.reason}</div>}
+                            </div>
+                          ));
                           // จัดกลุ่มรายการตามเดือน พร้อมยอดรวมของเดือน — กดที่เดือนเพื่อดูรายละเอียดของเดือนนั้น
                           const byMonth={};
                           custRows.forEach(r=>{const k=`${r.year}-${String(r.month||1).padStart(2,'0')}`;if(!byMonth[k])byMonth[k]={key:k,year:r.year,month:r.month||1,rows:[],sum:0};byMonth[k].rows.push(r);byMonth[k].sum+=r.amount||0;});
