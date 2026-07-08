@@ -5984,7 +5984,7 @@ window.__dataReady.then(data => {
 
     // ===== นำเข้า Excel (ไฟล์คิวคำนวณ ที่มีชีทแยกตามเดือน 1-12) =====
     const [showImport,setShowImport]=useState(false);
-    const [importData,setImportData]=useState({plates:[],days:[],skipped:[]}); // plates:[{month,pile_type,plates_used}] days:[{month,production_days}]
+    const [importData,setImportData]=useState({plates:[],days:[],skipped:[],incompleteMonths:[]}); // plates:[{month,pile_type,plates_used}] days:[{month,production_days}]
     const [importYear,setImportYear]=useState(2569);
     const [importing,setImporting]=useState(false);
     const fileInputRef=React.useRef(null);
@@ -6007,7 +6007,7 @@ window.__dataReady.then(data => {
           const wb=XLSX.read(evt.target.result,{type:'array'});
           const monthSheets=wb.SheetNames.filter(n=>/^\d{1,2}$/.test(n.trim()));
           if(monthSheets.length===0){alert('ไม่พบชีทที่ตั้งชื่อเป็นเลขเดือน (1-12) ในไฟล์นี้');return;}
-          const plates=[],days=[],skipped=new Set();
+          const plates=[],days=[],skipped=new Set(),incompleteMonths=[];
           monthSheets.forEach(sheetName=>{
             const month=Number(sheetName);
             if(month<1||month>12)return;
@@ -6027,6 +6027,8 @@ window.__dataReady.then(data => {
             if(plateRowIdxs.length===0)return;
             const summaryIdx=plateRowIdxs[plateRowIdxs.length-1];
             const dailyIdxs=plateRowIdxs.slice(0,-1);
+            const daysInMonth=new Date((importYear-543),month,0).getDate();
+            if(dailyIdxs.length<daysInMonth){incompleteMonths.push(month);return;}
             let prodDays=0;
             dailyIdxs.forEach(ri=>{
               let sum=0;
@@ -6051,7 +6053,7 @@ window.__dataReady.then(data => {
             });
             Object.entries(plateMap).forEach(([pile_type,d])=>{plates.push({month,pile_type,plates_used:d.plates_used,merged:d.merged});});
           });
-          setImportData({plates,days,skipped:[...skipped]});
+          setImportData({plates,days,skipped:[...skipped],incompleteMonths});
           setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
@@ -6218,6 +6220,7 @@ window.__dataReady.then(data => {
           </div>
           <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>พบข้อมูล {importData.days.length} เดือน · {importData.plates.length} รายการแพ</div>
           {importData.skipped.length>0&&<div style={{fontSize:12,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ พบรุ่นแพที่ยังไม่มีในระบบ (ข้ามไป ไม่นำเข้า): {importData.skipped.join(', ')}</div>}
+          {importData.incompleteMonths&&importData.incompleteMonths.length>0&&<div style={{fontSize:12,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ เดือนที่ข้อมูลไม่เต็มเดือน (ข้ามไป ไม่นำเข้า): {importData.incompleteMonths.map(m=>MO[m-1]).join(', ')}</div>}
           <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
               <thead><tr style={{background:'#f8fafc'}}>
