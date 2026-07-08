@@ -5383,6 +5383,11 @@ window.__dataReady.then(data => {
 
     // ===== รายวัน (shared calendar helpers) =====
     const [selDayMonth,setSelDayMonth]=useState(new Date().getMonth()+1);
+    // เมื่อโหลดข้อมูล/เปลี่ยนปี ให้เด้งไปเดือนล่าสุดที่มีข้อมูลเสมอ
+    useEffect(()=>{
+      const ms=yearRows.filter(r=>(r.trips||0)>0).map(r=>r.month);
+      if(ms.length){const latest=Math.max(...ms);setSelMonth(latest);setSelDayMonth(latest);}
+    },[rows,selYear]);
     const [dayForm,setDayForm]=useState({vehicle_type:'เทรลเลอร์',driver_name:'',original_name:'',days:{}});
     const [showDayForm,setShowDayForm]=useState(false);
     const [showAddDriver,setShowAddDriver]=useState(false);
