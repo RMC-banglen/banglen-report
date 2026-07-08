@@ -6074,7 +6074,12 @@ window.__dataReady.then(data => {
             <thead>
               <tr style={{background:'#f8fafc'}}>
                 <th style={{textAlign:'left',padding:'9px 12px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>สินค้า</th>
-                {QUARTERS.map(q=><th key={q.k} style={{textAlign:'center',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{q.k}</th>)}
+                {QUARTERS.map(q=>{
+                  const qDays=q.months.reduce((s,m)=>s+(daysOf(m)||0),0);
+                  return<th key={q.k} style={{textAlign:'center',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>
+                    {q.k}<div style={{fontSize:10,fontWeight:600,color:'#94a3b8',marginTop:2}}>{qDays>0?`รวม ${qDays} วัน`:'–'}</div>
+                  </th>;
+                })}
                 <th style={{textAlign:'center',padding:'9px 10px',color:'#2f5fd0',fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#eff6ff'}}>รวม {quarterMonthCount} เดือน</th>
                 <th style={{textAlign:'center',padding:'9px 10px',color:'#64748b',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>แพที่มี</th>
                 <th style={{textAlign:'left',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>% ใช้กำลังผลิตต่อ cap/วัน</th>
