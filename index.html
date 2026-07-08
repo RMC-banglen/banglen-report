@@ -5888,6 +5888,7 @@ window.__dataReady.then(data => {
     const pctColor=n=>{if(n==null)return'#cbd5e1';if(n>=0.7)return'#0d9488';if(n>=0.5)return'#2563eb';if(n>=0.3)return'#d97706';return'#94a3b8';};
     const [rows,setRows]=useState([]);
     const [dayRows,setDayRows]=useState([]); // plate_usage_days: {year,month,production_days}
+    const [capRows,setCapRows]=useState([]); // plate_capacities: {pile_type,cap}
     const [loading,setLoading]=useState(true);
     const [selYear,setSelYear]=useState(2569);
     const [showForm,setShowForm]=useState(false);
@@ -5896,6 +5897,9 @@ window.__dataReady.then(data => {
     const [showDaysForm,setShowDaysForm]=useState(false);
     const [daysForm,setDaysForm]=useState({month:1,production_days:''});
     const [savingDays,setSavingDays]=useState(false);
+    const [showCapForm,setShowCapForm]=useState(false);
+    const [capForm,setCapForm]=useState({pile_type:'',cap:''});
+    const [savingCap,setSavingCap]=useState(false);
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     useEffect(()=>{fetch();},[]);
     function fetch(){
@@ -5903,7 +5907,24 @@ window.__dataReady.then(data => {
       Promise.all([
         DB.from('plate_usage').select('*').order('year').order('month'),
         DB.from('plate_usage_days').select('*').order('year').order('month'),
-      ]).then(([a,b])=>{setRows(a.data||[]);setDayRows(b.data||[]);setLoading(false);});
+        DB.from('plate_capacities').select('*'),
+      ]).then(([a,b,c])=>{setRows(a.data||[]);setDayRows(b.data||[]);setCapRows(c.data||[]);setLoading(false);});
+    }
+    const getCap=pileType=>{
+      const c=capRows.find(x=>x.pile_type===pileType);
+      if(c)return Number(c.cap);
+      return PILE_TYPES.find(p=>p.k===pileType).cap;
+    };
+    function openCapEdit(pileType){
+      setCapForm({pile_type:pileType,cap:getCap(pileType)});
+      setShowCapForm(true);
+    }
+    async function saveCap(){
+      setSavingCap(true);
+      await DB.from('plate_capacities').upsert({pile_type:capForm.pile_type,cap:Number(capForm.cap)||0},{onConflict:'pile_type'});
+      setSavingCap(false);
+      setShowCapForm(false);
+      fetch();
     }
 
     const years=[...new Set([...rows.map(r=>r.year),...dayRows.map(r=>r.year)])].sort((a,b)=>b-a);
@@ -5919,7 +5940,7 @@ window.__dataReady.then(data => {
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
       const pd=daysOf(m);
       if(!r||!pd)return null;
-      const cap=PILE_TYPES.find(p=>p.k===pileType).cap;
+      const cap=getCap(pileType);
       return r.plates_used/(cap*pd);
     };
     const quarterUtil=(pileType,qMonths)=>{
@@ -6104,7 +6125,7 @@ window.__dataReady.then(data => {
               </tr>
             </thead>
             <tbody>
-              {[...PILE_TYPES].map(p=>({...p,yUtil:yearUtil(p.k)})).sort((a,b)=>(b.yUtil??-1)-(a.yUtil??-1)).map((p,idx)=>{
+              {[...PILE_TYPES].map(p=>({...p,cap:getCap(p.k),yUtil:yearUtil(p.k)})).sort((a,b)=>(b.yUtil??-1)-(a.yUtil??-1)).map((p,idx)=>{
                 const yUtil=p.yUtil;
                 return<tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                   <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{pileLabel(p.k)}</td>
@@ -6118,7 +6139,9 @@ window.__dataReady.then(data => {
                   <td style={{textAlign:'center',padding:'8px 10px',borderBottom:'1px solid #f1f5f9',background:'#fafbff'}}>
                     {yUtil!=null?<span style={{color:pctColor(yUtil),fontWeight:800}}>{yearAvgPlates(p.k).toFixed(2)} แพ</span>:<span style={{color:'#cbd5e1'}}>–</span>}
                   </td>
-                  <td style={{textAlign:'center',padding:'8px 10px',color:'#64748b',borderBottom:'1px solid #f1f5f9'}}>{p.cap}</td>
+                  <td style={{textAlign:'center',padding:'8px 10px',color:'#64748b',borderBottom:'1px solid #f1f5f9'}}>
+                    {canEdit?<span onClick={()=>openCapEdit(p.k)} title="แก้ไขจำนวนแพที่มี" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{p.cap}</span>:p.cap}
+                  </td>
                   <td style={{textAlign:'center',padding:'8px 10px',color:'#1e293b',fontWeight:700,borderBottom:'1px solid #f1f5f9'}}>{yearPlatesUsed(p.k)}</td>
                   <td style={{padding:'8px 10px',borderBottom:'1px solid #f1f5f9'}}>
                     {yUtil!=null?<div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -6203,6 +6226,21 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setShowDaysForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={handleSaveDays} disabled={savingDays} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#d97706',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDays?0.5:1}}>{savingDays?'กำลังบันทึก...':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+
+      {showCapForm&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowCapForm(false);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>แก้ไขจำนวนแพที่มี</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{capForm.pile_type}</div>
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>จำนวนแพที่มี</div>
+            <input type="number" step="0.5" value={capForm.cap} onChange={e=>setCapForm(f=>({...f,cap:e.target.value}))} placeholder="0" style={inp}/>
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>setShowCapForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={saveCap} disabled={savingCap} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#d97706',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingCap?0.5:1}}>{savingCap?'กำลังบันทึก...':'บันทึก'}</button>
           </div>
         </div>
       </div>}
