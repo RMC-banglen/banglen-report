@@ -5715,25 +5715,25 @@ window.__dataReady.then(data => {
                     const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
                     const wdTotal=months.reduce((s,m)=>s+(workdaysOf(m)||0),0);
                     return<>
-                      <tr style={{background:'#f0f9ff',fontWeight:700,fontSize:13}}>
-                        <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#f0f9ff',color:'#0369a1',whiteSpace:'nowrap',borderTop:'2px solid #bae6fd'}}>จำนวนวันทำงาน</td>
-                        {months.map(m=>{const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'9px 6px',color:'#0369a1',whiteSpace:'nowrap',borderTop:'2px solid #bae6fd'}}>
+                      <tr style={{background:'#f8fafc',fontWeight:700,fontSize:13}}>
+                        <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',whiteSpace:'nowrap',borderTop:'2px solid #cbd5e1'}}>จำนวนวันทำงาน</td>
+                        {months.map(m=>{const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'9px 6px',color:'#475569',whiteSpace:'nowrap',borderTop:'2px solid #cbd5e1'}}>
                           {canEdit?<span onClick={()=>editWorkdays(m)} title="แก้ไขจำนวนวันทำงาน" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{d!=null?d:'–'}</span>:(d!=null?d:'–')}
                         </td>;})}
-                        <td style={{textAlign:'right',padding:'9px 8px',color:'#0369a1',background:'#e0f2fe',borderTop:'2px solid #bae6fd'}}>{wdTotal||'–'}</td>
-                        {canEdit&&<td style={{background:'#f0f9ff',borderTop:'2px solid #bae6fd'}}></td>}
+                        <td style={{textAlign:'right',padding:'9px 8px',color:'#475569',background:'#f1f5f9',borderTop:'2px solid #cbd5e1'}}>{wdTotal||'–'}</td>
+                        {canEdit&&<td style={{background:'#f8fafc',borderTop:'2px solid #cbd5e1'}}></td>}
                       </tr>
-                      <tr style={{background:'#f0fdfa',fontWeight:800,fontSize:14}}>
-                        <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#f0fdfa',color:'#0f766e',whiteSpace:'nowrap'}}>จำนวนเที่ยวรถบริษัท</td>
-                        {months.map(m=>{const v=companyCol(m);return<td key={m} style={{textAlign:'right',padding:'9px 6px',color:'#0f766e',whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
-                        <td style={{textAlign:'right',padding:'9px 8px',color:'#fff',background:'#14b8a6'}}>{companyGrand?fmt(companyGrand):'–'}</td>
-                        {canEdit&&<td style={{background:'#f0fdfa'}}></td>}
+                      <tr style={{background:'#eff6ff',fontWeight:800,fontSize:14}}>
+                        <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#eff6ff',color:'#1e40af',whiteSpace:'nowrap'}}>จำนวนเที่ยวรถบริษัท</td>
+                        {months.map(m=>{const v=companyCol(m);return<td key={m} style={{textAlign:'right',padding:'9px 6px',color:'#1e40af',whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
+                        <td style={{textAlign:'right',padding:'9px 8px',color:'#fff',background:'#2f5fd0'}}>{companyGrand?fmt(companyGrand):'–'}</td>
+                        {canEdit&&<td style={{background:'#eff6ff'}}></td>}
                       </tr>
-                      <tr style={{background:'#ecfeff',fontWeight:900,fontSize:15}}>
-                        <td style={{padding:'11px 8px',position:'sticky',left:0,background:'#ecfeff',color:'#0e7490',whiteSpace:'nowrap',borderTop:'2px solid #a5f3fc'}}>เฉลี่ยเที่ยว/วัน (รถ {numTrucks} คัน)</td>
-                        {months.map(m=>{const v=companyCol(m);const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'11px 6px',color:'#0e7490',whiteSpace:'nowrap',borderTop:'2px solid #a5f3fc'}}>{v&&d?(v/d/numTrucks).toFixed(2):'–'}</td>;})}
-                        <td style={{textAlign:'right',padding:'11px 8px',color:'#fff',background:'#06b6d4',fontSize:16,borderTop:'2px solid #a5f3fc'}}>{companyGrand&&wdTotal?(companyGrand/wdTotal/numTrucks).toFixed(2):'–'}</td>
-                        {canEdit&&<td style={{background:'#ecfeff',borderTop:'2px solid #a5f3fc'}}></td>}
+                      <tr style={{background:'#eff6ff',fontWeight:900,fontSize:15}}>
+                        <td style={{padding:'11px 8px',position:'sticky',left:0,background:'#eff6ff',color:'#1e3a8a',whiteSpace:'nowrap',borderTop:'2px solid #bfdbfe'}}>เฉลี่ยเที่ยว/วัน (รถ {numTrucks} คัน)</td>
+                        {months.map(m=>{const v=companyCol(m);const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'11px 6px',color:'#1e3a8a',whiteSpace:'nowrap',borderTop:'2px solid #bfdbfe'}}>{v&&d?(v/d/numTrucks).toFixed(2):'–'}</td>;})}
+                        <td style={{textAlign:'right',padding:'11px 8px',color:'#fff',background:'#1e3a8a',fontSize:16,borderTop:'2px solid #bfdbfe'}}>{companyGrand&&wdTotal?(companyGrand/wdTotal/numTrucks).toFixed(2):'–'}</td>
+                        {canEdit&&<td style={{background:'#eff6ff',borderTop:'2px solid #bfdbfe'}}></td>}
                       </tr>
                     </>;
                   })()}
