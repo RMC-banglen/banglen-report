@@ -5694,17 +5694,27 @@ window.__dataReady.then(data => {
             {kpi('วันทำงานสะสม',wdTotal?fmt(wdTotal):'–','วัน',lastM?`เดือนล่าสุด ${MO[lastM-1]} ${workdaysOf(lastM)||'–'} วัน`:'','#475569')}
           </div>
           {/* กราฟเที่ยวรายเดือน แยกประเภทรถ */}
-          {card('จำนวนเที่ยวรายเดือน แยกประเภทรถ',`ปี ${selYear} · เทียบเทรลเลอร์กับ 10ล้อ-12ล้อ`,
-            monthsData.length?<GroupedBarChart categories={cats} series={[
-              {label:'เทรลเลอร์',color:'#2563eb',data:monthsData.map(m=>trailer.colTotal(m))},
-              {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>wheel.colTotal(m))},
-            ]} height={280} unit="เที่ยว"/>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
-          {/* เฉลี่ยเที่ยว/วัน/คัน รายเดือน */}
-          {card('เฉลี่ยเที่ยว/วัน/คัน รายเดือน','เที่ยวรถบริษัท ÷ วันทำงาน ÷ จำนวนรถ (เทรลเลอร์ 6 คัน · 10ล้อ-12ล้อ 2 คัน)',
-            monthsData.length?<LineChart categories={cats} series={[
-              {label:'เทรลเลอร์',color:'#2563eb',data:monthsData.map(m=>{const v=avgOf(trailer,m);return v!=null?+v.toFixed(2):null;})},
-              {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>{const v=avgOf(wheel,m);return v!=null?+v.toFixed(2):null;})},
-            ]} height={260} decimals={2} showValues={true}/>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
+          {(()=>{
+            const legend=<div style={{display:'flex',gap:18,marginBottom:6}}>
+              {[{label:'🚛 เทรลเลอร์',color:'#2563eb'},{label:'🚚 10ล้อ-12ล้อ',color:'#15803d'}].map(l=>
+                <div key={l.label} style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:l.color}}>
+                  <span style={{width:12,height:12,borderRadius:3,background:l.color,display:'inline-block'}}/>{l.label}
+                </div>)}
+            </div>;
+            return<>
+              {card('จำนวนเที่ยวรายเดือน แยกประเภทรถ',`ปี ${selYear} · เทียบเทรลเลอร์กับ 10ล้อ-12ล้อ`,
+                monthsData.length?<>{legend}<GroupedBarChart categories={cats} series={[
+                  {label:'เทรลเลอร์',color:'#2563eb',data:monthsData.map(m=>trailer.colTotal(m))},
+                  {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>wheel.colTotal(m))},
+                ]} height={280} unit="เที่ยว"/></>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
+              {/* เฉลี่ยเที่ยว/วัน/คัน รายเดือน */}
+              {card('เฉลี่ยเที่ยว/วัน/คัน รายเดือน','เที่ยวรถบริษัท ÷ วันทำงาน ÷ จำนวนรถ (เทรลเลอร์ 6 คัน · 10ล้อ-12ล้อ 2 คัน)',
+                monthsData.length?<>{legend}<LineChart categories={cats} series={[
+                  {label:'เทรลเลอร์',color:'#2563eb',data:monthsData.map(m=>{const v=avgOf(trailer,m);return v!=null?+v.toFixed(2):null;})},
+                  {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>{const v=avgOf(wheel,m);return v!=null?+v.toFixed(2):null;})},
+                ]} height={260} decimals={2} showValues={true}/></>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
+            </>;
+          })()}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:20}}>
             {/* สัดส่วนเที่ยวเทรลเลอร์ */}
             {card('สัดส่วนเที่ยวเทรลเลอร์ทั้งปี','รถบริษัท เทียบ รถร่วม/รับเอง/บ่อตะกั่ว',
