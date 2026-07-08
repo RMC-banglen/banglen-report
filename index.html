@@ -5459,9 +5459,12 @@ window.__dataReady.then(data => {
       const idx=items.findIndex(i=>i.name===name);
       const swapIdx=idx+dir;
       if(idx<0||swapIdx<0||swapIdx>=items.length)return;
-      const a=items[idx],b=items[swapIdx];
-      await DB.from('transport_trips').update({sort_order:b.order}).eq('vehicle_type',type).eq('driver_name',a.name);
-      await DB.from('transport_trips').update({sort_order:a.order}).eq('vehicle_type',type).eq('driver_name',b.name);
+      // สลับตำแหน่งในลิสต์ แล้วกำหนด sort_order ใหม่ทั้งชุด (กันกรณี sort_order ซ้ำกันแล้วสลับไม่ติด)
+      const order=[...items];
+      [order[idx],order[swapIdx]]=[order[swapIdx],order[idx]];
+      for(let i=0;i<order.length;i++){
+        await DB.from('transport_trips').update({sort_order:i+1}).eq('vehicle_type',type).eq('driver_name',order[i].name);
+      }
       fetch();
     }
 
