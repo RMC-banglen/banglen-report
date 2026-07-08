@@ -5691,6 +5691,18 @@ window.__dataReady.then(data => {
                     <td style={{textAlign:'right',padding:'7px 8px',color:'#fff',background:t.color,borderTop:'2px solid #e2e8f0'}}>{fmt(typeGrand)}</td>
                     {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
                   </tr>
+                  {t.k==='เทรลเลอร์'&&(()=>{
+                    const NUM_COMPANY_TRUCKS=6;
+                    const companyItems=items.filter(i=>!i.name.includes('รถร่วม'));
+                    const companyCol=m=>companyItems.reduce((s,it)=>s+cell(it.name,m),0);
+                    const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
+                    return<tr style={{background:'#fffbeb',fontWeight:700}}>
+                      <td style={{padding:'7px 8px',position:'sticky',left:0,background:'#fffbeb',color:'#b45309',whiteSpace:'nowrap'}}>เฉลี่ยรถบริษัท/คัน (÷{NUM_COMPANY_TRUCKS} ไม่รวมรถร่วม)</td>
+                      {months.map(m=>{const v=companyCol(m);return<td key={m} style={{textAlign:'right',padding:'7px 6px',color:'#b45309',whiteSpace:'nowrap'}}>{v?(v/NUM_COMPANY_TRUCKS).toFixed(1):'–'}</td>;})}
+                      <td style={{textAlign:'right',padding:'7px 8px',color:'#b45309',background:'#fef3c7'}}>{companyGrand?(companyGrand/NUM_COMPANY_TRUCKS).toFixed(1):'–'}</td>
+                      {canEdit&&<td style={{background:'#fffbeb'}}></td>}
+                    </tr>;
+                  })()}
                 </tfoot>
               </table>
             </div>
