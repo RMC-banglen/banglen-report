@@ -4671,15 +4671,15 @@ window.__dataReady.then(data => {
             <div style={{fontSize:11,color:'#94a3b8',marginTop:3}}>{u.position||(u.role==='admin'?'ผู้ดูแลระบบ':u.role==='viewer'?'ผู้บริหาร':'ผู้ใช้งาน')}</div>
           </div>)}
         </div>
-      </>:<div style={{background:'#fff',borderRadius:20,padding:'32px 28px',boxShadow:'0 4px 20px rgba(0,0,0,.1)',textAlign:'center',minWidth:260}}>
+      </>:<div style={{background:'#fff',borderRadius:20,padding:'32px 28px',boxShadow:'0 4px 20px rgba(0,0,0,.1)',textAlign:'center',minWidth:340}}>
         <div style={{fontSize:17,fontWeight:700,color:'#1e293b',marginBottom:4}}>{selected.name}</div>
         <div style={{fontSize:13,color:'#94a3b8',marginBottom:18}}>กรอก PIN 4 หลัก</div>
         <div style={{display:'flex',gap:10,justifyContent:'center',marginBottom:20}}>
           {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:'50%',background:error?'#dc2626':pin.length>i?'#0f766e':'#e2e8f0',transition:'background .15s'}}/>)}
         </div>
         {error&&<div style={{color:'#dc2626',fontSize:13,marginBottom:10,fontWeight:600}}>{error}</div>}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
-          {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d,i)=><button key={i} onClick={()=>d===''?null:d==='⌫'?setPin(p=>p.slice(0,-1)):pressPin(String(d))} style={{padding:'13px',fontSize:19,fontWeight:600,border:'1.5px solid #e2e8f0',borderRadius:10,background:d===''?'transparent':'#f8fafc',color:'#1e293b',cursor:d===''?'default':'pointer',visibility:d===''?'hidden':'visible'}}>{d}</button>)}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:16}}>
+          {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d,i)=><button key={i} onClick={()=>d===''?null:d==='⌫'?setPin(p=>p.slice(0,-1)):pressPin(String(d))} style={{padding:'18px',minWidth:80,fontSize:20,fontWeight:600,border:'1.5px solid #e2e8f0',borderRadius:10,background:d===''?'transparent':'#f8fafc',color:'#1e293b',cursor:d===''?'default':'pointer',visibility:d===''?'hidden':'visible'}}>{d}</button>)}
         </div>
         <button onClick={()=>setSelected(null)} style={{fontSize:13,color:'#94a3b8',background:'none',border:'none',cursor:'pointer'}}>← เลือกผู้ใช้อื่น</button>
       </div>}
