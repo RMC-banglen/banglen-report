@@ -5382,8 +5382,8 @@ window.__dataReady.then(data => {
     const [importRows,setImportRows]=useState([]);
     const [importing,setImporting]=useState(false);
     const [importType,setImportType]=useState('เทรลเลอร์');
-    const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ขับรถสำรองแทน (หักจากคนขับ ไปเข้ารถสำรอง)
-    const spareNameOf=vt=>{const r=rows.find(x=>x.vehicle_type===vt&&x.driver_name.trim().startsWith('สำรอง'));return r?r.driver_name:null;};
+    const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ขับรถสำรองแทน (หักจากคนขับ ไปเข้ารถสำรอง ไม่ว่าจะเป็นประเภทรถเดียวกันหรือไม่)
+    const spareRow=()=>{const r=rows.find(x=>x.driver_name.trim().startsWith('สำรอง'));return r?{name:r.driver_name,vt:r.vehicle_type}:null;};
     const fileInputRef=React.useRef(null);
 
     // ===== คำนวณข้อมูลแยกตามประเภทรถ =====
@@ -5518,14 +5518,13 @@ window.__dataReady.then(data => {
       e.target.value='';
     }
     function buildAdjustedImportRows(){
-      // หักเที่ยวที่คนขับไปขับรถสำรองแทน ออกจากยอดของคนขับ แล้วย้ายไปเข้ารถสำรองของประเภทรถนั้น
+      // หักเที่ยวที่คนขับไปขับรถสำรองแทน ออกจากยอดของคนขับ แล้วย้ายไปเข้ารถสำรอง (ไม่ว่าคนขับจะเป็นประเภทรถใด)
       const list=importRows.map(r=>({...r}));
+      const spare=spareRow();
       Object.entries(spareAssign).forEach(([key,amount])=>{
         amount=Number(amount)||0;
-        if(amount<=0)return;
+        if(amount<=0||!spare)return;
         const [vt,name]=key.split('|');
-        const spareName=spareNameOf(vt);
-        if(!spareName)return;
         let remaining=amount;
         const driverRows=list.filter(r=>r.vehicle_type===vt&&r.driver_name===name).sort((a,b)=>b.trips-a.trips);
         for(const r of driverRows){
@@ -5533,7 +5532,7 @@ window.__dataReady.then(data => {
           const take=Math.min(r.trips,remaining);
           r.trips-=take;
           remaining-=take;
-          if(take>0)list.push({vehicle_type:vt,driver_name:spareName,year:r.year,month:r.month,day:r.day,trips:take,source:r.source});
+          if(take>0)list.push({vehicle_type:spare.vt,driver_name:spare.name,year:r.year,month:r.month,day:r.day,trips:take,source:r.source});
         }
       });
       return list.filter(r=>r.trips>0);
@@ -5821,10 +5820,10 @@ window.__dataReady.then(data => {
                   </tr></thead>
                   <tbody>
                     {drivers.map((d,i)=>{
-                      const spareName=spareNameOf(d.vt);
+                      const spare=spareRow();
                       const key=d.vt+'|'+d.name;
                       const checked=(spareAssign[key]||0)>0;
-                      const canSpare=spareName&&d.name!==spareName;
+                      const canSpare=spare&&!(d.vt===spare.vt&&d.name===spare.name);
                       return<tr key={key} style={{background:i%2?'#fcfcfd':'#fff'}}>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name}</td>
