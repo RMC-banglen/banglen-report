@@ -6010,11 +6010,20 @@ window.__dataReady.then(data => {
               if(sum>0)prodDays++;
             });
             days.push({month,production_days:prodDays});
+            const plateMap={}; // pile_type -> รวมค่าของเดือนนี้ (รวมโรงงาน+มอก.เข้าด้วยกันถ้าไม่มี capacity แยก)
             Object.entries(colMap).forEach(([ci,name])=>{
               const val=Number(data[summaryIdx][ci])||0;
-              if(PILE_TYPES.find(p=>p.k===name))plates.push({month,pile_type:name,plates_used:val});
-              else if(val>0)skipped.add(name);
+              let target=name;
+              if(!PILE_TYPES.find(p=>p.k===name)){
+                if(name.endsWith('โรงงาน')){
+                  const mogName=name.replace('โรงงาน','มอก.');
+                  if(PILE_TYPES.find(p=>p.k===mogName))target=mogName;
+                  else{if(val>0)skipped.add(name);return;}
+                }else{if(val>0)skipped.add(name);return;}
+              }
+              plateMap[target]=(plateMap[target]||0)+val;
             });
+            Object.entries(plateMap).forEach(([pile_type,plates_used])=>{plates.push({month,pile_type,plates_used});});
           });
           setImportData({plates,days,skipped:[...skipped]});
           setShowImport(true);
