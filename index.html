@@ -5501,6 +5501,7 @@ window.__dataReady.then(data => {
             const colC=String(row[2]||'').trim();
             if(/^รวม\s*\d+\s*รายการ/.test(colC))continue; // แถวสรุปย่อย ไม่ต้องใช้ (นับเองจากแถวรายการ)
             if(isDateStr(colA)){
+              if(/^\S+-\d+[-.]\d+$/.test(colB))continue; // บิลที่มีท้าย -1 / .1 ฯลฯ เป็นบิลย่อย/แก้ไข ไม่นับเป็นเที่ยว
               if(colB&&currentGroup){
                 const {name,vt}=resolveTarget(currentGroup);
                 const [d,m,y]=colA.split('/').map(Number);
