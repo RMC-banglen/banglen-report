@@ -5948,7 +5948,7 @@ window.__dataReady.then(data => {
     const months=monthsAll.length?monthsAll:[1,2,3,4,5];
     // นับจำนวนเดือนรวมแบบสะสมตามไตรมาส (มีข้อมูลถึง Q ไหน ก็รวม Q นั้น x 3 เดือน)
     const quarterMonthCount=monthsAll.length?Math.max(...monthsAll):0;
-    const activeQuarters=QUARTERS.filter(q=>q.months.some(m=>monthsAll.includes(m)));
+    const activeQuarters=QUARTERS.filter(q=>q.months.some(m=>(daysOf(m)||0)>0));
     const pileLabel=pileType=>yearRows.some(r=>r.pile_type===pileType&&r.note==='factory_merged')?`${pileType} (+โรงงาน)`:pileType;
     const cellUtil=(pileType,m)=>{
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
