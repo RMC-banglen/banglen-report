@@ -5932,6 +5932,7 @@ window.__dataReady.then(data => {
       if(!vals.length)return null;
       return vals.reduce((s,v)=>s+v,0)/vals.length;
     };
+    const yearPlatesUsed=pileType=>yearRows.filter(x=>x.pile_type===pileType).reduce((s,r)=>s+(Number(r.plates_used)||0),0);
 
     function openEdit(pileType,m){
       const r=yearRows.find(x=>x.pile_type===pileType&&x.month===m);
@@ -6082,6 +6083,7 @@ window.__dataReady.then(data => {
                 })}
                 <th style={{textAlign:'center',padding:'9px 10px',color:'#2f5fd0',fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#eff6ff'}}>รวม {quarterMonthCount} เดือน</th>
                 <th style={{textAlign:'center',padding:'9px 10px',color:'#64748b',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>แพที่มี</th>
+                <th style={{textAlign:'center',padding:'9px 10px',color:'#64748b',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>รวมแพผลิต</th>
                 <th style={{textAlign:'left',padding:'9px 10px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>% ใช้กำลังผลิตต่อ cap/วัน</th>
               </tr>
             </thead>
@@ -6100,6 +6102,7 @@ window.__dataReady.then(data => {
                     {yUtil!=null?<span style={{color:pctColor(yUtil),fontWeight:800}}>{fmtPct(yUtil)}</span>:<span style={{color:'#cbd5e1'}}>–</span>}
                   </td>
                   <td style={{textAlign:'center',padding:'8px 10px',color:'#64748b',borderBottom:'1px solid #f1f5f9'}}>{p.cap}</td>
+                  <td style={{textAlign:'center',padding:'8px 10px',color:'#1e293b',fontWeight:700,borderBottom:'1px solid #f1f5f9'}}>{yearPlatesUsed(p.k)}</td>
                   <td style={{padding:'8px 10px',borderBottom:'1px solid #f1f5f9'}}>
                     {yUtil!=null?<div style={{display:'flex',alignItems:'center',gap:8}}>
                       <div style={{flex:1,height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden',minWidth:60,maxWidth:140}}>
