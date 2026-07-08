@@ -5436,7 +5436,9 @@ window.__dataReady.then(data => {
       const colTotal=m=>items.reduce((s,it)=>s+monthValue(it.name,m),0);
       const typeGrand=items.reduce((s,it)=>s+rowTotal(it.name),0);
       const monthGrand=colTotal(selMonth);
-      const monthItems=items.map(it=>({...it,trips:monthValue(it.name,selMonth)})).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
+      // เที่ยวที่คนขับไปช่วยขับรถสำรอง (บันทึกไว้ใน helper) นับรวมเป็นผลงานของคนขับคนนั้นด้วย
+      const helperMonth=name=>yearRows.filter(r=>r.helper===name&&r.month===selMonth).reduce((s,r)=>s+(r.trips||0),0);
+      const monthItems=items.map(it=>{const h=helperMonth(it.name);return{...it,trips:monthValue(it.name,selMonth)+h,helped:h};}).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
       const dayCell=(name,d)=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       const dayRowTotal=name=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
       const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
@@ -5566,7 +5568,7 @@ window.__dataReady.then(data => {
           const take=Math.min(r.trips,remaining);
           r.trips-=take;
           remaining-=take;
-          if(take>0)list.push({vehicle_type:spare.vt,driver_name:spare.name,year:r.year,month:r.month,day:r.day,trips:take,source:r.source});
+          if(take>0)list.push({vehicle_type:spare.vt,driver_name:spare.name,year:r.year,month:r.month,day:r.day,trips:take,source:r.source,helper:name});
         }
       });
       return list.filter(r=>r.trips>0);
@@ -5585,7 +5587,7 @@ window.__dataReady.then(data => {
         const {items}=getTypeData(r.vehicle_type);
         const existingOrder=rows.find(x=>x.vehicle_type===r.vehicle_type&&x.driver_name===r.driver_name)?.sort_order;
         const sortOrder=existingOrder!=null?existingOrder:(items.length+idx+1);
-        return {year:r.year,month:r.month,day:r.day,vehicle_type:r.vehicle_type,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips,note:r.source};
+        return {year:r.year,month:r.month,day:r.day,vehicle_type:r.vehicle_type,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips,note:r.source,helper:r.helper||null};
       });
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
@@ -5755,13 +5757,23 @@ window.__dataReady.then(data => {
                   {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
                 </select>
               </div>
-              {monthItems.length>0?<div style={{display:'flex',flexDirection:'column',gap:7}}>
-                {monthItems.slice(0,3).map((it,i)=><div key={it.name} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#475569'}}>
-                  <span style={{fontSize:16}}>{['🥇','🥈','🥉'][i]}</span>
-                  <span style={{flex:1,fontWeight:600,color:'#1e293b'}}>{it.name}</span>
-                  <b style={{color:t.color}}>{fmt(it.trips)} เที่ยว</b>
-                </div>)}
-              </div>:<div style={{fontSize:13,color:'#94a3b8'}}>ยังไม่มีข้อมูลเดือนนี้</div>}
+              {monthItems.length>0?(()=>{
+                // จัดอันดับแบบคะแนนเท่ากันได้เหรียญเดียวกัน (dense ranking) โชว์ถึงอันดับ 3
+                let rank=0,prev=null;
+                const ranked=[];
+                for(const it of monthItems){
+                  if(it.trips!==prev){rank++;prev=it.trips;}
+                  if(rank>3)break;
+                  ranked.push({...it,rank});
+                }
+                return<div style={{display:'flex',flexDirection:'column',gap:7}}>
+                  {ranked.map(it=><div key={it.name} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#475569'}}>
+                    <span style={{fontSize:16}}>{['🥇','🥈','🥉'][it.rank-1]}</span>
+                    <span style={{flex:1,fontWeight:600,color:'#1e293b'}}>{it.name}{it.helped>0&&<span title={`รวมเที่ยวที่ไปช่วยขับรถสำรอง ${fmt(it.helped)} เที่ยว`} style={{marginLeft:6,fontSize:11,color:'#0f766e',fontWeight:700}}>🤝 +{fmt(it.helped)}</span>}</span>
+                    <b style={{color:t.color}}>{fmt(it.trips)} เที่ยว</b>
+                  </div>)}
+                </div>;
+              })():<div style={{fontSize:13,color:'#94a3b8'}}>ยังไม่มีข้อมูลเดือนนี้</div>}
             </div>
           </div>
 
