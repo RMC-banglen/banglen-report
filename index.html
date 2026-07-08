@@ -5390,13 +5390,28 @@ window.__dataReady.then(data => {
     const [confirmDel,setConfirmDel]=useState(null); // {type,name}
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     const [workdays,setWorkdays]=useState([]); // transport_workdays: {year,month,days}
+    const [dayNotes,setDayNotes]=useState([]); // transport_day_notes: เหตุผลวันว่าง เช่น หยุด/รถเสีย
     useEffect(()=>{fetch();},[]);
     function fetch(){
       setLoading(true);
       Promise.all([
         DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name'),
         DB.from('transport_workdays').select('*'),
-      ]).then(([a,b])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setLoading(false);});
+        DB.from('transport_day_notes').select('*'),
+      ]).then(([a,b,c])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setLoading(false);});
+    }
+    const dayNoteOf=(vt,name,d)=>{const r=dayNotes.find(x=>x.year===selYear&&x.month===selDayMonth&&x.day===d&&x.vehicle_type===vt&&x.driver_name===name);return r?r.note:null;};
+    async function editDayNote(vt,name,d){
+      const cur=dayNoteOf(vt,name,d);
+      const v=window.prompt(`เหตุผลที่ไม่มีเที่ยว · ${name} · วันที่ ${d} ${MO[selDayMonth-1]} ${selYear}\n(เช่น หยุด, รถเสีย, ลา — เว้นว่างเพื่อลบ)`,cur||'');
+      if(v==null)return;
+      if(v.trim()===''){
+        if(cur!=null)await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).eq('day',d).eq('vehicle_type',vt).eq('driver_name',name);
+      }else{
+        const {error}=await DB.from('transport_day_notes').upsert({year:selYear,month:selDayMonth,day:d,vehicle_type:vt,driver_name:name,note:v.trim()},{onConflict:'year,month,day,vehicle_type,driver_name'});
+        if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
+      }
+      fetch();
     }
     const workdaysOf=m=>{const r=workdays.find(x=>x.year===selYear&&x.month===m);return r?r.days:null;};
     async function editWorkdays(m){
@@ -5932,7 +5947,15 @@ window.__dataReady.then(data => {
                   {items.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
                   {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                     <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                    {dayList.map(d=>{const v=dayCell(it.name,d);return<td key={d} style={{textAlign:'right',padding:'4px 3px',color:v?'#334155':'#e2e8f0',borderBottom:'1px solid #f1f5f9'}}>{v||'·'}</td>;})}
+                    {dayList.map(d=>{
+                      const v=dayCell(it.name,d);
+                      const note=v?null:dayNoteOf(t.k,it.name,d);
+                      return<td key={d} style={{textAlign:v?'right':'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9'}}>
+                        {v?v
+                          :note?<span title={note} onClick={canEdit?()=>editDayNote(t.k,it.name,d):undefined} style={{cursor:canEdit?'pointer':'default',fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</span>
+                          :canEdit?<span onClick={()=>editDayNote(t.k,it.name,d)} title="คลิกเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย" style={{cursor:'pointer'}}>·</span>:'·'}
+                      </td>;
+                    })}
                     <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
                     {canEdit&&<td style={{padding:'2px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                       <button onClick={()=>moveDriver(t.k,it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
