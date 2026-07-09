@@ -5574,11 +5574,11 @@ window.__dataReady.then(data => {
           // วันที่อาจเป็นข้อความ "01/06/2569" หรือเซลล์วันที่จริงของ Excel (เลข serial) ก็ได้
           const parseDate=s=>{
             const t=String(s).trim();
-            let m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{3,4})$/);
-            if(m)return{d:Number(m[1]),m:Number(m[2]),y:Number(m[3])};
+            let m=t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{3,4})/); // รองรับมีเวลาต่อท้าย และคั่นด้วย / - .
+            if(m){let y=Number(m[3]);if(y<2200)y+=543;return{d:Number(m[1]),m:Number(m[2]),y};}
             const n=Number(t);
-            if(Number.isFinite(n)&&n>30000&&n<80000){ // Excel serial date
-              const dt=new Date(Math.round((n-25569)*86400*1000));
+            if(Number.isFinite(n)&&n>30000&&n<80000){ // Excel serial date (อาจมีเศษเวลา)
+              const dt=new Date(Math.round((Math.floor(n)-25569)*86400*1000));
               return{d:dt.getUTCDate(),m:dt.getUTCMonth()+1,y:dt.getUTCFullYear()+543};
             }
             return null;
@@ -5600,7 +5600,13 @@ window.__dataReady.then(data => {
             return fallback?{name:fallback.name,vt:fallback.vt}:{name:'รถบ่อตะกั่ว',vt:importType};
           }
           const counts={}; // key: vt|driver|y|m|d|prefix -> จำนวนเที่ยว(บิล)ของวันนั้น แยกตามชุดเลขที่บิล (เช่น BLV, BLF)
-          let currentGroup=null;
+          let currentGroup=null,lastDt=null; // lastDt = วันที่ล่าสุดในบล็อกเดียวกัน ใช้แทนแถวบิลที่อ่านวันที่ไม่ออก
+          const countBill=(dt,billNo)=>{
+            const {name,vt}=resolveTarget(currentGroup);
+            const prefix=(billNo.match(/^[A-Za-zก-๙]+/)||['อื่นๆ'])[0];
+            const key=vt+'|'+name+'|'+dt.y+'|'+dt.m+'|'+dt.d+'|'+prefix;
+            counts[key]=(counts[key]||0)+1;
+          };
           for(let ri=0;ri<data.length;ri++){
             const row=data[ri];
             const colA=String(row[0]||'').trim();
@@ -5609,19 +5615,21 @@ window.__dataReady.then(data => {
             if(/^รวม\s*\d+\s*รายการ/.test(colC))continue; // แถวสรุปย่อย ไม่ต้องใช้ (นับเองจากแถวรายการ)
             const dt=parseDate(colA);
             if(dt){
+              lastDt=dt;
               if(/^\S+-\d+[-.]\d+$/.test(colB))continue; // บิลที่มีท้าย -1 / .1 ฯลฯ เป็นบิลย่อย/แก้ไข ไม่นับเป็นเที่ยว
-              if(colB&&currentGroup){
-                const {name,vt}=resolveTarget(currentGroup);
-                const prefix=(colB.match(/^[A-Za-zก-๙]+/)||['อื่นๆ'])[0];
-                const key=vt+'|'+name+'|'+dt.y+'|'+dt.m+'|'+dt.d+'|'+prefix;
-                counts[key]=(counts[key]||0)+1;
-              }
+              if(colB&&currentGroup)countBill(dt,colB);
               continue;
             }
             if(!colA&&!colB)continue; // แถวเว้นวรรค
             if(colA==='C1'||colA==='รหัสโครงการ'||colA==='วันที่เอกสาร')continue; // แถวหัวตารางของไฟล์
-            if(isBillNo(colB)||isBillNo(colA))continue; // แถวบิลที่วันที่อ่านไม่ออก อย่าให้กลายเป็นชื่อกลุ่ม
+            if(isBillNo(colB)||isBillNo(colA)){
+              // แถวบิลที่อ่านวันที่ไม่ออก -> นับด้วยวันที่ล่าสุดของบล็อกเดียวกัน (บิลเรียงตามวันอยู่แล้ว) และห้ามกลายเป็นชื่อกลุ่ม
+              const billNo=isBillNo(colB)?colB:colA;
+              if(!/^\S+-\d+[-.]\d+$/.test(billNo)&&currentGroup&&lastDt)countBill(lastDt,billNo);
+              continue;
+            }
             currentGroup=colB||colA; // แถวขึ้นกลุ่มคนขับใหม่ (ชื่ออยู่คอลัมน์ B ปกติ, ถ้าไม่มีโครงการใช้คอลัมน์ A)
+            lastDt=null;
           }
           const parsed=Object.entries(counts).map(([key,trips])=>{
             const [vt,driver_name,y,m,d,prefix]=key.split('|');
