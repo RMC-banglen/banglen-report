@@ -6452,7 +6452,7 @@ window.__dataReady.then(data => {
               </tr>
             </thead>
             <tbody>
-              {[...PILE_TYPES].map(p=>({...p,cap:getCap(p.k),yUtil:yearUtil(p.k)})).sort((a,b)=>(b.yUtil??-1)-(a.yUtil??-1)).map((p,idx)=>{
+              {[...PILE_TYPES].map(p=>({...p,cap:getCap(p.k),yUtil:yearUtil(p.k)})).sort((a,b)=>yearPlatesUsed(b.k)-yearPlatesUsed(a.k)).map((p,idx)=>{
                 const yUtil=p.yUtil;
                 return<tr key={p.k} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                   <td style={{padding:'8px 12px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{pileLabel(p.k)}</td>
