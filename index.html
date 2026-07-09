@@ -5571,7 +5571,19 @@ window.__dataReady.then(data => {
           const data=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
           if(!data.length){alert('ไม่พบข้อมูลในไฟล์');return;}
           // รูปแบบ "รายงานใบส่งของ": บล็อกซ้ำๆ ต่อคนขับ -> [รหัส, ชื่อคนขับ] แล้วตามด้วยแถวรายการ [วันที่, เลขบิล, ...] จนถึงแถว "รวม N รายการ"
-          const isDateStr=s=>/^\d{1,2}\/\d{1,2}\/\d{3,4}$/.test(String(s).trim());
+          // วันที่อาจเป็นข้อความ "01/06/2569" หรือเซลล์วันที่จริงของ Excel (เลข serial) ก็ได้
+          const parseDate=s=>{
+            const t=String(s).trim();
+            let m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{3,4})$/);
+            if(m)return{d:Number(m[1]),m:Number(m[2]),y:Number(m[3])};
+            const n=Number(t);
+            if(Number.isFinite(n)&&n>30000&&n<80000){ // Excel serial date
+              const dt=new Date(Math.round((n-25569)*86400*1000));
+              return{d:dt.getUTCDate(),m:dt.getUTCMonth()+1,y:dt.getUTCFullYear()+543};
+            }
+            return null;
+          };
+          const isBillNo=s=>/^[A-Za-zก-๙]+\d+-\d+/.test(String(s).trim());
           // ทุกชื่อ+ประเภทรถที่มีอยู่แล้วในระบบ (ทั้ง 2 ประเภท) ไว้จับคู่ชื่อจากไฟล์
           const existingList=[...new Map(rows.map(r=>[r.vehicle_type+'||'+r.driver_name,{name:r.driver_name,vt:r.vehicle_type}])).values()];
           const aliasOf=n=>n.split('/')[0].trim();
@@ -5595,19 +5607,20 @@ window.__dataReady.then(data => {
             const colB=String(row[1]||'').trim();
             const colC=String(row[2]||'').trim();
             if(/^รวม\s*\d+\s*รายการ/.test(colC))continue; // แถวสรุปย่อย ไม่ต้องใช้ (นับเองจากแถวรายการ)
-            if(isDateStr(colA)){
+            const dt=parseDate(colA);
+            if(dt){
               if(/^\S+-\d+[-.]\d+$/.test(colB))continue; // บิลที่มีท้าย -1 / .1 ฯลฯ เป็นบิลย่อย/แก้ไข ไม่นับเป็นเที่ยว
               if(colB&&currentGroup){
                 const {name,vt}=resolveTarget(currentGroup);
-                const [d,m,y]=colA.split('/').map(Number);
                 const prefix=(colB.match(/^[A-Za-zก-๙]+/)||['อื่นๆ'])[0];
-                const key=vt+'|'+name+'|'+y+'|'+m+'|'+d+'|'+prefix;
+                const key=vt+'|'+name+'|'+dt.y+'|'+dt.m+'|'+dt.d+'|'+prefix;
                 counts[key]=(counts[key]||0)+1;
               }
               continue;
             }
             if(!colA&&!colB)continue; // แถวเว้นวรรค
             if(colA==='C1'||colA==='รหัสโครงการ'||colA==='วันที่เอกสาร')continue; // แถวหัวตารางของไฟล์
+            if(isBillNo(colB)||isBillNo(colA))continue; // แถวบิลที่วันที่อ่านไม่ออก อย่าให้กลายเป็นชื่อกลุ่ม
             currentGroup=colB||colA; // แถวขึ้นกลุ่มคนขับใหม่ (ชื่ออยู่คอลัมน์ B ปกติ, ถ้าไม่มีโครงการใช้คอลัมน์ A)
           }
           const parsed=Object.entries(counts).map(([key,trips])=>{
