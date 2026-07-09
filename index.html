@@ -5837,7 +5837,7 @@ window.__dataReady.then(data => {
                 }
                 // ผู้ช่วยขับรถสำรองของเดือนนี้ (โชว์เสมอ แม้ไม่ติด Top 3)
                 const helpers={};
-                yearRows.filter(r=>r.helper&&r.month===selMonth).forEach(r=>{helpers[r.helper]=(helpers[r.helper]||0)+(r.trips||0);});
+                yearRows.filter(r=>r.helper&&!r.helper.includes('บ่อตะกั่ว')&&r.month===selMonth).forEach(r=>{helpers[r.helper]=(helpers[r.helper]||0)+(r.trips||0);});
                 const helperList=Object.entries(helpers).sort((a,b)=>b[1]-a[1]);
                 return<div style={{display:'flex',flexDirection:'column',gap:7}}>
                   {ranked.map(it=><div key={it.name} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#475569'}}>
