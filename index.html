@@ -5219,6 +5219,37 @@ window.__dataReady.then(data => {
                   <button onClick={()=>setConfirmDel({item:it.name,year:selYear})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
                 </td>}
               </tr>)}
+              {/* แถวรวมหัว+หาง: จับคู่หัวรถกับหางเทรลเลอร์ตามชื่อเล่นท้ายชื่อ */}
+              {(()=>{
+                const tails=items.filter(i=>i.name.includes('หางเทรลเลอร์'));
+                if(!tails.length)return null;
+                const pairs=tails.map(tail=>{
+                  const nick=tail.name.split('หางเทรลเลอร์')[1].trim();
+                  if(!nick)return null;
+                  const head=items.find(i=>!i.name.includes('หางเทรลเลอร์')&&i.name.trim().endsWith(nick));
+                  return head?{nick,head:head.name,tail:tail.name}:null;
+                }).filter(Boolean);
+                if(!pairs.length)return null;
+                return<>
+                  <tr><td colSpan={months.length+4+(canEdit?1:0)} style={{background:'#eef2ff',color:'#3730a3',fontWeight:800,fontSize:12,padding:'6px 8px',position:'sticky',left:0}}>รวมหัว+หาง รายคัน</td></tr>
+                  {pairs.map((p,pi)=>{
+                    const sumM=m=>cell(p.head,m)+cell(p.tail,m);
+                    const cur=rowTotal(p.head)+rowTotal(p.tail);
+                    const prev=rowTotalPrev(p.head)+rowTotalPrev(p.tail);
+                    const d=cur-prev;
+                    return<tr key={p.nick} style={{background:pi%2?'#f5f7ff':'#eef2ff'}}>
+                      <td style={{padding:'5px 8px',position:'sticky',left:0,background:pi%2?'#f5f7ff':'#eef2ff',fontWeight:800,color:'#3730a3',borderBottom:'1px solid #e0e7ff',whiteSpace:'nowrap'}}>🚛 {p.nick} (หัว+หาง)</td>
+                      {months.map(m=>{const v=sumM(m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#3730a3':'#c7d2fe',borderBottom:'1px solid #e0e7ff',whiteSpace:'nowrap',fontWeight:700}}>{v?fmt2(v):'–'}</td>;})}
+                      <td style={{textAlign:'right',padding:'5px 8px',fontWeight:900,color:'#3730a3',borderBottom:'1px solid #e0e7ff',background:'#e0e7ff',whiteSpace:'nowrap'}}>{fmt2(cur)}</td>
+                      <td style={{textAlign:'right',padding:'5px 8px',color:'#818cf8',borderBottom:'1px solid #e0e7ff',whiteSpace:'nowrap'}}>{prev?fmt2(prev):'–'}</td>
+                      <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #e0e7ff',whiteSpace:'nowrap',fontWeight:700,color:!prev?'#c7d2fe':d>0?'#c0392b':'#3B6D11'}}>
+                        {!prev?'–':d===0?'–':<>{d>0?'▲ +':'▼ '}{fmt2(Math.abs(d))}</>}
+                      </td>
+                      {canEdit&&<td style={{borderBottom:'1px solid #e0e7ff'}}></td>}
+                    </tr>;
+                  })}
+                </>;
+              })()}
             </tbody>
             <tfoot>
               <tr style={{background:'#f1f5f9',fontWeight:800}}>
