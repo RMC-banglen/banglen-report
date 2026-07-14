@@ -5226,7 +5226,7 @@ window.__dataReady.then(data => {
                 const pairs=tails.map(tail=>{
                   const nick=tail.name.split('หางเทรลเลอร์')[1].trim();
                   if(!nick)return null;
-                  const head=items.find(i=>!i.name.includes('หางเทรลเลอร์')&&i.name.trim().endsWith(nick));
+                  const head=items.find(i=>!i.name.includes('หางเทรลเลอร์')&&i.name.split('(')[0].trim().endsWith(nick));
                   return head?{nick,head:head.name,tail:tail.name}:null;
                 }).filter(Boolean);
                 if(!pairs.length)return null;
