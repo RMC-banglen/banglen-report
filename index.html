@@ -5330,6 +5330,28 @@ window.__dataReady.then(data => {
                     <td style={{padding:'6px 8px',textAlign:'right',fontSize:12,fontWeight:600,color:idf>0?'#dc2626':idf<0?'#16a34a':'#cbd5e1'}}>{idf>0?'▲':idf<0?'▼':'–'} {fmt(Math.abs(idf))}</td>
                   </tr>;
                 })}
+                {/* รวมหัว+หาง ต่อคัน (จับคู่ชื่อเล่นท้ายชื่อ ตัดวงเล็บออกก่อน) */}
+                {isExp&&(()=>{
+                  const tails=its.filter(n=>n.includes('หางเทรลเลอร์'));
+                  const pairs=tails.map(tail=>{
+                    const nick=tail.split('หางเทรลเลอร์')[1].trim();
+                    if(!nick)return null;
+                    const head=its.find(n=>!n.includes('หางเทรลเลอร์')&&n.split('(')[0].trim().endsWith(nick));
+                    return head?{nick,head,tail}:null;
+                  }).filter(Boolean);
+                  return pairs.map(p=>{
+                    const ith=periodTotItem(yearRows,sec,p.head)+periodTotItem(yearRows,sec,p.tail);
+                    const ipv=periodTotItem(prevRows,sec,p.head)+periodTotItem(prevRows,sec,p.tail);
+                    const idf=ith-ipv;
+                    if(ith===0&&ipv===0)return null;
+                    return<tr key={'pair-'+p.nick} style={{background:'#eef2ff'}}>
+                      <td style={{padding:'6px 8px 6px 26px',color:'#3730a3',fontSize:12,fontWeight:800}}>🚛 {p.nick} (หัว+หาง)</td>
+                      <td style={{padding:'6px 8px',textAlign:'right',color:'#818cf8',fontSize:12,fontWeight:700}}>{ipv?fmt(ipv):'–'}</td>
+                      <td style={{padding:'6px 8px',textAlign:'right',color:'#3730a3',fontSize:12,fontWeight:800}}>{ith?fmt(ith):'–'}</td>
+                      <td style={{padding:'6px 8px',textAlign:'right',fontSize:12,fontWeight:800,color:idf>0?'#dc2626':idf<0?'#16a34a':'#c7d2fe'}}>{idf>0?'▲':idf<0?'▼':'–'} {fmt(Math.abs(idf))}</td>
+                    </tr>;
+                  });
+                })()}
                 </React.Fragment>;
               })}
             </tbody>
