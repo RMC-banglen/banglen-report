@@ -5138,7 +5138,90 @@ window.__dataReady.then(data => {
       <div style={{display:'flex',gap:6,marginBottom:16,borderBottom:'2px solid #f1f5f9'}}>
         <button onClick={()=>setView('table')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='table'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='table'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📋 ตารางรายละเอียด</button>
         <button onClick={()=>setView('compare')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='compare'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='compare'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🎯 KPI เปรียบเทียบ</button>
+        <button onClick={()=>setView('analyze')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='analyze'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='analyze'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🔍 วิเคราะห์ผิดปกติ</button>
       </div>
+
+      {view==='analyze'&&(()=>{
+        const fmtB=n=>Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+        // 1) ข้อมูลเสีย: ชื่อรายการ/หมวดเป็นตัวอักษรผิด (encoding พัง)
+        const brokenRows=yearRows.filter(r=>/[?]{3,}/.test(r.line_item||'')||/[?]{3,}/.test(r.section||''));
+        // 2) ยอดซ้ำกันเป๊ะ (>10,000 บาท) ระหว่างรายการ/เดือนที่ต่างกัน — น่าสงสัยว่าคัดลอกยอดผิด
+        const byAmt={};
+        yearRows.filter(r=>r.amount>10000).forEach(r=>{const k=r.amount;(byAmt[k]=byAmt[k]||[]).push(r);});
+        const dupGroups=Object.entries(byAmt).filter(([,list])=>{
+          const uniq=new Set(list.map(r=>r.section+'|'+r.line_item+'|'+r.month));
+          return uniq.size>1; // ต่างรายการ/เดือนกันจริง ไม่ใช่แค่ query ซ้ำ
+        }).map(([amt,list])=>({amt:Number(amt),list})).sort((a,b)=>b.amt-a.amt);
+        // 3) รายการที่ยอดสะสมปีนี้ (เท่าที่มีข้อมูล) แซงยอดทั้งปีก่อนไปแล้ว และ >20,000
+        const totBySec={};
+        rows.forEach(r=>{const k=r.section+'|'+r.line_item;(totBySec[k]=totBySec[k]||{})[r.year]=(totBySec[k][r.year]||0)+(r.amount||0);});
+        const jumpItems=Object.entries(totBySec).map(([k,y])=>{
+          const [section,line_item]=k.split('|');
+          return{section,line_item,cur:y[selYear]||0,prev:y[selYear-1]||0};
+        }).filter(x=>x.cur>x.prev&&x.cur>20000&&x.prev>=0&&!/[?]{3,}/.test(x.line_item)).sort((a,b)=>(b.cur-b.prev)-(a.cur-a.prev));
+        // 4) ยอดเดือนเดียวสูงสุด 10 อันดับ
+        const topSingles=[...yearRows].filter(r=>!/[?]{3,}/.test(r.line_item)).sort((a,b)=>b.amount-a.amount).slice(0,10);
+        const card=(title,color,bg,children)=><div style={{background:'#fff',border:`1px solid ${color}30`,borderRadius:14,padding:'18px 20px',marginBottom:20}}>
+          <div style={{fontSize:15,fontWeight:800,color,marginBottom:12}}>{title}</div>
+          {children}
+        </div>;
+        return<div>
+          <div style={{fontSize:13,color:'#64748b',marginBottom:16}}>วิเคราะห์อัตโนมัติจากข้อมูลปี {selYear} (เทียบปี {selYear-1}) — ใช้เป็นจุดสังเกตก่อนประชุม ไม่ใช่ข้อสรุปสุดท้าย</div>
+
+          {brokenRows.length>0&&card('🔴 พบข้อมูลเสีย (ชื่อรายการ/หมวดอ่านไม่ออก)','#dc2626',null,
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {brokenRows.map((r,i)=><div key={i} style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:13,display:'flex',justifyContent:'space-between'}}>
+                <span>เดือน {MO[r.month-1]} · หมวด/รายการอ่านไม่ออก</span>
+                <b style={{color:'#dc2626'}}>{fmtB(r.amount)} ฿</b>
+              </div>)}
+              <div style={{fontSize:12,color:'#94a3b8'}}>น่าจะเกิดจาก encoding พังตอนนำเข้า ควรตรวจสอบว่าเป็นยอดซ้ำกับรายการอื่นหรือไม่ ก่อนพิจารณาลบ</div>
+            </div>
+          )}
+
+          {dupGroups.length>0&&card('🟠 ยอดซ้ำกันเป๊ะระหว่างรายการ/เดือนต่างกัน (>10,000 บาท)','#d97706',null,
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {dupGroups.map((g,i)=><div key={i} style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'10px 14px'}}>
+                <div style={{fontWeight:800,color:'#b45309',marginBottom:6}}>{fmtB(g.amt)} ฿</div>
+                <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                  {g.list.map((r,ri)=><div key={ri} style={{fontSize:12,color:'#475569'}}>{r.line_item} · {MO[r.month-1]} · {r.section}</div>)}
+                </div>
+              </div>)}
+            </div>
+          )}
+
+          {jumpItems.length>0&&card('🟡 รายการที่ยอดปีนี้แซงยอดทั้งปีก่อนไปแล้ว','#0d9488',null,
+            <div style={{overflowX:'auto'}}>
+              <table style={{borderCollapse:'collapse',width:'100%',fontSize:12}}>
+                <thead><tr style={{background:'#f8fafc'}}>
+                  <th style={{textAlign:'left',padding:'6px 8px'}}>รายการ</th>
+                  <th style={{textAlign:'left',padding:'6px 8px'}}>หมวด</th>
+                  <th style={{textAlign:'right',padding:'6px 8px'}}>ปี {selYear-1} (ทั้งปี)</th>
+                  <th style={{textAlign:'right',padding:'6px 8px'}}>ปี {selYear} (เท่าที่มี)</th>
+                  <th style={{textAlign:'right',padding:'6px 8px'}}>เพิ่มขึ้น</th>
+                </tr></thead>
+                <tbody>
+                  {jumpItems.map((x,i)=><tr key={i} style={{background:i%2?'#fcfcfd':'#fff'}}>
+                    <td style={{padding:'6px 8px',fontWeight:600}}>{x.line_item}</td>
+                    <td style={{padding:'6px 8px',color:'#94a3b8'}}>{x.section}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',color:'#94a3b8'}}>{fmt(x.prev)}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',fontWeight:700}}>{fmt(x.cur)}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',fontWeight:800,color:'#dc2626'}}>+{fmt(x.cur-x.prev)}</td>
+                  </tr>)}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {card('📌 ยอดเดือนเดียวสูงสุด 10 อันดับ ปี '+selYear,'#2f5fd0',null,
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {topSingles.map((r,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13,padding:'6px 10px',background:i%2?'#fafbfc':'#fff',borderRadius:6}}>
+                <span><b style={{color:'#94a3b8',marginRight:8}}>{i+1}.</b>{r.line_item} <span style={{color:'#94a3b8'}}>· {MO[r.month-1]} · {r.section}</span></span>
+                <b style={{color:'#2f5fd0'}}>{fmtB(r.amount)} ฿</b>
+              </div>)}
+            </div>
+          )}
+        </div>;
+      })()}
 
       {view==='table'&&<>
       {/* Summary cards — แยกตามสถานที่ */}
