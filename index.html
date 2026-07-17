@@ -5775,7 +5775,7 @@ window.__dataReady.then(data => {
           if(parsed.length===0){alert('ไม่พบข้อมูลรายการขนส่งในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์ (ควรเป็นรายงานใบส่งของแยกตามคนขับ)');return;}
           // snap to 15-day or full-month: if max day in month <=17 → keep only days 1-15
           const maxDayOf={};parsed.forEach(r=>{const k=r.year+'|'+r.month;if((r.day||0)>(maxDayOf[k]||0))maxDayOf[k]=r.day;});
-          const snapped=parsed.filter(r=>maxDayOf[r.year+'|'+r.month]<=17?r.day<=15:true);
+          const snapped=parsed.filter(r=>maxDayOf[r.year+'|'+r.month]>=25?true:r.day<=15);
           setImportRows(snapped);setSpareAssign({});setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
