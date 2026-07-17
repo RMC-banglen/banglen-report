@@ -6118,7 +6118,8 @@ window.__dataReady.then(data => {
       </div>}
 
       {view==='daily'&&TYPES.map(t=>{
-        const {items,dayCell,dayRowTotal,dayColTotal,dayGrand}=getTypeData(t.k);
+        const {items,dayRows,dayCell,dayRowTotal,dayColTotal,dayGrand}=getTypeData(t.k);
+        const dayItems=items.filter(it=>dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth));
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14}}>
             <span style={{fontSize:15}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
@@ -6139,8 +6140,8 @@ window.__dataReady.then(data => {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-                  {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
+                  {dayItems.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
+                  {dayItems.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                     <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
                     {dayList.map(d=>{
                       const v=dayCell(it.name,d);
@@ -6157,7 +6158,7 @@ window.__dataReady.then(data => {
                     <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
                     {canEdit&&<td style={{padding:'2px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                       <button onClick={()=>moveDriver(t.k,it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
-                      <button onClick={()=>moveDriver(t.k,it.name,1)} disabled={idx===items.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===items.length-1?'default':'pointer',fontSize:10,color:idx===items.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
+                      <button onClick={()=>moveDriver(t.k,it.name,1)} disabled={idx===dayItems.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===dayItems.length-1?'default':'pointer',fontSize:10,color:idx===dayItems.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
                       <button onClick={()=>openDayForm(t.k,it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0'}}>แก้</button>
                     </td>}
                   </tr>)}
