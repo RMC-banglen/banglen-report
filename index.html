@@ -5671,6 +5671,7 @@ window.__dataReady.then(data => {
       const dayOrder=existingOrder!=null?existingOrder:(items.length+1);
       let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
       const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).not('day','is',null);
+      if(delErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ (ลบข้อมูลเก่า): '+delErr.message);return;}
       if(ins.length===0){
         // ยังไม่มียอดเดือนนี้ -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
         const existsElsewhere=rows.some(r=>r.vehicle_type===type&&r.driver_name===dayForm.driver_name&&!(r.year===selYear&&r.month===selDayMonth));
@@ -5679,7 +5680,7 @@ window.__dataReady.then(data => {
       let insErr=null;
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
       setSavingDay(false);
-      if(delErr||insErr){alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
+      if(insErr){alert('บันทึกไม่สำเร็จ: '+(insErr.message||'เกิดข้อผิดพลาด'));return;}
       setShowDayForm(false);fetch();
     }
     async function moveDriver(type,name,dir){
