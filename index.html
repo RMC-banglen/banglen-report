@@ -6084,7 +6084,14 @@ window.__dataReady.then(data => {
                               const avg=vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;
                               return<td key={m} style={{textAlign:'right',padding:'11px 6px',color:avg!=null?c.text:'#94a3b8',whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>{avg!=null?avg.toFixed(2):'–'}</td>;
                             })}
-                            {(()=>{const mv=months.map(m=>{const vals=companyItems.map(it=>{const ad=dayRows.filter(r=>r.driver_name===it.name&&r.month===m&&(r.trips||0)>0).length;return ad?cell(it.name,m)/ad:null;}).filter(v=>v!=null);return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;}).filter(v=>v!=null);const ga=mv.length?mv.reduce((s,v)=>s+v,0)/mv.length:null;return<td style={{textAlign:'right',padding:'11px 8px',color:ga!=null?c.cell2Text:'#94a3b8',background:c.cell2,fontSize:15,fontWeight:900,borderTop:`2px solid ${c.border}`}}>{ga!=null?ga.toFixed(2):'–'}</td>;})()}
+                            {(()=>{
+                              const isComplete=m=>dayRows.some(r=>companyItems.find(it=>it.name===r.driver_name)&&r.month===m&&(r.day||0)>=25);
+                              const completeMths=months.filter(m=>isComplete(m));
+                              const srcMths=completeMths.length?completeMths:months;
+                              const mv=srcMths.map(m=>{const vals=companyItems.map(it=>{const ad=dayRows.filter(r=>r.driver_name===it.name&&r.month===m&&(r.trips||0)>0).length;return ad?cell(it.name,m)/ad:null;}).filter(v=>v!=null);return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;}).filter(v=>v!=null);
+                              const ga=mv.length?mv.reduce((s,v)=>s+v,0)/mv.length:null;
+                              return<td style={{textAlign:'right',padding:'11px 8px',color:ga!=null?c.cell2Text:'#94a3b8',background:c.cell2,fontSize:15,fontWeight:900,borderTop:`2px solid ${c.border}`}}>{ga!=null?ga.toFixed(2):'–'}</td>;
+                            })()}
                             {canEdit&&<td style={{background:c.bg,borderTop:`2px solid ${c.border}`}}></td>}
                           </tr>
                         </>;
