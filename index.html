@@ -5965,7 +5965,7 @@ window.__dataReady.then(data => {
       })()}
 
       {view==='monthly'&&TYPES.map(t=>{
-        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems}=getTypeData(t.k);
+        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows}=getTypeData(t.k);
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
             <span style={{fontSize:18}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
@@ -6077,9 +6077,13 @@ window.__dataReady.then(data => {
                             {canEdit&&<td style={{background:c.bg}}></td>}
                           </tr>
                           <tr style={{background:c.bg,fontWeight:900,fontSize:15}}>
-                            <td style={{padding:'11px 8px',position:'sticky',left:0,background:c.bg,color:c.text,whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>เฉลี่ยเที่ยว/วัน (รถ {numTrucks} คัน)</td>
-                            {months.map(m=>{const v=companyCol(m);const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'11px 6px',color:c.text,whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>{v&&d?(v/d/numTrucks).toFixed(2):'–'}</td>;})}
-                            <td style={{textAlign:'right',padding:'11px 8px',color:c.cell2Text,background:c.cell2,fontSize:16,borderTop:`2px solid ${c.border}`}}>{companyGrand&&wdTotal?(companyGrand/wdTotal/numTrucks).toFixed(2):'–'}</td>
+                            <td style={{padding:'11px 8px',position:'sticky',left:0,background:c.bg,color:c.text,whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>เฉลี่ยเที่ยว/วันที่วิ่ง</td>
+                            {months.map(m=>{
+                              const vals=companyItems.map(it=>{const ad=dayRows.filter(r=>r.driver_name===it.name&&r.month===m&&(r.trips||0)>0).length;return ad?cell(it.name,m)/ad:null;}).filter(v=>v!=null);
+                              const avg=vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;
+                              return<td key={m} style={{textAlign:'right',padding:'11px 6px',color:avg!=null?c.text:'#94a3b8',whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>{avg!=null?avg.toFixed(2):'–'}</td>;
+                            })}
+                            <td style={{textAlign:'right',padding:'11px 8px',color:'#94a3b8',background:c.cell2,fontSize:13,borderTop:`2px solid ${c.border}`}}>–</td>
                             {canEdit&&<td style={{background:c.bg,borderTop:`2px solid ${c.border}`}}></td>}
                           </tr>
                         </>;
