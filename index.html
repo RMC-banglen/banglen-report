@@ -6119,7 +6119,8 @@ window.__dataReady.then(data => {
 
       {view==='daily'&&TYPES.map(t=>{
         const {items,dayRows,dayCell,dayRowTotal,dayColTotal,dayGrand}=getTypeData(t.k);
-        const dayItems=items.filter(it=>dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth));
+        const NON_CO=['รถบ่อตะกั่ว','รับเอง','รถร่วม'];
+        const dayItems=items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth));
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14}}>
             <span style={{fontSize:15}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
