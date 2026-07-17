@@ -6051,7 +6051,7 @@ window.__dataReady.then(data => {
                   {(()=>{
                     // รถบริษัท = ไม่รวมรถร่วมและรับเอง · เทรลเลอร์ 6 คัน / 10ล้อ-12ล้อ 2 คัน · วันทำงานใช้ชุดเดียวกัน
                     const numTrucks=t.k==='เทรลเลอร์'?6:2;
-                    const companyItems=items.filter(i=>!i.name.includes('รถร่วม')&&!i.name.includes('รับเอง'));
+                    const companyItems=items.filter(i=>!i.name.includes('รถร่วม')&&!i.name.includes('รับเอง')&&!i.name.includes('บ่อตะกั่ว'));
                     const companyCol=m=>companyItems.reduce((s,it)=>s+cell(it.name,m),0);
                     const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
                     const wdTotal=months.reduce((s,m)=>s+(workdaysOf(m)||0),0);
