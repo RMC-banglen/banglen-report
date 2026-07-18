@@ -404,7 +404,8 @@ window.__dataReady = (async function loadData() {
       db.from('damage_items').select('*').order('year').order('month').range(0, 4999),
       db.from('damage_sales').select('*').order('year').order('month'),
     ]);
-    const damageItems = diRes.data || [];
+    // กันข้อมูลซ้ำ (id เดียวกัน) เผื่อการดึงข้อมูลซ้อนกันชั่วคราว ทำให้ยอดเสียหายบวกซ้ำ
+    const damageItems = [...new Map((diRes.data || []).map(r => [r.id, r])).values()];
     const damageSales = {};
     (dsRes.data || []).forEach(r => { damageSales[`${r.year}-${r.month}`] = +r.sales; });
 
