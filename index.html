@@ -3502,6 +3502,9 @@ window.__dataReady.then(data => {
 
       {subTab==='kpi'&&(()=>{
         const lastYearReps=reports.filter(r=>new Date(r.report_date).getFullYear()===ceYear-1&&!r.exclude_kpi);
+        const allLastYearReps=reports.filter(r=>new Date(r.report_date).getFullYear()===ceYear-1);
+        const excludedThisYear=allYearReps.length-yearReps.length;
+        const excludedLastYear=allLastYearReps.length-lastYearReps.length;
         const diffBadge=(a,b)=>{const d=a-b;if(d===0)return<span style={{fontSize:15,color:'#94a3b8',fontWeight:600}}>เท่ากับปีก่อน</span>;return<span style={{fontSize:22,fontWeight:900,color:d>0?'#993C1D':'#3B6D11'}}>{d>0?'▲ +'+d:' ▼ '+d} เคส</span>;};
         // sub_type breakdown for คุณภาพผลิตภัณฑ์
         const qualityRepsY=yearReps.filter(r=>r.type==='คุณภาพผลิตภัณฑ์');
@@ -3519,15 +3522,18 @@ window.__dataReady.then(data => {
           <div style={{fontSize:16,fontWeight:700,color:'#475569',marginBottom:14}}>KPI ทั้งปี {selYear} เทียบกับ ปี {selYear-1}</div>
           <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
             {[['ทั้งหมด',null,'#1e293b','#f1f5f9'],[SL.open,'open',SC.open,SB.open],[SL.in_progress,'in_progress',SC.in_progress,SB.in_progress],[SL.done,'done',SC.done,SB.done]].map(([lbl,st,clr,bg])=>{
-              const a=cntBy(yearReps,st),b=cntBy(lastYearReps,st);
+              const isTotal=lbl==='ทั้งหมด';
+              const curSet=isTotal?allYearReps:yearReps, prevSet=isTotal?allLastYearReps:lastYearReps;
+              const a=cntBy(curSet,st),b=cntBy(prevSet,st);
               return<div key={lbl} style={{background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:12,padding:'14px 18px',flex:1,minWidth:130}}>
                 <div style={{fontSize:16,fontWeight:700,color:clr,marginBottom:8}}>{lbl}</div>
                 <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:6}}>
-                  <span style={{fontSize:52,fontWeight:900,color:'#1e293b',lineHeight:1,cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>{const filtered=st?yearReps.filter(r=>r.status===st):yearReps;setKpiModal({title:`${lbl} ปี ${selYear}`,rows:filtered});}}>{a}</span>
+                  <span style={{fontSize:52,fontWeight:900,color:'#1e293b',lineHeight:1,cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>{const filtered=st?curSet.filter(r=>r.status===st):curSet;setKpiModal({title:`${lbl} ปี ${selYear}`,rows:filtered});}}>{a}</span>
                   <span style={{fontSize:15,color:'#94a3b8'}}>ปี {selYear}</span>
                 </div>
-                <div style={{fontSize:15,color:'#94a3b8',marginBottom:8}}>ปีก่อน: <span style={{fontWeight:700,color:'#64748b',cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>{const filtered=st?lastYearReps.filter(r=>r.status===st):lastYearReps;setKpiModal({title:`${lbl} ปี ${selYear-1}`,rows:filtered});}}>{b}</span> เคส</div>
+                <div style={{fontSize:15,color:'#94a3b8',marginBottom:8}}>ปีก่อน: <span style={{fontWeight:700,color:'#64748b',cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>{const filtered=st?prevSet.filter(r=>r.status===st):prevSet;setKpiModal({title:`${lbl} ปี ${selYear-1}`,rows:filtered});}}>{b}</span> เคส</div>
                 {diffBadge(a,b)}
+                {isTotal&&(excludedThisYear>0||excludedLastYear>0)&&<div style={{fontSize:13,color:'#b45309',marginTop:8,paddingTop:8,borderTop:'1px dashed #e2e8f0'}}>ในจำนวนนี้ไม่นับ KPI {excludedThisYear} เคส (ปีก่อน {excludedLastYear} เคส)</div>}
               </div>;
             })}
           </div>
