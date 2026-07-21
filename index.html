@@ -3533,7 +3533,10 @@ window.__dataReady.then(data => {
                 </div>
                 <div style={{fontSize:15,color:'#94a3b8',marginBottom:8}}>ปีก่อน: <span style={{fontWeight:700,color:'#64748b',cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>{const filtered=st?prevSet.filter(r=>r.status===st):prevSet;setKpiModal({title:`${lbl} ปี ${selYear-1}`,rows:filtered});}}>{b}</span> เคส</div>
                 {diffBadge(a,b)}
-                {isTotal&&(excludedThisYear>0||excludedLastYear>0)&&<div style={{fontSize:16,color:'#b45309',marginTop:8,paddingTop:8,borderTop:'1px dashed #e2e8f0'}}>ในจำนวนนี้ไม่นับ KPI <span style={{fontSize:22,fontWeight:900,cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>setKpiModal({title:`ไม่นับ KPI ปี ${selYear}`,rows:allYearReps.filter(r=>r.exclude_kpi)})}>{excludedThisYear} เคส</span> <span style={{fontSize:14}}>(ปีก่อน <span style={{fontSize:18,fontWeight:800,cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>setKpiModal({title:`ไม่นับ KPI ปี ${selYear-1}`,rows:allLastYearReps.filter(r=>r.exclude_kpi)})}>{excludedLastYear} เคส</span>)</span></div>}
+                {isTotal&&(excludedThisYear>0||excludedLastYear>0)&&<div style={{fontSize:16,color:'#b45309',marginTop:8,paddingTop:8,borderTop:'1px dashed #e2e8f0'}}>
+                  <div>ในจำนวนนี้ไม่นับ KPI <span style={{fontSize:22,fontWeight:900,cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>setKpiModal({title:`ไม่นับ KPI ปี ${selYear}`,rows:allYearReps.filter(r=>r.exclude_kpi)})}>{excludedThisYear} เคส</span></div>
+                  <div style={{fontSize:14}}>(ปีก่อน <span style={{fontSize:18,fontWeight:800,cursor:'pointer',textDecoration:'underline dotted'}} onClick={()=>setKpiModal({title:`ไม่นับ KPI ปี ${selYear-1}`,rows:allLastYearReps.filter(r=>r.exclude_kpi)})}>{excludedLastYear} เคส</span>)</div>
+                </div>}
               </div>;
             })}
           </div>
