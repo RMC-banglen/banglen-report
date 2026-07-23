@@ -3393,7 +3393,7 @@ window.__dataReady.then(data => {
     const typeKpi=typeList.map(t=>({
       type:t,
       thisYear:yearReps.filter(r=>r.type===t).length,
-      lastYear:lastYearReps.filter(r=>r.type===t).length,
+      lastYear:reports.filter(r=>new Date(r.report_date).getFullYear()===ceYear-1&&r.type===t&&!r.exclude_kpi).length,
       open:yearReps.filter(r=>r.type===t&&r.status==='open').length,
       in_progress:yearReps.filter(r=>r.type===t&&r.status==='in_progress').length,
       done:yearReps.filter(r=>r.type===t&&r.status==='done').length,
