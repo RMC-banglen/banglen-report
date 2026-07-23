@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "Bash(powershell -command \"[Convert]::ToBase64String\\([IO.File]::ReadAllBytes\\('D:\\\\claude AI\\\\Pro\\\\logo.png.jpg'\\)\\)\")",
+      "Read(//c/Users/rmcuser/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/58d94ab5-0a28-4b61-ba91-a270c560f0d6/cb4ad8ad-b059-406b-8463-962926fa14f7/skills/xlsx/**)",
+      "Bash(ls bin *)",
+      "Bash(ls scripts *)",
+      "Bash(rm -f _dump_re.txt _dump_stock.txt)",
+      "Bash(ls *.txt)",
+      "PowerShell($n = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($n\\) { node --version } else { Write-Output \"no-node\" })"
+    ]
+  }
+}
