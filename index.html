@@ -4752,7 +4752,7 @@ window.__dataReady.then(data => {
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขนส่ง','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
   const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'}];
-  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'}];
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
@@ -6778,6 +6778,227 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  function AccidentReportTab({currentUser}){
+    const canEdit=currentUser?.role==='admin'||(currentUser?.role==='editor');
+    const TYPES_ACC=['บาดเจ็บ','เพลิงไหม้','วัสดุล้ม/พัง','ยานพาหนะ','ไฟฟ้า','สารเคมี','อื่นๆ'];
+    const SEVERITIES=[{k:'เล็กน้อย',c:'#3B6D11',bg:'#EAF3DE'},{k:'ปานกลาง',c:'#854F0B',bg:'#FAEEDA'},{k:'ร้ายแรง',c:'#993C1D',bg:'#FAECE7'}];
+    const LOCATIONS=['โรงงานบางเลน','สนามผลิต','บ่อตะกั่ว','ขนส่ง/นอกสถานที่','อื่นๆ'];
+    const SL={open:'รอดำเนินการ',in_progress:'อยู่ระหว่างแก้ไข',done:'แก้ไขแล้ว'};
+    const SC={open:'#993C1D',in_progress:'#854F0B',done:'#3B6D11'};
+    const SBG={open:'#FAECE7',in_progress:'#FAEEDA',done:'#EAF3DE'};
+    const THAI_M_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+    const [records,setRecords]=React.useState([]);
+    const [loading,setLoading]=React.useState(true);
+    const [showForm,setShowForm]=React.useState(false);
+    const [editId,setEditId]=React.useState(null);
+    const [saving,setSaving]=React.useState(false);
+    const [filterYear,setFilterYear]=React.useState(new Date().getFullYear()+543);
+    const [filterMonth,setFilterMonth]=React.useState(0);
+    const [filterSeverity,setFilterSeverity]=React.useState('');
+    const [filterStatus,setFilterStatus]=React.useState('');
+    const EMPTY_FORM={incident_date:'',incident_time:'',type:'บาดเจ็บ',severity:'เล็กน้อย',location:'โรงงานบางเลน',injured_name:'',description:'',action_taken:'',status:'open'};
+    const [form,setForm]=React.useState(EMPTY_FORM);
+
+    React.useEffect(()=>{fetchAll();},[]);
+
+    async function fetchAll(){
+      setLoading(true);
+      const {data}=await DB.from('accident_reports').select('*').order('incident_date',{ascending:false});
+      setRecords(data||[]);
+      setLoading(false);
+    }
+
+    async function handleSave(){
+      if(!form.incident_date){alert('กรุณาเลือกวันที่เกิดเหตุ');return;}
+      if(!form.description){alert('กรุณากรอกรายละเอียดเหตุการณ์');return;}
+      setSaving(true);
+      try{
+        const payload={incident_date:form.incident_date,incident_time:form.incident_time||null,type:form.type,severity:form.severity,location:form.location,injured_name:form.injured_name||null,description:form.description,action_taken:form.action_taken||null,status:form.status,created_by:currentUser?.name||null};
+        if(editId){
+          const {error}=await DB.from('accident_reports').update(payload).eq('id',editId);
+          if(error)throw error;
+        } else {
+          const {error}=await DB.from('accident_reports').insert(payload);
+          if(error)throw error;
+        }
+        setShowForm(false);setEditId(null);setForm(EMPTY_FORM);
+        fetchAll();
+      }catch(e){alert('เกิดข้อผิดพลาด: '+e.message);}
+      setSaving(false);
+    }
+
+    async function handleDelete(id){
+      if(!confirm('ลบรายงานนี้?'))return;
+      await DB.from('accident_reports').delete().eq('id',id);
+      fetchAll();
+    }
+
+    function openAdd(){
+      const n=new Date();
+      setEditId(null);
+      setForm({...EMPTY_FORM,incident_date:n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')});
+      setShowForm(true);
+    }
+
+    function openEdit(r){
+      setEditId(r.id);
+      setForm({incident_date:String(r.incident_date).slice(0,10),incident_time:r.incident_time||'',type:r.type,severity:r.severity,location:r.location,injured_name:r.injured_name||'',description:r.description||'',action_taken:r.action_taken||'',status:r.status});
+      setShowForm(true);
+    }
+
+    const ceYear=filterYear-543;
+    const years=[...new Set(records.map(r=>new Date(r.incident_date).getFullYear()+543))].sort((a,b)=>b-a);
+    if(years.length===0){const y=new Date().getFullYear()+543;years.push(y);}
+    const filtered=records.filter(r=>{
+      const d=new Date(r.incident_date);
+      if(d.getFullYear()!==ceYear)return false;
+      if(filterMonth&&d.getMonth()+1!==filterMonth)return false;
+      if(filterSeverity&&r.severity!==filterSeverity)return false;
+      if(filterStatus&&r.status!==filterStatus)return false;
+      return true;
+    });
+    const sevColor=(s)=>SEVERITIES.find(x=>x.k===s)||{c:'#64748b',bg:'#f1f5f9'};
+    const fmtDate=(s)=>{if(!s)return'–';const d=new Date(s);return`${d.getDate()} ${THAI_M_FULL[d.getMonth()]} ${d.getFullYear()+543}`;};
+
+    const countBySev=(sev)=>filtered.filter(r=>r.severity===sev).length;
+    const countOpen=filtered.filter(r=>r.status!=='done').length;
+
+    const inputStyle={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,boxSizing:'border-box'};
+    const labelStyle={fontSize:13,fontWeight:600,color:'#374151',marginBottom:4,display:'block'};
+
+    return <div style={{padding:'24px 20px',maxWidth:1100,margin:'0 auto'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:10}}>
+        <div>
+          <h2 style={{fontSize:20,fontWeight:700,color:'#1e293b',margin:0}}>รายงานอุบัติเหตุ</h2>
+          <div style={{fontSize:13,color:'#64748b',marginTop:2}}>บันทึกและติดตามเหตุการณ์อุบัติเหตุในองค์กร</div>
+        </div>
+        {canEdit&&<button onClick={openAdd} style={{padding:'9px 20px',background:'#dc2626',color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:600,cursor:'pointer'}}>+ บันทึกอุบัติเหตุ</button>}
+      </div>
+
+      {/* Summary KPI */}
+      <div style={{display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+        {[{label:'ทั้งหมด (ปีนี้)',val:filtered.length,c:'#1e40af',bg:'#eff6ff'},{label:'ร้ายแรง',val:countBySev('ร้ายแรง'),c:'#993C1D',bg:'#FAECE7'},{label:'ปานกลาง',val:countBySev('ปานกลาง'),c:'#854F0B',bg:'#FAEEDA'},{label:'เล็กน้อย',val:countBySev('เล็กน้อย'),c:'#3B6D11',bg:'#EAF3DE'},{label:'ยังไม่แก้ไข',val:countOpen,c:'#7c3aed',bg:'#f3eefe'}].map(({label,val,c,bg})=>
+          <div key={label} style={{background:bg,border:`1.5px solid ${c}22`,borderRadius:10,padding:'12px 20px',minWidth:110,textAlign:'center'}}>
+            <div style={{fontSize:26,fontWeight:800,color:c}}>{val}</div>
+            <div style={{fontSize:12,color:c,fontWeight:600}}>{label}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
+        <select value={filterYear} onChange={e=>setFilterYear(Number(e.target.value))} style={{padding:'7px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:13}}>
+          {years.map(y=><option key={y} value={y}>ปี {y}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e=>setFilterMonth(Number(e.target.value))} style={{padding:'7px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:13}}>
+          <option value={0}>ทุกเดือน</option>
+          {THAI_M_FULL.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+        </select>
+        <select value={filterSeverity} onChange={e=>setFilterSeverity(e.target.value)} style={{padding:'7px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:13}}>
+          <option value=''>ทุกระดับ</option>
+          {SEVERITIES.map(s=><option key={s.k} value={s.k}>{s.k}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{padding:'7px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:13}}>
+          <option value=''>ทุกสถานะ</option>
+          {Object.entries(SL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
+        {(filterMonth||filterSeverity||filterStatus)?<button onClick={()=>{setFilterMonth(0);setFilterSeverity('');setFilterStatus('');}} style={{padding:'7px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:13,background:'#f8fafc',cursor:'pointer',color:'#64748b'}}>ล้างตัวกรอง</button>:null}
+      </div>
+
+      {/* Table */}
+      {loading?<div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>กำลังโหลด...</div>:
+      filtered.length===0?<div style={{textAlign:'center',padding:40,color:'#94a3b8',background:'#f8fafc',borderRadius:12}}>ไม่มีข้อมูลอุบัติเหตุในช่วงเวลานี้</div>:
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead>
+            <tr style={{background:'#f1f5f9'}}>
+              {['วันที่','ประเภท','ระดับ','สถานที่','ผู้บาดเจ็บ','รายละเอียด','สถานะ',canEdit?'จัดการ':''].filter(Boolean).map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:700,color:'#374151',whiteSpace:'nowrap',borderBottom:'2px solid #e2e8f0'}}>{h}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r,i)=>{
+              const sv=sevColor(r.severity);
+              return <tr key={r.id} style={{background:i%2===0?'#fff':'#f8fafc',borderBottom:'1px solid #f1f5f9'}}>
+                <td style={{padding:'10px 12px',whiteSpace:'nowrap',fontWeight:600}}>{fmtDate(r.incident_date)}{r.incident_time&&<span style={{color:'#64748b',fontWeight:400}}><br/>{r.incident_time}</span>}</td>
+                <td style={{padding:'10px 12px',whiteSpace:'nowrap'}}>{r.type}</td>
+                <td style={{padding:'10px 12px'}}><span style={{background:sv.bg,color:sv.c,fontWeight:700,padding:'3px 10px',borderRadius:20,fontSize:12,whiteSpace:'nowrap'}}>{r.severity}</span></td>
+                <td style={{padding:'10px 12px',whiteSpace:'nowrap'}}>{r.location}</td>
+                <td style={{padding:'10px 12px'}}>{r.injured_name||<span style={{color:'#94a3b8'}}>–</span>}</td>
+                <td style={{padding:'10px 12px',maxWidth:280}}><div style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{r.description}</div>
+                  {r.action_taken&&<div style={{marginTop:4,padding:'4px 8px',background:'#f0fdf4',borderLeft:'3px solid #22c55e',fontSize:12,color:'#166534',borderRadius:'0 4px 4px 0'}}><b>การแก้ไข:</b> {r.action_taken}</div>}
+                </td>
+                <td style={{padding:'10px 12px'}}><span style={{background:SBG[r.status],color:SC[r.status],fontWeight:600,padding:'3px 10px',borderRadius:20,fontSize:12,whiteSpace:'nowrap'}}>{SL[r.status]}</span></td>
+                {canEdit&&<td style={{padding:'10px 12px',whiteSpace:'nowrap'}}>
+                  <button onClick={()=>openEdit(r)} style={{marginRight:6,padding:'4px 10px',border:'1px solid #3b82f6',borderRadius:6,background:'#eff6ff',color:'#2563eb',fontSize:12,cursor:'pointer'}}>แก้ไข</button>
+                  <button onClick={()=>handleDelete(r.id)} style={{padding:'4px 10px',border:'1px solid #ef4444',borderRadius:6,background:'#fef2f2',color:'#dc2626',fontSize:12,cursor:'pointer'}}>ลบ</button>
+                </td>}
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>}
+
+      {/* Form Modal */}
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={e=>{if(e.target===e.currentTarget){setShowForm(false);setEditId(null);setForm(EMPTY_FORM);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:560,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.25)'}}>
+          <h3 style={{margin:'0 0 20px',fontSize:17,fontWeight:700,color:'#1e293b'}}>{editId?'แก้ไขรายงานอุบัติเหตุ':'บันทึกอุบัติเหตุใหม่'}</h3>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={labelStyle}>วันที่เกิดเหตุ <span style={{color:'red'}}>*</span></label>
+              <input type="date" value={form.incident_date} onChange={e=>setForm(f=>({...f,incident_date:e.target.value}))} style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>เวลา (ถ้าทราบ)</label>
+              <input type="time" value={form.incident_time} onChange={e=>setForm(f=>({...f,incident_time:e.target.value}))} style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>ระดับความรุนแรง</label>
+              <select value={form.severity} onChange={e=>setForm(f=>({...f,severity:e.target.value}))} style={inputStyle}>
+                {SEVERITIES.map(s=><option key={s.k} value={s.k}>{s.k}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>ประเภทอุบัติเหตุ</label>
+              <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inputStyle}>
+                {TYPES_ACC.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>สถานที่</label>
+              <select value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} style={inputStyle}>
+                {LOCATIONS.map(l=><option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={labelStyle}>ชื่อผู้ได้รับบาดเจ็บ (ถ้ามี)</label>
+              <input type="text" value={form.injured_name} onChange={e=>setForm(f=>({...f,injured_name:e.target.value}))} placeholder="ชื่อ-นามสกุล / ตำแหน่ง" style={inputStyle}/>
+            </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={labelStyle}>รายละเอียดเหตุการณ์ <span style={{color:'red'}}>*</span></label>
+              <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={4} placeholder="อธิบายเหตุการณ์ที่เกิดขึ้น สาเหตุ และผลกระทบ" style={{...inputStyle,resize:'vertical'}}/>
+            </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={labelStyle}>การแก้ไข / มาตรการป้องกัน</label>
+              <textarea value={form.action_taken} onChange={e=>setForm(f=>({...f,action_taken:e.target.value}))} rows={3} placeholder="สิ่งที่ดำเนินการแล้ว หรือแผนป้องกันในอนาคต" style={{...inputStyle,resize:'vertical'}}/>
+            </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={labelStyle}>สถานะ</label>
+              <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={inputStyle}>
+                {Object.entries(SL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+            <button onClick={()=>{setShowForm(false);setEditId(null);setForm(EMPTY_FORM);}} style={{padding:'9px 20px',border:'1px solid #e2e8f0',borderRadius:8,background:'#f8fafc',fontSize:14,cursor:'pointer',color:'#64748b'}}>ยกเลิก</button>
+            <button onClick={handleSave} disabled={saving} style={{padding:'9px 24px',background:'#dc2626',color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:600,cursor:saving?'not-allowed':'pointer',opacity:saving?0.7:1}}>{saving?'กำลังบันทึก...':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+    </div>;
+  }
+
   function UserManagementTab({currentUser,onUpdateSession}){
     const db=DB;
     const [users,setUsers]=React.useState([]);
@@ -6922,7 +7143,7 @@ window.__dataReady.then(data => {
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
     const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
-    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'}];
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'},{id:'accident',label:'รายงานอุบัติเหตุ'}];
     const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
@@ -6959,6 +7180,7 @@ window.__dataReady.then(data => {
         {tab==='repair'&&<RepairExpenseTab canEditBL={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_banglen||(currentUser.permissions||{}).repair))} canEditBT={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_bottakua||(currentUser.permissions||{}).repair))}/>}
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
+        {tab==='accident'&&<AccidentReportTab currentUser={currentUser}/>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
