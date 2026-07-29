@@ -6805,7 +6805,12 @@ window.__dataReady.then(data => {
     async function fetchAll(){
       setLoading(true);
       const {data}=await DB.from('accident_reports').select('*').order('incident_date',{ascending:false});
-      setRecords(data||[]);
+      const rows=data||[];
+      setRecords(rows);
+      if(rows.length>0){
+        const d=new Date(rows[0].incident_date);
+        setFilterYear(d.getFullYear()+543);
+      }
       setLoading(false);
     }
 
