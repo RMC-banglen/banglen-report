@@ -3481,6 +3481,10 @@ window.__dataReady.then(data => {
                 <span style={{fontSize:15,color:'#94a3b8',marginLeft:2}}>{fmtDate(r.report_date)}</span>
               </div>
               {r.description&&<div style={{fontSize:17,color:'#334155',lineHeight:1.8,marginBottom:14,whiteSpace:'pre-line'}}>{r.description}</div>}
+              {r.root_cause&&<div style={{fontSize:16,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 18px',lineHeight:1.7,marginBottom:10}}>
+                <div style={{fontWeight:700,marginBottom:6}}>📋 คำอธิบายปัญหาหลัก:</div>
+                <div style={{whiteSpace:'pre-line'}}>{r.root_cause}</div>
+              </div>}
               {r.fix_note&&<div style={{fontSize:16,color:'#3B6D11',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:'12px 18px',lineHeight:1.7}}>
                 <div style={{fontWeight:700,marginBottom:6}}>✓ การแก้ไข:</div>
                 <div style={{whiteSpace:'pre-line'}}>{r.fix_note}</div>
