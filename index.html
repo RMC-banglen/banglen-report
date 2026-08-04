@@ -2245,7 +2245,7 @@ window.__dataReady.then(data => {
         const totalAmt = col => DAMAGE_GROUPS.reduce((a,g)=>a+groupAmt(g,col),0);
 
         const tdNum = (v,sale,bold,bg) => {
-          const pct = sale>0?(v/sale*100).toFixed(3)+'%':'–';
+          const pct = sale>0?(v/sale*100).toFixed(2)+'%':'–';
           return <>
             <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:bold?700:400,background:bg||'',padding:'3px 6px',whiteSpace:'nowrap'}}>
               {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:2}):'–'}
