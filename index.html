@@ -5629,6 +5629,8 @@ window.__dataReady.then(data => {
     const [importType,setImportType]=useState('เทรลเลอร์');
     const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ไปขับรถคันอื่นแทน (หักจากคนขับ ไปเข้ารถปลายทางที่เลือก)
     const [spareTargetChoice,setSpareTargetChoice]=useState({}); // key เดียวกับ spareAssign -> "vt||driverName" ปลายทางที่เลือกเอง (ถ้าไม่เลือก ใช้ spareTargetFor อัตโนมัติ)
+    const [spareDayAssign,setSpareDayAssign]=useState({}); // key -> {day: จำนวนเที่ยวที่ระบุเจาะจงวัน} ถ้ามีจะใช้แทนยอดรวมแบบหักอัตโนมัติ
+    const [expandSpareDay,setExpandSpareDay]=useState(null); // key ของแถวที่กำลังเปิดแก้ไขวันที่
     const allDrivers=[...new Map(rows.map(r=>[r.vehicle_type+'||'+r.driver_name,{vt:r.vehicle_type,name:r.driver_name}])).values()];
     // หาปลายทางรถสำรองให้เหมาะกับคนขับต้นทาง: ถ้าเป็นกลุ่ม "บ่อตะกั่ว" ให้ไปรถบ่อตะกั่วของ 10ล้อ-12ล้อ ไม่งั้นไปรถสำรองปกติ
     const spareTargetFor=(driverName,vt)=>{
@@ -5802,14 +5804,15 @@ window.__dataReady.then(data => {
           const maxDayOf={};parsed.forEach(r=>{const k=r.year+'|'+r.month;if((r.day||0)>(maxDayOf[k]||0))maxDayOf[k]=r.day;});
           const daysInMonth=(y,m)=>new Date(y-543,m,0).getDate();
           const snapped=parsed.filter(r=>{const dim=daysInMonth(r.year,r.month);return maxDayOf[r.year+'|'+r.month]>=dim?true:r.day<=15;});
-          setImportRows(snapped);setSpareAssign({});setSpareTargetChoice({});setShowImport(true);
+          setImportRows(snapped);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
       reader.readAsArrayBuffer(file);
       e.target.value='';
     }
     function buildAdjustedImportRows(){
-      // หักเที่ยวที่คนขับไปขับรถสำรองแทน ออกจากยอดของคนขับ แล้วย้ายไปเข้ารถสำรอง (ไม่ว่าคนขับจะเป็นประเภทรถใด)
+      // หักเที่ยวที่คนขับไปขับรถคันอื่นแทน ออกจากยอดของคนขับ แล้วย้ายไปเข้ารถปลายทาง (ไม่ว่าคนขับจะเป็นประเภทรถใด)
+      // ถ้าระบุวันที่เจาะจงไว้ (spareDayAssign) จะหักตามวันนั้นๆ ตรงๆ ไม่ใช่หักแบบเรียงจากวันที่เที่ยวเยอะสุด
       const list=importRows.map(r=>({...r}));
       Object.entries(spareAssign).forEach(([key,amount])=>{
         amount=Number(amount)||0;
@@ -5818,6 +5821,20 @@ window.__dataReady.then(data => {
         const choice=spareTargetChoice[key];
         const spare=choice?(()=>{const [cvt,cname]=choice.split('||');return{vt:cvt,name:cname};})():spareTargetFor(name,vt);
         if(!spare)return;
+        const dayMap=spareDayAssign[key];
+        const hasDayMap=dayMap&&Object.values(dayMap).some(v=>Number(v)>0);
+        if(hasDayMap){
+          Object.entries(dayMap).forEach(([day,v])=>{
+            let take=Number(v)||0;
+            if(take<=0)return;
+            const r=list.find(x=>x.vehicle_type===vt&&x.driver_name===name&&x.day===Number(day));
+            if(!r)return;
+            take=Math.min(r.trips,take);
+            r.trips-=take;
+            if(take>0)list.push({vehicle_type:spare.vt,driver_name:spare.name,year:r.year,month:r.month,day:r.day,trips:take,source:r.source,helper:name});
+          });
+          return;
+        }
         let remaining=amount;
         const driverRows=list.filter(r=>r.vehicle_type===vt&&r.driver_name===name).sort((a,b)=>b.trips-a.trips);
         for(const r of driverRows){
@@ -5850,7 +5867,7 @@ window.__dataReady.then(data => {
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
       setImporting(false);
       if(insErr){alert('นำเข้าไม่สำเร็จ: '+insErr.message);return;}
-      setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});fetch();
+      setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);fetch();
     }
 
     function openAdd(type){const {items}=getTypeData(type);setForm({id:null,year:selYear,vehicle_type:type,driver_name:'',sort_order:(items.length+1),trips:{}});setShowForm(true);}
@@ -6251,7 +6268,7 @@ window.__dataReady.then(data => {
         </div>
       </div>}
 
-      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});}}}>
+      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:640,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
           {(()=>{
@@ -6295,17 +6312,46 @@ window.__dataReady.then(data => {
                           </select>
                         </td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
-                          {choice?<input type="number" min="0" max={d.total} value={spareAssign[key]} onChange={e=>setSpareAssign(s=>({...s,[key]:e.target.value}))} style={{width:60,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>:'–'}
+                          {choice?<div style={{display:'flex',alignItems:'center',gap:6,justifyContent:'flex-end'}}>
+                            <input type="number" min="0" max={d.total} value={spareAssign[key]} onChange={e=>setSpareAssign(s=>({...s,[key]:e.target.value}))} style={{width:50,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>
+                            <button onClick={()=>setExpandSpareDay(expandSpareDay===key?null:key)} style={{padding:'2px 6px',border:'1px solid #c7d2fe',borderRadius:5,background:expandSpareDay===key?'#e0e7ff':'#fff',color:'#3730a3',fontSize:10,cursor:'pointer',whiteSpace:'nowrap'}}>{expandSpareDay===key?'ปิด':'ระบุวันที่'}</button>
+                          </div>:'–'}
                         </td>
                       </tr>;
                     })}
+                    {expandSpareDay&&drivers.some(d=>d.vt+'|'+d.name===expandSpareDay)&&(()=>{
+                      const key=expandSpareDay;
+                      const [dvt,dname]=key.split('|');
+                      const dayRows=importRows.filter(r=>r.vehicle_type===dvt&&r.driver_name===dname).sort((a,b)=>a.day-b.day);
+                      const dayMap=spareDayAssign[key]||{};
+                      const sum=Object.values(dayMap).reduce((s,v)=>s+(Number(v)||0),0);
+                      return<tr>
+                        <td colSpan={6} style={{padding:'10px 14px',background:'#eef2ff',borderBottom:'1px solid #e0e7ff'}}>
+                          <div style={{fontSize:11,fontWeight:700,color:'#3730a3',marginBottom:8}}>ระบุวันที่และจำนวนเที่ยวที่ไปขับแทน — {dname}</div>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                            {dayRows.map(r=><div key={r.day} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                              <span style={{fontSize:10,color:'#64748b'}}>วันที่ {r.day}</span>
+                              <input type="number" min="0" max={r.trips} value={dayMap[r.day]||''} placeholder="0" onChange={e=>{
+                                const v=e.target.value;
+                                const newMap={...dayMap,[r.day]:v};
+                                setSpareDayAssign(s=>({...s,[key]:newMap}));
+                                const total=Object.values(newMap).reduce((sm,vv)=>sm+(Number(vv)||0),0);
+                                setSpareAssign(s=>({...s,[key]:total}));
+                              }} style={{width:48,padding:'3px 4px',border:'1px solid #c7d2fe',borderRadius:5,fontSize:11,textAlign:'center'}}/>
+                              <span style={{fontSize:9,color:'#94a3b8'}}>/{r.trips}</span>
+                            </div>)}
+                          </div>
+                          <div style={{fontSize:11,color:'#3730a3',marginTop:8,fontWeight:700}}>รวม {sum} เที่ยว</div>
+                        </td>
+                      </tr>;
+                    })()}
                   </tbody>
                 </table>
               </div>
             </>;
           })()}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
           </div>
         </div>
