@@ -4450,7 +4450,8 @@ window.__dataReady.then(data => {
       }
     };
 
-    const filtered = tasks.filter(t=>t.dept===dept&&(typeFilter==='ALL'||t.type===typeFilter));
+    const PRI_ORDER={urgent:0,high:1,normal:2};
+    const filtered = tasks.filter(t=>t.dept===dept&&(typeFilter==='ALL'||t.type===typeFilter)).sort((a,b)=>(PRI_ORDER[a.priority]??2)-(PRI_ORDER[b.priority]??2));
     const byStatus = s => filtered.filter(t=>t.status===s);
     const urgentCount = tasks.filter(t=>t.dept===dept&&t.priority==='urgent'&&t.status!=='done').length;
     const doneMonth   = tasks.filter(t=>t.dept===dept&&t.status==='done').length;
