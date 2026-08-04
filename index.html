@@ -5752,6 +5752,10 @@ window.__dataReady.then(data => {
             if(exact)return{name:exact.name,vt:exact.vt};
             const byAlias=existingList.find(e=>aliasOf(e.name)===rawName);
             if(byAlias)return{name:byAlias.name,vt:byAlias.vt};
+            // ชื่อในไฟล์อาจเป็น "ชื่อ นามสกุล" (ไม่มี "/") ให้ลองเทียบแค่คำแรกของชื่อกับ alias ที่มีอยู่
+            const firstWord=n=>n.trim().split(/\s+/)[0];
+            const byFirstWord=existingList.find(e=>aliasOf(e.name)===firstWord(rawName));
+            if(byFirstWord)return{name:byFirstWord.name,vt:byFirstWord.vt};
             const fallback=existingList.find(e=>e.name==='รถบ่อตะกั่ว'||aliasOf(e.name)==='รถบ่อตะกั่ว');
             return fallback?{name:fallback.name,vt:fallback.vt}:{name:'รถบ่อตะกั่ว',vt:importType};
           }
