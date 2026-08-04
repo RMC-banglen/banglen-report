@@ -5825,13 +5825,18 @@ window.__dataReady.then(data => {
         const hasDayMap=dayMap&&Object.values(dayMap).some(v=>Number(v)>0);
         if(hasDayMap){
           Object.entries(dayMap).forEach(([day,v])=>{
-            let take=Number(v)||0;
-            if(take<=0)return;
-            const r=list.find(x=>x.vehicle_type===vt&&x.driver_name===name&&x.day===Number(day));
-            if(!r)return;
-            take=Math.min(r.trips,take);
-            r.trips-=take;
-            if(take>0)list.push({vehicle_type:spare.vt,driver_name:spare.name,year:r.year,month:r.month,day:r.day,trips:take,source:r.source,helper:name});
+            let remainingDay=Number(v)||0;
+            if(remainingDay<=0)return;
+            // วันเดียวกันอาจมีหลายแถว (คนละชุดเลขที่บิล) ให้หักไล่ทีละแถวจนครบจำนวนที่ระบุ
+            const dayRows=list.filter(x=>x.vehicle_type===vt&&x.driver_name===name&&x.day===Number(day));
+            for(const r of dayRows){
+              if(remainingDay<=0)break;
+              const take=Math.min(r.trips,remainingDay);
+              if(take<=0)continue;
+              r.trips-=take;
+              remainingDay-=take;
+              list.push({vehicle_type:spare.vt,driver_name:spare.name,year:r.year,month:r.month,day:r.day,trips:take,source:r.source,helper:name});
+            }
           });
           return;
         }
@@ -6322,7 +6327,10 @@ window.__dataReady.then(data => {
                     {expandSpareDay&&drivers.some(d=>d.vt+'|'+d.name===expandSpareDay)&&(()=>{
                       const key=expandSpareDay;
                       const [dvt,dname]=key.split('|');
-                      const dayRows=importRows.filter(r=>r.vehicle_type===dvt&&r.driver_name===dname).sort((a,b)=>a.day-b.day);
+                      // รวมแถวที่วันเดียวกัน (มาจากคนละชุดเลขที่บิล) เป็นวันเดียว โชว์ยอดรวมเที่ยวของวันนั้น
+                      const dayTotals={};
+                      importRows.filter(r=>r.vehicle_type===dvt&&r.driver_name===dname).forEach(r=>{dayTotals[r.day]=(dayTotals[r.day]||0)+r.trips;});
+                      const dayRows=Object.entries(dayTotals).map(([day,trips])=>({day:Number(day),trips})).sort((a,b)=>a.day-b.day);
                       const dayMap=spareDayAssign[key]||{};
                       const sum=Object.values(dayMap).reduce((s,v)=>s+(Number(v)||0),0);
                       return<tr>
