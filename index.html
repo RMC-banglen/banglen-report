@@ -6083,16 +6083,20 @@ window.__dataReady.then(data => {
                 </thead>
                 <tbody>
                   {items.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-                  {items.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
+                  {items.map((it,idx)=>{
+                    // เที่ยวที่คนขับคนนี้ไปช่วยขับรถของคนอื่น (helper) ให้บวกรวมแสดงในแถวของตัวเอง โดยไม่กระทบยอดรวมของตาราง (colTotal/typeGrand ยังนับจากรถจริงเท่านั้น)
+                    const helperAt=m=>yearRows.filter(r=>r.helper===it.name&&!r.helper.includes('บ่อตะกั่ว')&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+                    const helperTotal=[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+helperAt(m),0);
+                    return<tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                     <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                    {months.map(m=>{const v=cell(it.name,m);return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:v?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
+                    {months.map(m=>{const v=cell(it.name,m),h=helperAt(m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว`:undefined}>{total?fmt(total):'–'}{h>0&&<span style={{fontSize:10,color:'#0f766e',fontWeight:700}}> 🤝</span>}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
-                      {canEdit?<span onClick={()=>openEdit(t.k,it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(rowTotal(it.name))}</span>:fmt(rowTotal(it.name))}
+                      {canEdit?<span onClick={()=>openEdit(t.k,it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(rowTotal(it.name)+helperTotal)}</span>:fmt(rowTotal(it.name)+helperTotal)}
                     </td>
                     {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                       <button onClick={()=>setConfirmDel({type:t.k,name:it.name})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
                     </td>}
-                  </tr>)}
+                  </tr>;})}
                 </tbody>
                 <tfoot>
                   <tr style={{background:'#f1f5f9',fontWeight:800}}>
