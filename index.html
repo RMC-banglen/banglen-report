@@ -5627,7 +5627,9 @@ window.__dataReady.then(data => {
     const [importRows,setImportRows]=useState([]);
     const [importing,setImporting]=useState(false);
     const [importType,setImportType]=useState('เทรลเลอร์');
-    const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ขับรถสำรองแทน (หักจากคนขับ ไปเข้ารถสำรอง ไม่ว่าจะเป็นประเภทรถเดียวกันหรือไม่)
+    const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ไปขับรถคันอื่นแทน (หักจากคนขับ ไปเข้ารถปลายทางที่เลือก)
+    const [spareTargetChoice,setSpareTargetChoice]=useState({}); // key เดียวกับ spareAssign -> "vt||driverName" ปลายทางที่เลือกเอง (ถ้าไม่เลือก ใช้ spareTargetFor อัตโนมัติ)
+    const allDrivers=[...new Map(rows.map(r=>[r.vehicle_type+'||'+r.driver_name,{vt:r.vehicle_type,name:r.driver_name}])).values()];
     // หาปลายทางรถสำรองให้เหมาะกับคนขับต้นทาง: ถ้าเป็นกลุ่ม "บ่อตะกั่ว" ให้ไปรถบ่อตะกั่วของ 10ล้อ-12ล้อ ไม่งั้นไปรถสำรองปกติ
     const spareTargetFor=(driverName,vt)=>{
       if(driverName.includes('บ่อตะกั่ว')){
@@ -5800,7 +5802,7 @@ window.__dataReady.then(data => {
           const maxDayOf={};parsed.forEach(r=>{const k=r.year+'|'+r.month;if((r.day||0)>(maxDayOf[k]||0))maxDayOf[k]=r.day;});
           const daysInMonth=(y,m)=>new Date(y-543,m,0).getDate();
           const snapped=parsed.filter(r=>{const dim=daysInMonth(r.year,r.month);return maxDayOf[r.year+'|'+r.month]>=dim?true:r.day<=15;});
-          setImportRows(snapped);setSpareAssign({});setShowImport(true);
+          setImportRows(snapped);setSpareAssign({});setSpareTargetChoice({});setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
       reader.readAsArrayBuffer(file);
@@ -5813,7 +5815,8 @@ window.__dataReady.then(data => {
         amount=Number(amount)||0;
         if(amount<=0)return;
         const [vt,name]=key.split('|');
-        const spare=spareTargetFor(name,vt);
+        const choice=spareTargetChoice[key];
+        const spare=choice?(()=>{const [cvt,cname]=choice.split('||');return{vt:cvt,name:cname};})():spareTargetFor(name,vt);
         if(!spare)return;
         let remaining=amount;
         const driverRows=list.filter(r=>r.vehicle_type===vt&&r.driver_name===name).sort((a,b)=>b.trips-a.trips);
@@ -5847,7 +5850,7 @@ window.__dataReady.then(data => {
       if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
       setImporting(false);
       if(insErr){alert('นำเข้าไม่สำเร็จ: '+insErr.message);return;}
-      setShowImport(false);setImportRows([]);setSpareAssign({});fetch();
+      setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});fetch();
     }
 
     function openAdd(type){const {items}=getTypeData(type);setForm({id:null,year:selYear,vehicle_type:type,driver_name:'',sort_order:(items.length+1),trips:{}});setShowForm(true);}
@@ -6248,7 +6251,7 @@ window.__dataReady.then(data => {
         </div>
       </div>}
 
-      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);setSpareAssign({});}}}>
+      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:640,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
           {(()=>{
@@ -6268,25 +6271,31 @@ window.__dataReady.then(data => {
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
-                    <th style={{textAlign:'center',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ขับรถสำรอง</th>
-                    <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>เที่ยวที่ขับรถสำรอง</th>
+                    <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ไปขับรถของ (ถ้ามี)</th>
+                    <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนเที่ยวที่ไปขับแทน</th>
                   </tr></thead>
                   <tbody>
                     {drivers.map((d,i)=>{
-                      const spare=spareTargetFor(d.name,d.vt);
                       const key=d.vt+'|'+d.name;
-                      const checked=(spareAssign[key]||0)>0;
-                      const canSpare=spare&&!(d.vt===spare.vt&&d.name===spare.name);
+                      const choice=spareTargetChoice[key]||'';
                       return<tr key={key} style={{background:i%2?'#fcfcfd':'#fff'}}>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name}</td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
-                        <td style={{textAlign:'center',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
-                          {canSpare?<input type="checkbox" checked={checked} title={`เข้า ${spare.name}`} onChange={e=>setSpareAssign(s=>{const n={...s};if(e.target.checked)n[key]=n[key]||1;else delete n[key];return n;})}/>:'–'}
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
+                          <select value={choice} onChange={e=>{
+                            const v=e.target.value;
+                            setSpareTargetChoice(s=>{const n={...s};if(v)n[key]=v;else delete n[key];return n;});
+                            if(v&&!spareAssign[key])setSpareAssign(s=>({...s,[key]:1}));
+                            if(!v)setSpareAssign(s=>{const n={...s};delete n[key];return n;});
+                          }} style={{width:'100%',padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11}}>
+                            <option value="">-- ไม่ย้าย --</option>
+                            {allDrivers.filter(o=>!(o.vt===d.vt&&o.name===d.name)).map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
+                          </select>
                         </td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
-                          {canSpare&&checked?<input type="number" min="0" max={d.total} value={spareAssign[key]} onChange={e=>setSpareAssign(s=>({...s,[key]:e.target.value}))} style={{width:60,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>:'–'}
+                          {choice?<input type="number" min="0" max={d.total} value={spareAssign[key]} onChange={e=>setSpareAssign(s=>({...s,[key]:e.target.value}))} style={{width:60,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>:'–'}
                         </td>
                       </tr>;
                     })}
@@ -6296,7 +6305,7 @@ window.__dataReady.then(data => {
             </>;
           })()}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
           </div>
         </div>
