@@ -5579,17 +5579,23 @@ window.__dataReady.then(data => {
         DB.from('transport_day_notes').select('*'),
       ]).then(([a,b,c])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setLoading(false);});
     }
+    const DAY_NOTE_OPTIONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน','ลาหยุด'];
     const dayNoteOf=(vt,name,d)=>{const r=dayNotes.find(x=>x.year===selYear&&x.month===selDayMonth&&x.day===d&&x.vehicle_type===vt&&x.driver_name===name);return r?r.note:null;};
-    async function editDayNote(vt,name,d){
+    const [dayNoteModal,setDayNoteModal]=useState(null); // {vt,name,day,value}
+    function editDayNote(vt,name,d){
       const cur=dayNoteOf(vt,name,d);
-      const v=window.prompt(`เหตุผลที่ไม่มีเที่ยว · ${name} · วันที่ ${d} ${MO[selDayMonth-1]} ${selYear}\n(เช่น หยุด, รถเสีย, ลา — เว้นว่างเพื่อลบ)`,cur||'');
-      if(v==null)return;
-      if(v.trim()===''){
-        if(cur!=null)await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).eq('day',d).eq('vehicle_type',vt).eq('driver_name',name);
+      setDayNoteModal({vt,name,day:d,value:cur&&!DAY_NOTE_OPTIONS.includes(cur)?'อื่นๆ':(cur||''),customText:cur&&!DAY_NOTE_OPTIONS.includes(cur)?cur:''});
+    }
+    async function saveDayNote(){
+      const {vt,name,day,value,customText}=dayNoteModal;
+      const finalNote=value==='อื่นๆ'?(customText||'').trim():value;
+      if(!finalNote){
+        await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).eq('day',day).eq('vehicle_type',vt).eq('driver_name',name);
       }else{
-        const {error}=await DB.from('transport_day_notes').upsert({year:selYear,month:selDayMonth,day:d,vehicle_type:vt,driver_name:name,note:v.trim()},{onConflict:'year,month,day,vehicle_type,driver_name'});
+        const {error}=await DB.from('transport_day_notes').upsert({year:selYear,month:selDayMonth,day,vehicle_type:vt,driver_name:name,note:finalNote},{onConflict:'year,month,day,vehicle_type,driver_name'});
         if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
       }
+      setDayNoteModal(null);
       fetch();
     }
     const workdaysOf=m=>{const r=workdays.find(x=>x.year===selYear&&x.month===m);return r?r.days:null;};
@@ -6320,6 +6326,28 @@ window.__dataReady.then(data => {
               <button onClick={()=>setShowDayForm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
               <button onClick={handleSaveDay} disabled={savingDay} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:savingDay?0.5:1}}>{savingDay?'กำลังบันทึก...':'บันทึก'}</button>
             </div>
+          </div>
+        </div>
+      </div>}
+
+      {dayNoteModal&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setDayNoteModal(null);}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:420}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>เหตุผลที่ไม่มีเที่ยว</div>
+          <div style={{fontSize:13,color:'#64748b',marginBottom:16}}>{dayNoteModal.name} · วันที่ {dayNoteModal.day} {MO[selDayMonth-1]} {selYear}</div>
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:dayNoteModal.value==='อื่นๆ'?12:16}}>
+            {['',...DAY_NOTE_OPTIONS,'อื่นๆ'].map(opt=>
+              <label key={opt||'none'} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',border:`1.5px solid ${dayNoteModal.value===opt?'#dc2626':'#e2e8f0'}`,borderRadius:8,background:dayNoteModal.value===opt?'#fef2f2':'#fff',cursor:'pointer'}}>
+                <input type="radio" checked={dayNoteModal.value===opt} onChange={()=>setDayNoteModal(m=>({...m,value:opt}))}/>
+                <span style={{fontSize:14,color:'#1e293b'}}>{opt===''?'(ไม่มีเหตุผล / ลบ)':opt}</span>
+              </label>
+            )}
+          </div>
+          {dayNoteModal.value==='อื่นๆ'&&<div style={{marginBottom:16}}>
+            <input type="text" autoFocus value={dayNoteModal.customText||''} onChange={e=>setDayNoteModal(m=>({...m,customText:e.target.value}))} placeholder="ระบุเหตุผล" style={inp}/>
+          </div>}
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>setDayNoteModal(null)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={saveDayNote} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>บันทึก</button>
           </div>
         </div>
       </div>}
