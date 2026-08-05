@@ -5673,8 +5673,11 @@ window.__dataReady.then(data => {
       // เที่ยวที่คนขับไปช่วยขับรถสำรอง (บันทึกไว้ใน helper) นับรวมเป็นผลงานของคนขับคนนั้นด้วย
       const helperMonth=name=>yearRows.filter(r=>r.helper===name&&r.month===selMonth).reduce((s,r)=>s+(r.trips||0),0);
       const monthItems=items.map(it=>{const h=helperMonth(it.name);return{...it,trips:monthValue(it.name,selMonth)+h,helped:h};}).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
-      const dayCell=(name,d)=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-      const dayRowTotal=name=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
+      // เที่ยวที่ถูกย้ายให้คนอื่นไปช่วยขับ (มี helper ระบุ) ไม่นับเป็นของทะเบียนนี้แล้ว แต่ไปนับเป็นของคนที่ช่วยขับแทน
+      const dayCell=(name,d)=>dayRows.filter(r=>r.driver_name===name&&!r.helper&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0)
+        +dayRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
+      const dayRowTotal=name=>dayRows.filter(r=>r.driver_name===name&&!r.helper&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0)
+        +dayRows.filter(r=>r.helper===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
       const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       const dayGrand=dayRows.filter(r=>r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
       return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayRowTotal,dayColTotal,dayGrand};
@@ -6272,12 +6275,13 @@ window.__dataReady.then(data => {
                     <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
                     {dayList.map(d=>{
                       const v=dayCell(it.name,d);
+                      const helped=dayRows.filter(r=>r.helper===it.name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
                       const note=v?null:dayNoteOf(t.k,it.name,d);
                       const clickable=!v&&canEdit;
                       return<td key={d} onClick={clickable?()=>editDayNote(t.k,it.name,d):undefined}
-                        title={note?note:clickable?'คลิกเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย':undefined}
+                        title={helped>0?`ไปช่วยขับแทน ${helped} เที่ยว`:note?note:clickable?'คลิกเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย':undefined}
                         style={{textAlign:'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
-                        {v?v
+                        {v?<>{v}{helped>0&&<span style={{fontSize:9,color:'#0f766e'}}>🤝</span>}</>
                           :note?<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</span>
                           :'·'}
                       </td>;
