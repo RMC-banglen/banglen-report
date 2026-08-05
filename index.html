@@ -5673,11 +5673,18 @@ window.__dataReady.then(data => {
       // เที่ยวที่คนขับไปช่วยขับรถสำรอง (บันทึกไว้ใน helper) นับรวมเป็นผลงานของคนขับคนนั้นด้วย
       const helperMonth=name=>yearRows.filter(r=>r.helper===name&&r.month===selMonth).reduce((s,r)=>s+(r.trips||0),0);
       const monthItems=items.map(it=>{const h=helperMonth(it.name);return{...it,trips:monthValue(it.name,selMonth)+h,helped:h};}).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
-      // dayCell/dayRowTotal = ยอดจริงของทะเบียนนี้เสมอ (ไม่หักออกแม้จะมีคนอื่นมาช่วยขับ) เพื่อให้เห็นยอดการใช้งานจริงของรถคันนั้น
-      // โดยเฉพาะรถที่ไม่มีคนขับประจำ (เช่น รถสำรอง/รถบ่อตะกั่ว) ซึ่งทุกเที่ยวจะถูกติด helper ไว้หมด ถ้าหักออกจะทำให้ยอดหายไปทั้งหมด
-      const dayCell=(name,d)=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-      const dayRowTotal=name=>dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-      // เที่ยวที่คนขับคนนี้ไปช่วยขับรถคันอื่นแทน (เอาไว้บวกเพิ่มแสดงเป็นเครดิตส่วนตัว แยกจากยอดของรถคันตัวเอง)
+      // รถที่ไม่มีคนขับประจำ (สำรอง/บ่อตะกั่ว) ให้โชว์ยอดจริงเสมอ ไม่หักออก เพราะทุกเที่ยวจะถูกติด helper ไว้หมด ถ้าหักจะทำให้ยอดหายไปทั้งคัน
+      // ส่วนคนขับที่มีทะเบียนของตัวเอง (เช่น สมนึก, ฐา) ถ้าถูกคนอื่นยืมไปขับ ให้หักออกจากทะเบียนต้นทาง แล้วไปนับที่คนขับที่ไปช่วยแทน
+      const isSpareVeh=n=>n.includes('สำรอง')||n.includes('บ่อตะกั่ว');
+      const dayCell=(name,d)=>{
+        const own=dayRows.filter(r=>r.driver_name===name&&(isSpareVeh(name)||!r.helper)&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
+        return own+dayRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
+      };
+      const dayRowTotal=name=>{
+        const own=dayRows.filter(r=>r.driver_name===name&&(isSpareVeh(name)||!r.helper)&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
+        return own+dayRows.filter(r=>r.helper===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
+      };
+      // เที่ยวที่คนขับคนนี้ไปช่วยขับรถคันอื่นแทน (ใช้แสดงป้าย 🤝 เฉยๆ ค่าถูกรวมอยู่ใน dayCell/dayRowTotal แล้ว)
       const dayHelped=(name,d)=>dayRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       const dayHelpedTotal=name=>dayRows.filter(r=>r.helper===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
       const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
@@ -6158,14 +6165,21 @@ window.__dataReady.then(data => {
                 <tbody>
                   {items.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
                   {items.map((it,idx)=>{
-                    // v = ยอดจริงของทะเบียนนี้เสมอ (ไม่หักออก) · helper = เครดิตที่คนขับคนนี้ไปช่วยขับคันอื่น (บวกเพิ่มแยกต่างหาก)
+                    // รถที่ไม่มีคนขับประจำ (สำรอง/บ่อตะกั่ว) โชว์ยอดจริงเสมอ · คนขับที่มีทะเบียนตัวเอง ถ้าถูกยืมไปขับ ให้หักออกจากทะเบียนต้นทาง ไปนับที่คนช่วยขับแทน
+                    const isSpareVeh=n=>n.includes('สำรอง')||n.includes('บ่อตะกั่ว');
+                    const ownAt=m=>{
+                      const dSum=dayRows.filter(r=>r.driver_name===it.name&&(isSpareVeh(it.name)||!r.helper)&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+                      if(dSum>0)return dSum;
+                      return typeRows.filter(r=>r.driver_name===it.name&&r.day==null&&(isSpareVeh(it.name)||!r.helper)&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+                    };
                     const helperAt=m=>yearRows.filter(r=>r.helper===it.name&&!r.helper.includes('บ่อตะกั่ว')&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+                    const ownTotal=[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+ownAt(m),0);
                     const helperTotal=[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+helperAt(m),0);
                     return<tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                     <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                    {months.map(m=>{const v=cell(it.name,m),h=helperAt(m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว`:undefined}>{total?fmt(total):'–'}{h>0&&<span style={{fontSize:10,color:'#0f766e',fontWeight:700}}> 🤝</span>}</td>;})}
+                    {months.map(m=>{const v=ownAt(m),h=helperAt(m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว`:undefined}>{total?fmt(total):'–'}{h>0&&<span style={{fontSize:10,color:'#0f766e',fontWeight:700}}> 🤝</span>}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
-                      {canEdit?<span onClick={()=>openEdit(t.k,it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(rowTotal(it.name)+helperTotal)}</span>:fmt(rowTotal(it.name)+helperTotal)}
+                      {canEdit?<span onClick={()=>openEdit(t.k,it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
                     </td>
                     {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                       <button onClick={()=>setConfirmDel({type:t.k,name:it.name})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
@@ -6292,7 +6306,7 @@ window.__dataReady.then(data => {
                         {helped>0&&<div style={{fontSize:9,color:'#0f766e',fontWeight:700}}>🤝{helped}</div>}
                       </td>;
                     })}
-                    <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name)+dayHelpedTotal(it.name))}</td>
+                    <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
                     {canEdit&&<td style={{padding:'2px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                       <button onClick={()=>moveDriver(t.k,it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
                       <button onClick={()=>moveDriver(t.k,it.name,1)} disabled={idx===dayItems.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===dayItems.length-1?'default':'pointer',fontSize:10,color:idx===dayItems.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
