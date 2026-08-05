@@ -6090,7 +6090,7 @@ window.__dataReady.then(data => {
       })()}
 
       {view==='monthly'&&TYPES.map(t=>{
-        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows}=getTypeData(t.k);
+        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows,typeRows}=getTypeData(t.k);
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
             <span style={{fontSize:18}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
