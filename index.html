@@ -5963,11 +5963,6 @@ window.__dataReady.then(data => {
         const byVehicle={};
         companyNotes.forEach(n=>{const k=n.vehicle_type+'|'+n.driver_name;if(!byVehicle[k])byVehicle[k]={vt:n.vehicle_type,name:n.driver_name,items:[]};byVehicle[k].items.push(n);});
         const vehicleList=Object.values(byVehicle).sort((a,b)=>b.items.length-a.items.length);
-        // สรุปตามสาเหตุ (normalize เบื้องต้น: ตัดช่องว่าง)
-        const byReason={};
-        companyNotes.forEach(n=>{const r=n.note.trim();byReason[r]=(byReason[r]||0)+1;});
-        const reasonList=Object.entries(byReason).sort((a,b)=>b[1]-a[1]);
-        const maxReason=Math.max(1,...reasonList.map(([,c])=>c));
         return<div>
           <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
             <div style={{flex:'1 1 200px',background:'#fef2f2',border:'2px solid #fecaca',borderRadius:14,padding:'16px 20px'}}>
@@ -5980,37 +5975,43 @@ window.__dataReady.then(data => {
             </div>
           </div>
 
-          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
-            <div style={{fontSize:15,fontWeight:800,color:'#1e293b',marginBottom:12}}>สรุปตามสาเหตุ</div>
-            {reasonList.length===0?<div style={{textAlign:'center',color:'#94a3b8',padding:20}}>ยังไม่มีข้อมูล — คลิกที่ช่องว่างในตารางรายวันเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย</div>:
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                {reasonList.map(([reason,count])=><div key={reason}>
-                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
-                    <span style={{fontWeight:600,color:'#334155'}}>{reason}</span>
-                    <span style={{fontWeight:800,color:'#dc2626'}}>{count} วัน</span>
-                  </div>
-                  <div style={{height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
-                    <div style={{height:'100%',width:`${(count/maxReason)*100}%`,background:'#dc2626',borderRadius:4}}/>
-                  </div>
-                </div>)}
-              </div>}
-          </div>
-
           <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden'}}>
             <div style={{padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#fef2f2'}}>
               <div style={{fontSize:15,fontWeight:800,color:'#b91c1c'}}>รายละเอียดตามคัน — ปี {selYear}</div>
             </div>
             {vehicleList.length===0?<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>:
               <div style={{padding:'10px 18px'}}>
-                {vehicleList.map(v=><div key={v.vt+'|'+v.name} style={{padding:'10px 0',borderBottom:'1px solid #f1f5f9'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                    <span style={{fontWeight:700,color:'#1e293b'}}>{v.vt==='เทรลเลอร์'?'🚛':'🚚'} {v.name}</span>
-                    <span style={{fontWeight:800,color:'#dc2626'}}>{v.items.length} วัน</span>
-                  </div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                    {v.items.sort((a,b)=>a.month-b.month||a.day-b.day).map((it,ii)=><span key={ii} title={it.note} style={{fontSize:11,padding:'3px 8px',borderRadius:6,background:'#fef2f2',border:'1px solid #fecaca',color:'#b91c1c'}}>{it.day} {MO[it.month-1]}: {it.note}</span>)}
-                  </div>
-                </div>)}
+                {vehicleList.map(v=>{
+                  // สรุปตามสาเหตุของคันนี้ แยกเป็นรายเดือน + รวมทั้งปี
+                  const monthsPresent=[...new Set(v.items.map(it=>it.month))].sort((a,b)=>a-b);
+                  const reasonsOfV=[...new Set(v.items.map(it=>it.note.trim()))];
+                  const countAt=(reason,m)=>v.items.filter(it=>it.note.trim()===reason&&(m==null||it.month===m)).length;
+                  return<div key={v.vt+'|'+v.name} style={{padding:'10px 0',borderBottom:'1px solid #f1f5f9'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                      <span style={{fontWeight:700,color:'#1e293b'}}>{v.vt==='เทรลเลอร์'?'🚛':'🚚'} {v.name}</span>
+                      <span style={{fontWeight:800,color:'#dc2626'}}>{v.items.length} วัน</span>
+                    </div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+                      {v.items.sort((a,b)=>a.month-b.month||a.day-b.day).map((it,ii)=><span key={ii} title={it.note} style={{fontSize:11,padding:'3px 8px',borderRadius:6,background:'#fef2f2',border:'1px solid #fecaca',color:'#b91c1c'}}>{it.day} {MO[it.month-1]}: {it.note}</span>)}
+                    </div>
+                    <div style={{overflowX:'auto'}}>
+                      <table style={{borderCollapse:'collapse',fontSize:11,minWidth:'100%'}}>
+                        <thead><tr style={{background:'#fafafa'}}>
+                          <th style={{textAlign:'left',padding:'4px 8px',color:'#64748b',fontWeight:700,borderBottom:'1px solid #f1f5f9'}}>สาเหตุ</th>
+                          {monthsPresent.map(m=><th key={m} style={{textAlign:'right',padding:'4px 8px',color:'#64748b',fontWeight:700,borderBottom:'1px solid #f1f5f9'}}>{MO[m-1]}</th>)}
+                          <th style={{textAlign:'right',padding:'4px 8px',color:'#b91c1c',fontWeight:800,borderBottom:'1px solid #f1f5f9'}}>รวมทั้งปี</th>
+                        </tr></thead>
+                        <tbody>
+                          {reasonsOfV.map(reason=><tr key={reason}>
+                            <td style={{padding:'4px 8px',color:'#334155',fontWeight:600}}>{reason}</td>
+                            {monthsPresent.map(m=>{const c=countAt(reason,m);return<td key={m} style={{textAlign:'right',padding:'4px 8px',color:c?'#475569':'#cbd5e1'}}>{c||'–'}</td>;})}
+                            <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:'#b91c1c'}}>{countAt(reason,null)}</td>
+                          </tr>)}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>;
+                })}
               </div>}
           </div>
         </div>;
