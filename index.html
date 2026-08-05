@@ -5676,8 +5676,10 @@ window.__dataReady.then(data => {
       // รถที่ไม่มีคนขับประจำ (สำรอง/บ่อตะกั่ว) ให้โชว์ยอดจริงเสมอ ไม่หักออก เพราะทุกเที่ยวจะถูกติด helper ไว้หมด ถ้าหักจะทำให้ยอดหายไปทั้งคัน
       // ส่วนคนขับที่มีทะเบียนของตัวเอง (เช่น สมนึก, ฐา) ถ้าถูกคนอื่นยืมไปขับ ให้หักออกจากทะเบียนต้นทาง แล้วไปนับที่คนขับที่ไปช่วยแทน
       const isSpareVeh=n=>n.includes('สำรอง')||n.includes('บ่อตะกั่ว');
+      // dayOwn = เที่ยวของทะเบียนตัวเองล้วนๆ (ไม่รวมที่ได้รับเครดิตจากการช่วยขับ) ใช้เช็คว่า "รถคันตัวเอง" ว่างไหม เพื่อให้บันทึกเหตุผลได้แม้จะมี dayCell>0 จากการไปช่วยขับที่อื่น
+      const dayOwn=(name,d)=>dayRows.filter(r=>r.driver_name===name&&(isSpareVeh(name)||!r.helper)&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       const dayCell=(name,d)=>{
-        const own=dayRows.filter(r=>r.driver_name===name&&(isSpareVeh(name)||!r.helper)&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
+        const own=dayOwn(name,d);
         return own+dayRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       };
       const dayRowTotal=name=>{
@@ -5689,7 +5691,7 @@ window.__dataReady.then(data => {
       const dayHelpedTotal=name=>dayRows.filter(r=>r.helper===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
       const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       const dayGrand=dayRows.filter(r=>r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-      return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal};
+      return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal};
     }
 
     function openDayForm(type,name){
@@ -6263,7 +6265,7 @@ window.__dataReady.then(data => {
       </div>}
 
       {view==='daily'&&TYPES.map(t=>{
-        const {items,dayRows,dayCell,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal}=getTypeData(t.k);
+        const {items,dayRows,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal}=getTypeData(t.k);
         const NON_CO=['รถบ่อตะกั่ว','รับเอง','รถร่วม'];
         const dayItems=items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth));
         return<div key={t.k} style={{marginBottom:32}}>
@@ -6290,19 +6292,21 @@ window.__dataReady.then(data => {
                   {dayItems.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                     <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
                     {dayList.map(d=>{
-                      // v = ยอดจริงของทะเบียนนี้ (ไม่หักออก แม้จะมีคนอื่นมาช่วยขับ) · helped = เครดิตที่คนขับคนนี้ไปช่วยขับคันอื่น (บวกเพิ่มแยกต่างหาก)
+                      // v = ยอดที่แสดง (ของตัวเอง + ที่ได้รับเครดิตจากการช่วยขับ) · ownV = ของทะเบียนตัวเองล้วนๆ ใช้เช็คว่ารถคันนี้ว่างไหม (บันทึกเหตุผลได้แม้ v>0 จากการไปช่วยขับที่อื่น)
                       const v=dayCell(it.name,d);
+                      const ownV=dayOwn(it.name,d);
                       const helped=dayHelped(it.name,d);
-                      const note=v?null:dayNoteOf(t.k,it.name,d);
-                      const clickable=!v&&canEdit;
+                      const note=ownV?null:dayNoteOf(t.k,it.name,d);
+                      const clickable=!ownV&&canEdit;
                       return<td key={d} onClick={clickable?()=>editDayNote(t.k,it.name,d):undefined}
-                        title={[helped>0?`ไปช่วยขับแทน ${helped} เที่ยว`:null,note?note:clickable?'คลิกเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย':null].filter(Boolean).join(' · ')||undefined}
-                        style={{textAlign:'center',padding:'4px 3px',color:v?'#334155':note||helped?'#0f766e':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
+                        title={[helped>0?`ไปช่วยขับแทน ${helped} เที่ยว`:null,note?`ทะเบียนตัวเอง: ${note}`:clickable?'คลิกเพื่อบันทึกเหตุผลของทะเบียนตัวเอง เช่น หยุด/รถเสีย':null].filter(Boolean).join(' · ')||undefined}
+                        style={{textAlign:'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
                         {v>0&&<span>{v}</span>}
                         {v===0&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
                           {note&&<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap',color:'#dc2626'}}>{note.length>4?note.slice(0,4):note}</span>}
-                          {!note&&!helped&&'·'}
+                          {!note&&'·'}
                         </div>}
+                        {note&&ownV===0&&v>0&&<div style={{fontSize:9,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'0 3px',color:'#dc2626',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</div>}
                         {helped>0&&<div style={{fontSize:9,color:'#0f766e',fontWeight:700}}>🤝{helped}</div>}
                       </td>;
                     })}
