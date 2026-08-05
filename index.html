@@ -6019,7 +6019,7 @@ window.__dataReady.then(data => {
       {view==='dashboard'&&(()=>{
         const trailer=getTypeData('เทรลเลอร์');
         const wheel=getTypeData('10ล้อ-12ล้อ');
-        const NUM={'เทรลเลอร์':6,'10ล้อ-12ล้อ':2};
+        const NUM={'เทรลเลอร์':7,'10ล้อ-12ล้อ':2};
         const isCompany=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง');
         const companyCol=(td)=>m=>td.items.filter(i=>isCompany(i.name)).reduce((s,it)=>s+td.cell(it.name,m),0);
         // เดือนที่มีข้อมูลจริง (จากทั้ง 2 ประเภท)
@@ -6053,7 +6053,7 @@ window.__dataReady.then(data => {
           {/* แถว KPI */}
           <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
             {kpi('รวมเที่ยวทั้งปี '+selYear,fmt(grandAll),'เที่ยว',`เทรลเลอร์ ${fmt(trailer.typeGrand)} · 10ล้อ-12ล้อ ${fmt(wheel.typeGrand)}`,'#1e293b')}
-            {kpi('เที่ยวเทรลเลอร์'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(trailer.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(trailer,lastM)?avgOf(trailer,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (6 คัน)`:'','#2563eb')}
+            {kpi('เที่ยวเทรลเลอร์'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(trailer.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(trailer,lastM)?avgOf(trailer,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (7 คัน)`:'','#2563eb')}
             {kpi('เที่ยว 10ล้อ-12ล้อ'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(wheel.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(wheel,lastM)?avgOf(wheel,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (2 คัน)`:'','#15803d')}
             {kpi('วันทำงานสะสม',wdTotal?fmt(wdTotal):'–','วัน',lastM?`เดือนล่าสุด ${MO[lastM-1]} ${workdaysOf(lastM)||'–'} วัน`:'','#475569')}
           </div>
@@ -6072,7 +6072,7 @@ window.__dataReady.then(data => {
                   {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>wheel.colTotal(m))},
                 ]} height={280} unit="เที่ยว"/></>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
               {/* เฉลี่ยเที่ยว/วัน/คัน รายเดือน */}
-              {card('เฉลี่ยเที่ยว/วัน/คัน รายเดือน','เที่ยวรถบริษัท ÷ วันทำงาน ÷ จำนวนรถ (เทรลเลอร์ 6 คัน · 10ล้อ-12ล้อ 2 คัน)',
+              {card('เฉลี่ยเที่ยว/วัน/คัน รายเดือน','เที่ยวรถบริษัท ÷ วันทำงาน ÷ จำนวนรถ (เทรลเลอร์ 7 คัน · 10ล้อ-12ล้อ 2 คัน)',
                 monthsData.length?<>{legend}<LineChart categories={cats} series={[
                   {label:'เทรลเลอร์',color:'#2563eb',data:monthsData.map(m=>{const v=avgOf(trailer,m);return v!=null?+v.toFixed(2):null;})},
                   {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>{const v=avgOf(wheel,m);return v!=null?+v.toFixed(2):null;})},
@@ -6205,8 +6205,8 @@ window.__dataReady.then(data => {
                     {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
                   </tr>
                   {(()=>{
-                    // รถบริษัท = ไม่รวมรถร่วมและรับเอง · เทรลเลอร์ 6 คัน / 10ล้อ-12ล้อ 2 คัน · วันทำงานใช้ชุดเดียวกัน
-                    const numTrucks=t.k==='เทรลเลอร์'?6:2;
+                    // รถบริษัท = ไม่รวมรถร่วมและรับเอง · เทรลเลอร์ 7 คัน / 10ล้อ-12ล้อ 2 คัน · วันทำงานใช้ชุดเดียวกัน
+                    const numTrucks=t.k==='เทรลเลอร์'?7:2;
                     const companyItems=items.filter(i=>!i.name.includes('รถร่วม')&&!i.name.includes('รับเอง')&&!i.name.includes('บ่อตะกั่ว'));
                     const companyCol=m=>companyItems.reduce((s,it)=>s+cell(it.name,m),0);
                     const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
