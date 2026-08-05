@@ -5931,7 +5931,70 @@ window.__dataReady.then(data => {
         <button onClick={()=>setView('daily')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='daily'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='daily'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📆 รายวัน</button>
         <button onClick={()=>setView('monthly')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='monthly'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='monthly'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📅 รายเดือน</button>
         <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='summary'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
+        <button onClick={()=>setView('stopped')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='stopped'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='stopped'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🛑 หยุดวิ่ง</button>
       </div>
+
+      {view==='stopped'&&(()=>{
+        const yearNotes=dayNotes.filter(n=>n.year===selYear).map(n=>({...n,vehLabel:n.vehicle_type}));
+        // แยกเป็นรถบริษัท (ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว) เพื่อไม่ให้ปนกับรถนอก
+        const companyNotes=yearNotes.filter(n=>!n.driver_name.includes('รถร่วม')&&!n.driver_name.includes('รับเอง')&&!n.driver_name.includes('บ่อตะกั่ว'));
+        const totalStopDays=companyNotes.length;
+        // สรุปตามคัน
+        const byVehicle={};
+        companyNotes.forEach(n=>{const k=n.vehicle_type+'|'+n.driver_name;if(!byVehicle[k])byVehicle[k]={vt:n.vehicle_type,name:n.driver_name,items:[]};byVehicle[k].items.push(n);});
+        const vehicleList=Object.values(byVehicle).sort((a,b)=>b.items.length-a.items.length);
+        // สรุปตามสาเหตุ (normalize เบื้องต้น: ตัดช่องว่าง)
+        const byReason={};
+        companyNotes.forEach(n=>{const r=n.note.trim();byReason[r]=(byReason[r]||0)+1;});
+        const reasonList=Object.entries(byReason).sort((a,b)=>b[1]-a[1]);
+        const maxReason=Math.max(1,...reasonList.map(([,c])=>c));
+        return<div>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
+            <div style={{flex:'1 1 200px',background:'#fef2f2',border:'2px solid #fecaca',borderRadius:14,padding:'16px 20px'}}>
+              <div style={{fontSize:13,color:'#b91c1c',fontWeight:700,marginBottom:6}}>รวมวันหยุดวิ่งทั้งปี {selYear}</div>
+              <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{totalStopDays} <span style={{fontSize:14,color:'#94a3b8'}}>วัน (รถบริษัท)</span></div>
+            </div>
+            <div style={{flex:'1 1 200px',background:'#fff',border:'2px solid #e2e8f0',borderRadius:14,padding:'16px 20px'}}>
+              <div style={{fontSize:13,color:'#64748b',fontWeight:700,marginBottom:6}}>จำนวนคันที่เคยหยุดวิ่ง</div>
+              <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{vehicleList.length} <span style={{fontSize:14,color:'#94a3b8'}}>คัน</span></div>
+            </div>
+          </div>
+
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
+            <div style={{fontSize:15,fontWeight:800,color:'#1e293b',marginBottom:12}}>สรุปตามสาเหตุ</div>
+            {reasonList.length===0?<div style={{textAlign:'center',color:'#94a3b8',padding:20}}>ยังไม่มีข้อมูล — คลิกที่ช่องว่างในตารางรายวันเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย</div>:
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {reasonList.map(([reason,count])=><div key={reason}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
+                    <span style={{fontWeight:600,color:'#334155'}}>{reason}</span>
+                    <span style={{fontWeight:800,color:'#dc2626'}}>{count} วัน</span>
+                  </div>
+                  <div style={{height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${(count/maxReason)*100}%`,background:'#dc2626',borderRadius:4}}/>
+                  </div>
+                </div>)}
+              </div>}
+          </div>
+
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden'}}>
+            <div style={{padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#fef2f2'}}>
+              <div style={{fontSize:15,fontWeight:800,color:'#b91c1c'}}>รายละเอียดตามคัน — ปี {selYear}</div>
+            </div>
+            {vehicleList.length===0?<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>:
+              <div style={{padding:'10px 18px'}}>
+                {vehicleList.map(v=><div key={v.vt+'|'+v.name} style={{padding:'10px 0',borderBottom:'1px solid #f1f5f9'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                    <span style={{fontWeight:700,color:'#1e293b'}}>{v.vt==='เทรลเลอร์'?'🚛':'🚚'} {v.name}</span>
+                    <span style={{fontWeight:800,color:'#dc2626'}}>{v.items.length} วัน</span>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                    {v.items.sort((a,b)=>a.month-b.month||a.day-b.day).map((it,ii)=><span key={ii} title={it.note} style={{fontSize:11,padding:'3px 8px',borderRadius:6,background:'#fef2f2',border:'1px solid #fecaca',color:'#b91c1c'}}>{it.day} {MO[it.month-1]}: {it.note}</span>)}
+                  </div>
+                </div>)}
+              </div>}
+          </div>
+        </div>;
+      })()}
 
       {view==='dashboard'&&(()=>{
         const trailer=getTypeData('เทรลเลอร์');
