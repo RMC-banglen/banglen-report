@@ -6128,10 +6128,14 @@ window.__dataReady.then(data => {
                   if(rank>3)break;
                   ranked.push({...it,rank});
                 }
-                // ผู้ช่วยขับรถสำรองของเดือนนี้ (โชว์เสมอ แม้ไม่ติด Top 3)
+                // ผู้ช่วยขับรถสำรองของเดือนนี้ (โชว์เสมอ แม้ไม่ติด Top 3) พร้อมแยกว่าไปขับคันไหนกี่เที่ยว
                 const helpers={};
-                yearRows.filter(r=>r.helper&&!r.helper.includes('บ่อตะกั่ว')&&r.month===selMonth).forEach(r=>{helpers[r.helper]=(helpers[r.helper]||0)+(r.trips||0);});
-                const helperList=Object.entries(helpers).sort((a,b)=>b[1]-a[1]);
+                yearRows.filter(r=>r.helper&&!r.helper.includes('บ่อตะกั่ว')&&r.month===selMonth).forEach(r=>{
+                  if(!helpers[r.helper])helpers[r.helper]={total:0,byTarget:{}};
+                  helpers[r.helper].total+=(r.trips||0);
+                  helpers[r.helper].byTarget[r.driver_name]=(helpers[r.helper].byTarget[r.driver_name]||0)+(r.trips||0);
+                });
+                const helperList=Object.entries(helpers).sort((a,b)=>b[1].total-a[1].total);
                 return<div style={{display:'flex',flexDirection:'column',gap:7}}>
                   {ranked.map(it=><div key={it.name} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#475569'}}>
                     <span style={{fontSize:16}}>{['🥇','🥈','🥉'][it.rank-1]}</span>
@@ -6140,8 +6144,13 @@ window.__dataReady.then(data => {
                   </div>)}
                   {helperList.length>0&&<div style={{borderTop:'1px dashed #e2e8f0',paddingTop:6,marginTop:2}}>
                     <div style={{fontSize:11,fontWeight:700,color:'#0f766e',marginBottom:4}}>🤝 ช่วยขับรถสำรอง</div>
-                    {helperList.map(([name,n])=><div key={name} style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#475569'}}>
-                      <span style={{fontWeight:600}}>{name}</span><b style={{color:'#0f766e'}}>{fmt(n)} เที่ยว</b>
+                    {helperList.map(([name,d])=><div key={name} style={{marginBottom:4}}>
+                      <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#475569'}}>
+                        <span style={{fontWeight:600}}>{name}</span><b style={{color:'#0f766e'}}>{fmt(d.total)} เที่ยว</b>
+                      </div>
+                      {Object.entries(d.byTarget).sort((a,b)=>b[1]-a[1]).map(([target,n])=><div key={target} style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#94a3b8',paddingLeft:10}}>
+                        <span>→ {target}</span><span>{fmt(n)} เที่ยว</span>
+                      </div>)}
                     </div>)}
                   </div>}
                 </div>;
