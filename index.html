@@ -6274,16 +6274,21 @@ window.__dataReady.then(data => {
                   {dayItems.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
                     <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
                     {dayList.map(d=>{
-                      const v=dayCell(it.name,d);
+                      // แยกเที่ยวของทะเบียนตัวเอง (ownV) กับเที่ยวที่ไปช่วยขับคันอื่น (helped) ออกจากกัน
+                      // ถ้า ownV=0 แปลว่ารถคันนี้ว่าง/ไม่ได้วิ่ง (แม้เจ้าของจะไปช่วยขับคันอื่นก็ตาม) จึงยังบันทึกเหตุผลของ "คันตัวเอง" ได้เสมอ
+                      const ownV=dayRows.filter(r=>r.driver_name===it.name&&!r.helper&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
                       const helped=dayRows.filter(r=>r.helper===it.name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-                      const note=v?null:dayNoteOf(t.k,it.name,d);
-                      const clickable=!v&&canEdit;
+                      const note=ownV?null:dayNoteOf(t.k,it.name,d);
+                      const clickable=!ownV&&canEdit;
                       return<td key={d} onClick={clickable?()=>editDayNote(t.k,it.name,d):undefined}
-                        title={helped>0?`ไปช่วยขับแทน ${helped} เที่ยว`:note?note:clickable?'คลิกเพื่อบันทึกเหตุผล เช่น หยุด/รถเสีย':undefined}
-                        style={{textAlign:'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
-                        {v?<>{v}{helped>0&&<span style={{fontSize:9,color:'#0f766e'}}>🤝</span>}</>
-                          :note?<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</span>
-                          :'·'}
+                        title={[helped>0?`ไปช่วยขับแทน ${helped} เที่ยว`:null,note?`ทะเบียนตัวเอง: ${note}`:clickable?'คลิกเพื่อบันทึกเหตุผลของทะเบียนตัวเอง เช่น หยุด/รถเสีย':null].filter(Boolean).join(' · ')||undefined}
+                        style={{textAlign:'center',padding:'4px 3px',color:ownV?'#334155':note||helped?'#0f766e':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
+                        {ownV>0&&<span>{ownV}{helped>0&&<span style={{fontSize:9,color:'#0f766e'}}> 🤝{helped}</span>}</span>}
+                        {ownV===0&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
+                          {note&&<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap',color:'#dc2626'}}>{note.length>4?note.slice(0,4):note}</span>}
+                          {helped>0&&<span style={{fontSize:11,fontWeight:700,color:'#0f766e'}}>🤝{helped}</span>}
+                          {!note&&!helped&&'·'}
+                        </div>}
                       </td>;
                     })}
                     <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
