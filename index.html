@@ -4154,17 +4154,42 @@ window.__dataReady.then(data => {
             height={300} unit="m³" decimals={0} showValues={true} boxedLabels={true}/>
         </ChartCard>
       </div>
-      <div style={{marginBottom:20}}>
-        <ChartCard title={`เปอร์เซ็นต์ผลิตรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)" span="full">
-          <LineChart
-            categories={lineCats}
-            series={[
-              {label:`ปี ${thisYear}`,color:'#5a8f3c',data:thisPct},
-              ...(lastPct.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastPct,dashed:true,showLabel:true}]:[]),
-            ]}
-            height={300} unit="%" decimals={1} showValues={true} boxedLabels={true}/>
-        </ChartCard>
-      </div>
+      {(()=>{
+        const matched=lineMonthNums.map((m,i)=>({m,a:thisPct[i],b:lastPct[i]})).filter(x=>x.a!=null&&x.b!=null);
+        const avgA=matched.length?matched.reduce((s,x)=>s+x.a,0)/matched.length:null;
+        const avgB=matched.length?matched.reduce((s,x)=>s+x.b,0)/matched.length:null;
+        const avgDiff=avgA!=null&&avgB!=null?avgA-avgB:null;
+        const avgUp=avgDiff!=null&&avgDiff>=0;
+        return<div style={{marginBottom:20}}>
+          {matched.length>0&&<div style={{background:'#fff',border:'2.5px solid #5a8f3c',borderRadius:16,padding:'18px 28px',marginBottom:20,display:'flex',alignItems:'center',gap:32,flexWrap:'wrap',boxShadow:'0 2px 12px rgba(90,143,60,0.10)'}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:'#64748b',marginBottom:4}}>เฉลี่ย % ผลิต {matched.length} เดือนที่ตรงกัน ปี {thisYear}</div>
+              <span style={{fontSize:42,fontWeight:900,color:'#5a8f3c',lineHeight:1}}>{fmt(avgA,1)}</span>
+              <span style={{fontSize:18,color:'#64748b',marginLeft:6}}>%</span>
+            </div>
+            <div style={{fontSize:28,color:'#e2e8f0'}}>vs</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:'#64748b',marginBottom:4}}>เฉลี่ย % ผลิต {matched.length} เดือนที่ตรงกัน ปี {lastYear}</div>
+              <span style={{fontSize:42,fontWeight:900,color:'#94a3b8',lineHeight:1}}>{fmt(avgB,1)}</span>
+              <span style={{fontSize:18,color:'#94a3b8',marginLeft:6}}>%</span>
+            </div>
+            <div style={{borderLeft:'2px solid #f1f5f9',paddingLeft:28}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#64748b',marginBottom:4}}>ส่วนต่าง</div>
+              <span style={{fontSize:36,fontWeight:900,color:avgUp?'#3f7d2b':'#c0392b'}}>{avgUp?'▲':'▼'} {fmt(Math.abs(avgDiff),1)}</span>
+              <span style={{fontSize:16,color:'#64748b',marginLeft:6}}>จุด %</span>
+            </div>
+          </div>}
+          <ChartCard title={`เปอร์เซ็นต์ผลิตรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle="เปอร์เซ็นต์การผลิตได้จริง (เกณฑ์กำลังผลิต)" span="full">
+            <LineChart
+              categories={lineCats}
+              series={[
+                {label:`ปี ${thisYear}`,color:'#5a8f3c',data:thisPct},
+                ...(lastPct.some(v=>v!=null)?[{label:`ปี ${lastYear}`,color:PALETTE.prev,data:lastPct,dashed:true,showLabel:true}]:[]),
+              ]}
+              height={300} unit="%" decimals={1} showValues={true} boxedLabels={true}/>
+          </ChartCard>
+        </div>;
+      })()}
       <ChartCard title="ตารางข้อมูลรายเดือน" subtitle={`ปี ${thisYear} เทียบ ปี ${lastYear}`} span="full">
         <div style={{overflowX:'auto'}}>
           <table className="tbl" style={{width:'100%',fontSize:13}}>
