@@ -4129,6 +4129,16 @@ window.__dataReady.then(data => {
           <div style={{marginBottom:20}}>
             <ChartCard title={`ยอดสะสมคิวผลิตรายเดือน — ปี ${thisYear} เทียบ ปี ${lastYear}`} subtitle={`สะสมตั้งแต่ ม.ค. ถึง ${THAI_M[cur.m-1]} • หน่วย: m³`} span="full">
               <LineChart categories={cumCats} series={[{label:`ปี ${thisYear}`,color:PALETTE.produced,data:cumThis},{label:`ปี ${lastYear}`,color:PALETTE.prev,data:cumLast,dashed:true,showLabel:true}]} height={280} unit="m³" decimals={0} showValues={true} boxedLabels={true}/>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:14,paddingTop:14,borderTop:'1px solid #f1f5f9'}}>
+                {cumCats.map((label,i)=>{
+                  const a=cumThis[i],b=cumLast[i],pct=b>0?(a-b)/b*100:null;
+                  const up=pct!=null&&pct>=0;
+                  return<div key={label} style={{flex:'1 1 90px',textAlign:'center',padding:'6px 4px',borderRadius:8,background:pct==null?'#f8fafc':up?'#eef7ea':'#fdeeee'}}>
+                    <div style={{fontSize:11,color:'#94a3b8',fontWeight:600}}>{label}</div>
+                    <div style={{fontSize:14,fontWeight:800,color:pct==null?'#94a3b8':up?'#3f7d2b':'#c0392b'}}>{pct==null?'–':`${up?'+':''}${fmt(pct,1)}%`}</div>
+                  </div>;
+                })}
+              </div>
             </ChartCard>
           </div>
         </>;
