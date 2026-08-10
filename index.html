@@ -2261,19 +2261,19 @@ window.__dataReady.then(data => {
             <button onClick={()=>setYoyMode(false)} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${!yoyMode?'#2f5fd0':'#e2e8f0'}`,background:!yoyMode?'#2f5fd0':'#fff',color:!yoyMode?'#fff':'#64748b',fontSize:12,fontWeight:700,cursor:'pointer'}}>รายเดือน</button>
             <button onClick={()=>setYoyMode(true)} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${yoyMode?'#2f5fd0':'#e2e8f0'}`,background:yoyMode?'#2f5fd0':'#fff',color:yoyMode?'#fff':'#64748b',fontSize:12,fontWeight:700,cursor:'pointer'}}>เทียบปีต่อปี</button>
           </div>
-          <div className="table-wrap" style={{overflowX:'auto'}}>
+          <div className="table-wrap" style={{overflow:'auto',maxHeight:'70vh'}}>
           <table className="dt" style={{fontSize:'12px',minWidth:'800px',borderCollapse:'collapse'}}>
             <thead>
               <tr style={{background:'#f5f5f5'}}>
-                <th className="ta-l" style={{minWidth:'180px',position:'sticky',left:0,background:'#f5f5f5',zIndex:2}}>รายการ</th>
-                {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',
+                <th className="ta-l" style={{minWidth:'180px',position:'sticky',left:0,top:0,background:'#f5f5f5',zIndex:3}}>รายการ</th>
+                {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',position:'sticky',top:0,zIndex:2,
                   background:(c.type==='year'||c.type==='yearAny')?'#d9ead3':c.type==='prevYear'?'#fce5cd':'#f5f5f5',
                   color:c.type==='prevYear'?'#b45f06':'inherit',
                   borderLeft:'1px solid #ddd',minWidth:'100px'}}>{c.label}</th>)}
               </tr>
               <tr style={{background:'#fafafa',fontSize:'10px',color:'var(--muted-text)'}}>
-                <th style={{position:'sticky',left:0,background:'#fafafa',zIndex:2}}></th>
-                {cols.map((c,i)=><React.Fragment key={i}><th style={{textAlign:'right',borderLeft:'1px solid #ddd'}}>บาท</th><th style={{textAlign:'right'}}>%</th></React.Fragment>)}
+                <th style={{position:'sticky',left:0,top:'25px',background:'#fafafa',zIndex:3}}></th>
+                {cols.map((c,i)=><React.Fragment key={i}><th style={{textAlign:'right',borderLeft:'1px solid #ddd',position:'sticky',top:'25px',background:'#fafafa',zIndex:2}}>บาท</th><th style={{textAlign:'right',position:'sticky',top:'25px',background:'#fafafa',zIndex:2}}>%</th></React.Fragment>)}
               </tr>
             </thead>
             <tbody>
