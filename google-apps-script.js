@@ -492,6 +492,8 @@ function onOpen() {
     .addItem('🔄 Sync ทันที', 'syncAll')
     .addItem('📋 ดู Log', 'showLog')
     .addToUi();
+
+  buildMonthMenu();
 }
 
 // รวมคอลัมน์ G (ประเภทเสียหาย) เข้า H (สาเหตุ) — รันครั้งเดียว
@@ -1042,3 +1044,98 @@ function syncPendingWork(ss) {
   if (data.length > 0) insertInBatches('pending_work', data, 200);
   Logger.log('✅ pending_work: ' + data.length + ' แถว');
 }
+
+// ============================================================
+// เมนู 📅 เลือกเดือน — กรองแถวในชีทที่เปิดอยู่
+// รองรับ 2 รูปแบบคอลัมน์ A:
+//   แบบ A: A = ปี (2568) และ B = เดือน (1-12)   → แท็บ รายเดือน
+//   แบบ B: A = "มกราคม 2568"                     → แท็บ REB-ROB / ID
+// แถวที่ A ว่าง = ใช้เดือนของแถวก่อนหน้า
+// ไม่เกี่ยวข้องกับส่วน Sync ใดๆ
+// ============================================================
+
+var MONTH_MENU_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                     'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+// อ่านคีย์เดือน "2568-01" ของทุกแถว
+function readMonthKeys(sh) {
+  var n = sh.getLastRow() - 1;
+  if (n < 1) return [];
+  var vals = sh.getRange(2, 1, n, 2).getValues();
+  var keys = [], last = '';
+  for (var i = 0; i < n; i++) {
+    var a = vals[i][0], b = vals[i][1], key = '';
+
+    if (typeof a === 'number' && typeof b === 'number' && a > 2400 && b >= 1 && b <= 12) {
+      key = a + '-' + (b < 10 ? '0' + b : b);
+    } else if (a) {
+      var parsed = parseThaiMonthYear(a);
+      if (parsed && parsed.year && parsed.month) {
+        key = parsed.year + '-' + (parsed.month < 10 ? '0' + parsed.month : parsed.month);
+      }
+    }
+
+    if (key) last = key;
+    keys.push(last);
+  }
+  return keys;
+}
+
+function fmtMonthKey(key) {
+  var p = key.split('-');
+  return MONTH_MENU_TH[parseInt(p[1], 10)] + ' ' + p[0];
+}
+
+function buildMonthMenu() {
+  var ui = SpreadsheetApp.getUi();
+  var menu = ui.createMenu('📅 เลือกเดือน');
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+  if (sh && sh.getLastRow() > 1) {
+    var seen = {};
+    readMonthKeys(sh).forEach(function(k) { if (k) seen[k] = true; });
+    Object.keys(seen).sort().reverse().forEach(function(k) {
+      var p = k.split('-');
+      menu.addItem(fmtMonthKey(k), 'showM_' + p[0] + '_' + p[1]);
+    });
+  }
+
+  menu.addSeparator();
+  menu.addItem('✅ แสดงทั้งหมด', 'monthShowAll');
+  menu.addItem('🔒 แค่เดือนล่าสุด', 'monthShowLatest');
+  menu.addToUi();
+}
+
+function filterMonthKey(key) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (!sh || sh.getLastRow() <= 1) return;
+  var keys = readMonthKeys(sh);
+  for (var i = 0; i < keys.length; i++) {
+    if (keys[i] === key) sh.showRows(i + 2, 1);
+    else sh.hideRows(i + 2, 1);
+  }
+}
+
+function monthShowAll() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sh && sh.getLastRow() > 1) sh.showRows(2, sh.getLastRow() - 1);
+}
+
+function monthShowLatest() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (!sh || sh.getLastRow() <= 1) return;
+  var latest = '';
+  readMonthKeys(sh).forEach(function(k) { if (k && k > latest) latest = k; });
+  if (!latest) { SpreadsheetApp.getUi().alert('ไม่พบข้อมูลเดือนในคอลัมน์ A'); return; }
+  filterMonthKey(latest);
+  SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะ ' + fmtMonthKey(latest));
+}
+
+ function showM_2565_01(){filterMonthKey('2565-01');} function showM_2565_02(){filterMonthKey('2565-02');} function showM_2565_03(){filterMonthKey('2565-03');} function showM_2565_04(){filterMonthKey('2565-04');} function showM_2565_05(){filterMonthKey('2565-05');} function showM_2565_06(){filterMonthKey('2565-06');} function showM_2565_07(){filterMonthKey('2565-07');} function showM_2565_08(){filterMonthKey('2565-08');} function showM_2565_09(){filterMonthKey('2565-09');} function showM_2565_10(){filterMonthKey('2565-10');} function showM_2565_11(){filterMonthKey('2565-11');} function showM_2565_12(){filterMonthKey('2565-12');}
+ function showM_2566_01(){filterMonthKey('2566-01');} function showM_2566_02(){filterMonthKey('2566-02');} function showM_2566_03(){filterMonthKey('2566-03');} function showM_2566_04(){filterMonthKey('2566-04');} function showM_2566_05(){filterMonthKey('2566-05');} function showM_2566_06(){filterMonthKey('2566-06');} function showM_2566_07(){filterMonthKey('2566-07');} function showM_2566_08(){filterMonthKey('2566-08');} function showM_2566_09(){filterMonthKey('2566-09');} function showM_2566_10(){filterMonthKey('2566-10');} function showM_2566_11(){filterMonthKey('2566-11');} function showM_2566_12(){filterMonthKey('2566-12');}
+ function showM_2567_01(){filterMonthKey('2567-01');} function showM_2567_02(){filterMonthKey('2567-02');} function showM_2567_03(){filterMonthKey('2567-03');} function showM_2567_04(){filterMonthKey('2567-04');} function showM_2567_05(){filterMonthKey('2567-05');} function showM_2567_06(){filterMonthKey('2567-06');} function showM_2567_07(){filterMonthKey('2567-07');} function showM_2567_08(){filterMonthKey('2567-08');} function showM_2567_09(){filterMonthKey('2567-09');} function showM_2567_10(){filterMonthKey('2567-10');} function showM_2567_11(){filterMonthKey('2567-11');} function showM_2567_12(){filterMonthKey('2567-12');}
+ function showM_2568_01(){filterMonthKey('2568-01');} function showM_2568_02(){filterMonthKey('2568-02');} function showM_2568_03(){filterMonthKey('2568-03');} function showM_2568_04(){filterMonthKey('2568-04');} function showM_2568_05(){filterMonthKey('2568-05');} function showM_2568_06(){filterMonthKey('2568-06');} function showM_2568_07(){filterMonthKey('2568-07');} function showM_2568_08(){filterMonthKey('2568-08');} function showM_2568_09(){filterMonthKey('2568-09');} function showM_2568_10(){filterMonthKey('2568-10');} function showM_2568_11(){filterMonthKey('2568-11');} function showM_2568_12(){filterMonthKey('2568-12');}
+ function showM_2569_01(){filterMonthKey('2569-01');} function showM_2569_02(){filterMonthKey('2569-02');} function showM_2569_03(){filterMonthKey('2569-03');} function showM_2569_04(){filterMonthKey('2569-04');} function showM_2569_05(){filterMonthKey('2569-05');} function showM_2569_06(){filterMonthKey('2569-06');} function showM_2569_07(){filterMonthKey('2569-07');} function showM_2569_08(){filterMonthKey('2569-08');} function showM_2569_09(){filterMonthKey('2569-09');} function showM_2569_10(){filterMonthKey('2569-10');} function showM_2569_11(){filterMonthKey('2569-11');} function showM_2569_12(){filterMonthKey('2569-12');}
+ function showM_2570_01(){filterMonthKey('2570-01');} function showM_2570_02(){filterMonthKey('2570-02');} function showM_2570_03(){filterMonthKey('2570-03');} function showM_2570_04(){filterMonthKey('2570-04');} function showM_2570_05(){filterMonthKey('2570-05');} function showM_2570_06(){filterMonthKey('2570-06');} function showM_2570_07(){filterMonthKey('2570-07');} function showM_2570_08(){filterMonthKey('2570-08');} function showM_2570_09(){filterMonthKey('2570-09');} function showM_2570_10(){filterMonthKey('2570-10');} function showM_2570_11(){filterMonthKey('2570-11');} function showM_2570_12(){filterMonthKey('2570-12');}
+ function showM_2571_01(){filterMonthKey('2571-01');} function showM_2571_02(){filterMonthKey('2571-02');} function showM_2571_03(){filterMonthKey('2571-03');} function showM_2571_04(){filterMonthKey('2571-04');} function showM_2571_05(){filterMonthKey('2571-05');} function showM_2571_06(){filterMonthKey('2571-06');} function showM_2571_07(){filterMonthKey('2571-07');} function showM_2571_08(){filterMonthKey('2571-08');} function showM_2571_09(){filterMonthKey('2571-09');} function showM_2571_10(){filterMonthKey('2571-10');} function showM_2571_11(){filterMonthKey('2571-11');} function showM_2571_12(){filterMonthKey('2571-12');}
+ function showM_2572_01(){filterMonthKey('2572-01');} function showM_2572_02(){filterMonthKey('2572-02');} function showM_2572_03(){filterMonthKey('2572-03');} function showM_2572_04(){filterMonthKey('2572-04');} function showM_2572_05(){filterMonthKey('2572-05');} function showM_2572_06(){filterMonthKey('2572-06');} function showM_2572_07(){filterMonthKey('2572-07');} function showM_2572_08(){filterMonthKey('2572-08');} function showM_2572_09(){filterMonthKey('2572-09');} function showM_2572_10(){filterMonthKey('2572-10');} function showM_2572_11(){filterMonthKey('2572-11');} function showM_2572_12(){filterMonthKey('2572-12');}
