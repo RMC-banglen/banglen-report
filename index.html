@@ -3219,6 +3219,339 @@ window.__dataReady.then(data => {
           </ChartCard>
         </>;
       })()}
+
+      <SandFMSection/>
+    </div>;
+  }
+
+  // ============================================================
+  // ขนาดคละทราย + ค่า FM (Fineness Modulus) — ASTM C33 / C136
+  // ============================================================
+  const FM_SIEVES=[
+    {key:'w9_5', label:'3/8″',  mm:'9.5 mm',   lo:100, hi:100},
+    {key:'w4_75',label:'เบอร์ 4',  mm:'4.75 mm',  lo:95,  hi:100},
+    {key:'w2_36',label:'เบอร์ 8',  mm:'2.36 mm',  lo:80,  hi:100},
+    {key:'w1_18',label:'เบอร์ 16', mm:'1.18 mm',  lo:50,  hi:85},
+    {key:'w0_60',label:'เบอร์ 30', mm:'0.60 mm',  lo:25,  hi:60},
+    {key:'w0_30',label:'เบอร์ 50', mm:'0.30 mm',  lo:5,   hi:30},
+    {key:'w0_15',label:'เบอร์ 100',mm:'0.15 mm',  lo:0,   hi:10},
+  ];
+  const FM_MIN=2.3, FM_MAX=3.1;
+
+  // คำนวณ %ค้างสะสม, %ผ่าน และ FM จากน้ำหนักค้างตะแกรง (กรัม)
+  function calcFM(w){
+    const wts=FM_SIEVES.map(s=>Number(w[s.key])||0);
+    const pan=Number(w.w_pan)||0;
+    const total=wts.reduce((a,b)=>a+b,0)+pan;
+    if(!total) return {total:0,rows:FM_SIEVES.map(s=>({...s,wt:0,ret:0,cum:0,pass:100})),fm:null,pan};
+    let cum=0;
+    const rows=FM_SIEVES.map((s,i)=>{
+      const ret=wts[i]/total*100;
+      cum+=ret;
+      return {...s,wt:wts[i],ret,cum,pass:100-cum};
+    });
+    const fm=rows.reduce((a,r)=>a+r.cum,0)/100;
+    return {total,rows,fm,pan};
+  }
+
+  function SandFMSection(){
+    const db=DB;
+    const [tests,setTests]=useState([]);
+    const [loading,setLoading]=useState(true);
+    const [showForm,setShowForm]=useState(false);
+    const [saving,setSaving]=useState(false);
+    const [editId,setEditId]=useState(null);
+    const [selId,setSelId]=useState(null);
+    const [msg,setMsg]=useState('');
+    const blank={test_date:new Date().toISOString().slice(0,10),sand_source:'',w9_5:'',w4_75:'',w2_36:'',w1_18:'',w0_60:'',w0_30:'',w0_15:'',w_pan:'',note:''};
+    const [form,setForm]=useState(blank);
+
+    const load=()=>{
+      db.from('sand_fm_tests').select('*').order('test_date',{ascending:false}).limit(200)
+        .then(({data})=>{
+          const rows=data||[];
+          setTests(rows);
+          if(rows.length&&selId==null) setSelId(rows[0].id);
+          setLoading(false);
+        }).catch(()=>setLoading(false));
+    };
+    useEffect(load,[]);
+
+    const live=calcFM(form);
+
+    const save=()=>{
+      if(!form.test_date){setMsg('❌ กรุณาใส่วันที่ทดสอบ');return;}
+      if(!live.total){setMsg('❌ กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
+      setSaving(true); setMsg('');
+      const rec={
+        test_date:form.test_date, sand_source:form.sand_source||'', note:form.note||'',
+        fm: live.fm!=null?Math.round(live.fm*100)/100:null
+      };
+      FM_SIEVES.forEach(s=>{rec[s.key]=Number(form[s.key])||0;});
+      rec.w_pan=Number(form.w_pan)||0;
+      const q=editId? db.from('sand_fm_tests').update(rec).eq('id',editId)
+                    : db.from('sand_fm_tests').insert([rec]);
+      q.then(({error})=>{
+        setSaving(false);
+        if(error){setMsg('❌ '+error.message);return;}
+        setMsg('✅ บันทึกแล้ว'); setShowForm(false); setEditId(null); setForm(blank); load();
+      });
+    };
+
+    const openNew =()=>{setForm(blank);setEditId(null);setMsg('');setShowForm(true);};
+    const openEdit=t=>{
+      const f={...blank,test_date:String(t.test_date||'').slice(0,10),sand_source:t.sand_source||'',note:t.note||''};
+      FM_SIEVES.forEach(s=>{f[s.key]=t[s.key]??'';});
+      f.w_pan=t.w_pan??'';
+      setForm(f);setEditId(t.id);setMsg('');setShowForm(true);
+    };
+    const del=t=>{
+      if(!window.confirm('ลบผลทดสอบวันที่ '+String(t.test_date).slice(0,10)+' ?'))return;
+      db.from('sand_fm_tests').delete().eq('id',t.id).then(()=>{if(selId===t.id)setSelId(null);load();});
+    };
+
+    const sel=tests.find(t=>t.id===selId)||tests[0]||null;
+    const selCalc=sel?calcFM(sel):null;
+    const fmVal=sel?.fm!=null?Number(sel.fm):selCalc?.fm;
+    const fmOK=fmVal!=null&&fmVal>=FM_MIN&&fmVal<=FM_MAX;
+
+    const inp={padding:'8px 10px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:15,width:'100%',fontFamily:'inherit'};
+    const lbl={fontSize:13,color:'#5f6470',marginBottom:4,fontWeight:600};
+    const btn=(bg,fg)=>({padding:'9px 18px',borderRadius:8,border:'none',background:bg,color:fg,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'});
+
+    return <>
+      <ChartCard span="wide"
+        title="ขนาดคละทราย & ค่าโมดูลัสความละเอียด (FM)"
+        subtitle={`เกณฑ์ ASTM C33 • FM ที่ยอมรับได้ ${FM_MIN}–${FM_MAX}`}
+        right={<button style={btn('#1a56db','#fff')} onClick={openNew}>+ บันทึกผลทดสอบ</button>}>
+
+        {loading? <div style={{padding:24,color:'#888'}}>กำลังโหลด…</div>
+        : tests.length===0? <div style={{padding:24,color:'#888',fontSize:15}}>ยังไม่มีข้อมูล — กด “+ บันทึกผลทดสอบ” เพื่อเริ่มบันทึก</div>
+        : <>
+          {/* เลือกครั้งที่ทดสอบ */}
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+            {tests.slice(0,12).map(t=>{
+              const v=t.fm!=null?Number(t.fm):calcFM(t).fm;
+              const ok=v!=null&&v>=FM_MIN&&v<=FM_MAX;
+              const on=t.id===sel?.id;
+              return <button key={t.id} onClick={()=>setSelId(t.id)}
+                style={{padding:'7px 13px',borderRadius:8,fontSize:14,cursor:'pointer',fontFamily:'inherit',
+                  border:on?'2px solid #1a56db':'1px solid #d6d8e0',
+                  background:on?'#eaf1fe':'#fff',fontWeight:on?700:500,color:'#333'}}>
+                {String(t.test_date).slice(0,10)}
+                <span style={{marginLeft:7,color:ok?'#059669':'#d13438',fontWeight:700}}>FM {v!=null?v.toFixed(2):'–'}</span>
+              </button>;
+            })}
+          </div>
+
+          {sel&&<>
+            {/* KPI */}
+            <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
+              <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px',background:fmOK?'#f2fbf6':'#fdf2f2'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ค่า FM</div>
+                <div style={{fontSize:32,fontWeight:800,color:fmOK?'#059669':'#d13438',lineHeight:1.1}}>{fmVal!=null?fmVal.toFixed(2):'–'}</div>
+                <div style={{fontSize:13,marginTop:4,color:fmOK?'#059669':'#d13438',fontWeight:600}}>
+                  {fmVal==null?'':fmOK?'✓ อยู่ในเกณฑ์ '+FM_MIN+'–'+FM_MAX:(fmVal<FM_MIN?'✗ ทรายละเอียดเกินไป':'✗ ทรายหยาบเกินไป')}
+                </div>
+              </div>
+              <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>น้ำหนักตัวอย่างรวม</div>
+                <div style={{fontSize:32,fontWeight:800,color:'#1a56db',lineHeight:1.1}}>{selCalc.total.toFixed(0)}<span style={{fontSize:16,fontWeight:600,marginLeft:4}}>g</span></div>
+                <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>ค้างถาดล่าง {selCalc.pan.toFixed(0)} g</div>
+              </div>
+              <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ผ่านเกณฑ์ขนาดคละ</div>
+                {(()=>{
+                  const bad=selCalc.rows.filter(r=>r.pass<r.lo-0.05||r.pass>r.hi+0.05);
+                  return <>
+                    <div style={{fontSize:32,fontWeight:800,color:bad.length?'#d13438':'#059669',lineHeight:1.1}}>{selCalc.rows.length-bad.length}<span style={{fontSize:16,fontWeight:600}}>/{selCalc.rows.length}</span></div>
+                    <div style={{fontSize:13,marginTop:4,color:bad.length?'#d13438':'#059669',fontWeight:600}}>
+                      {bad.length?'หลุดเกณฑ์: '+bad.map(b=>b.label).join(', '):'✓ ทุกตะแกรงอยู่ในเกณฑ์'}
+                    </div>
+                  </>;
+                })()}
+              </div>
+              {sel.sand_source&&<div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>แหล่งทราย</div>
+                <div style={{fontSize:19,fontWeight:700,color:'#333',lineHeight:1.3}}>{sel.sand_source}</div>
+              </div>}
+            </div>
+
+            {/* กราฟขนาดคละ */}
+            <GradationChart rows={selCalc.rows}/>
+
+            {/* ตารางผล */}
+            <div style={{overflowX:'auto',marginTop:18}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                <thead>
+                  <tr style={{background:'#f4f6fa'}}>
+                    {['ตะแกรง','ขนาด','น้ำหนักค้าง (g)','% ค้าง','% ค้างสะสม','% ผ่าน','เกณฑ์ ASTM C33','ผล'].map(h=>
+                      <th key={h} style={{padding:'9px 11px',textAlign:'left',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap'}}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {selCalc.rows.map(r=>{
+                    const ok=r.pass>=r.lo-0.05&&r.pass<=r.hi+0.05;
+                    return <tr key={r.key} style={{borderBottom:'1px solid #eef0f5'}}>
+                      <td style={{padding:'8px 11px',fontWeight:600}}>{r.label}</td>
+                      <td style={{padding:'8px 11px',color:'#6b7280'}}>{r.mm}</td>
+                      <td style={{padding:'8px 11px'}}>{r.wt.toFixed(0)}</td>
+                      <td style={{padding:'8px 11px'}}>{r.ret.toFixed(1)}</td>
+                      <td style={{padding:'8px 11px'}}>{r.cum.toFixed(1)}</td>
+                      <td style={{padding:'8px 11px',fontWeight:700}}>{r.pass.toFixed(1)}</td>
+                      <td style={{padding:'8px 11px',color:'#6b7280'}}>{r.lo===r.hi?r.lo:r.lo+'–'+r.hi}</td>
+                      <td style={{padding:'8px 11px',fontWeight:700,color:ok?'#059669':'#d13438'}}>{ok?'✓ ผ่าน':'✗ หลุด'}</td>
+                    </tr>;
+                  })}
+                  <tr style={{borderBottom:'1px solid #eef0f5',background:'#fafbfd'}}>
+                    <td style={{padding:'8px 11px',fontWeight:600}}>ถาดล่าง (Pan)</td>
+                    <td style={{padding:'8px 11px',color:'#6b7280'}}>&lt; 0.15 mm</td>
+                    <td style={{padding:'8px 11px'}}>{selCalc.pan.toFixed(0)}</td>
+                    <td colSpan={5} style={{padding:'8px 11px',color:'#6b7280'}}>ไม่นำมาคำนวณ FM</td>
+                  </tr>
+                  <tr style={{background:'#f4f6fa'}}>
+                    <td colSpan={4} style={{padding:'10px 11px',fontWeight:700}}>ผลรวม % ค้างสะสม</td>
+                    <td style={{padding:'10px 11px',fontWeight:800,color:'#1a56db'}}>{(selCalc.rows.reduce((a,r)=>a+r.cum,0)).toFixed(1)}</td>
+                    <td colSpan={2} style={{padding:'10px 11px',fontWeight:700}}>FM = ผลรวม ÷ 100</td>
+                    <td style={{padding:'10px 11px',fontWeight:800,color:fmOK?'#059669':'#d13438'}}>{fmVal!=null?fmVal.toFixed(2):'–'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {sel.note&&<div style={{marginTop:12,fontSize:14,color:'#42465a',background:'#f7f8fb',border:'1px solid #e6e8ee',borderRadius:8,padding:'10px 14px'}}>
+              <b>หมายเหตุ:</b> {sel.note}
+            </div>}
+
+            <div style={{marginTop:14,display:'flex',gap:9}}>
+              <button style={btn('#f0f2f7','#42465a')} onClick={()=>openEdit(sel)}>✏️ แก้ไข</button>
+              <button style={btn('#fdeced','#d13438')} onClick={()=>del(sel)}>🗑️ ลบ</button>
+            </div>
+          </>}
+        </>}
+      </ChartCard>
+
+      {/* แนวโน้ม FM */}
+      {tests.length>1&&<ChartCard span="wide" title="แนวโน้มค่า FM" subtitle={`เส้นประ = ขอบเกณฑ์ ${FM_MIN} และ ${FM_MAX}`}>
+        <LineChart
+          categories={[...tests].reverse().map(t=>String(t.test_date).slice(5,10))}
+          unit="" decimals={2} yMin={1.8} yMax={3.6} showValues
+          series={[{label:'FM',color:'#1a56db',data:[...tests].reverse().map(t=>t.fm!=null?Number(t.fm):calcFM(t).fm)}]}
+          targets={[{value:FM_MAX,color:'#d13438',label:'สูงสุด '+FM_MAX},{value:FM_MIN,color:'#d13438',label:'ต่ำสุด '+FM_MIN}]}
+          height={260} padRight={110}/>
+      </ChartCard>}
+
+      {/* ฟอร์มบันทึก */}
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(20,22,30,.55)',zIndex:9999,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'32px 16px',overflowY:'auto'}}>
+        <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:760,padding:26,boxShadow:'0 18px 50px rgba(0,0,0,.28)'}}>
+          <h3 style={{margin:'0 0 4px',fontSize:22,fontWeight:800,color:'#22252e'}}>{editId?'แก้ไขผลทดสอบขนาดคละทราย':'บันทึกผลทดสอบขนาดคละทราย'}</h3>
+          <p style={{margin:'0 0 20px',fontSize:14,color:'#6b7280'}}>ใส่น้ำหนักทรายที่ค้างบนแต่ละตะแกรง (กรัม) — ระบบคำนวณ FM ให้อัตโนมัติ</p>
+
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:18}}>
+            <div><div style={lbl}>วันที่ทดสอบ *</div>
+              <input type="date" style={inp} value={form.test_date} onChange={e=>setForm({...form,test_date:e.target.value})}/></div>
+            <div><div style={lbl}>แหล่งทราย / ผู้ขาย</div>
+              <input style={inp} placeholder="เช่น ทรายแม่น้ำ นครชัยศรี" value={form.sand_source} onChange={e=>setForm({...form,sand_source:e.target.value})}/></div>
+          </div>
+
+          <div style={{border:'1px solid #e6e8ee',borderRadius:12,overflow:'hidden',marginBottom:18}}>
+            <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr',gap:0,background:'#f4f6fa',padding:'9px 12px',fontSize:13,fontWeight:700,color:'#42465a'}}>
+              <div>ตะแกรง</div><div>น้ำหนักค้าง (g)</div><div style={{textAlign:'right'}}>% ค้างสะสม</div><div style={{textAlign:'right'}}>% ผ่าน</div><div style={{textAlign:'right'}}>เกณฑ์</div>
+            </div>
+            {FM_SIEVES.map((s,i)=>{
+              const r=live.rows[i];
+              const ok=live.total>0&&r.pass>=r.lo-0.05&&r.pass<=r.hi+0.05;
+              return <div key={s.key} style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr',gap:0,alignItems:'center',padding:'7px 12px',borderTop:'1px solid #eef0f5'}}>
+                <div style={{fontSize:14,fontWeight:600}}>{s.label} <span style={{color:'#9aa0ac',fontWeight:400,fontSize:13}}>({s.mm})</span></div>
+                <div style={{paddingRight:10}}>
+                  <input type="number" step="0.1" min="0" style={{...inp,padding:'6px 9px',fontSize:14}}
+                    value={form[s.key]} onChange={e=>setForm({...form,[s.key]:e.target.value})}/>
+                </div>
+                <div style={{textAlign:'right',fontSize:14,color:'#6b7280'}}>{live.total?r.cum.toFixed(1):'–'}</div>
+                <div style={{textAlign:'right',fontSize:14,fontWeight:700,color:live.total?(ok?'#059669':'#d13438'):'#9aa0ac'}}>{live.total?r.pass.toFixed(1):'–'}</div>
+                <div style={{textAlign:'right',fontSize:13,color:'#9aa0ac'}}>{s.lo===s.hi?s.lo:s.lo+'–'+s.hi}</div>
+              </div>;
+            })}
+            <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr',gap:0,alignItems:'center',padding:'7px 12px',borderTop:'1px solid #eef0f5',background:'#fafbfd'}}>
+              <div style={{fontSize:14,fontWeight:600}}>ถาดล่าง (Pan)</div>
+              <div style={{paddingRight:10}}>
+                <input type="number" step="0.1" min="0" style={{...inp,padding:'6px 9px',fontSize:14}}
+                  value={form.w_pan} onChange={e=>setForm({...form,w_pan:e.target.value})}/>
+              </div>
+              <div style={{gridColumn:'3 / span 3',textAlign:'right',fontSize:13,color:'#9aa0ac'}}>ไม่นำมาคำนวณ FM</div>
+            </div>
+          </div>
+
+          <div style={{display:'flex',gap:16,alignItems:'center',padding:'14px 18px',borderRadius:12,marginBottom:18,
+            background:live.fm==null?'#f7f8fb':(live.fm>=FM_MIN&&live.fm<=FM_MAX?'#f2fbf6':'#fdf2f2'),
+            border:'1px solid '+(live.fm==null?'#e6e8ee':(live.fm>=FM_MIN&&live.fm<=FM_MAX?'#bfe6d2':'#f5c6c6'))}}>
+            <div>
+              <div style={{fontSize:13,color:'#5f6470'}}>ค่า FM ที่คำนวณได้</div>
+              <div style={{fontSize:34,fontWeight:800,lineHeight:1.1,
+                color:live.fm==null?'#9aa0ac':(live.fm>=FM_MIN&&live.fm<=FM_MAX?'#059669':'#d13438')}}>
+                {live.fm!=null?live.fm.toFixed(2):'–'}</div>
+            </div>
+            <div style={{fontSize:14,color:'#42465a',lineHeight:1.6}}>
+              น้ำหนักรวม <b>{live.total.toFixed(0)} g</b><br/>
+              {live.fm==null?'ใส่น้ำหนักเพื่อคำนวณ'
+                :live.fm<FM_MIN?'ทรายละเอียดเกินไป — ใช้น้ำ/ปูนมากขึ้น'
+                :live.fm>FM_MAX?'ทรายหยาบเกินไป — คอนกรีตอาจแยกตัว'
+                :'อยู่ในเกณฑ์ '+FM_MIN+'–'+FM_MAX+' ✓'}
+            </div>
+          </div>
+
+          <div style={{marginBottom:18}}>
+            <div style={lbl}>หมายเหตุ</div>
+            <textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
+          </div>
+
+          {msg&&<div style={{marginBottom:14,fontSize:15,fontWeight:600,color:msg[0]==='✅'?'#059669':'#d13438'}}>{msg}</div>}
+
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button style={btn('#f0f2f7','#42465a')} onClick={()=>{setShowForm(false);setEditId(null);setMsg('');}}>ยกเลิก</button>
+            <button style={btn('#1a56db','#fff')} disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+    </>;
+  }
+
+  // กราฟเส้นโค้งขนาดคละ (% ผ่าน) พร้อมแถบเกณฑ์ ASTM C33
+  function GradationChart({rows}){
+    const W=760,H=330,ml=54,mr=20,mt=16,mb=52;
+    const iw=W-ml-mr, ih=H-mt-mb;
+    const n=rows.length;
+    const x=i=>ml+(n===1?iw/2:i*iw/(n-1));
+    const y=v=>mt+ih-(v/100)*ih;
+    const band=rows.map((r,i)=>`${x(i)},${y(r.hi)}`).join(' ')+' '+
+               rows.map((r,i)=>`${x(n-1-i)},${y(rows[n-1-i].lo)}`).join(' ');
+    const line=rows.map((r,i)=>`${x(i)},${y(r.pass)}`).join(' ');
+    return <div style={{overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',minWidth:600,height:'auto',display:'block'}}>
+        {[0,20,40,60,80,100].map(v=><g key={v}>
+          <line x1={ml} x2={W-mr} y1={y(v)} y2={y(v)} stroke="#eceef4"/>
+          <text x={ml-9} y={y(v)+4} textAnchor="end" fontSize="12" fill="#8b91a1">{v}</text>
+        </g>)}
+        <polygon points={band} fill="#1a56db" opacity=".10"/>
+        <polyline points={rows.map((r,i)=>`${x(i)},${y(r.hi)}`).join(' ')} fill="none" stroke="#94a7d8" strokeWidth="1.5" strokeDasharray="5 4"/>
+        <polyline points={rows.map((r,i)=>`${x(i)},${y(r.lo)}`).join(' ')} fill="none" stroke="#94a7d8" strokeWidth="1.5" strokeDasharray="5 4"/>
+        <polyline points={line} fill="none" stroke="#1a56db" strokeWidth="2.6" strokeLinejoin="round"/>
+        {rows.map((r,i)=>{
+          const ok=r.pass>=r.lo-0.05&&r.pass<=r.hi+0.05;
+          return <g key={r.key}>
+            <circle cx={x(i)} cy={y(r.pass)} r="5.5" fill={ok?'#1a56db':'#d13438'} stroke="#fff" strokeWidth="2"/>
+            <text x={x(i)} y={y(r.pass)-12} textAnchor="middle" fontSize="12" fontWeight="700" fill={ok?'#1a56db':'#d13438'}>{r.pass.toFixed(0)}</text>
+            <text x={x(i)} y={H-30} textAnchor="middle" fontSize="12.5" fontWeight="600" fill="#42465a">{r.label}</text>
+            <text x={x(i)} y={H-14} textAnchor="middle" fontSize="11.5" fill="#9aa0ac">{r.mm}</text>
+          </g>;
+        })}
+        <text x={14} y={mt+ih/2} textAnchor="middle" fontSize="12.5" fill="#6b7280" transform={`rotate(-90 14 ${mt+ih/2})`}>% ผ่านตะแกรง</text>
+      </svg>
+      <div style={{display:'flex',gap:20,justifyContent:'center',marginTop:6,fontSize:13.5,color:'#5f6470',flexWrap:'wrap'}}>
+        <span><span style={{display:'inline-block',width:22,height:3,background:'#1a56db',verticalAlign:'middle',marginRight:7,borderRadius:2}}></span>ทรายที่ทดสอบ</span>
+        <span><span style={{display:'inline-block',width:22,height:11,background:'#1a56db',opacity:.16,verticalAlign:'middle',marginRight:7,borderRadius:2}}></span>ช่วงเกณฑ์ ASTM C33</span>
+        <span><span style={{display:'inline-block',width:9,height:9,background:'#d13438',borderRadius:'50%',verticalAlign:'middle',marginRight:7}}></span>จุดที่หลุดเกณฑ์</span>
+      </div>
     </div>;
   }
 
