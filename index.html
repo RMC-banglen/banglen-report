@@ -3269,9 +3269,9 @@ window.__dataReady.then(data => {
     const load=()=>{
       db.from('sand_fm_tests').select('*').order('test_date',{ascending:false}).limit(200)
         .then(({data})=>{
-          const rows=data||[];
+          const rows=data||[];   // เรียงวันที่ล่าสุดก่อน
           setTests(rows);
-          if(rows.length&&selId==null) setSelId(rows[0].id);
+          setSelId(rows.length?rows[0].id:null);   // เปิดมาโชว์วันล่าสุดเสมอ
           setLoading(false);
         }).catch(()=>setLoading(false));
     };
@@ -3328,21 +3328,23 @@ window.__dataReady.then(data => {
         {loading? <div style={{padding:24,color:'#888'}}>กำลังโหลด…</div>
         : tests.length===0? <div style={{padding:24,color:'#888',fontSize:15}}>ยังไม่มีข้อมูล — กด “+ บันทึกผลทดสอบ” เพื่อเริ่มบันทึก</div>
         : <>
-          {/* เลือกครั้งที่ทดสอบ */}
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
-            {tests.slice(0,12).map(t=>{
-              const v=t.fm!=null?Number(t.fm):calcFM(t).fm;
-              const ok=v!=null&&v>=FM_MIN&&v<=FM_MAX;
-              const on=t.id===sel?.id;
-              return <button key={t.id} onClick={()=>setSelId(t.id)}
-                style={{padding:'7px 13px',borderRadius:8,fontSize:14,cursor:'pointer',fontFamily:'inherit',
-                  border:on?'2px solid #1a56db':'1px solid #d6d8e0',
-                  background:on?'#eaf1fe':'#fff',fontWeight:on?700:500,color:'#333'}}>
-                {String(t.test_date).slice(0,10)}
-                <span style={{marginLeft:7,color:ok?'#059669':'#d13438',fontWeight:700}}>FM {v!=null?v.toFixed(2):'–'}</span>
-              </button>;
-            })}
-          </div>
+          {/* เลือกวันที่ทดสอบ — ปฏิทินเปิดเฉพาะวันที่มีผล */}
+          {(()=>{
+            const dateOf=t=>String(t.test_date).slice(0,10);
+            const availDates=new Set(tests.map(dateOf));
+            const selDate=sel?dateOf(sel):null;
+            const idx=tests.findIndex(t=>t.id===sel?.id);
+            const go=d=>{const t=tests[idx+d]; if(t) setSelId(t.id);};
+            const nav={border:'1px solid #d6d8e0',background:'#fff',borderRadius:7,width:30,height:30,fontSize:16,cursor:'pointer',color:'#42465a',fontFamily:'inherit'};
+            return <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:16}}>
+              <span style={{fontSize:14,color:'#5f6470',fontWeight:600}}>วันที่ทดสอบ</span>
+              <DatePicker value={selDate} availDates={availDates}
+                onChange={ds=>{const t=tests.find(x=>dateOf(x)===ds); if(t) setSelId(t.id);}}/>
+              <button style={{...nav,opacity:idx<tests.length-1?1:.35}} disabled={idx>=tests.length-1} onClick={()=>go(1)} title="ครั้งก่อนหน้า">‹</button>
+              <button style={{...nav,opacity:idx>0?1:.35}} disabled={idx<=0} onClick={()=>go(-1)} title="ครั้งถัดไป">›</button>
+              <span style={{fontSize:13.5,color:'#8b91a1'}}>มีผลทดสอบ {tests.length} ครั้ง</span>
+            </div>;
+          })()}
 
           {sel&&<>
             {/* KPI */}
