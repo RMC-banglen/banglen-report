@@ -3437,10 +3437,10 @@ window.__dataReady.then(data => {
       {tests.length>1&&<ChartCard span="wide" title="แนวโน้มค่า FM" subtitle={`เส้นประ = ขอบเกณฑ์ ${FM_MIN} และ ${FM_MAX}`}>
         <LineChart
           categories={[...tests].reverse().map(t=>String(t.test_date).slice(5,10))}
-          unit="" decimals={2} showValues
+          unit="" decimals={2} showValues boxedLabels
           series={[{label:'FM',color:'#1a56db',data:[...tests].reverse().map(t=>t.fm!=null?Number(t.fm):calcFM(t).fm)}]}
           targets={[{value:FM_MAX,color:'#d13438',label:'สูงสุด'},{value:FM_MIN,color:'#d13438',label:'ต่ำสุด'}]}
-          height={260} padRight={110}/>
+          height={280} padRight={130}/>
       </ChartCard>}
 
       {/* ฟอร์มบันทึก */}
