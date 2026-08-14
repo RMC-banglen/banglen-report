@@ -3518,7 +3518,7 @@ window.__dataReady.then(data => {
 
   // กราฟเส้นโค้งขนาดคละ (% ผ่าน) พร้อมแถบเกณฑ์ ASTM C33
   function GradationChart({rows}){
-    const W=760,H=330,ml=54,mr=20,mt=16,mb=52;
+    const W=760,H=300,ml=52,mr=54,mt=28,mb=50;
     const iw=W-ml-mr, ih=H-mt-mb;
     const n=rows.length;
     const x=i=>ml+(n===1?iw/2:i*iw/(n-1));
@@ -3527,7 +3527,7 @@ window.__dataReady.then(data => {
                rows.map((r,i)=>`${x(n-1-i)},${y(rows[n-1-i].lo)}`).join(' ');
     const line=rows.map((r,i)=>`${x(i)},${y(r.pass)}`).join(' ');
     return <div style={{overflowX:'auto'}}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',minWidth:600,height:'auto',display:'block'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',maxWidth:720,minWidth:480,height:'auto',display:'block',margin:'0 auto'}}>
         {[0,20,40,60,80,100].map(v=><g key={v}>
           <line x1={ml} x2={W-mr} y1={y(v)} y2={y(v)} stroke="#eceef4"/>
           <text x={ml-9} y={y(v)+4} textAnchor="end" fontSize="12" fill="#8b91a1">{v}</text>
