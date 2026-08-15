@@ -103,8 +103,9 @@ function fetchCalibrationItems() {
 // ============================================================
 function buildMessage(overdue, soon, today) {
   var L = [];
-  L.push('🔧 <b>แจ้งเตือนรอบงานประจำ</b>');
-  L.push('<i>' + fmtThaiDate(today) + '</i>');
+  // บรรทัดแรก = สรุปสั้น เพื่อให้เห็นบนหน้าล็อกมือถือโดยไม่ต้องเปิดแอป
+  L.push('<b>' + buildHeadline(overdue, soon) + '</b>');
+  L.push('🔧 รอบงานประจำ · ' + fmtThaiDate(today));
 
   if (overdue.length) {
     L.push('');
@@ -135,6 +136,26 @@ function buildMessage(overdue, soon, today) {
   L.push('<a href="' + DASHBOARD_URL + '">เปิดหน้ารอบงานประจำ →</a>');
 
   return L.join('\n');
+}
+
+// ============================================================
+// สรุปบรรทัดแรก — โผล่บนหน้าล็อกมือถือ
+// ============================================================
+function buildHeadline(overdue, soon) {
+  if (!overdue.length && !soon.length) return '✅ ไม่มีรายการใกล้ครบกำหนด';
+
+  // หยิบรายการที่ด่วนที่สุดมาโชว์ชื่อ
+  var top = overdue.length ? overdue[0] : soon[0];
+  var topTxt = esc(top.it.name) + ' ' +
+    (top.d < 0 ? 'เลยมา ' + Math.abs(top.d) + ' วัน' : 'อีก ' + top.d + ' วัน');
+
+  var total = overdue.length + soon.length;
+  if (total === 1) return (overdue.length ? '🔴 ' : '🟡 ') + topTxt;
+
+  var parts = [];
+  if (overdue.length) parts.push('🔴 เกินกำหนด ' + overdue.length);
+  if (soon.length)    parts.push('🟡 ใกล้ครบ ' + soon.length);
+  return parts.join(' · ') + ' รายการ — ' + topTxt;
 }
 
 // ============================================================
