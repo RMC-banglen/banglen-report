@@ -3828,7 +3828,7 @@ window.__dataReady.then(data => {
               </div>
               {r.description&&<div style={{fontSize:17,color:'#334155',lineHeight:1.8,marginBottom:14,whiteSpace:'pre-line'}}>{r.description}</div>}
               {r.root_cause&&<div style={{fontSize:16,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 18px',lineHeight:1.7,marginBottom:10}}>
-                <div style={{fontWeight:700,marginBottom:6}}>📋 คำอธิบายปัญหาหลัก:</div>
+                <div style={{fontWeight:700,marginBottom:6}}>📋 สาเหตุ:</div>
                 <div style={{whiteSpace:'pre-line'}}>{r.root_cause}</div>
               </div>}
               {r.fix_note&&<div style={{fontSize:16,color:'#3B6D11',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:'12px 18px',lineHeight:1.7}}>
@@ -4287,7 +4287,7 @@ window.__dataReady.then(data => {
             <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={3} style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
           </div>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>คำอธิบายปัญหาหลัก</div>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>สาเหตุ</div>
             <textarea value={form.root_cause||''} onChange={e=>setForm(f=>({...f,root_cause:e.target.value}))} rows={3} placeholder="อธิบายสาเหตุหลักของปัญหา..." style={{width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
           </div>
           <div style={{marginBottom:12}}>
