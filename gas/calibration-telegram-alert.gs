@@ -61,6 +61,16 @@ function collect() {
   var items = fetchCalibrationItems();
   if (items === null) { Logger.log('❌ ดึงข้อมูลจาก Supabase ไม่ได้'); return null; }
 
+  // รายการที่ผูกกับผลทดสอบทราย → ใช้วันที่ล่าสุดจากตาราง sand_fm_tests
+  var latestSandFM = fetchLatestSandFM();
+  items = items.map(function(it) {
+    if (it.link_source === 'sand_fm' && latestSandFM) {
+      it.last_cal_date = latestSandFM;
+      it.next_cal_date = calcNext(latestSandFM, it.interval_type, Number(it.interval_value));
+    }
+    return it;
+  });
+
   var today = startOfToday();
   var overdue = [], soon = [];
 
@@ -142,6 +152,36 @@ function buildMessage(overdue, soon, today) {
   L.push('<a href="' + DASHBOARD_URL + '">เปิดหน้ารอบงานประจำ →</a>');
 
   return L.join('\n');
+}
+
+// ============================================================
+// วันที่ทดสอบขนาดคละทรายล่าสุด (หน้าคุณภาพ-วัตถุดิบ)
+// ============================================================
+function fetchLatestSandFM() {
+  try {
+    var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/sand_fm_tests?select=test_date&order=test_date.desc&limit=1', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) return null;
+    var rows = JSON.parse(res.getContentText());
+    return rows.length ? String(rows[0].test_date).slice(0, 10) : null;
+  } catch (err) {
+    Logger.log('fetchLatestSandFM error: ' + err.message);
+    return null;
+  }
+}
+
+// คำนวณวันครบกำหนดถัดไป
+function calcNext(last, type, val) {
+  if (!last) return null;
+  var p = String(last).slice(0, 10).split('-');
+  var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  if (type === 'day') d.setDate(d.getDate() + val);
+  else if (type === 'year') d.setFullYear(d.getFullYear() + val);
+  else d.setMonth(d.getMonth() + val);
+  var m = d.getMonth() + 1, dd = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (dd < 10 ? '0' + dd : dd);
 }
 
 // ============================================================

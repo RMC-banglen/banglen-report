@@ -5207,7 +5207,9 @@ window.__dataReady.then(data => {
 
   function CalibrationTab({currentUser}){
     const db=DB;
-    const EMPTY={name:'',category:'เครื่องวัด',interval_type:'month',interval_value:12,last_cal_date:'',responsible:'',note:''};
+    const EMPTY={name:'',category:'เครื่องวัด',interval_type:'month',interval_value:12,last_cal_date:'',responsible:'',note:'',link_source:''};
+    // แหล่งข้อมูลที่ดึงวันที่ล่าสุดมาให้อัตโนมัติ
+    const LINK_SOURCES=[{v:'',label:'กรอกวันที่เอง'},{v:'sand_fm',label:'🔗 ผลทดสอบขนาดคละทราย (หน้าคุณภาพ-วัตถุดิบ)'}];
     const CATS=['เครื่องวัด','เครื่องมือกล','ยานพาหนะ','อุปกรณ์ความปลอดภัย','เปลี่ยนเมื่อชำรุด','อื่นๆ'];
     const [items,setItems]=useState([]);
     const [loading,setLoading]=useState(true);
@@ -5216,7 +5218,11 @@ window.__dataReady.then(data => {
     const [form,setForm]=useState(EMPTY);
     const [filterCat,setFilterCat]=useState('ALL');
     const [filterSt,setFilterSt]=useState('ALL');
+    const [srcDates,setSrcDates]=useState({});   // {sand_fm:'2026-08-15'}
     useEffect(()=>{db.from('calibration_items').select('*').order('name').then(({data})=>{setItems(data||[]);setLoading(false);});},[]);
+    useEffect(()=>{db.from('sand_fm_tests').select('test_date').order('test_date',{ascending:false}).limit(1)
+      .then(({data})=>{if(data&&data.length)setSrcDates(s=>({...s,sand_fm:String(data[0].test_date).slice(0,10)}));})
+      .catch(()=>{});},[]);
     const calcNext=(last,type,val)=>{if(!last)return null;const d=new Date(last);if(type==='day')d.setDate(d.getDate()+val);else if(type==='month')d.setMonth(d.getMonth()+val);else d.setFullYear(d.getFullYear()+val);return d.toISOString().slice(0,10);};
     const daysUntil=next=>{if(!next)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(next)-t)/(864e5));};
     // รอบที่นับเป็นวัน = เตือนล่วงหน้า 3 วัน, รอบเดือน/ปี = เตือนล่วงหน้า 30 วัน
@@ -5234,10 +5240,16 @@ window.__dataReady.then(data => {
       setShowForm(false);setEditId(null);setForm(EMPTY);
     };
     const handleDel=async id=>{if(!confirm('ลบรายการนี้?'))return;await db.from('calibration_items').delete().eq('id',id);setItems(prev=>prev.filter(x=>x.id!==id));};
-    const openEdit=item=>{setForm({name:item.name,category:item.category||'เครื่องวัด',interval_type:item.interval_type||'month',interval_value:item.interval_value||12,last_cal_date:item.last_cal_date||'',responsible:item.responsible||'',note:item.note||''});setEditId(item.id);setShowForm(true);};
-    const allCats=[...new Set(items.map(x=>x.category).filter(Boolean))];
-    const counts={total:items.length,overdue:items.filter(x=>getSt(x)==='overdue').length,soon:items.filter(x=>getSt(x)==='soon').length,ok:items.filter(x=>getSt(x)==='ok').length};
-    const filtered=[...items].filter(x=>filterCat==='ALL'||x.category===filterCat).filter(x=>filterSt==='ALL'||getSt(x)===filterSt).sort((a,b)=>({overdue:0,soon:1,unset:2,ok:3}[getSt(a)]??2)-({overdue:0,soon:1,unset:2,ok:3}[getSt(b)]??2));
+    const openEdit=item=>{const raw=items.find(x=>x.id===item.id)||item;setForm({name:raw.name,category:raw.category||'เครื่องวัด',interval_type:raw.interval_type||'month',interval_value:raw.interval_value||12,last_cal_date:raw.last_cal_date||'',responsible:raw.responsible||'',note:raw.note||'',link_source:raw.link_source||''});setEditId(raw.id);setShowForm(true);};
+    // รายการที่ผูกกับแหล่งข้อมูลอื่น → ใช้วันที่ล่าสุดจากแหล่งนั้นแทน แล้วคำนวณครั้งถัดไปใหม่
+    const effItems=items.map(x=>{
+      const src=x.link_source&&srcDates[x.link_source];
+      if(!src) return x;
+      return {...x,last_cal_date:src,next_cal_date:calcNext(src,x.interval_type,Number(x.interval_value)),_linked:true};
+    });
+    const allCats=[...new Set(effItems.map(x=>x.category).filter(Boolean))];
+    const counts={total:effItems.length,overdue:effItems.filter(x=>getSt(x)==='overdue').length,soon:effItems.filter(x=>getSt(x)==='soon').length,ok:effItems.filter(x=>getSt(x)==='ok').length};
+    const filtered=[...effItems].filter(x=>filterCat==='ALL'||x.category===filterCat).filter(x=>filterSt==='ALL'||getSt(x)===filterSt).sort((a,b)=>({overdue:0,soon:1,unset:2,ok:3}[getSt(a)]??2)-({overdue:0,soon:1,unset:2,ok:3}[getSt(b)]??2));
     const inp={width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:14,outline:'none',boxSizing:'border-box'};
     if(loading)return<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>กำลังโหลด...</div>;
     return<div style={{padding:'24px 0'}}>
@@ -5280,7 +5292,10 @@ window.__dataReady.then(data => {
                 </td>
                 <td style={{padding:'12px 8px',textAlign:'center'}}><span style={{fontSize:12,padding:'3px 10px',borderRadius:12,background:'#f1f5f9',color:'#475569',fontWeight:600}}>{item.category||'–'}</span></td>
                 <td style={{padding:'12px 8px',textAlign:'center',color:'#94a3b8',whiteSpace:'nowrap'}}>{isBroken?'–':intLabel(item)}</td>
-                <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',whiteSpace:'nowrap'}}>{fmtDate(item.last_cal_date)}</td>
+                <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',whiteSpace:'nowrap'}}>
+                  {fmtDate(item.last_cal_date)}
+                  {item._linked&&<div style={{fontSize:11,color:'#0369a1',marginTop:2}} title="ดึงจากผลทดสอบขนาดคละทราย หน้าคุณภาพ-วัตถุดิบ">🔗 อัตโนมัติ</div>}
+                </td>
                 <td style={{padding:'12px 8px',textAlign:'center',fontWeight:600,whiteSpace:'nowrap',color:'#94a3b8'}}>{isBroken?'–':fmtDate(item.next_cal_date)}</td>
                 <td style={{padding:'12px 8px',textAlign:'center',whiteSpace:'nowrap'}}>
                   {isBroken
@@ -5326,12 +5341,26 @@ window.__dataReady.then(data => {
               </select>
             </div>
           </div>}
+          {form.category!=='เปลี่ยนเมื่อชำรุด'&&<div style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>ที่มาของวันที่ล่าสุด</label>
+            <select value={form.link_source} onChange={e=>setForm({...form,link_source:e.target.value})} style={{...inp,background:'#fff'}}>
+              {LINK_SOURCES.map(s=><option key={s.v} value={s.v}>{s.label}</option>)}
+            </select>
+          </div>}
           <div style={{marginBottom:20}}>
-            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>{form.category==='เปลี่ยนเมื่อชำรุด'?'วันที่เปลี่ยนล่าสุด':'วันที่ Cal ล่าสุด'}</label>
-            <input type="date" value={form.last_cal_date} onChange={e=>setForm({...form,last_cal_date:e.target.value})} style={inp}/>
-            {form.last_cal_date&&form.category!=='เปลี่ยนเมื่อชำรุด'&&<div style={{fontSize:12,color:'#0369a1',marginTop:6,background:'#e0f2fe',padding:'6px 10px',borderRadius:6}}>
-              📅 ครั้งถัดไป: <b>{fmtDate(calcNext(form.last_cal_date,form.interval_type,Number(form.interval_value)))}</b>
-            </div>}
+            {form.link_source
+              ?<div style={{fontSize:13,color:'#0369a1',background:'#e0f2fe',padding:'10px 12px',borderRadius:8,lineHeight:1.7}}>
+                 🔗 ดึงวันที่จาก<b>{(LINK_SOURCES.find(s=>s.v===form.link_source)||{}).label.replace('🔗 ','')}</b>อัตโนมัติ<br/>
+                 วันที่ล่าสุดตอนนี้: <b>{fmtDate(srcDates[form.link_source])}</b>
+                 {srcDates[form.link_source]&&<> · ครั้งถัดไป: <b>{fmtDate(calcNext(srcDates[form.link_source],form.interval_type,Number(form.interval_value)))}</b></>}
+               </div>
+              :<>
+                <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>{form.category==='เปลี่ยนเมื่อชำรุด'?'วันที่เปลี่ยนล่าสุด':'วันที่ Cal ล่าสุด'}</label>
+                <input type="date" value={form.last_cal_date} onChange={e=>setForm({...form,last_cal_date:e.target.value})} style={inp}/>
+                {form.last_cal_date&&form.category!=='เปลี่ยนเมื่อชำรุด'&&<div style={{fontSize:12,color:'#0369a1',marginTop:6,background:'#e0f2fe',padding:'6px 10px',borderRadius:6}}>
+                  📅 ครั้งถัดไป: <b>{fmtDate(calcNext(form.last_cal_date,form.interval_type,Number(form.interval_value)))}</b>
+                </div>}
+               </>}
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>{setShowForm(false);setEditId(null);}} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
