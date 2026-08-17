@@ -3221,7 +3221,271 @@ window.__dataReady.then(data => {
       })()}
 
       <SandFMSection/>
+      <StoneGradationSection/>
     </div>;
+  }
+
+  // ============================================================
+  // ขนาดคละหิน (Coarse Aggregate Gradation) — ASTM C33 / C136 — หิน 3/4″ (No.67) และ หิน 1″ (No.57)
+  // ============================================================
+  const STONE_SIZES=['3/4″','1″'];
+  const STONE_SIEVES_ALL=[
+    {key:'w37_5',label:'1-1/2″',mm:'37.5 mm'},
+    {key:'w25_0',label:'1″',    mm:'25.0 mm'},
+    {key:'w19_0',label:'3/4″',  mm:'19.0 mm'},
+    {key:'w12_5',label:'1/2″',  mm:'12.5 mm'},
+    {key:'w9_5', label:'3/8″',  mm:'9.5 mm'},
+    {key:'w4_75',label:'เบอร์ 4',mm:'4.75 mm'},
+    {key:'w2_36',label:'เบอร์ 8',mm:'2.36 mm'},
+  ];
+  const STONE_LIMITS={
+    '3/4″':{w25_0:[100,100],w19_0:[90,100],w9_5:[20,55],w4_75:[0,10],w2_36:[0,5]}, // ASTM C33 No.67
+    '1″':  {w37_5:[100,100],w25_0:[95,100],w12_5:[25,60],w4_75:[0,10],w2_36:[0,5]}, // ASTM C33 No.57
+  };
+
+  function calcStoneGradation(size,w){
+    const limits=STONE_LIMITS[size]||STONE_LIMITS['3/4″'];
+    const activeSieves=STONE_SIEVES_ALL.filter(s=>limits[s.key]);
+    const wts=activeSieves.map(s=>Number(w[s.key])||0);
+    const pan=Number(w.w_pan)||0;
+    const total=wts.reduce((a,b)=>a+b,0)+pan;
+    if(!total)return{total:0,rows:activeSieves.map(s=>({...s,lo:limits[s.key][0],hi:limits[s.key][1],wt:0,ret:0,cum:0,pass:100})),pan};
+    let cum=0;
+    const rows=activeSieves.map((s,i)=>{const [lo,hi]=limits[s.key];const ret=wts[i]/total*100;cum+=ret;return{...s,lo,hi,wt:wts[i],ret,cum,pass:100-cum};});
+    return{total,rows,pan};
+  }
+
+  function StoneGradationSection(){
+    const db=DB;
+    const [size,setSize]=useState('3/4″');
+    const [tests,setTests]=useState([]);
+    const [loading,setLoading]=useState(true);
+    const [showForm,setShowForm]=useState(false);
+    const [saving,setSaving]=useState(false);
+    const [editId,setEditId]=useState(null);
+    const [selId,setSelId]=useState(null);
+    const [msg,setMsg]=useState('');
+    const blank={test_date:new Date().toISOString().slice(0,10),stone_size:'3/4″',stone_source:'',w37_5:'',w25_0:'',w19_0:'',w12_5:'',w9_5:'',w4_75:'',w2_36:'',w_pan:'',note:''};
+    const [form,setForm]=useState(blank);
+
+    const load=()=>{
+      db.from('stone_gradation_tests').select('*').order('test_date',{ascending:false}).limit(200)
+        .then(({data})=>{setTests(data||[]);setLoading(false);}).catch(()=>setLoading(false));
+    };
+    useEffect(load,[]);
+
+    const sizeTests=tests.filter(t=>t.stone_size===size);
+    useEffect(()=>{setSelId(sizeTests.length?sizeTests[0].id:null);},[size,tests.length]);
+
+    const live=calcStoneGradation(form.stone_size,form);
+
+    const save=()=>{
+      if(!form.test_date){setMsg('❌ กรุณาใส่วันที่ทดสอบ');return;}
+      if(!live.total){setMsg('❌ กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
+      setSaving(true);setMsg('');
+      const rec={test_date:form.test_date,stone_size:form.stone_size,stone_source:form.stone_source||'',note:form.note||''};
+      STONE_SIEVES_ALL.forEach(s=>{rec[s.key]=Number(form[s.key])||0;});
+      rec.w_pan=Number(form.w_pan)||0;
+      const q=editId?db.from('stone_gradation_tests').update(rec).eq('id',editId)
+                    :db.from('stone_gradation_tests').insert([rec]);
+      q.then(({error})=>{
+        setSaving(false);
+        if(error){setMsg('❌ '+error.message);return;}
+        setMsg('✅ บันทึกแล้ว');setShowForm(false);setEditId(null);setForm({...blank,stone_size:size});load();
+      });
+    };
+
+    const openNew=()=>{setForm({...blank,stone_size:size});setEditId(null);setMsg('');setShowForm(true);};
+    const openEdit=t=>{
+      const f={...blank,test_date:String(t.test_date||'').slice(0,10),stone_size:t.stone_size||'3/4″',stone_source:t.stone_source||'',note:t.note||''};
+      STONE_SIEVES_ALL.forEach(s=>{f[s.key]=t[s.key]??'';});
+      f.w_pan=t.w_pan??'';
+      setForm(f);setEditId(t.id);setMsg('');setShowForm(true);
+    };
+    const del=t=>{
+      if(!window.confirm('ลบผลทดสอบวันที่ '+String(t.test_date).slice(0,10)+' ?'))return;
+      db.from('stone_gradation_tests').delete().eq('id',t.id).then(()=>{if(selId===t.id)setSelId(null);load();});
+    };
+
+    const sel=sizeTests.find(t=>t.id===selId)||sizeTests[0]||null;
+    const selCalc=sel?calcStoneGradation(sel.stone_size,sel):null;
+
+    const inp={padding:'8px 10px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:15,width:'100%',fontFamily:'inherit'};
+    const lbl={fontSize:13,color:'#5f6470',marginBottom:4,fontWeight:600};
+    const btn=(bg,fg)=>({padding:'9px 18px',borderRadius:8,border:'none',background:bg,color:fg,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'});
+    const liveOk=live.total>0&&!live.rows.some(r=>r.pass<r.lo-0.05||r.pass>r.hi+0.05);
+
+    return <>
+      <ChartCard span="wide"
+        title="ขนาดคละหิน (Coarse Aggregate)"
+        subtitle="เกณฑ์ ASTM C33 — หิน 3/4″ (No.67) และหิน 1″ (No.57)"
+        right={<button style={btn('#1a56db','#fff')} onClick={openNew}>+ บันทึกผลทดสอบ</button>}>
+
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {STONE_SIZES.map(s=><button key={s} onClick={()=>setSize(s)} style={{padding:'8px 18px',borderRadius:8,border:`1.5px solid ${size===s?'#1a56db':'#e6e8ee'}`,background:size===s?'#1a56db':'#fff',color:size===s?'#fff':'#42465a',fontSize:14,fontWeight:700,cursor:'pointer'}}>หิน {s}</button>)}
+        </div>
+
+        {loading? <div style={{padding:24,color:'#888'}}>กำลังโหลด…</div>
+        : sizeTests.length===0? <div style={{padding:24,color:'#888',fontSize:15}}>ยังไม่มีข้อมูลหิน {size} — กด “+ บันทึกผลทดสอบ” เพื่อเริ่มบันทึก</div>
+        : <>
+          {(()=>{
+            const dateOf=t=>String(t.test_date).slice(0,10);
+            const availDates=new Set(sizeTests.map(dateOf));
+            const selDate=sel?dateOf(sel):null;
+            const idx=sizeTests.findIndex(t=>t.id===sel?.id);
+            const go=d=>{const t=sizeTests[idx+d];if(t)setSelId(t.id);};
+            const nav={border:'1px solid #d6d8e0',background:'#fff',borderRadius:7,width:30,height:30,fontSize:16,cursor:'pointer',color:'#42465a',fontFamily:'inherit'};
+            return <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:16}}>
+              <span style={{fontSize:14,color:'#5f6470',fontWeight:600}}>วันที่ทดสอบ</span>
+              <DatePicker value={selDate} availDates={availDates}
+                onChange={ds=>{const t=sizeTests.find(x=>dateOf(x)===ds);if(t)setSelId(t.id);}}/>
+              <button style={{...nav,opacity:idx<sizeTests.length-1?1:.35}} disabled={idx>=sizeTests.length-1} onClick={()=>go(1)} title="ครั้งก่อนหน้า">‹</button>
+              <button style={{...nav,opacity:idx>0?1:.35}} disabled={idx<=0} onClick={()=>go(-1)} title="ครั้งถัดไป">›</button>
+              <span style={{fontSize:13.5,color:'#8b91a1'}}>มีผลทดสอบ {sizeTests.length} ครั้ง</span>
+            </div>;
+          })()}
+
+          {sel&&<>
+            <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
+              <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>น้ำหนักตัวอย่างรวม</div>
+                <div style={{fontSize:32,fontWeight:800,color:'#1a56db',lineHeight:1.1}}>{selCalc.total.toFixed(0)}<span style={{fontSize:16,fontWeight:600,marginLeft:4}}>g</span></div>
+                <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>ค้างถาดล่าง {selCalc.pan.toFixed(0)} g</div>
+              </div>
+              <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ผ่านเกณฑ์ขนาดคละ</div>
+                {(()=>{
+                  const bad=selCalc.rows.filter(r=>r.pass<r.lo-0.05||r.pass>r.hi+0.05);
+                  return <>
+                    <div style={{fontSize:32,fontWeight:800,color:bad.length?'#d13438':'#059669',lineHeight:1.1}}>{selCalc.rows.length-bad.length}<span style={{fontSize:16,fontWeight:600}}>/{selCalc.rows.length}</span></div>
+                    <div style={{fontSize:13,marginTop:4,color:bad.length?'#d13438':'#059669',fontWeight:600}}>
+                      {bad.length?'หลุดเกณฑ์: '+bad.map(b=>b.label).join(', '):'✓ ทุกตะแกรงอยู่ในเกณฑ์'}
+                    </div>
+                  </>;
+                })()}
+              </div>
+              <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ขนาดหิน</div>
+                <div style={{fontSize:22,fontWeight:800,color:'#333',lineHeight:1.3}}>{sel.stone_size}</div>
+              </div>
+              {sel.stone_source&&<div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+                <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>แหล่งหิน</div>
+                <div style={{fontSize:19,fontWeight:700,color:'#333',lineHeight:1.3}}>{sel.stone_source}</div>
+              </div>}
+            </div>
+
+            <GradationChart rows={selCalc.rows}/>
+
+            <div style={{overflowX:'auto',marginTop:18}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                <thead>
+                  <tr style={{background:'#f4f6fa'}}>
+                    {['ตะแกรง','ขนาด','น้ำหนักค้าง (g)','% ค้าง','% ค้างสะสม','% ผ่าน','เกณฑ์ ASTM C33','ผล'].map(h=>
+                      <th key={h} style={{padding:'9px 11px',textAlign:'left',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap'}}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {selCalc.rows.map(r=>{
+                    const ok=r.pass>=r.lo-0.05&&r.pass<=r.hi+0.05;
+                    return <tr key={r.key} style={{borderBottom:'1px solid #eef0f5'}}>
+                      <td style={{padding:'8px 11px',fontWeight:600}}>{r.label}</td>
+                      <td style={{padding:'8px 11px',color:'#6b7280'}}>{r.mm}</td>
+                      <td style={{padding:'8px 11px'}}>{r.wt.toFixed(0)}</td>
+                      <td style={{padding:'8px 11px'}}>{r.ret.toFixed(1)}</td>
+                      <td style={{padding:'8px 11px'}}>{r.cum.toFixed(1)}</td>
+                      <td style={{padding:'8px 11px',fontWeight:700}}>{r.pass.toFixed(1)}</td>
+                      <td style={{padding:'8px 11px',color:'#6b7280'}}>{r.lo===r.hi?r.lo:r.lo+'–'+r.hi}</td>
+                      <td style={{padding:'8px 11px',fontWeight:700,color:ok?'#059669':'#d13438'}}>{ok?'✓ ผ่าน':'✗ หลุด'}</td>
+                    </tr>;
+                  })}
+                  <tr style={{background:'#fafbfd'}}>
+                    <td style={{padding:'8px 11px',fontWeight:600}}>ถาดล่าง (Pan)</td>
+                    <td colSpan={6} style={{padding:'8px 11px'}}>{selCalc.pan.toFixed(0)} g</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {sel.note&&<div style={{marginTop:12,fontSize:14,color:'#42465a',background:'#f7f8fb',border:'1px solid #e6e8ee',borderRadius:8,padding:'10px 14px'}}>
+              <b>หมายเหตุ:</b> {sel.note}
+            </div>}
+
+            <div style={{marginTop:14,display:'flex',gap:9}}>
+              <button style={btn('#f0f2f7','#42465a')} onClick={()=>openEdit(sel)}>✏️ แก้ไข</button>
+              <button style={btn('#fdeced','#d13438')} onClick={()=>del(sel)}>🗑️ ลบ</button>
+            </div>
+          </>}
+        </>}
+      </ChartCard>
+
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(20,22,30,.55)',zIndex:9999,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'32px 16px',overflowY:'auto'}}>
+        <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:760,padding:26,boxShadow:'0 18px 50px rgba(0,0,0,.28)'}}>
+          <h3 style={{margin:'0 0 4px',fontSize:22,fontWeight:800,color:'#22252e'}}>{editId?'แก้ไขผลทดสอบขนาดคละหิน':'บันทึกผลทดสอบขนาดคละหิน'}</h3>
+          <p style={{margin:'0 0 20px',fontSize:14,color:'#6b7280'}}>ใส่น้ำหนักหินที่ค้างบนแต่ละตะแกรง (กรัม) — ใช้เครื่องเขย่าและตะแกรงกลมแบบเดียวกับทราย</p>
+
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:18}}>
+            <div><div style={lbl}>วันที่ทดสอบ *</div>
+              <input type="date" style={inp} value={form.test_date} onChange={e=>setForm({...form,test_date:e.target.value})}/></div>
+            <div><div style={lbl}>ขนาดหิน *</div>
+              <select style={inp} value={form.stone_size} onChange={e=>setForm({...form,stone_size:e.target.value})}>
+                {STONE_SIZES.map(s=><option key={s} value={s}>หิน {s}</option>)}
+              </select></div>
+            <div><div style={lbl}>แหล่งหิน / ผู้ขาย</div>
+              <input style={inp} placeholder="เช่น หินศักรินทร์" value={form.stone_source} onChange={e=>setForm({...form,stone_source:e.target.value})}/></div>
+          </div>
+
+          <div style={{border:'1px solid #e6e8ee',borderRadius:12,overflow:'hidden',marginBottom:18}}>
+            <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr',gap:0,background:'#f4f6fa',padding:'9px 12px',fontSize:13,fontWeight:700,color:'#42465a'}}>
+              <div>ตะแกรง</div><div>น้ำหนักค้าง (g)</div><div style={{textAlign:'right'}}>% ค้างสะสม</div><div style={{textAlign:'right'}}>% ผ่าน</div><div style={{textAlign:'right'}}>เกณฑ์</div>
+            </div>
+            {live.rows.map((r)=>{
+              const ok=live.total>0&&r.pass>=r.lo-0.05&&r.pass<=r.hi+0.05;
+              return <div key={r.key} style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr',gap:0,alignItems:'center',padding:'7px 12px',borderTop:'1px solid #eef0f5'}}>
+                <div style={{fontSize:14,fontWeight:600}}>{r.label} <span style={{color:'#9aa0ac',fontWeight:400,fontSize:13}}>({r.mm})</span></div>
+                <div style={{paddingRight:10}}>
+                  <input type="number" step="0.1" min="0" style={{...inp,padding:'6px 9px',fontSize:14}}
+                    value={form[r.key]} onChange={e=>setForm({...form,[r.key]:e.target.value})}/>
+                </div>
+                <div style={{textAlign:'right',fontSize:14,color:'#6b7280'}}>{live.total?r.cum.toFixed(1):'–'}</div>
+                <div style={{textAlign:'right',fontSize:14,fontWeight:700,color:live.total?(ok?'#059669':'#d13438'):'#9aa0ac'}}>{live.total?r.pass.toFixed(1):'–'}</div>
+                <div style={{textAlign:'right',fontSize:13,color:'#9aa0ac'}}>{r.lo===r.hi?r.lo:r.lo+'–'+r.hi}</div>
+              </div>;
+            })}
+            <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr',gap:0,alignItems:'center',padding:'7px 12px',borderTop:'1px solid #eef0f5',background:'#fafbfd'}}>
+              <div style={{fontSize:14,fontWeight:600}}>ถาดล่าง (Pan)</div>
+              <div style={{paddingRight:10}}>
+                <input type="number" step="0.1" min="0" style={{...inp,padding:'6px 9px',fontSize:14}}
+                  value={form.w_pan} onChange={e=>setForm({...form,w_pan:e.target.value})}/>
+              </div>
+              <div style={{gridColumn:'3 / span 3'}}/>
+            </div>
+          </div>
+
+          <div style={{display:'flex',gap:16,alignItems:'center',padding:'14px 18px',borderRadius:12,marginBottom:18,
+            background:live.total===0?'#f7f8fb':(liveOk?'#f2fbf6':'#fdf2f2'),
+            border:'1px solid '+(live.total===0?'#e6e8ee':(liveOk?'#bfe6d2':'#f5c6c6'))}}>
+            <div style={{fontSize:14,color:'#42465a',lineHeight:1.6}}>
+              น้ำหนักรวม <b>{live.total.toFixed(0)} g</b><br/>
+              {live.total===0?'ใส่น้ำหนักเพื่อคำนวณ'
+                :liveOk?'✓ อยู่ในเกณฑ์ ASTM C33 ทุกตะแกรง'
+                :'✗ มีบางตะแกรงหลุดเกณฑ์ ตรวจสอบขนาดคละ'}
+            </div>
+          </div>
+
+          <div style={{marginBottom:18}}>
+            <div style={lbl}>หมายเหตุ</div>
+            <textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
+          </div>
+
+          {msg&&<div style={{marginBottom:14,fontSize:15,fontWeight:600,color:msg[0]==='✅'?'#059669':'#d13438'}}>{msg}</div>}
+
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button style={btn('#f0f2f7','#42465a')} onClick={()=>{setShowForm(false);setEditId(null);setMsg('');}}>ยกเลิก</button>
+            <button style={btn('#1a56db','#fff')} disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+    </>;
   }
 
   // ============================================================
