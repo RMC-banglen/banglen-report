@@ -29,7 +29,8 @@ var SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
 
 // แจ้งเตือนล่วงหน้ากี่วัน
-var WARN_DAYS = 30;
+var WARN_DAYS       = 30;   // รอบที่นับเป็นเดือน/ปี
+var WARN_DAYS_SHORT = 3;    // รอบที่นับเป็นวัน (เช่น ทุก 7 วัน) — เตือนกระชั้นกว่า
 
 // ส่งข้อความ "ไม่มีรายการใกล้ครบกำหนด" ด้วยไหม (false = เงียบเมื่อไม่มีอะไร)
 var NOTIFY_WHEN_EMPTY = false;
@@ -68,13 +69,18 @@ function collect() {
     if (String(it.category || '') === 'เปลี่ยนเมื่อชำรุด') return;   // ไม่มีรอบตายตัว
     var d = daysUntil(it.next_cal_date, today);
     if (d < 0) overdue.push({ it: it, d: d });
-    else if (d <= WARN_DAYS) soon.push({ it: it, d: d });
+    else if (d <= warnDays(it)) soon.push({ it: it, d: d });
   });
 
   overdue.sort(function(a, b) { return a.d - b.d; });
   soon.sort(function(a, b) { return a.d - b.d; });
 
   return { items: items, today: today, overdue: overdue, soon: soon };
+}
+
+// รอบที่นับเป็นวันเตือนกระชั้นกว่า
+function warnDays(it) {
+  return it.interval_type === 'day' ? WARN_DAYS_SHORT : WARN_DAYS;
 }
 
 // ============================================================
@@ -119,7 +125,7 @@ function buildMessage(overdue, soon, today) {
 
   if (soon.length) {
     L.push('');
-    L.push('🟡 <b>ใกล้ถึงกำหนดใน ' + WARN_DAYS + ' วัน (' + soon.length + ' รายการ)</b>');
+    L.push('🟡 <b>ใกล้ถึงกำหนด (' + soon.length + ' รายการ)</b>');
     soon.forEach(function(x) {
       L.push('• <b>' + esc(x.it.name) + '</b>');
       L.push('   อีก <b>' + x.d + ' วัน</b> — ครบกำหนด ' + fmtDate(x.it.next_cal_date));
