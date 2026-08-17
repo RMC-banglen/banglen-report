@@ -5219,7 +5219,7 @@ window.__dataReady.then(data => {
     useEffect(()=>{db.from('calibration_items').select('*').order('name').then(({data})=>{setItems(data||[]);setLoading(false);});},[]);
     const calcNext=(last,type,val)=>{if(!last)return null;const d=new Date(last);if(type==='day')d.setDate(d.getDate()+val);else if(type==='month')d.setMonth(d.getMonth()+val);else d.setFullYear(d.getFullYear()+val);return d.toISOString().slice(0,10);};
     const daysUntil=next=>{if(!next)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(next)-t)/(864e5));};
-    const getSt=item=>{const d=daysUntil(item.next_cal_date);if(d===null)return'unset';if(d<0)return'overdue';if(d<=30)return'soon';return'ok';};
+    const getSt=item=>{if(item.category==='เปลี่ยนเมื่อชำรุด')return'ok';const d=daysUntil(item.next_cal_date);if(d===null)return'unset';if(d<0)return'overdue';if(d<=30)return'soon';return'ok';};
     const SI={overdue:{label:'เกินกำหนด',color:'#dc2626',bg:'#fef2f2',bdr:'#fca5a5'},soon:{label:'ใกล้ถึงกำหนด',color:'#d97706',bg:'#fffbeb',bdr:'#fde68a'},ok:{label:'ปกติ',color:'#16a34a',bg:'#f0fdf4',bdr:'#86efac'},unset:{label:'ไม่ระบุ',color:'#94a3b8',bg:'#f8fafc',bdr:'#e2e8f0'}};
     const fmtDate=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return`${p[2]}/${p[1]}/${Number(p[0])+543}`;};
     const intLabel=item=>{const n=item.interval_value,t=item.interval_type;return t==='day'?`ทุก ${n} วัน`:t==='month'?`ทุก ${n} เดือน`:`ทุก ${n} ปี`;};
