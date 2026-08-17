@@ -3786,6 +3786,17 @@ window.__dataReady.then(data => {
         ))}
       </div>
 
+      <div style={{display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+        {[['open',SL.open,SC.open,'rgba(153,60,29,0.10)'],['in_progress',SL.in_progress,SC.in_progress,'rgba(133,79,11,0.10)']].map(([st,l,c,sh])=>{
+          const rows=allYearReps.filter(r=>r.status===st);
+          return<div key={st} onClick={()=>setKpiModal({title:`${l}ค้างอยู่ ปี ${selYear}`,rows})} style={{display:'flex',flexDirection:'column',background:'#fff',border:'2px dashed '+c,borderRadius:18,padding:'14px 24px 12px',flex:1,minWidth:180,boxShadow:'0 2px 12px '+sh,cursor:'pointer'}}>
+            <span style={{fontSize:12,fontWeight:700,color:c,letterSpacing:'0.3px',marginBottom:4}}>{l}ค้างอยู่ · ปี {selYear} (ทั้งปี)</span>
+            <span style={{fontSize:40,fontWeight:900,color:c,lineHeight:1,letterSpacing:'-1px',textDecoration:'underline dotted'}}>{rows.length}</span>
+            <span style={{fontSize:12,color:'#94a3b8',marginTop:4}}>เคส · คลิกดูรายการ</span>
+          </div>;
+        })}
+      </div>
+
       <div style={{fontSize:18,fontWeight:700,color:'#1e293b',marginBottom:12}}>รายการปัญหา — {THAI_M_FULL[selMonth-1]} {selYear}</div>
       {monthReps.length===0&&<div style={{textAlign:'center',padding:'32px 0',color:'#94a3b8',fontSize:14}}>ไม่มีรายงานในเดือนนี้</div>}
       {monthReps.map((r,ri)=>{
