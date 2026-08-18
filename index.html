@@ -6811,8 +6811,17 @@ window.__dataReady.then(data => {
                 </div>
               </div>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
             {/* อันดับคนขับ */}
-            {card('อันดับเที่ยววิ่งทั้งปี ต่อคัน/คนขับ','เฉพาะรถบริษัท · 🚛 เทรลเลอร์ · 🚚 10ล้อ-12ล้อ',
-              rank.length?<HBarChart items={rank} color="#2f5fd0"/>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
+            {card('อันดับเที่ยววิ่งทั้งปี ต่อคัน/คนขับ','เฉพาะรถบริษัท · 🚛 เทรลเลอร์ · 🚚 10ล้อ-12ล้อ · เรียงจากวิ่งมากไปน้อย',
+              rank.length?<div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {rank.map((it,i)=><div key={it.label} style={{display:'flex',alignItems:'center',gap:12}}>
+                  <div style={{width:26,textAlign:'right',fontSize:13,fontWeight:800,color:i<3?'#2f5fd0':'#94a3b8',flexShrink:0}}>{i+1}</div>
+                  <div style={{width:160,fontSize:13,color:'#334155',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',flexShrink:0}} title={it.label}>{it.label}</div>
+                  <div style={{flex:1,height:16,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${(it.value/(rank[0]?.value||1))*100}%`,background:i<3?'#2f5fd0':'#93a6e0',borderRadius:4}}/>
+                  </div>
+                  <div style={{width:60,textAlign:'right',fontSize:13,fontWeight:700,color:'#1e293b',flexShrink:0}}>{fmt(it.value)}</div>
+                </div>)}
+              </div>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
           </div>
         </div>;
       })()}
