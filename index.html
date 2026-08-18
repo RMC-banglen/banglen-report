@@ -5505,7 +5505,7 @@ window.__dataReady.then(data => {
     const db=DB;
     const EMPTY={name:'',category:'เครื่องวัด',interval_type:'month',interval_value:12,last_cal_date:'',responsible:'',note:'',link_source:''};
     // แหล่งข้อมูลที่ดึงวันที่ล่าสุดมาให้อัตโนมัติ
-    const LINK_SOURCES=[{v:'',label:'กรอกวันที่เอง'},{v:'sand_fm',label:'🔗 ผลทดสอบขนาดคละทราย (หน้าคุณภาพ-วัตถุดิบ)'}];
+    const LINK_SOURCES=[{v:'',label:'กรอกวันที่เอง'},{v:'sand_fm',label:'🔗 ผลทดสอบขนาดคละทราย (หน้าคุณภาพ-วัตถุดิบ)'},{v:'stone_gradation',label:'🔗 ผลทดสอบขนาดคละหิน (หน้าคุณภาพ-วัตถุดิบ)'}];
     const CATS=['เครื่องวัด','เครื่องมือกล','ยานพาหนะ','อุปกรณ์ความปลอดภัย','เปลี่ยนเมื่อชำรุด','อื่นๆ'];
     const [items,setItems]=useState([]);
     const [loading,setLoading]=useState(true);
@@ -5518,6 +5518,9 @@ window.__dataReady.then(data => {
     useEffect(()=>{db.from('calibration_items').select('*').order('name').then(({data})=>{setItems(data||[]);setLoading(false);});},[]);
     useEffect(()=>{db.from('sand_fm_tests').select('test_date').order('test_date',{ascending:false}).limit(1)
       .then(({data})=>{if(data&&data.length)setSrcDates(s=>({...s,sand_fm:String(data[0].test_date).slice(0,10)}));})
+      .catch(()=>{});},[]);
+    useEffect(()=>{db.from('stone_gradation_tests').select('test_date').order('test_date',{ascending:false}).limit(1)
+      .then(({data})=>{if(data&&data.length)setSrcDates(s=>({...s,stone_gradation:String(data[0].test_date).slice(0,10)}));})
       .catch(()=>{});},[]);
     const calcNext=(last,type,val)=>{if(!last)return null;const d=new Date(last);if(type==='day')d.setDate(d.getDate()+val);else if(type==='month')d.setMonth(d.getMonth()+val);else d.setFullYear(d.getFullYear()+val);return d.toISOString().slice(0,10);};
     const daysUntil=next=>{if(!next)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(next)-t)/(864e5));};
@@ -5590,7 +5593,7 @@ window.__dataReady.then(data => {
                 <td style={{padding:'12px 8px',textAlign:'center',color:'#94a3b8',whiteSpace:'nowrap'}}>{isBroken?'–':intLabel(item)}</td>
                 <td style={{padding:'12px 8px',textAlign:'center',color:'#475569',whiteSpace:'nowrap'}}>
                   {fmtDate(item.last_cal_date)}
-                  {item._linked&&<div style={{fontSize:11,color:'#0369a1',marginTop:2}} title="ดึงจากผลทดสอบขนาดคละทราย หน้าคุณภาพ-วัตถุดิบ">🔗 อัตโนมัติ</div>}
+                  {item._linked&&<div style={{fontSize:11,color:'#0369a1',marginTop:2}} title={`ดึงจาก${(LINK_SOURCES.find(s=>s.v===item.link_source)||{}).label?.replace('🔗 ','')||'ผลทดสอบ'} หน้าคุณภาพ-วัตถุดิบ`}>🔗 อัตโนมัติ</div>}
                 </td>
                 <td style={{padding:'12px 8px',textAlign:'center',fontWeight:600,whiteSpace:'nowrap',color:'#94a3b8'}}>{isBroken?'–':fmtDate(item.next_cal_date)}</td>
                 <td style={{padding:'12px 8px',textAlign:'center',whiteSpace:'nowrap'}}>
