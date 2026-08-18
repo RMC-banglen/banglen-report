@@ -6224,7 +6224,7 @@ window.__dataReady.then(data => {
               </tr></tfoot>
             </table>}
           </div>
-          {(()=>{const detTotal=details.reduce((s,d)=>s+(d.amount||0),0);const orig=detailModal.cellAmt||0;const diff=detTotal-orig;return(details.length>0&&diff!==0)?<div style={{background:'#fffbeb',border:'1.5px solid #fbbf24',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#92400e',display:'flex',alignItems:'center',gap:8}}>
+          {(()=>{const detTotal=details.reduce((s,d)=>s+(d.amount||0),0);const orig=detailModal.cellAmt||0;const diff=Math.round((detTotal-orig)*100)/100;return(details.length>0&&diff!==0)?<div style={{background:'#fffbeb',border:'1.5px solid #fbbf24',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#92400e',display:'flex',alignItems:'center',gap:8}}>
             ⚠️ ยอดรายละเอียดรวม <b>{fmt2(detTotal)}</b> {diff>0?'มากกว่า':'น้อยกว่า'}ยอดในตาราง <b>{fmt2(orig)}</b> อยู่ <b>{fmt2(Math.abs(diff))}</b> บาท
           </div>:null;})()}
           <div style={{borderTop:'1.5px solid #e2e8f0',paddingTop:14}}>
