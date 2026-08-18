@@ -3699,13 +3699,13 @@ window.__dataReady.then(data => {
 
       {/* สรุปเจ้าที่ FM เกิน 2.80 */}
       {(()=>{
-        const FM_WARN=2.80;
+        const FM_WARN=2.90;
         const overList=tests
           .map(t=>({...t,fmVal:t.fm!=null?Number(t.fm):calcFM(t).fm}))
-          .filter(t=>t.fmVal!=null&&t.fmVal>FM_WARN)
+          .filter(t=>t.fmVal!=null&&t.fmVal>=FM_WARN)
           .sort((a,b)=>String(b.test_date).localeCompare(String(a.test_date)));
         if(overList.length===0)return null;
-        return <ChartCard span="wide" title={`⚠️ ทรายที่ FM เกิน ${FM_WARN}`} subtitle="สรุปแหล่งทราย/วันที่ที่ค่า FM สูงเกินเกณฑ์แนะนำ (ทรายหยาบเกินไป)">
+        return <ChartCard span="wide" title={`⚠️ ทรายที่ FM ${FM_WARN} ขึ้นไป`} subtitle="สรุปแหล่งทราย/วันที่ที่ค่า FM สูงเกินเกณฑ์แนะนำ (ทรายหยาบเกินไป)">
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {overList.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 14px',borderRadius:10,background:'#fdf2f2',border:'1px solid #f5c6c6'}}>
               <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
