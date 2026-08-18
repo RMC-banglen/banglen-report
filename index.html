@@ -6757,10 +6757,14 @@ window.__dataReady.then(data => {
         trailer.items.forEach(it=>{const c=catOf(it.name);shareMap[c]=(shareMap[c]||0)+trailer.rowTotal(it.name);});
         const SHARE_COLORS={'รถบริษัท':'#2f5fd0','รถบ่อตะกั่ว':'#7b61c4','รับเอง':'#d98a2b','รถร่วม':'#d65b5b'};
         const segments=Object.entries(shareMap).filter(([,v])=>v>0).map(([label,value])=>({label,value,color:SHARE_COLORS[label]||'#94a3b8'}));
-        // อันดับคนขับ (ทั้งปี รวม 2 ประเภท เฉพาะรถบริษัท)
-        const rank=[...trailer.items.filter(i=>isCompany(i.name)).map(i=>({label:'🚛 '+i.name,value:trailer.rowTotal(i.name)})),
-                    ...wheel.items.filter(i=>isCompany(i.name)).map(i=>({label:'🚚 '+i.name,value:wheel.rowTotal(i.name)}))]
+        // อันดับคนขับ (ทั้งปี รวม 2 ประเภท ทุกทะเบียน รวมรถร่วม/รับเอง/บ่อตะกั่วด้วย)
+        const rank=[...trailer.items.map(i=>({label:'🚛 '+i.name,value:trailer.rowTotal(i.name)})),
+                    ...wheel.items.map(i=>({label:'🚚 '+i.name,value:wheel.rowTotal(i.name)}))]
                     .filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
+        // อันดับคนขับของเดือนล่าสุดที่มีข้อมูล
+        const rankMonth=lastM?[...trailer.items.map(i=>({label:'🚛 '+i.name,value:trailer.cell(i.name,lastM)})),
+                    ...wheel.items.map(i=>({label:'🚚 '+i.name,value:wheel.cell(i.name,lastM)}))]
+                    .filter(i=>i.value>0).sort((a,b)=>b.value-a.value):[];
         const card=(title,sub,children)=><div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
           <div style={{fontSize:15,fontWeight:800,color:'#1e293b'}}>{title}</div>
           {sub&&<div style={{fontSize:12,color:'#94a3b8',marginBottom:10}}>{sub}</div>}
@@ -6811,13 +6815,26 @@ window.__dataReady.then(data => {
                 </div>
               </div>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
             {/* อันดับคนขับ */}
-            {card('อันดับเที่ยววิ่งทั้งปี ต่อคัน/คนขับ','เฉพาะรถบริษัท · 🚛 เทรลเลอร์ · 🚚 10ล้อ-12ล้อ · เรียงจากวิ่งมากไปน้อย',
+            {card('อันดับเที่ยววิ่งทั้งปี ต่อคัน/คนขับ','ทุกทะเบียน · 🚛 เทรลเลอร์ · 🚚 10ล้อ-12ล้อ · เรียงจากวิ่งมากไปน้อย',
               rank.length?<div style={{display:'flex',flexDirection:'column',gap:8}}>
                 {rank.map((it,i)=><div key={it.label} style={{display:'flex',alignItems:'center',gap:12}}>
                   <div style={{width:26,textAlign:'right',fontSize:13,fontWeight:800,color:i<3?'#2f5fd0':'#94a3b8',flexShrink:0}}>{i+1}</div>
                   <div style={{width:160,fontSize:13,color:'#334155',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',flexShrink:0}} title={it.label}>{it.label}</div>
                   <div style={{flex:1,height:16,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
                     <div style={{height:'100%',width:`${(it.value/(rank[0]?.value||1))*100}%`,background:i<3?'#2f5fd0':'#93a6e0',borderRadius:4}}/>
+                  </div>
+                  <div style={{width:60,textAlign:'right',fontSize:13,fontWeight:700,color:'#1e293b',flexShrink:0}}>{fmt(it.value)}</div>
+                </div>)}
+              </div>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
+
+            {/* อันดับคนขับรายเดือน (เดือนล่าสุดที่มีข้อมูล) */}
+            {card(`อันดับเที่ยววิ่ง ${lastM?MO[lastM-1]:''} ต่อคัน/คนขับ`,'ทุกทะเบียน · 🚛 เทรลเลอร์ · 🚚 10ล้อ-12ล้อ · เรียงจากวิ่งมากไปน้อย',
+              rankMonth.length?<div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {rankMonth.map((it,i)=><div key={it.label} style={{display:'flex',alignItems:'center',gap:12}}>
+                  <div style={{width:26,textAlign:'right',fontSize:13,fontWeight:800,color:i<3?'#15803d':'#94a3b8',flexShrink:0}}>{i+1}</div>
+                  <div style={{width:160,fontSize:13,color:'#334155',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',flexShrink:0}} title={it.label}>{it.label}</div>
+                  <div style={{flex:1,height:16,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${(it.value/(rankMonth[0]?.value||1))*100}%`,background:i<3?'#15803d':'#86c99a',borderRadius:4}}/>
                   </div>
                   <div style={{width:60,textAlign:'right',fontSize:13,fontWeight:700,color:'#1e293b',flexShrink:0}}>{fmt(it.value)}</div>
                 </div>)}
