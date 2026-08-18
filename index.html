@@ -6484,7 +6484,7 @@ window.__dataReady.then(data => {
               const found=existingList.find(e=>e.name==='รับเอง'||aliasOf(e.name)==='รับเอง');
               return found?{name:found.name,vt:found.vt}:{name:'รับเอง',vt:importType};
             }
-            if(rawName.includes('มีรถขนส่งอื่นๆ')||rawName.startsWith('รถร่วม')){
+            if(rawName.includes('รถขนส่งอื่นๆ')||rawName.startsWith('รถร่วม')){
               const found=existingList.find(e=>e.name==='รถร่วม'||aliasOf(e.name)==='รถร่วม');
               return found?{name:found.name,vt:found.vt}:{name:'รถร่วม',vt:importType};
             }
