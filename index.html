@@ -6228,9 +6228,31 @@ window.__dataReady.then(data => {
             ⚠️ ยอดรายละเอียดรวม <b>{fmt2(detTotal)}</b> {diff>0?'มากกว่า':'น้อยกว่า'}ยอดในตาราง <b>{fmt2(orig)}</b> อยู่ <b>{fmt2(Math.abs(diff))}</b> บาท
           </div>:null;})()}
           <div style={{borderTop:'1.5px solid #e2e8f0',paddingTop:14}}>
-            <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:8}}>เพิ่มรายการ</div>
+            <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:8}}>เพิ่มรายการ · หรือคัดลอกทั้งตารางจาก Excel มาวางในช่องรายละเอียดได้เลย (จะแยกรายการ+ยอดเงินให้อัตโนมัติ รองรับคอลัมน์เกินและแถวหักส่วนลด)</div>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <input placeholder="รายละเอียด เช่น ค่าแรง, ค่าอะไหล่" value={newDetail.description} onChange={e=>setNewDetail({...newDetail,description:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addDetail()} onPaste={async e=>{const txt=e.clipboardData.getData('text');if(!txt.includes('\t')&&!txt.includes('\n'))return;e.preventDefault();const rows=txt.trim().split('\n').map(r=>r.split('\t')).filter(r=>r.length>=2&&r[0].trim()&&!isNaN(Number(r[1].replace(/,/g,'')))).map(r=>({year:detailModal.year,month:detailModal.month,section:selSec,line_item:detailModal.item,description:r[0].trim(),amount:Number(r[1].replace(/,/g,''))}));if(!rows.length){alert('ไม่พบข้อมูล 2 คอลัมน์ (รายละเอียด Tab จำนวนเงิน)');return;}await DB.from('repair_expense_details').insert(rows);fetchDetails(detailModal.item,detailModal.month,detailModal.year);}} style={{flex:1,padding:'8px 10px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,outline:'none'}}/>
+              <input placeholder="รายละเอียด เช่น ค่าแรง, ค่าอะไหล่ (หรือวางข้อมูลจาก Excel ที่นี่)" value={newDetail.description} onChange={e=>setNewDetail({...newDetail,description:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addDetail()} onPaste={async e=>{
+                const txt=e.clipboardData.getData('text');
+                if(!txt.includes('\t')&&!txt.includes('\n'))return;
+                e.preventDefault();
+                const numRe=/^-?[\d,]+\.?\d*$/;
+                const rows=txt.trim().split('\n').map(line=>{
+                  const cells=line.split('\t').map(c=>c.trim());
+                  // หาคอลัมน์ยอดเงิน: เอาตัวเลขที่อยู่ขวาสุดของแถว (ปกติคือคอลัมน์ "รวม")
+                  let amtIdx=-1;
+                  for(let i=cells.length-1;i>=0;i--){if(cells[i]&&numRe.test(cells[i].replace(/,/g,''))){amtIdx=i;break;}}
+                  if(amtIdx<0)return null;
+                  let amount=Number(cells[amtIdx].replace(/,/g,''));
+                  // แถวหักส่วนลด: มักมีเซลล์ "-" เดี่ยวๆ อยู่ก่อนตัวเลข ให้ตีความเป็นค่าติดลบ
+                  if(amount>0&&cells.slice(0,amtIdx).some(c=>c==='-'))amount=-amount;
+                  // หาคอลัมน์รายละเอียด: เซลล์แรกที่มีตัวอักษร (ข้ามรหัสตัวเลขล้วนๆ เช่น "7701")
+                  const desc=cells.find(c=>c&&/[a-zA-Zก-๙]/.test(c));
+                  if(!desc)return null;
+                  return{year:detailModal.year,month:detailModal.month,section:selSec,line_item:detailModal.item,description:desc,amount};
+                }).filter(Boolean);
+                if(!rows.length){alert('ไม่พบข้อมูลที่แยกรายการ+ยอดเงินได้ ลองคัดลอกใหม่ หรือกรอกเองทีละรายการ');return;}
+                await DB.from('repair_expense_details').insert(rows);
+                fetchDetails(detailModal.item,detailModal.month,detailModal.year);
+              }} style={{flex:1,padding:'8px 10px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,outline:'none'}}/>
               <input type="number" placeholder="จำนวนเงิน" value={newDetail.amount} onChange={e=>setNewDetail({...newDetail,amount:e.target.value})} onKeyDown={e=>e.key==='Enter'&&addDetail()} style={{width:110,padding:'8px 10px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,outline:'none'}}/>
               <button onClick={addDetail} style={{padding:'8px 16px',background:'#2f5fd0',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>+ เพิ่ม</button>
             </div>
