@@ -698,6 +698,24 @@ function parseDateCell(val) {
 // Sync Sheet "รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB"
 // และ "เสียหายในโรงงานบางเลน รหัสID" → damage_items
 // ============================================================
+// อ่านค่าจากชีทโดยกระจายค่าของเซลล์ที่ merge ไว้ให้ครบทุกแถว/คอลัมน์ในกลุ่ม
+// (Sheets คืนค่าให้เฉพาะเซลล์ซ้ายบนของ merge ที่เหลือเป็นค่าว่าง)
+function readValuesExpandingMerges(sheet) {
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return values;
+  sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn())
+    .getMergedRanges().forEach(function(m) {
+      const r0 = m.getRow(), c0 = m.getColumn();
+      const v = values[r0 - 1][c0 - 1];
+      for (let r = r0; r < r0 + m.getNumRows(); r++) {
+        for (let c = c0; c < c0 + m.getNumColumns(); c++) {
+          if (values[r - 1] !== undefined) values[r - 1][c - 1] = v;
+        }
+      }
+    });
+  return values;
+}
+
 function syncDamageItems(ss) {
   const records = [];
 
@@ -707,7 +725,7 @@ function syncDamageItems(ss) {
   if (!sheetRR) {
     Logger.log('⚠️ ไม่พบ Sheet REB-ROB');
   } else {
-    const rows = sheetRR.getDataRange().getValues();
+    const rows = readValuesExpandingMerges(sheetRR);
     const headers = rows[0].map(h => String(h).trim());
     // หา index คอลัมน์
     const ci = {};
@@ -785,7 +803,7 @@ function syncDamageItems(ss) {
   if (!sheetID) {
     Logger.log('⚠️ ไม่พบ Sheet ID');
   } else {
-    const rows = sheetID.getDataRange().getValues();
+    const rows = readValuesExpandingMerges(sheetID);
     const headers = rows[0].map(h => String(h).trim());
     const ci = {};
     headers.forEach((h, i) => { ci[h] = i; });
