@@ -1928,7 +1928,9 @@ window.__dataReady.then(data => {
       const id=setInterval(resize,400);
       return ()=>clearInterval(id);
     },[]);
-    return <iframe ref={ref} src="pile-materials.html" title="สต็อกวัตถุดิบเสาเข็ม" onLoad={resize}
+    // ต่อ query แปลกๆ ท้าย src กันเบราว์เซอร์ใช้ pile-materials.html เก่าจากแคชของ iframe (hard refresh หน้าแม่ไม่ได้ล้างแคช iframe เสมอไป)
+    const cacheBust=React.useMemo(()=>Date.now(),[]);
+    return <iframe ref={ref} src={`pile-materials.html?v=${cacheBust}`} title="สต็อกวัตถุดิบเสาเข็ม" onLoad={resize}
       style={{width:'100%',minHeight:400,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
   }
 
