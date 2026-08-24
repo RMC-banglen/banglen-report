@@ -39,6 +39,7 @@
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script type="module">
 // ต่อ query แคชบัสต์เดียวกับที่หน้านี้ถูกเปิด (เช่น ?v=... จาก iframe ในหน้าแม่) ไปที่ pile-calc.js ด้วย
@@ -49,6 +50,12 @@ window.__PileCalc = PileCalcMod;
 </script>
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
+// ใช้ Supabase โปรเจกต์เดียวกับระบบหลัก (index.html) — เก็บสถานะทั้งหมดเป็น JSON ก้อนเดียวในตาราง pile_materials_state
+// แทน localStorage เดิม (ซึ่งอยู่แค่เครื่อง/เบราว์เซอร์เดียว เปิดเครื่องอื่นหรือล้างแคชแล้วข้อมูลหาย)
+const SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
+const DB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const PILE_STATE_ROW_ID = 'default';
 let PC = null; // pile-calc module, loaded async below
 function waitForPileCalc() {
   return new Promise(resolve => {
@@ -192,6 +199,7 @@ class App extends React.Component {
     rawRows: null, rebarWeights: null, plateWeights: null, whiskerWeights: null, whiskerSpecs: null,
     pcWireKgPerM: null, pcWireTable: null, stirrupTable: null, stirrupWireMm: null, plateThicknessMm: null,
     plateBigSheetKg: { 6: 438, 8: 584, 9: 657 },
+    syncStatus: 'loading',
   };
 
   persistKeys = ['result', 'rawRows', 'fileName', 'actual', 'stock', 'plateStockDiam', 'generalUseEntries', 'plateGeneralUseEntries',
@@ -211,31 +219,46 @@ class App extends React.Component {
       stirrupWireMm: Object.fromEntries(Object.entries(PC.STIRRUP_WIRE_MM).map(([d, v]) => [d, v.toFixed(1)])),
       plateThicknessMm: { ...PC.PLATE_THICKNESS_MM },
     });
-    this.loadPersisted();
+    // โหลดจาก localStorage ก่อนทันที (เร็ว, กันจอว่างระหว่างรอเน็ต) แล้วค่อยดึงจาก Supabase มาทับถ้ามีของใหม่กว่า
+    this.applyPersistedObj(this.readLocal());
+    await this.loadFromSupabase();
     this._persistReady = true;
   }
-  loadPersisted() {
+  readLocal() {
+    try { const raw = localStorage.getItem('pileCalcState_v1'); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  applyPersistedObj(saved) {
+    if (!saved) return;
+    const patch = {};
+    this.persistKeys.forEach(k => { if (saved[k] !== undefined) patch[k] = saved[k]; });
+    if (patch.periodLabel === 'งวดปัจจุบัน') patch.periodLabel = null;
+    this.setState(patch);
+  }
+  async loadFromSupabase() {
     try {
-      const raw = localStorage.getItem('pileCalcState_v1');
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      const patch = {};
-      this.persistKeys.forEach(k => { if (saved[k] !== undefined) patch[k] = saved[k]; });
-      if (patch.periodLabel === 'งวดปัจจุบัน') patch.periodLabel = null;
-      this.setState(patch);
-    } catch (e) {}
+      this.setState({ syncStatus: 'loading' });
+      const { data, error } = await DB.from('pile_materials_state').select('data').eq('id', PILE_STATE_ROW_ID).maybeSingle();
+      if (error) throw error;
+      if (data && data.data) { this.applyPersistedObj(data.data); this.setState({ syncStatus: 'synced' }); }
+      else this.setState({ syncStatus: 'synced' }); // ยังไม่เคยมีข้อมูลบน Supabase — ใช้ของ localStorage ต่อไปก่อน
+    } catch (e) {
+      console.warn('โหลดข้อมูลจาก Supabase ไม่สำเร็จ ใช้ข้อมูลที่บันทึกไว้ในเครื่องแทน', e);
+      this.setState({ syncStatus: 'offline' });
+    }
   }
   savePersisted() {
-    try {
-      const out = {};
-      this.persistKeys.forEach(k => { out[k] = this.state[k]; });
-      localStorage.setItem('pileCalcState_v1', JSON.stringify(out));
-    } catch (e) {}
+    const out = {};
+    this.persistKeys.forEach(k => { out[k] = this.state[k]; });
+    try { localStorage.setItem('pileCalcState_v1', JSON.stringify(out)); } catch (e) {}
+    this.setState({ syncStatus: 'saving' });
+    DB.from('pile_materials_state').upsert({ id: PILE_STATE_ROW_ID, data: out, updated_at: new Date().toISOString() })
+      .then(({ error }) => { if (error) throw error; this.setState({ syncStatus: 'synced' }); })
+      .catch(e => { console.warn('บันทึกขึ้น Supabase ไม่สำเร็จ (บันทึกไว้ในเครื่องแล้ว จะลองใหม่เมื่อแก้ไขครั้งถัดไป)', e); this.setState({ syncStatus: 'offline' }); });
   }
   componentDidUpdate() {
     if (!this._persistReady) return;
     clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(() => this.savePersisted(), 400);
+    this._saveTimer = setTimeout(() => this.savePersisted(), 600);
   }
 
   fmt(n, d) { return fmt(n, d); }
@@ -700,6 +723,7 @@ class App extends React.Component {
               <input type="file" accept=".xlsx" onChange={e => this.handleFile(e)} style={{ display: 'none' }} />
             </label>
             <div style={{ fontSize: 14, color: '#78839A' }}>{s.loading ? 'กำลังอ่านไฟล์...' : (s.fileName ? 'ไฟล์: ' + s.fileName : 'ยังไม่ได้เลือกไฟล์')}</div>
+            <SyncBadge status={s.syncStatus} />
           </div>
           {s.error && <div style={{ color: '#c0392b', fontSize: 14, marginTop: 10 }}>{s.error}</div>}
           <div style={{ fontSize: 13, color: '#8892a0', marginTop: 10 }}>ไฟล์ต้องมีคอลัมน์: รหัสสินค้า, รายการสินค้า, จำนวน</div>
@@ -902,6 +926,16 @@ function TrendView({ app }) {
       <div style={{ fontSize: 12, color: '#78839A' }}>% ผิดพลาด = ส่วนต่างจริง ÷ ยอดคำนวณ ต่อวัตถุดิบ ในแต่ละงวด (คอลัมน์ขวาสุดคืองวดปัจจุบัน)</div>
     </div>
   );
+}
+function SyncBadge({ status }) {
+  const map = {
+    loading: { text: '🔄 กำลังโหลดข้อมูล...', color: '#78839A' },
+    saving: { text: '🔄 กำลังบันทึกขึ้น Supabase...', color: '#78839A' },
+    synced: { text: '☁️ บันทึกขึ้น Supabase แล้ว (sync ข้ามเครื่อง)', color: '#1f9d55' },
+    offline: { text: '⚠️ บันทึกขึ้น Supabase ไม่ได้ — ข้อมูลอยู่ในเครื่องนี้เท่านั้นตอนนี้', color: '#c0392b' },
+  };
+  const cur = map[status] || map.loading;
+  return <span style={{ fontSize: 12, color: cur.color, marginLeft: 'auto' }}>{cur.text}</span>;
 }
 function SettingsPanel({ app }) {
   const s = app.state, mod = app._mod;
