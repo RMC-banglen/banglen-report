@@ -1915,7 +1915,7 @@ window.__dataReady.then(data => {
     </nav>;
   }
 
-  function PileMaterialsFrame(){
+  function PileMaterialsFrame({canEdit}){
     // ให้ iframe ยืดความสูงตามเนื้อหาจริง เพื่อให้เลื่อนหน้าจอเดียว (แทนที่จะมี scrollbar ซ้อนกัน 2 อัน)
     const ref=React.useRef(null);
     const resize=()=>{
@@ -1930,7 +1930,7 @@ window.__dataReady.then(data => {
     },[]);
     // ต่อ query แปลกๆ ท้าย src กันเบราว์เซอร์ใช้ pile-materials.html เก่าจากแคชของ iframe (hard refresh หน้าแม่ไม่ได้ล้างแคช iframe เสมอไป)
     const cacheBust=React.useMemo(()=>Date.now(),[]);
-    return <iframe ref={ref} src={`pile-materials.html?v=${cacheBust}`} title="สต็อกวัตถุดิบเสาเข็ม" onLoad={resize}
+    return <iframe ref={ref} src={`pile-materials.html?v=${cacheBust}${canEdit?'':'&readonly=1'}`} title="สต็อกวัตถุดิบเสาเข็ม" onLoad={resize}
       style={{width:'100%',minHeight:400,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
   }
 
@@ -5461,7 +5461,7 @@ window.__dataReady.then(data => {
   }
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขนส่ง','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
-  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'}];
+  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'วัตถุดิบ'}];
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
@@ -8178,7 +8178,7 @@ window.__dataReady.then(data => {
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
         {tab==='accident'&&<AccidentReportTab currentUser={currentUser}/>}
-        {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame/></div>}
+        {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pileMaterials)}/></div>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>

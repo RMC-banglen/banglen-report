@@ -56,6 +56,8 @@ const SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
 const DB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PILE_STATE_ROW_ID = 'default';
+// สิทธิ์แก้ไข ส่งมาจากหน้าแม่ผ่าน query (?readonly=1) ตามสิทธิ์ผู้ใช้ที่ล็อกอินอยู่ — ถ้าไม่มี query นี้ (เช่นเปิดไฟล์นี้ตรงๆ) ถือว่าแก้ไขได้ตามปกติ
+const READONLY = new URLSearchParams(location.search).get('readonly') === '1';
 let PC = null; // pile-calc module, loaded async below
 function waitForPileCalc() {
   return new Promise(resolve => {
@@ -124,13 +126,14 @@ function GeneralUseModal({ title, entries, onAdd, onClose, unit }) {
       <div style={{ fontSize: 14, color: '#78839A' }}>ระบุจำนวนและสาเหตุทีละรายการ ระบบจะรวมยอดให้อัตโนมัติ</div>
       {entries.map((e, i) => (
         <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input type="number" value={e.amount} onChange={ev => e.onAmountChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} />
-          <input type="text" value={e.reason} onChange={ev => e.onReasonChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} />
-          <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>
+          <input type="number" value={e.amount} onChange={ev => e.onAmountChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} disabled={READONLY} />
+          <input type="text" value={e.reason} onChange={ev => e.onReasonChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
         </div>
       ))}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
-        <button onClick={onAdd} style={btnDashed()}>+ เพิ่มรายการ</button>
+        {!READONLY && <button onClick={onAdd} style={btnDashed()}>+ เพิ่มรายการ</button>}
+        {READONLY && <div />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>รวม: {fmt(entries.reduce((s, e) => s + (Number(e.amount) || 0), 0), 1)} {unit || ''}</div>
           <button onClick={onClose} style={btnPrimary()}>เสร็จสิ้น</button>
@@ -151,16 +154,16 @@ function ActualCell({ row, stockMode }) {
       {[['ยกมา', 'opening'], ['รับเข้า', 'received']].map(([lbl, f]) => (
         <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 11, color: '#78839A', whiteSpace: 'nowrap' }}>{lbl}</span>
-          <input type="number" value={row[f]} onChange={e => row['on' + f[0].toUpperCase() + f.slice(1) + 'Change'](e.target.value)} style={inp(80, true)} />
+          <input type="number" value={row[f]} onChange={e => row['on' + f[0].toUpperCase() + f.slice(1) + 'Change'](e.target.value)} style={inp(80, true)} disabled={READONLY} />
         </div>
       ))}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 11, color: '#2f5fd0', fontWeight: 600, whiteSpace: 'nowrap' }}>นับสต็อก</span>
-        <input type="number" value={row.closing} onChange={e => row.onClosingChange(e.target.value)} style={{ ...inp(80, true), borderColor: '#2f5fd0' }} />
+        <input type="number" value={row.closing} onChange={e => row.onClosingChange(e.target.value)} style={{ ...inp(80, true), borderColor: '#2f5fd0' }} disabled={READONLY} />
       </div>
     </div>
   );
-  return <input type="number" value={row.actual} onChange={e => row.onActualChange(e.target.value)} placeholder="0" style={inp(100, true)} />;
+  return <input type="number" value={row.actual} onChange={e => row.onActualChange(e.target.value)} placeholder="0" style={inp(100, true)} disabled={READONLY} />;
 }
 
 function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, extraRebarButton, allowExtraSpec }) {
@@ -187,8 +190,8 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input type="text" value={row.spec} onChange={e => row.onSpecChange(e.target.value)} placeholder="ระบุขนาด/สเปคเหล็ก" style={{ ...inp(null), flex: 1 }} />
-                    <button onClick={row.onRemoveExtra} style={btnGhost('#c0392b')}>ลบ</button>
+                    <input type="text" value={row.spec} onChange={e => row.onSpecChange(e.target.value)} placeholder="ระบุขนาด/สเปคเหล็ก" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
+                    {!READONLY && <button onClick={row.onRemoveExtra} style={btnGhost('#c0392b')}>ลบ</button>}
                   </div>
                 ) : row.label}
               </td>
@@ -272,6 +275,7 @@ class App extends React.Component {
     }
   }
   savePersisted() {
+    if (READONLY) return;
     const out = {};
     this.persistKeys.forEach(k => { out[k] = this.state[k]; });
     this._lastSavedSnapshot = JSON.stringify(this.persistKeys.map(k => out[k]));
@@ -294,11 +298,11 @@ class App extends React.Component {
   toggleSettings() { this.setState(s => ({ showSettings: !s.showSettings })); }
   toggleAlertList() { this.setState(s => ({ showAlertList: !s.showAlertList })); }
   setMainSearchQuery(v) { this.setState({ mainSearchQuery: v }); }
-  setAlertThreshold(v) { this.setState({ alertThresholdPct: v === '' ? 0 : Number(v) }); }
-  setAlertThresholdCategory(k, v) { this.setState(s => ({ alertThresholdByCategory: { ...s.alertThresholdByCategory, [k]: v === '' ? null : Number(v) } })); }
+  setAlertThreshold(v) { if (READONLY) return; this.setState({ alertThresholdPct: v === '' ? 0 : Number(v) }); }
+  setAlertThresholdCategory(k, v) { if (READONLY) return; this.setState(s => ({ alertThresholdByCategory: { ...s.alertThresholdByCategory, [k]: v === '' ? null : Number(v) } })); }
   getThresholdFor(k) { const v = this.state.alertThresholdByCategory[k]; return (v == null || v === '') ? (this.state.alertThresholdPct || Infinity) : v; }
-  toggleCurrentPeriodLock() { this.setState(s => ({ periodLocked: { ...s.periodLocked, [s.periodLabel]: !s.periodLocked[s.periodLabel] } })); }
-  toggleLock(k) { this.setState(s => ({ locks: { ...s.locks, [k]: !s.locks[k] } })); }
+  toggleCurrentPeriodLock() { if (READONLY) return; this.setState(s => ({ periodLocked: { ...s.periodLocked, [s.periodLabel]: !s.periodLocked[s.periodLabel] } })); }
+  toggleLock(k) { if (READONLY) return; this.setState(s => ({ locks: { ...s.locks, [k]: !s.locks[k] } })); }
   setSettingsTab(t) { this.setState({ settingsTab: t }); }
   setResultView(v) { this.setState({ resultView: v }); }
 
@@ -308,6 +312,7 @@ class App extends React.Component {
       plateGeneralUseEntries: s.plateGeneralUseEntries, periodLabel: s.periodLabel, periods: s.periods, periodHistory: s.periodHistory };
   }
   undoLastAction() {
+    if (READONLY) return;
     const stack = this.state.undoStack;
     if (!stack || !stack.length) return;
     const prev = stack[stack.length - 1];
@@ -321,6 +326,7 @@ class App extends React.Component {
     });
   }
   redoLastAction() {
+    if (READONLY) return;
     this.setState(s => {
       if (!s.redoStack.length) return null;
       const rs = [...s.redoStack]; const n = rs.pop();
@@ -330,18 +336,23 @@ class App extends React.Component {
   }
 
   updateStock(key, field, value) {
+    if (READONLY) return;
     this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], stock: { ...s.stock, [key]: { ...s.stock[key], [field]: value === '' ? null : Number(value) } } }));
   }
   updatePlateStockDiam(diam, field, value) {
+    if (READONLY) return;
     this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateStockDiam: { ...s.plateStockDiam, [diam]: { ...s.plateStockDiam[diam], [field]: value === '' ? 0 : Number(value) } } }));
   }
   addPlateGeneralUseEntry(t) {
+    if (READONLY) return;
     this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateGeneralUseEntries: { ...s.plateGeneralUseEntries, [t]: [...(s.plateGeneralUseEntries[t] || []), { kg: 0, note: '' }] } }));
   }
   removePlateGeneralUseEntry(t, idx) {
+    if (READONLY) return;
     this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateGeneralUseEntries: { ...s.plateGeneralUseEntries, [t]: (s.plateGeneralUseEntries[t] || []).filter((_, i) => i !== idx) } }));
   }
   updatePlateGeneralUseEntry(t, idx, field, value) {
+    if (READONLY) return;
     this.setState(s => {
       const list = [...(s.plateGeneralUseEntries[t] || [])];
       list[idx] = { ...list[idx], [field]: field === 'kg' ? (value === '' ? 0 : Number(value)) : value };
@@ -360,26 +371,29 @@ class App extends React.Component {
       pcWireKgPerM: this.state.pcWireKgPerM, pcWireTable: this.state.pcWireTable, stirrupTable: this.state.stirrupTable };
   }
   recompute() { if (!this.state.rawRows || !this._mod) return; this.setState({ result: this._mod.calcPileList(this.state.rawRows, this.currentConfig()) }); }
-  updateRebarWeight(k, v) { this.setState(s => ({ rebarWeights: { ...s.rebarWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
-  updatePlateWeight(k, v) { this.setState(s => ({ plateWeights: { ...s.plateWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
-  updateWhiskerWeight(k, v) { this.setState(s => ({ whiskerWeights: { ...s.whiskerWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
-  updateWhiskerSpec(k, v) { this.setState(s => ({ whiskerSpecs: { ...s.whiskerSpecs, [k]: v } }), () => this.recompute()); }
-  updatePcKgPerM(mm, v) { this.setState(s => ({ pcWireKgPerM: { ...s.pcWireKgPerM, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
-  updatePcWire(id, field, v) { this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => c.id === id ? { ...c, [field]: v === '' ? 0 : Number(v) } : c) }), () => this.recompute()); }
-  updatePlateThickness(diam, v) { this.setState(s => ({ plateThicknessMm: { ...s.plateThicknessMm, [diam]: Number(v) } })); }
-  updatePlateBigSheetKg(mm, v) { this.setState(s => ({ plateBigSheetKg: { ...s.plateBigSheetKg, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
-  updateStirrupWireMm(diam, v) { this.setState(s => ({ stirrupWireMm: { ...s.stirrupWireMm, [diam]: v } })); }
-  updateStirrup(diam, len, v) { this.setState(s => ({ stirrupTable: { ...s.stirrupTable, [diam]: { ...s.stirrupTable[diam], [len]: v === '' ? null : Number(v) } } }), () => this.recompute()); }
+  updateRebarWeight(k, v) { if (READONLY) return; this.setState(s => ({ rebarWeights: { ...s.rebarWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updatePlateWeight(k, v) { if (READONLY) return; this.setState(s => ({ plateWeights: { ...s.plateWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updateWhiskerWeight(k, v) { if (READONLY) return; this.setState(s => ({ whiskerWeights: { ...s.whiskerWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updateWhiskerSpec(k, v) { if (READONLY) return; this.setState(s => ({ whiskerSpecs: { ...s.whiskerSpecs, [k]: v } }), () => this.recompute()); }
+  updatePcKgPerM(mm, v) { if (READONLY) return; this.setState(s => ({ pcWireKgPerM: { ...s.pcWireKgPerM, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updatePcWire(id, field, v) { if (READONLY) return; this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => c.id === id ? { ...c, [field]: v === '' ? 0 : Number(v) } : c) }), () => this.recompute()); }
+  updatePlateThickness(diam, v) { if (READONLY) return; this.setState(s => ({ plateThicknessMm: { ...s.plateThicknessMm, [diam]: Number(v) } })); }
+  updatePlateBigSheetKg(mm, v) { if (READONLY) return; this.setState(s => ({ plateBigSheetKg: { ...s.plateBigSheetKg, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updateStirrupWireMm(diam, v) { if (READONLY) return; this.setState(s => ({ stirrupWireMm: { ...s.stirrupWireMm, [diam]: v } })); }
+  updateStirrup(diam, len, v) { if (READONLY) return; this.setState(s => ({ stirrupTable: { ...s.stirrupTable, [diam]: { ...s.stirrupTable[diam], [len]: v === '' ? null : Number(v) } } }), () => this.recompute()); }
   addStirrupLength(diam, len) {
+    if (READONLY) return;
     len = Number(len); if (!len) return;
     this.setState(s => { const cur = s.stirrupTable[diam] || {}; if (cur[len] != null) return null;
       return { stirrupTable: { ...s.stirrupTable, [diam]: { ...cur, [len]: 0 } } }; }, () => this.recompute());
   }
   removeStirrupLength(diam, len) {
+    if (READONLY) return;
     this.setState(s => { const cur = { ...(s.stirrupTable[diam] || {}) }; delete cur[len];
       return { stirrupTable: { ...s.stirrupTable, [diam]: cur } }; }, () => this.recompute());
   }
   setPcWireCondType(id, type) {
+    if (READONLY) return;
     this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => {
       if (c.id !== id) return c;
       const base = { id: c.id, diam: c.diam, pc4: c.pc4, pc5: c.pc5 };
@@ -390,10 +404,11 @@ class App extends React.Component {
     }) }), () => this.recompute());
   }
   addPcWireRow(diam) {
+    if (READONLY) return;
     this.setState(s => { const nextId = Math.max(-1, ...s.pcWireTable.map(c => c.id)) + 1;
       return { pcWireTable: [...s.pcWireTable, { id: nextId, diam, pc4: 0, pc5: 0 }] }; }, () => this.recompute());
   }
-  removePcWireRow(id) { this.setState(s => ({ pcWireTable: s.pcWireTable.filter(c => c.id !== id) }), () => this.recompute()); }
+  removePcWireRow(id) { if (READONLY) return; this.setState(s => ({ pcWireTable: s.pcWireTable.filter(c => c.id !== id) }), () => this.recompute()); }
 
   buildLockUi(key) {
     const locked = this.state.locks[key];
@@ -403,18 +418,21 @@ class App extends React.Component {
 
   toggleGeneralUseOpen(key) { this.setState(s => ({ generalUseOpen: { ...s.generalUseOpen, [key]: !s.generalUseOpen[key] } })); }
   togglePlateGeneralUseOpen(t) { this.setState(s => ({ plateGeneralUseOpen: { ...s.plateGeneralUseOpen, [t]: !s.plateGeneralUseOpen[t] } })); }
-  addExtraRebarItem() { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: [...s.extraRebarItems, { id: 'x' + Date.now() + Math.random(), spec: '' }] })); }
-  removeExtraRebarItem(id) { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.filter(it => it.id !== id) })); }
-  updateExtraRebarSpec(id, v) { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.map(it => it.id === id ? { ...it, spec: v } : it) })); }
+  addExtraRebarItem() { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: [...s.extraRebarItems, { id: 'x' + Date.now() + Math.random(), spec: '' }] })); }
+  removeExtraRebarItem(id) { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.filter(it => it.id !== id) })); }
+  updateExtraRebarSpec(id, v) { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.map(it => it.id === id ? { ...it, spec: v } : it) })); }
   addGeneralUseEntry(key) {
+    if (READONLY) return;
     this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [],
       generalUseEntries: { ...s.generalUseEntries, [key]: [...(s.generalUseEntries[key] || []), { amount: 0, reason: '' }] },
       generalUseOpen: { ...s.generalUseOpen, [key]: true } }));
   }
   removeGeneralUseEntry(key, idx) {
+    if (READONLY) return;
     this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], generalUseEntries: { ...s.generalUseEntries, [key]: (s.generalUseEntries[key] || []).filter((_, i) => i !== idx) } }));
   }
   updateGeneralUseEntry(key, idx, field, value) {
+    if (READONLY) return;
     this.setState(s => {
       const list = [...(s.generalUseEntries[key] || [])];
       list[idx] = { ...list[idx], [field]: field === 'amount' ? (value === '' ? 0 : Number(value)) : value };
@@ -436,7 +454,7 @@ class App extends React.Component {
     if (pctLost == null || !isFinite(pctLost) || Math.abs(pctLost) < threshold) return 'transparent';
     return pctLost > 0 ? '#eaf7ea' : '#fbeaea';
   }
-  setActual(key, value) { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], actual: { ...s.actual, [key]: value } })); }
+  setActual(key, value) { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], actual: { ...s.actual, [key]: value } })); }
 
   buildRow(key, label, calcVal, extraFmt) {
     const hasStockEntry = this.state.stock[key] && (this.state.stock[key].opening != null || this.state.stock[key].received != null || this.state.stock[key].closing != null);
@@ -673,6 +691,7 @@ class App extends React.Component {
   }
 
   async handleFile(e) {
+    if (READONLY) return;
     const file = e.target.files[0]; if (!file) return;
     this.setState({ loading: true, error: '', fileName: file.name });
     try {
@@ -691,6 +710,7 @@ class App extends React.Component {
   }
 
   confirmPeriodPicker() {
+    if (READONLY) return;
     const finalLabel = THAI_MONTHS[this.state.periodPickerMonth] + ' ' + this.state.periodPickerYear;
     if (this.state.periodPickerPurpose === 'add') {
       if (!this.state.periodLabel) {
@@ -731,6 +751,7 @@ class App extends React.Component {
     });
   }
   closeMonthCarryForward() {
+    if (READONLY) return;
     const curIdx = THAI_MONTHS.indexOf((this.state.periodLabel || '').split(' ')[0]);
     const curYear = parseInt((this.state.periodLabel || '').split(' ')[1], 10);
     let nextMonth = 0, nextYear = new Date().getFullYear() + 543;
@@ -738,6 +759,7 @@ class App extends React.Component {
     this.setState({ periodPickerOpen: true, periodPickerPurpose: 'close', periodPickerMonth: nextMonth, periodPickerYear: nextYear });
   }
   deleteCurrentPeriod() {
+    if (READONLY) return;
     const label = this.state.periodLabel;
     if (!confirm('ลบข้อมูลทั้งหมดของงวด "' + label + '" ทิ้งถาวร? การกระทำนี้ย้อนกลับไม่ได้')) return;
     this.setState(s => {
@@ -770,21 +792,29 @@ class App extends React.Component {
     return (
       <div style={{ fontFamily: "'IBM Plex Sans Thai','Sarabun',sans-serif", color: '#1f2733', maxWidth: 1200, margin: '0 auto', padding: '32px 24px 80px', display: 'flex', flexDirection: 'column', gap: 26 }}>
 
+        {READONLY && (
+          <div style={{ background: '#fff6e5', border: '1px solid #e8c98a', borderRadius: 10, padding: '12px 18px', fontSize: 14, color: '#8a6114', fontWeight: 600 }} data-no-print="true">
+            🔒 คุณมีสิทธิ์ดูอย่างเดียว — ไม่สามารถอัปโหลดไฟล์ใหม่หรือแก้ไขข้อมูลในหน้านี้ได้
+          </div>
+        )}
+
         <div style={card()} data-no-print="true">
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#2f5fd0', color: 'white', fontWeight: 600, fontSize: 15, padding: '11px 20px', borderRadius: 8, cursor: 'pointer' }}>
-              เลือกไฟล์ Excel
-              <input ref={this.fileInputRef} type="file" accept=".xlsx" onChange={e => this.handleFile(e)} style={{ display: 'none' }} />
-            </label>
+            {!READONLY && (
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#2f5fd0', color: 'white', fontWeight: 600, fontSize: 15, padding: '11px 20px', borderRadius: 8, cursor: 'pointer' }}>
+                เลือกไฟล์ Excel
+                <input ref={this.fileInputRef} type="file" accept=".xlsx" onChange={e => this.handleFile(e)} style={{ display: 'none' }} />
+              </label>
+            )}
             <div style={{ fontSize: 14, color: '#78839A' }}>{s.loading ? 'กำลังอ่านไฟล์...' : (s.fileName ? 'ไฟล์: ' + s.fileName : 'ยังไม่ได้เลือกไฟล์')}</div>
             <SyncBadge status={s.syncStatus} />
           </div>
           {s.error && <div style={{ color: '#c0392b', fontSize: 14, marginTop: 10 }}>{s.error}</div>}
           <div style={{ fontSize: 13, color: '#8892a0', marginTop: 10 }}>ไฟล์ต้องมีคอลัมน์: รหัสสินค้า, รายการสินค้า, จำนวน</div>
-          <button onClick={() => this.toggleSettings()} style={{ ...btnGhost(), marginTop: 12 }}>{s.showSettings ? 'ซ่อนตั้งค่าคงที่' : 'ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)'}</button>
+          {!READONLY && <button onClick={() => this.toggleSettings()} style={{ ...btnGhost(), marginTop: 12 }}>{s.showSettings ? 'ซ่อนตั้งค่าคงที่' : 'ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)'}</button>}
         </div>
 
-        {s.showSettings && <SettingsPanel app={this} />}
+        {s.showSettings && !READONLY && <SettingsPanel app={this} />}
 
         {s.periodPickerOpen && (
           <Modal onClose={() => { if (!s.periodPickerRequired) this.setState({ periodPickerOpen: false, periodPickerPurpose: null }); }}>
@@ -857,15 +887,15 @@ class App extends React.Component {
                   <select value={s.periodLabel || ''} onChange={e => this.switchPeriod(e.target.value)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #2f5fd0', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#244c9b', background: 'white' }}>
                     {(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
-                  <button onClick={() => this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add' })} style={btnDashed()}>+ งวดใหม่</button>
-                  <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>
-                  {s.undoStack.length > 0 && <button onClick={() => this.undoLastAction()} style={{ ...btnGhost('#8a6114'), border: '1px solid #e0c07a', background: '#fdf6e8' }}>↩ ย้อนกลับ ({s.undoStack.length})</button>}
-                  {s.redoStack.length > 0 && <button onClick={() => this.redoLastAction()} style={{ ...btnGhost('#244c9b'), border: '1px solid #b9cdf0', background: '#eef3fc' }}>↪ ทำซ้ำ ({s.redoStack.length})</button>}
+                  {!READONLY && <button onClick={() => this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add' })} style={btnDashed()}>+ งวดใหม่</button>}
+                  {!READONLY && <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>}
+                  {!READONLY && s.undoStack.length > 0 && <button onClick={() => this.undoLastAction()} style={{ ...btnGhost('#8a6114'), border: '1px solid #e0c07a', background: '#fdf6e8' }}>↩ ย้อนกลับ ({s.undoStack.length})</button>}
+                  {!READONLY && s.redoStack.length > 0 && <button onClick={() => this.redoLastAction()} style={{ ...btnGhost('#244c9b'), border: '1px solid #b9cdf0', background: '#eef3fc' }}>↪ ทำซ้ำ ({s.redoStack.length})</button>}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
-                  {stockMode && <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>}
+                  {stockMode && !READONLY && <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>}
                 </div>
 
                 {s.periodLocked[s.periodLabel] && (
@@ -887,7 +917,7 @@ class App extends React.Component {
                 <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
-                  extraRebarButton={<button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />
+                  extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />
 
                 {mp.plateRowsM.map((row, i) => row.plateGeneralUseOpen && (
                   <GeneralUseModalPlate key={'p' + i} row={row} onClose={() => this.togglePlateGeneralUseOpen(row.thickness)} />
@@ -910,13 +940,14 @@ function GeneralUseModalPlate({ row, onClose }) {
       <div style={{ fontSize: 14, color: '#78839A' }}>ระบุน้ำหนัก (กก.) และสาเหตุทีละรายการ ระบบจะรวมยอดและแปลงเป็นแผ่นใหญ่ให้อัตโนมัติ</div>
       {row.plateGeneralUseEntries.map((e, i) => (
         <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input type="number" value={e.kg} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(130, true)} />
-          <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} />
-          <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>
+          <input type="number" value={e.kg} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(130, true)} disabled={READONLY} />
+          <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
         </div>
       ))}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
-        <button onClick={row.onAddPlateGeneralUseEntry} style={btnDashed()}>+ เพิ่มรายการ</button>
+        {!READONLY && <button onClick={row.onAddPlateGeneralUseEntry} style={btnDashed()}>+ เพิ่มรายการ</button>}
+        {READONLY && <div />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>รวม: {row.generalUseFmt} แผ่นใหญ่</div>
           <button onClick={onClose} style={btnPrimary()}>เสร็จสิ้น</button>
