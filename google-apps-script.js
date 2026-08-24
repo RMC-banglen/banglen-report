@@ -490,6 +490,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
+    .addItem('🔽 ตั้ง Dropdown ประเภท', 'setupTypeDropdowns')
     .addItem('📋 ดู Log', 'showLog')
     .addToUi();
 
@@ -1157,3 +1158,70 @@ function monthShowLatest() {
  function showM_2570_01(){filterMonthKey('2570-01');} function showM_2570_02(){filterMonthKey('2570-02');} function showM_2570_03(){filterMonthKey('2570-03');} function showM_2570_04(){filterMonthKey('2570-04');} function showM_2570_05(){filterMonthKey('2570-05');} function showM_2570_06(){filterMonthKey('2570-06');} function showM_2570_07(){filterMonthKey('2570-07');} function showM_2570_08(){filterMonthKey('2570-08');} function showM_2570_09(){filterMonthKey('2570-09');} function showM_2570_10(){filterMonthKey('2570-10');} function showM_2570_11(){filterMonthKey('2570-11');} function showM_2570_12(){filterMonthKey('2570-12');}
  function showM_2571_01(){filterMonthKey('2571-01');} function showM_2571_02(){filterMonthKey('2571-02');} function showM_2571_03(){filterMonthKey('2571-03');} function showM_2571_04(){filterMonthKey('2571-04');} function showM_2571_05(){filterMonthKey('2571-05');} function showM_2571_06(){filterMonthKey('2571-06');} function showM_2571_07(){filterMonthKey('2571-07');} function showM_2571_08(){filterMonthKey('2571-08');} function showM_2571_09(){filterMonthKey('2571-09');} function showM_2571_10(){filterMonthKey('2571-10');} function showM_2571_11(){filterMonthKey('2571-11');} function showM_2571_12(){filterMonthKey('2571-12');}
  function showM_2572_01(){filterMonthKey('2572-01');} function showM_2572_02(){filterMonthKey('2572-02');} function showM_2572_03(){filterMonthKey('2572-03');} function showM_2572_04(){filterMonthKey('2572-04');} function showM_2572_05(){filterMonthKey('2572-05');} function showM_2572_06(){filterMonthKey('2572-06');} function showM_2572_07(){filterMonthKey('2572-07');} function showM_2572_08(){filterMonthKey('2572-08');} function showM_2572_09(){filterMonthKey('2572-09');} function showM_2572_10(){filterMonthKey('2572-10');} function showM_2572_11(){filterMonthKey('2572-11');} function showM_2572_12(){filterMonthKey('2572-12');}
+
+// ============================================================
+// ทำคอลัมน์ "ประเภท" เป็น Dropdown — กันพิมพ์ผิด/พิมพ์ไม่ตรงกัน
+// รันจากเมนู 📊 Sync Dashboard → 🔽 ตั้ง Dropdown ประเภท
+// ============================================================
+
+// ประเภทของชีท REB-ROB (รับคืน-เสียหายหน้างาน)
+var TYPES_REB_ROB = [
+  'รับคืนสินค้าใช้ได้',
+  'เสาเข็ม Fail',
+  'เสาร้าวในกอง/จากขนส่ง/ปีกแตก',
+  'ปั้นจั่นลากหัก/ชน',
+  'เสาเข็มหัวแตก',
+  'ตอกเอียง/เทสต์ไม่ผ่าน/ผิดหมุด',
+  'ตอกสไลด์'
+];
+
+// ประเภทของชีท ID (เสียหายในโรงงาน)
+var TYPES_ID = [
+  'ผู้รับเหมา',
+  'พนักงานบริษัท',
+  'เสาเสียในสต็อค',
+  'เสาเข็มหายจากนับสต็อค',
+  'เสาเข็มสั่งผลิตผิด/ส่งผิด/ปรับปรุง',
+  'ย้ายไปบ่อตะกั่ว'
+];
+
+function setupTypeDropdowns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var msg = [];
+
+  msg.push(applyDropdown(ss, 'รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB', 'ประเภท', TYPES_REB_ROB));
+  msg.push(applyDropdown(ss, 'เสียหายในโรงงานบางเลน รหัสID', 'ประเภทเสียหาย', TYPES_ID));
+
+  SpreadsheetApp.getUi().alert(msg.join('\n'));
+}
+
+// ใส่ Data Validation ให้คอลัมน์ที่ระบุ (หาโดยชื่อหัวคอลัมน์)
+function applyDropdown(ss, sheetName, headerName, list) {
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) return '⚠️ ไม่พบ Sheet: ' + sheetName;
+
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+                  .map(function(h) { return String(h).trim(); });
+  var col = headers.indexOf(headerName) + 1;
+  if (col === 0) return '⚠️ ไม่พบคอลัมน์ "' + headerName + '" ใน ' + sheetName;
+
+  var lastRow = Math.max(sh.getLastRow(), 2);
+  var rows = lastRow - 1 + 500;   // เผื่อแถวใหม่อีก 500 แถว
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(list, true)     // true = โชว์ลูกศร dropdown
+    .setAllowInvalid(false)             // พิมพ์นอกรายการไม่ได้ ค่าเดิมที่ผิดจะขึ้นสามเหลี่ยมแดง
+    .setHelpText('เลือกจากรายการเท่านั้น — ถ้าต้องเพิ่มประเภทใหม่ ให้แก้ที่ Apps Script')
+    .build();
+  sh.getRange(2, col, rows, 1).setDataValidation(rule);
+
+  // นับค่าที่ไม่ตรงรายการ เพื่อให้รู้ว่าต้องไปแก้กี่ช่อง
+  var vals = sh.getRange(2, col, Math.max(sh.getLastRow() - 1, 1), 1).getValues();
+  var bad = 0;
+  vals.forEach(function(r) {
+    var v = String(r[0]).trim();
+    if (v && list.indexOf(v) < 0) bad++;
+  });
+
+  return '✅ ' + sheetName.slice(0, 22) + '… คอลัมน์ "' + headerName + '"'
+       + (bad ? '\n   ⚠️ มี ' + bad + ' ช่องที่ค่าไม่ตรงรายการ (ขึ้นสามเหลี่ยมแดง) — แก้ให้ตรงด้วย' : '\n   ทุกช่องตรงรายการแล้ว');
+}
