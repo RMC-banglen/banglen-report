@@ -2897,7 +2897,7 @@ window.__dataReady.then(data => {
     </div>;
   }
 
-  function ConcreteView({year}){
+  function ConcreteView({year,canEdit}){
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
     const [err,setErr]=useState(null);
@@ -2945,6 +2945,7 @@ window.__dataReady.then(data => {
     const [syncing,setSyncing]=useState(false);
     const [syncMsg,setSyncMsg]=useState('');
     const syncFromGAS=()=>{
+      if(!canEdit)return;
       setSyncing(true); setSyncMsg('');
       fetch(CONCRETE_URL).then(r=>r.json()).then(res=>{
         const raw=res.data||[];
@@ -3265,8 +3266,8 @@ window.__dataReady.then(data => {
         </>;
       })()}
 
-      <SandFMSection/>
-      <StoneGradationSection/>
+      <SandFMSection canEdit={canEdit}/>
+      <StoneGradationSection canEdit={canEdit}/>
     </div>;
   }
 
@@ -3300,7 +3301,7 @@ window.__dataReady.then(data => {
     return{total,rows,pan};
   }
 
-  function StoneGradationSection(){
+  function StoneGradationSection({canEdit}){
     const db=DB;
     const [size,setSize]=useState('3/4″');
     const [tests,setTests]=useState([]);
@@ -3325,6 +3326,7 @@ window.__dataReady.then(data => {
     const live=calcStoneGradation(form.stone_size,form);
 
     const save=()=>{
+      if(!canEdit)return;
       if(!form.test_date){setMsg('❌ กรุณาใส่วันที่ทดสอบ');return;}
       if(!live.total){setMsg('❌ กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
       setSaving(true);setMsg('');
@@ -3348,6 +3350,7 @@ window.__dataReady.then(data => {
       setForm(f);setEditId(t.id);setMsg('');setShowForm(true);
     };
     const del=t=>{
+      if(!canEdit)return;
       if(!window.confirm('ลบผลทดสอบวันที่ '+String(t.test_date).slice(0,10)+' ?'))return;
       db.from('stone_gradation_tests').delete().eq('id',t.id).then(()=>{if(selId===t.id)setSelId(null);load();});
     };
@@ -3364,7 +3367,7 @@ window.__dataReady.then(data => {
       <ChartCard span="wide"
         title="ขนาดคละหิน (Coarse Aggregate)"
         subtitle="เกณฑ์ ASTM C33 — หิน 3/4″ (No.67) และหิน 1″ (No.57)"
-        right={<button style={btn('#1a56db','#fff')} onClick={openNew}>+ บันทึกผลทดสอบ</button>}>
+        right={canEdit&&<button style={btn('#1a56db','#fff')} onClick={openNew}>+ บันทึกผลทดสอบ</button>}>
 
         <div style={{display:'flex',gap:8,marginBottom:16}}>
           {STONE_SIZES.map(s=><button key={s} onClick={()=>setSize(s)} style={{padding:'8px 18px',borderRadius:8,border:`1.5px solid ${size===s?'#1a56db':'#e6e8ee'}`,background:size===s?'#1a56db':'#fff',color:size===s?'#fff':'#42465a',fontSize:14,fontWeight:700,cursor:'pointer'}}>หิน {s}</button>)}
@@ -3455,10 +3458,10 @@ window.__dataReady.then(data => {
               <b>หมายเหตุ:</b> {sel.note}
             </div>}
 
-            <div style={{marginTop:14,display:'flex',gap:9}}>
+            {canEdit&&<div style={{marginTop:14,display:'flex',gap:9}}>
               <button style={btn('#f0f2f7','#42465a')} onClick={()=>openEdit(sel)}>✏️ แก้ไข</button>
               <button style={btn('#fdeced','#d13438')} onClick={()=>del(sel)}>🗑️ ลบ</button>
-            </div>
+            </div>}
           </>}
         </>}
       </ChartCard>
@@ -3563,7 +3566,7 @@ window.__dataReady.then(data => {
     return {total,rows,fm,pan};
   }
 
-  function SandFMSection(){
+  function SandFMSection({canEdit}){
     const db=DB;
     const [tests,setTests]=useState([]);
     const [loading,setLoading]=useState(true);
@@ -3589,6 +3592,7 @@ window.__dataReady.then(data => {
     const live=calcFM(form);
 
     const save=()=>{
+      if(!canEdit)return;
       if(!form.test_date){setMsg('❌ กรุณาใส่วันที่ทดสอบ');return;}
       if(!live.total){setMsg('❌ กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
       setSaving(true); setMsg('');
@@ -3615,6 +3619,7 @@ window.__dataReady.then(data => {
       setForm(f);setEditId(t.id);setMsg('');setShowForm(true);
     };
     const del=t=>{
+      if(!canEdit)return;
       if(!window.confirm('ลบผลทดสอบวันที่ '+String(t.test_date).slice(0,10)+' ?'))return;
       db.from('sand_fm_tests').delete().eq('id',t.id).then(()=>{if(selId===t.id)setSelId(null);load();});
     };
@@ -3632,7 +3637,7 @@ window.__dataReady.then(data => {
       <ChartCard span="wide"
         title="ขนาดคละทราย & ค่าโมดูลัสความละเอียด (FM)"
         subtitle={`เกณฑ์ ASTM C33 • FM ที่ยอมรับได้ ${FM_MIN}–${FM_MAX}`}
-        right={<button style={btn('#1a56db','#fff')} onClick={openNew}>+ บันทึกผลทดสอบ</button>}>
+        right={canEdit&&<button style={btn('#1a56db','#fff')} onClick={openNew}>+ บันทึกผลทดสอบ</button>}>
 
         {loading? <div style={{padding:24,color:'#888'}}>กำลังโหลด…</div>
         : tests.length===0? <div style={{padding:24,color:'#888',fontSize:15}}>ยังไม่มีข้อมูล — กด “+ บันทึกผลทดสอบ” เพื่อเริ่มบันทึก</div>
@@ -3734,10 +3739,10 @@ window.__dataReady.then(data => {
               <b>หมายเหตุ:</b> {sel.note}
             </div>}
 
-            <div style={{marginTop:14,display:'flex',gap:9}}>
+            {canEdit&&<div style={{marginTop:14,display:'flex',gap:9}}>
               <button style={btn('#f0f2f7','#42465a')} onClick={()=>openEdit(sel)}>✏️ แก้ไข</button>
               <button style={btn('#fdeced','#d13438')} onClick={()=>del(sel)}>🗑️ ลบ</button>
-            </div>
+            </div>}
           </>}
         </>}
       </ChartCard>
@@ -5461,9 +5466,9 @@ window.__dataReady.then(data => {
   }
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขนส่ง','ฝ่ายจัดซื้อ','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
-  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'วัตถุดิบ'}];
+  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'วัตถุดิบ'},{k:'concrete',v:'คุณภาพวัตถุดิบ'}];
   // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
-  const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials'};
+  const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',concrete:'concrete'};
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
@@ -8174,7 +8179,7 @@ window.__dataReady.then(data => {
         {tab==='overview'&&<OverviewTab year={year}/>}
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='damage'&&<DamageDetailTab currentUser={currentUser}/>}
-        {tab==='concrete'&&<ConcreteView year={year}/>}
+        {tab==='concrete'&&<ConcreteView year={year} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
         {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
         {tab==='repair'&&<RepairExpenseTab canEditBL={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_banglen||(currentUser.permissions||{}).repair))} canEditBT={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_bottakua||(currentUser.permissions||{}).repair))}/>}
