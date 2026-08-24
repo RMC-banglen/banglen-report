@@ -1092,7 +1092,7 @@ function SettingsPanel({ app }) {
               {CATS.map(c => (
                 <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 13, width: 80 }}>{c.label}</span>
-                  <input type="number" value={s.alertThresholdByCategory[c.key] ?? ''} onChange={e => app.setAlertThresholdCategory(c.key, e.target.value)} placeholder={'เริ่มต้น ' + s.alertThresholdPct + '%'} style={inp(80, true)} />
+                  <input type="number" value={s.alertThresholdByCategory[c.key] ?? ''} onChange={e => app.setAlertThresholdCategory(c.key, e.target.value)} placeholder={String(s.alertThresholdPct)} style={inp(64, true)} />
                   <span style={{ fontSize: 12, color: '#78839A' }}>%</span>
                 </div>
               ))}
