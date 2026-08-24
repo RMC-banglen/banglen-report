@@ -908,6 +908,11 @@ function SettingsPanel({ app }) {
     { title: 'มาตรฐาน มอก.', rows: rows.filter(r => r.isMok) },
     { title: 'โรงงาน (ไม่มี มอก.)', rows: rows.filter(r => !r.isMok) },
   ].filter(g => g.rows.length);
+  // จัดกลุ่ม entries [diam, ...] เป็น มอก./โรงงาน พร้อมสี — ใช้กับตาราง PC.wire และปลอกแบบละเอียด
+  const groupDiam = entries => [
+    { title: 'มาตรฐาน มอก.', bg: '#eef6f7', color: '#1f7a8c', lineColor: '#d5e9ec', rows: entries.filter(([d]) => mok(d)).sort((a, b) => a[0].localeCompare(b[0], 'th')) },
+    { title: 'โรงงาน (ไม่มี มอก.)', bg: '#f7f4ee', color: '#8a6d1f', lineColor: '#ece5d5', rows: entries.filter(([d]) => !mok(d)).sort((a, b) => a[0].localeCompare(b[0], 'th')) },
+  ].filter(g => g.rows.length);
   const tabs = [['rebar', 'เหล็กเสริม'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['pcWire', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['alert', 'เกณฑ์แจ้งเตือน']];
   const lockBtn = (key) => { const ui = app.buildLockUi(key); return <button onClick={ui.onToggle} style={{ ...btnGhost(), fontSize: 12 }}>{ui.label}</button>; };
   return (
@@ -994,37 +999,44 @@ function SettingsPanel({ app }) {
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, marginBottom: 10 }}><b>จำนวนเส้นลวดต่อเสาแต่ละขนาด/ความยาว</b>{lockBtn('pcWire')}</div>
-            <div style={{ opacity: s.locks.pcWire ? 0.5 : 1, pointerEvents: s.locks.pcWire ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {Object.entries(
+            <div style={{ opacity: s.locks.pcWire ? 0.5 : 1, pointerEvents: s.locks.pcWire ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {groupDiam(Object.entries(
                 (s.pcWireTable || []).reduce((acc, c) => { (acc[c.diam] = acc[c.diam] || []).push(c); return acc; }, {})
-              ).sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([diam, rows]) => (
-                <div key={diam} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{dl(diam)}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {rows.map(c => {
-                      const condType = c.exact !== undefined ? 'exact' : c.max !== undefined ? 'max' : c.min !== undefined ? 'min' : 'all';
-                      const condVal = c.exact ?? c.max ?? c.min ?? '';
-                      return (
-                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <select value={condType} onChange={e => app.setPcWireCondType(c.id, e.target.value)} style={inp(150)}>
-                            <option value="all">ทุกความยาว</option>
-                            <option value="exact">ยาวเท่ากับ (ม.)</option>
-                            <option value="max">ยาวน้อยกว่า (ม.)</option>
-                            <option value="min">ยาวมากกว่า/เท่ากับ (ม.)</option>
-                          </select>
-                          {condType !== 'all' && (
-                            <input type="number" step="0.1" value={condVal} onChange={e => app.updatePcWire(c.id, condType, e.target.value)} style={inp(80)} placeholder="ม." />
-                          )}
-                          <span style={{ fontSize: 12, color: '#78839A' }}>PC4</span>
-                          <input type="number" value={c.pc4 ?? 0} onChange={e => app.updatePcWire(c.id, 'pc4', e.target.value)} style={inp(70)} />
-                          <span style={{ fontSize: 12, color: '#78839A' }}>PC5</span>
-                          <input type="number" value={c.pc5 ?? 0} onChange={e => app.updatePcWire(c.id, 'pc5', e.target.value)} style={inp(70)} />
-                          <button onClick={() => app.removePcWireRow(c.id)} style={{ ...btnGhost(), fontSize: 12, color: '#c0392b' }}>ลบ</button>
+              )).map((g, gi) => (
+                <div key={gi} style={{ border: '1px solid #dce7ea', borderRadius: 10, padding: 14, background: g.bg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: g.color }}>{g.title}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {g.rows.map(([diam, rows]) => (
+                      <div key={diam} style={{ borderTop: '1px solid ' + g.lineColor, paddingTop: 10 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: g.color }}>{dl(diam)}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {rows.map(c => {
+                            const condType = c.exact !== undefined ? 'exact' : c.max !== undefined ? 'max' : c.min !== undefined ? 'min' : 'all';
+                            const condVal = c.exact ?? c.max ?? c.min ?? '';
+                            return (
+                              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: '6px 8px' }}>
+                                <select value={condType} onChange={e => app.setPcWireCondType(c.id, e.target.value)} style={inp(150)}>
+                                  <option value="all">ทุกความยาว</option>
+                                  <option value="exact">ยาวเท่ากับ (ม.)</option>
+                                  <option value="max">ยาวน้อยกว่า (ม.)</option>
+                                  <option value="min">ยาวมากกว่า/เท่ากับ (ม.)</option>
+                                </select>
+                                {condType !== 'all' && (
+                                  <input type="number" step="0.1" value={condVal} onChange={e => app.updatePcWire(c.id, condType, e.target.value)} style={inp(80)} placeholder="ม." />
+                                )}
+                                <span style={{ fontSize: 12, color: '#78839A' }}>PC4</span>
+                                <input type="number" value={c.pc4 ?? 0} onChange={e => app.updatePcWire(c.id, 'pc4', e.target.value)} style={inp(70)} />
+                                <span style={{ fontSize: 12, color: '#78839A' }}>PC5</span>
+                                <input type="number" value={c.pc5 ?? 0} onChange={e => app.updatePcWire(c.id, 'pc5', e.target.value)} style={inp(70)} />
+                                <button onClick={() => app.removePcWireRow(c.id)} style={{ ...btnGhost(), fontSize: 12, color: '#c0392b' }}>ลบ</button>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                        <button onClick={() => app.addPcWireRow(diam)} style={{ ...btnGhost(), fontSize: 12, marginTop: 6, background: 'white' }}>+ เพิ่มเงื่อนไข</button>
+                      </div>
+                    ))}
                   </div>
-                  <button onClick={() => app.addPcWireRow(diam)} style={{ ...btnGhost(), fontSize: 12, marginTop: 8 }}>+ เพิ่มเงื่อนไข</button>
                 </div>
               ))}
             </div>
@@ -1032,34 +1044,38 @@ function SettingsPanel({ app }) {
         )}
         {s.settingsTab === 'stirrup' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>ขนาดลวดปลอกต่อเสาแต่ละขนาด</b>{lockBtn('stirrup')}</div>
-            <div style={{ opacity: s.locks.stirrup ? 0.5 : 1, pointerEvents: s.locks.stirrup ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-              {Object.entries(s.stirrupWireMm || {}).sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([diam, mm]) => (
-                <div key={diam} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, width: 100 }}>{dl(diam)}</span>
-                  <select value={mm} onChange={e => app.updateStirrupWireMm(diam, e.target.value)} style={inp(140)}>
-                    <option value="">— เลือก —</option><option value="2.8">2.8 มม.</option><option value="3.0">3.0 มม.</option><option value="4.0">4.0 มม.</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>น้ำหนักลวดปลอกต่อต้น (กก.) ตามความยาวปัดลง</b>{lockBtn('stirrup')}</div>
-            <div style={{ opacity: s.locks.stirrup ? 0.5 : 1, pointerEvents: s.locks.stirrup ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {Object.entries(s.stirrupTable || {}).sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([diam, lenMap]) => (
-                <div key={diam} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{dl(diam)}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 8 }}>
-                    {Object.entries(lenMap || {}).sort((a, b) => Number(a[0]) - Number(b[0])).map(([len, v]) => (
-                      <div key={len}>
-                        <div style={{ fontSize: 12, color: '#78839A', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>ยาว {len} ม.</span>
-                          <span onClick={() => app.removeStirrupLength(diam, len)} style={{ color: '#c0392b', cursor: 'pointer' }}>ลบ</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>น้ำหนักลวดปลอกต่อเสา 1 ต้น (กก.) ตามขนาด/ความยาวเสา</b>{lockBtn('stirrup')}</div>
+            <div style={{ opacity: s.locks.stirrup ? 0.5 : 1, pointerEvents: s.locks.stirrup ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {groupDiam(Object.entries(s.stirrupTable || {})).map((g, gi) => (
+                <div key={gi} style={{ border: '1px solid #dce7ea', borderRadius: 10, padding: 14, background: g.bg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: g.color }}>{g.title}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto', paddingRight: 4 }}>
+                    {g.rows.map(([diam, lenMap]) => (
+                      <div key={diam} style={{ borderTop: '1px solid ' + g.lineColor, paddingTop: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontWeight: 600, fontSize: 13, color: g.color }}>{dl(diam)}</span>
+                          <span style={{ fontSize: 11, color: '#78839A' }}>ขนาดลวด</span>
+                          <select value={(s.stirrupWireMm || {})[diam] || ''} onChange={e => app.updateStirrupWireMm(diam, e.target.value)} style={inp(110)}>
+                            <option value="">— เลือก —</option><option value="2.8">2.8 มม.</option><option value="3.0">3.0 มม.</option><option value="4.0">4.0 มม.</option>
+                          </select>
                         </div>
-                        <input type="number" step="0.001" value={v ?? ''} onChange={e => app.updateStirrup(diam, len, e.target.value)} style={{ ...inp(null), width: '100%' }} />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8 }}>
+                          {Object.entries(lenMap || {}).sort((a, b) => Number(a[0]) - Number(b[0])).map(([len, v]) => (
+                            <div key={len} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 6 }}>
+                              <div style={{ fontSize: 11, color: '#78839A', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                                <span>ยาว</span>
+                                <span>{len}</span>
+                                <span>ม.</span>
+                                <span onClick={() => app.removeStirrupLength(diam, len)} style={{ marginLeft: 'auto', color: '#c0392b', cursor: 'pointer', border: '1px solid #e3e7ee', borderRadius: 4, padding: '1px 6px' }}>ลบ</span>
+                              </div>
+                              <input type="number" step="0.001" value={v ?? ''} onChange={e => app.updateStirrup(diam, len, e.target.value)} placeholder="น้ำหนัก กก." style={{ ...inp(null), width: '100%' }} />
+                            </div>
+                          ))}
+                        </div>
+                        <button onClick={() => { const len = window.prompt('ความยาว (ม.) ที่จะเพิ่มสำหรับ ' + dl(diam) + ' ?'); if (len) app.addStirrupLength(diam, len); }} style={{ ...btnGhost(), fontSize: 12, marginTop: 8, background: 'white' }}>+ เพิ่มความยาว</button>
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => { const len = window.prompt('ความยาว (ม.) ที่จะเพิ่มสำหรับ ' + dl(diam) + ' ?'); if (len) app.addStirrupLength(diam, len); }} style={{ ...btnGhost(), fontSize: 12, marginTop: 8 }}>+ เพิ่มความยาว</button>
                 </div>
               ))}
             </div>
