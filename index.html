@@ -5466,7 +5466,8 @@ window.__dataReady.then(data => {
   }
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขนส่ง','ฝ่ายจัดซื้อ','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
-  const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'วัตถุดิบ'},{k:'concrete',v:'คุณภาพวัตถุดิบ'}];
+  // เรียงลำดับ + ใช้คำเดียวกับ TAB_PERM_LIST ด้านล่าง (หน้าที่เข้าดูได้) ให้ตรงกัน จะได้เทียบคู่กันง่ายตอนตั้งสิทธิ์
+  const PERM_LIST=[{k:'quality',v:'รายงานปัญหา'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
   const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',concrete:'concrete'};
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
