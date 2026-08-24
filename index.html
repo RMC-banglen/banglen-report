@@ -5462,6 +5462,8 @@ window.__dataReady.then(data => {
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขนส่ง','ฝ่ายจัดซื้อ','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
   const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'วัตถุดิบ'}];
+  // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
+  const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials'};
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
@@ -5512,7 +5514,8 @@ window.__dataReady.then(data => {
         <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',marginBottom:5}}>สิทธิ์แก้ไข</div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           {PERM_LIST.map(({k,v})=>{
-            const tabOk=isAdmin||(k==='quality'?tabPerms['quality']!==false:tabPerms['worktrack']!==false);
+            const gateTab=PERM_TAB_GATE[k]||'worktrack';
+            const tabOk=isAdmin||tabPerms[gateTab]!==false;
             const has=tabOk&&(isAdmin||perms[k]);
             const disabled=isAdmin;
             return <button key={k} onClick={()=>!disabled&&onTogglePerm(u.id,'perm',k,!perms[k])} style={{fontSize:12,padding:'5px 12px',borderRadius:20,border:`1.5px solid ${has?'#0f766e':'#e2e8f0'}`,background:has?'#f0fdf4':'#f8fafc',color:has?'#0f766e':'#94a3b8',cursor:disabled?'default':'pointer',fontWeight:600}}>
