@@ -905,8 +905,8 @@ function SettingsPanel({ app }) {
   if (!mod) return null;
   const mok = mod.isMok, dl = mod.diamLabel;
   const groupBy = rows => [
-    { title: 'มาตรฐาน มอก.', rows: rows.filter(r => r.isMok) },
-    { title: 'โรงงาน (ไม่มี มอก.)', rows: rows.filter(r => !r.isMok) },
+    { title: 'มาตรฐาน มอก.', bg: '#eef6f7', color: '#1f7a8c', rows: rows.filter(r => r.isMok) },
+    { title: 'โรงงาน (ไม่มี มอก.)', bg: '#f7f4ee', color: '#8a6d1f', rows: rows.filter(r => !r.isMok) },
   ].filter(g => g.rows.length);
   // จัดกลุ่ม entries [diam, ...] เป็น มอก./โรงงาน พร้อมสี — ใช้กับตาราง PC.wire และปลอกแบบละเอียด
   const groupDiam = entries => [
@@ -945,11 +945,11 @@ function SettingsPanel({ app }) {
             <b>น้ำหนักแผ่นเพลทต่อแผ่น (กก.) ตามขนาดเสา</b>
             <div style={{ opacity: s.locks.plate ? 0.5 : 1, pointerEvents: s.locks.plate ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {groupBy(Object.entries(s.plateWeights || {}).map(([k, v]) => ({ key: k, value: v, isMok: mok(k) }))).map((g, i) => (
-                <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{g.title}</div>
+                <div key={i} style={{ border: '1px solid #dce7ea', borderRadius: 8, padding: 12, background: g.bg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: g.color }}>{g.title}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
                     {g.rows.map(row => (
-                      <div key={row.key}>
+                      <div key={row.key} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 8 }}>
                         <div style={{ fontSize: 12, color: '#78839A' }}>{dl(row.key)}</div>
                         <input type="number" step="0.001" value={row.value ?? ''} onChange={e => app.updatePlateWeight(row.key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
                         {!row.isMok ? (
@@ -970,11 +970,11 @@ function SettingsPanel({ app }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>น้ำหนักเหล็กหนวดกุ้งต่อชิ้น (กก.)</b>{lockBtn('whisker')}</div>
             <div style={{ opacity: s.locks.whisker ? 0.5 : 1, pointerEvents: s.locks.whisker ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {groupBy(Object.entries(s.whiskerWeights || {}).map(([k, v]) => ({ key: k, value: v, isMok: mok(k) }))).map((g, i) => (
-                <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{g.title}</div>
+                <div key={i} style={{ border: '1px solid #dce7ea', borderRadius: 8, padding: 12, background: g.bg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: g.color }}>{g.title}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
                     {g.rows.map(row => (
-                      <div key={row.key}>
+                      <div key={row.key} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 8 }}>
                         <div style={{ fontSize: 12, color: '#78839A' }}>{dl(row.key)}</div>
                         <input type="number" step="0.001" value={row.value ?? ''} onChange={e => app.updateWhiskerWeight(row.key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
                         <select value={(s.whiskerSpecs || {})[row.key] || ''} onChange={e => app.updateWhiskerSpec(row.key, e.target.value)} style={{ ...inp(null), width: '100%', fontSize: 11, marginTop: 4 }}>
