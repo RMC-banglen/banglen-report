@@ -1889,6 +1889,23 @@ window.__dataReady.then(data => {
     </>;
   }
 
+  function PileMaterialsFrame(){
+    // ให้ iframe ยืดความสูงตามเนื้อหาจริง เพื่อให้เลื่อนหน้าจอเดียว (แทนที่จะมี scrollbar ซ้อนกัน 2 อัน)
+    const ref=React.useRef(null);
+    const resize=()=>{
+      try{
+        const doc=ref.current&&ref.current.contentWindow&&ref.current.contentWindow.document;
+        if(doc)ref.current.style.height=(doc.documentElement.scrollHeight+20)+'px';
+      }catch(e){}
+    };
+    React.useEffect(()=>{
+      const id=setInterval(resize,400);
+      return ()=>clearInterval(id);
+    },[]);
+    return <iframe ref={ref} src="pile-materials.html" title="สต็อกวัตถุดิบเสาเข็ม" onLoad={resize}
+      style={{width:'100%',minHeight:400,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
+  }
+
   function DamageDetailTab({currentUser}){
     const isAdmin=currentUser?.role==='admin';
     const tp={...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
@@ -8133,7 +8150,7 @@ window.__dataReady.then(data => {
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
         {tab==='accident'&&<AccidentReportTab currentUser={currentUser}/>}
-        {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><iframe src="pile-materials.html" title="สต็อกวัตถุดิบเสาเข็ม" style={{width:'100%',height:'calc(100vh - 160px)',border:'1px solid #e2e8f0',borderRadius:12,background:'#fff'}}/></div>}
+        {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame/></div>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
