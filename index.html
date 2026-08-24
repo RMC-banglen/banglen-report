@@ -1889,6 +1889,32 @@ window.__dataReady.then(data => {
     </>;
   }
 
+  function TabNav({tabs,tab,setTab}){
+    // แสดงแท็บหลักไว้แถวเดียวไม่ต้องเลื่อน ที่เหลือพับเก็บใน dropdown "อื่นๆ"
+    const MAIN_COUNT=7;
+    const mainTabs=tabs.slice(0,MAIN_COUNT);
+    const moreTabs=tabs.slice(MAIN_COUNT);
+    const moreActive=moreTabs.some(t=>t.id===tab);
+    const [open,setOpen]=React.useState(false);
+    const ref=React.useRef(null);
+    React.useEffect(()=>{
+      if(!open)return;
+      const onDocClick=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+      document.addEventListener('mousedown',onDocClick);
+      return ()=>document.removeEventListener('mousedown',onDocClick);
+    },[open]);
+    if(!moreTabs.length) return <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}</nav>;
+    return <nav className="tabs" style={{position:'relative',overflow:'visible'}}>
+      {mainTabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}
+      <div ref={ref} style={{position:'relative',flexShrink:0}}>
+        <button className={`tabs__btn ${moreActive?'is-active':''}`} onClick={()=>setOpen(o=>!o)}>อื่นๆ {open?'▴':'▾'}</button>
+        {open&&<div style={{position:'absolute',top:'100%',right:0,marginTop:4,background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,boxShadow:'0 8px 24px rgba(0,0,0,.12)',padding:6,minWidth:220,zIndex:50,display:'flex',flexDirection:'column',gap:2}}>
+          {moreTabs.map(t=><button key={t.id} onClick={()=>{setTab(t.id);setOpen(false);}} style={{textAlign:'left',border:0,background:tab===t.id?'#eff6ff':'transparent',color:tab===t.id?'var(--primary)':'#334155',fontFamily:'inherit',fontSize:13.5,fontWeight:600,padding:'9px 12px',borderRadius:7,cursor:'pointer'}}>{t.label}</button>)}
+        </div>}
+      </div>
+    </nav>;
+  }
+
   function PileMaterialsFrame(){
     // ให้ iframe ยืดความสูงตามเนื้อหาจริง เพื่อให้เลื่อนหน้าจอเดียว (แทนที่จะมี scrollbar ซ้อนกัน 2 อัน)
     const ref=React.useRef(null);
@@ -8136,7 +8162,7 @@ window.__dataReady.then(data => {
           </div>
         </div>
       </header>
-      <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}</nav>
+      <TabNav tabs={tabs} tab={tab} setTab={setTab}/>
       <main>
         {tab==='meeting'&&<HeadOfficeMeetingTab/>}
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
