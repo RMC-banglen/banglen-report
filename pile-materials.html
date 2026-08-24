@@ -41,7 +41,10 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
 <script type="module">
-import * as PileCalcMod from './pile-calc.js';
+// ต่อ query แคชบัสต์เดียวกับที่หน้านี้ถูกเปิด (เช่น ?v=... จาก iframe ในหน้าแม่) ไปที่ pile-calc.js ด้วย
+// กันปัญหาเบราว์เซอร์ใช้ pile-calc.js เก่าจากแคชค้าง ทั้งที่ pile-materials.html โหลดใหม่แล้ว
+const v = new URLSearchParams(location.search).get('v');
+const PileCalcMod = await import('./pile-calc.js' + (v ? ('?v=' + v) : ''));
 window.__PileCalc = PileCalcMod;
 </script>
 <script type="text/babel">
