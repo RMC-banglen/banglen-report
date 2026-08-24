@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>สต็อกวัตถุดิบเสาเข็ม — ร่วมมิตรคอนกรีต(บางเลน)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f4f6f9; --surface: #ffffff; --line: #e8ebf1; --ink: #1f2733; --ink-soft: #46505f;
+    --muted-text: #6a7382; --primary: #2f5fd0; --primary-dark: #244c9b; --primary-wash: #eef3fc;
+    --radius: 12px; --shadow: 0 1px 2px rgba(22,34,51,0.04), 0 4px 14px rgba(22,34,51,0.05);
+    --font: 'IBM Plex Sans Thai', 'Sarabun', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; }
+  a { color: var(--primary); }
+  a:hover { color: var(--primary-dark); }
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 18px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .topbar__mark { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(150deg, #3a6ad8, #244c9b); display: grid; place-items: center; color: white; font-weight: 800; font-size: 18px; }
+  .topbar__title { font-size: 18px; font-weight: 700; margin: 0; }
+  .topbar__sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted-text); }
+  @media print { [data-no-print] { display: none !important; } body { background: white; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar__mark">RMC</div>
+  <div>
+    <p class="topbar__title">สต็อกวัตถุดิบเสาเข็ม</p>
+    <p class="topbar__sub">บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด</p>
+  </div>
+</div>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+<script type="module">
+import * as PileCalcMod from './pile-calc.js';
+window.__PileCalc = PileCalcMod;
+</script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+let PC = null; // pile-calc module, loaded async below
+function waitForPileCalc() {
+  return new Promise(resolve => {
+    if (window.__PileCalc) return resolve(window.__PileCalc);
+    const iv = setInterval(() => { if (window.__PileCalc) { clearInterval(iv); resolve(window.__PileCalc); } }, 20);
+  });
+}
+
+function fmt(n, digits) {
+  if (n == null || !isFinite(n)) return '-';
+  return n.toLocaleString('th-TH', { minimumFractionDigits: digits ?? 1, maximumFractionDigits: digits ?? 1 });
+}
+function parseFmtNum(str) {
+  if (str == null || str === '' || str === '-') return null;
+  const n = parseFloat(String(str).replace(/[+,%]/g, ''));
+  return isFinite(n) ? n : null;
+}
+const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const CATS = [
+  { key: 'rebar', label: 'เหล็กเสริม' }, { key: 'plate', label: 'เพลท' }, { key: 'pc', label: 'PC.wire' },
+  { key: 'stirrup', label: 'ลวดปลอก' }, { key: 'whisker', label: 'หนวดกุ้ง' }, { key: 'collar', label: 'Collar' },
+];
+
+/* ---------- small UI ---------- */
+function Modal({ onClose, children }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: 'white', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 26, display: 'flex', flexDirection: 'column', gap: 14, width: 560, maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', textAlign: 'left' }} onClick={e => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  );
+}
+function GeneralUseModal({ title, entries, onAdd, onClose, unit }) {
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>ใช้งานอื่น-เสียหาย — {title}</div>
+      <div style={{ fontSize: 14, color: '#78839A' }}>ระบุจำนวนและสาเหตุทีละรายการ ระบบจะรวมยอดให้อัตโนมัติ</div>
+      {entries.map((e, i) => (
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input type="number" value={e.amount} onChange={ev => e.onAmountChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} />
+          <input type="text" value={e.reason} onChange={ev => e.onReasonChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} />
+          <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
+        <button onClick={onAdd} style={btnDashed()}>+ เพิ่มรายการ</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>รวม: {fmt(entries.reduce((s, e) => s + (Number(e.amount) || 0), 0), 1)} {unit || ''}</div>
+          <button onClick={onClose} style={btnPrimary()}>เสร็จสิ้น</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+const inp = (w, right) => ({ width: w || undefined, textAlign: right ? 'right' : 'left', padding: '8px 10px', borderRadius: 6, border: '1px solid #d8dde6', fontFamily: 'inherit', fontSize: 14 });
+const btnGhost = (color) => ({ padding: '8px 12px', borderRadius: 6, border: '1px solid #d8dde6', background: 'white', fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', color: color || '#333' });
+const btnDashed = () => ({ padding: '8px 14px', borderRadius: 6, border: '1px dashed #aab', background: 'white', fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', color: '#556' });
+const btnPrimary = () => ({ padding: '9px 18px', borderRadius: 8, border: 'none', background: '#2f5fd0', color: 'white', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer' });
+
+function ActualCell({ row, stockMode }) {
+  if (stockMode) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+      <div style={{ fontSize: 13, color: '#2f5fd0', fontWeight: 700 }}>{row.actualFmt}</div>
+      {[['ยกมา', 'opening'], ['รับเข้า', 'received']].map(([lbl, f]) => (
+        <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, color: '#78839A', whiteSpace: 'nowrap' }}>{lbl}</span>
+          <input type="number" value={row[f]} onChange={e => row['on' + f[0].toUpperCase() + f.slice(1) + 'Change'](e.target.value)} style={inp(80, true)} />
+        </div>
+      ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 11, color: '#2f5fd0', fontWeight: 600, whiteSpace: 'nowrap' }}>นับสต็อก</span>
+        <input type="number" value={row.closing} onChange={e => row.onClosingChange(e.target.value)} style={{ ...inp(80, true), borderColor: '#2f5fd0' }} />
+      </div>
+    </div>
+  );
+  return <input type="number" value={row.actual} onChange={e => row.onActualChange(e.target.value)} placeholder="0" style={inp(100, true)} />;
+}
+
+function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, extraRebarButton, allowExtraSpec }) {
+  if (!rows || !rows.length) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 13, color: '#78839A' }}>{subtitle}</div>}
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden', tableLayout: 'fixed' }}>
+        <thead>
+          <tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
+            <th style={th(28)}>รายการ</th>
+            <th style={th(15, true)}>คำนวณ ({unitLabel})</th>
+            <th style={th(18, true)}>ใช้จริง ({unitLabel})</th>
+            <th style={th(10, true)}>ส่วนต่าง</th>
+            <th style={th(12, true)}>ใช้งานอื่น-เสียหาย</th>
+            <th style={th(9, true)}>ส่วนต่างจริง</th>
+            <th style={th(8, true)}>% หาย</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} style={{ borderTop: '1px solid #eef0f4', verticalAlign: 'top' }}>
+              <td style={td()}>
+                {allowExtraSpec && row.isExtra ? (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="text" value={row.spec} onChange={e => row.onSpecChange(e.target.value)} placeholder="ระบุขนาด/สเปคเหล็ก" style={{ ...inp(null), flex: 1 }} />
+                    <button onClick={row.onRemoveExtra} style={btnGhost('#c0392b')}>ลบ</button>
+                  </div>
+                ) : row.label}
+              </td>
+              <td style={td(true)}>{row.calcFmt}</td>
+              <td style={{ padding: '6px 14px', textAlign: 'right' }}><ActualCell row={row} stockMode={stockMode} /></td>
+              <td style={{ ...td(true), color: row.diffColor }}>{row.diffFmt}</td>
+              <td style={{ padding: '6px 14px', textAlign: 'right' }}>
+                <button onClick={() => onOpenGeneralUse(row)} style={{ background: '#f4f6f9', border: '1px solid #d8dde6', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, minWidth: 70 }}>{row.generalUseSummaryFmt}</button>
+              </td>
+              <td style={{ ...td(true), fontWeight: 700 }}>{row.realDiffFmt}</td>
+              <td style={{ ...td(true), fontWeight: 700, background: row.rowBg, borderRadius: 6 }}>{row.pctLostFmt}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {extraRebarButton}
+    </div>
+  );
+}
+const th = (w, right) => ({ padding: '10px 14px', fontSize: 13, width: w + '%', textAlign: right ? 'right' : 'left' });
+const td = (right) => ({ padding: '9px 14px', fontSize: 14, textAlign: right ? 'right' : 'left' });
+
+/* ========================= main app ========================= */
+class App extends React.Component {
+  state = {
+    fileName: '', loading: false, error: '', result: null, actual: {},
+    showSettings: false, settingsTab: 'rebar', resultView: 'main',
+    stock: {}, plateStockDiam: {}, plateGeneralUseEntries: {}, plateGeneralUseOpen: {},
+    extraRebarItems: [], alertThresholdPct: 5, alertThresholdByCategory: {},
+    mainSearchQuery: '', showAlertList: false, periodLocked: {}, periodSummaries: {},
+    generalUseEntries: {}, generalUseOpen: {}, periodLabel: null, periods: [], periodHistory: {},
+    periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
+    periodPickerMonth: new Date().getMonth(), periodPickerYear: new Date().getFullYear() + 543,
+    undoStack: [], redoStack: [],
+    locks: { rebar: true, plate: true, whisker: true, pcKgPerM: true, pcWire: true, stirrup: true },
+    rawRows: null, rebarWeights: null, plateWeights: null, whiskerWeights: null, whiskerSpecs: null,
+    pcWireKgPerM: null, pcWireTable: null, stirrupTable: null, stirrupWireMm: null, plateThicknessMm: null,
+    plateBigSheetKg: { 6: 438, 8: 584, 9: 657 },
+  };
+
+  persistKeys = ['result', 'rawRows', 'fileName', 'actual', 'stock', 'plateStockDiam', 'generalUseEntries', 'plateGeneralUseEntries',
+    'periodLabel', 'periods', 'periodHistory', 'periodLocked', 'periodSummaries', 'extraRebarItems', 'alertThresholdPct',
+    'rebarWeights', 'plateWeights', 'whiskerWeights', 'whiskerSpecs', 'pcWireKgPerM', 'pcWireTable', 'stirrupTable', 'stirrupWireMm', 'plateThicknessMm',
+    'plateBigSheetKg', 'locks'];
+
+  async componentDidMount() {
+    PC = await waitForPileCalc();
+    this._mod = PC;
+    this.setState({
+      rebarWeights: { ...PC.REBAR_WEIGHT_PER_M }, plateWeights: { ...PC.PLATE_WEIGHT_PER_PIECE },
+      whiskerWeights: { ...PC.WHISKER_WEIGHT_PER_PIECE },
+      whiskerSpecs: Object.fromEntries(Object.keys(PC.WHISKER_WEIGHT_PER_PIECE).map(k => [k, PC.WHISKER_REBAR_SPEC[k] || ''])),
+      pcWireKgPerM: { ...PC.PC_WIRE_KG_PER_M }, pcWireTable: PC.PC_WIRE_TABLE.map(c => ({ ...c })),
+      stirrupTable: Object.fromEntries(Object.entries(PC.STIRRUP_TABLE).map(([d, m]) => [d, { ...m }])),
+      stirrupWireMm: Object.fromEntries(Object.entries(PC.STIRRUP_WIRE_MM).map(([d, v]) => [d, v.toFixed(1)])),
+      plateThicknessMm: { ...PC.PLATE_THICKNESS_MM },
+    });
+    this.loadPersisted();
+    this._persistReady = true;
+  }
+  loadPersisted() {
+    try {
+      const raw = localStorage.getItem('pileCalcState_v1');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      const patch = {};
+      this.persistKeys.forEach(k => { if (saved[k] !== undefined) patch[k] = saved[k]; });
+      if (patch.periodLabel === 'งวดปัจจุบัน') patch.periodLabel = null;
+      this.setState(patch);
+    } catch (e) {}
+  }
+  savePersisted() {
+    try {
+      const out = {};
+      this.persistKeys.forEach(k => { out[k] = this.state[k]; });
+      localStorage.setItem('pileCalcState_v1', JSON.stringify(out));
+    } catch (e) {}
+  }
+  componentDidUpdate() {
+    if (!this._persistReady) return;
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this.savePersisted(), 400);
+  }
+
+  fmt(n, d) { return fmt(n, d); }
+  parseFmtNum(s) { return parseFmtNum(s); }
+
+  toggleSettings() { this.setState(s => ({ showSettings: !s.showSettings })); }
+  toggleAlertList() { this.setState(s => ({ showAlertList: !s.showAlertList })); }
+  setMainSearchQuery(v) { this.setState({ mainSearchQuery: v }); }
+  setAlertThreshold(v) { this.setState({ alertThresholdPct: v === '' ? 0 : Number(v) }); }
+  setAlertThresholdCategory(k, v) { this.setState(s => ({ alertThresholdByCategory: { ...s.alertThresholdByCategory, [k]: v === '' ? null : Number(v) } })); }
+  getThresholdFor(k) { const v = this.state.alertThresholdByCategory[k]; return (v == null || v === '') ? (this.state.alertThresholdPct || Infinity) : v; }
+  toggleCurrentPeriodLock() { this.setState(s => ({ periodLocked: { ...s.periodLocked, [s.periodLabel]: !s.periodLocked[s.periodLabel] } })); }
+  toggleLock(k) { this.setState(s => ({ locks: { ...s.locks, [k]: !s.locks[k] } })); }
+  setSettingsTab(t) { this.setState({ settingsTab: t }); }
+  setResultView(v) { this.setState({ resultView: v }); }
+
+  pushUndo(s) { const st = [...(s.undoStack || []), this.snapshotFullState(s)]; return st.length > 20 ? st.slice(st.length - 20) : st; }
+  snapshotFullState(s) {
+    return { stock: s.stock, plateStockDiam: s.plateStockDiam, actual: s.actual, generalUseEntries: s.generalUseEntries,
+      plateGeneralUseEntries: s.plateGeneralUseEntries, periodLabel: s.periodLabel, periods: s.periods, periodHistory: s.periodHistory };
+  }
+  undoLastAction() {
+    const stack = this.state.undoStack;
+    if (!stack || !stack.length) return;
+    const prev = stack[stack.length - 1];
+    if (prev.periodLabel !== this.state.periodLabel) {
+      if (!confirm('การย้อนกลับนี้จะเปลี่ยนงวดที่กำลังดูจาก "' + this.state.periodLabel + '" กลับไปเป็น "' + prev.periodLabel + '" ต้องการดำเนินการต่อหรือไม่?')) return;
+    }
+    this.setState(s => {
+      const ns = [...s.undoStack]; const p = ns.pop();
+      const redoStack = [...s.redoStack, this.snapshotFullState(s)];
+      return { ...p, undoStack: ns, redoStack, generalUseOpen: {} };
+    });
+  }
+  redoLastAction() {
+    this.setState(s => {
+      if (!s.redoStack.length) return null;
+      const rs = [...s.redoStack]; const n = rs.pop();
+      const undoStack = [...s.undoStack, this.snapshotFullState(s)];
+      return { ...n, undoStack, redoStack: rs, generalUseOpen: {} };
+    });
+  }
+
+  updateStock(key, field, value) {
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], stock: { ...s.stock, [key]: { ...s.stock[key], [field]: value === '' ? null : Number(value) } } }));
+  }
+  updatePlateStockDiam(diam, field, value) {
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateStockDiam: { ...s.plateStockDiam, [diam]: { ...s.plateStockDiam[diam], [field]: value === '' ? 0 : Number(value) } } }));
+  }
+  addPlateGeneralUseEntry(t) {
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateGeneralUseEntries: { ...s.plateGeneralUseEntries, [t]: [...(s.plateGeneralUseEntries[t] || []), { kg: 0, note: '' }] } }));
+  }
+  removePlateGeneralUseEntry(t, idx) {
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateGeneralUseEntries: { ...s.plateGeneralUseEntries, [t]: (s.plateGeneralUseEntries[t] || []).filter((_, i) => i !== idx) } }));
+  }
+  updatePlateGeneralUseEntry(t, idx, field, value) {
+    this.setState(s => {
+      const list = [...(s.plateGeneralUseEntries[t] || [])];
+      list[idx] = { ...list[idx], [field]: field === 'kg' ? (value === '' ? 0 : Number(value)) : value };
+      return { undoStack: this.pushUndo(s), redoStack: [], plateGeneralUseEntries: { ...s.plateGeneralUseEntries, [t]: list } };
+    });
+  }
+  computedActualFromStock(key) {
+    const s = this.state.stock[key]; if (!s) return '';
+    const opening = s.opening ?? 0, received = s.received ?? 0, closing = s.closing;
+    if (closing == null) return '';
+    return opening + received - closing;
+  }
+  currentConfig() {
+    return { rebarWeights: this.state.rebarWeights, plateWeights: this.state.plateWeights,
+      whiskerWeights: this.state.whiskerWeights, whiskerSpecs: this.state.whiskerSpecs,
+      pcWireKgPerM: this.state.pcWireKgPerM, pcWireTable: this.state.pcWireTable, stirrupTable: this.state.stirrupTable };
+  }
+  recompute() { if (!this.state.rawRows || !this._mod) return; this.setState({ result: this._mod.calcPileList(this.state.rawRows, this.currentConfig()) }); }
+  updateRebarWeight(k, v) { this.setState(s => ({ rebarWeights: { ...s.rebarWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updatePlateWeight(k, v) { this.setState(s => ({ plateWeights: { ...s.plateWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updateWhiskerWeight(k, v) { this.setState(s => ({ whiskerWeights: { ...s.whiskerWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updateWhiskerSpec(k, v) { this.setState(s => ({ whiskerSpecs: { ...s.whiskerSpecs, [k]: v } }), () => this.recompute()); }
+  updatePcKgPerM(mm, v) { this.setState(s => ({ pcWireKgPerM: { ...s.pcWireKgPerM, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updatePcWire(id, field, v) { this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => c.id === id ? { ...c, [field]: v === '' ? 0 : Number(v) } : c) }), () => this.recompute()); }
+  updatePlateThickness(diam, v) { this.setState(s => ({ plateThicknessMm: { ...s.plateThicknessMm, [diam]: Number(v) } })); }
+  updatePlateBigSheetKg(mm, v) { this.setState(s => ({ plateBigSheetKg: { ...s.plateBigSheetKg, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
+  updateStirrupWireMm(diam, v) { this.setState(s => ({ stirrupWireMm: { ...s.stirrupWireMm, [diam]: v } })); }
+  updateStirrup(diam, len, v) { this.setState(s => ({ stirrupTable: { ...s.stirrupTable, [diam]: { ...s.stirrupTable[diam], [len]: v === '' ? null : Number(v) } } }), () => this.recompute()); }
+
+  buildLockUi(key) {
+    const locked = this.state.locks[key];
+    return { locked, label: locked ? '🔒 ล็อกอยู่ — กดเพื่อปลดล็อก' : '🔓 ปลดล็อกแล้ว — กดเพื่อล็อก',
+      pointerEvents: locked ? 'none' : 'auto', opacity: locked ? 0.5 : 1, onToggle: () => this.toggleLock(key) };
+  }
+
+  toggleGeneralUseOpen(key) { this.setState(s => ({ generalUseOpen: { ...s.generalUseOpen, [key]: !s.generalUseOpen[key] } })); }
+  togglePlateGeneralUseOpen(t) { this.setState(s => ({ plateGeneralUseOpen: { ...s.plateGeneralUseOpen, [t]: !s.plateGeneralUseOpen[t] } })); }
+  addExtraRebarItem() { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: [...s.extraRebarItems, { id: 'x' + Date.now() + Math.random(), spec: '' }] })); }
+  removeExtraRebarItem(id) { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.filter(it => it.id !== id) })); }
+  updateExtraRebarSpec(id, v) { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.map(it => it.id === id ? { ...it, spec: v } : it) })); }
+  addGeneralUseEntry(key) {
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [],
+      generalUseEntries: { ...s.generalUseEntries, [key]: [...(s.generalUseEntries[key] || []), { amount: 0, reason: '' }] },
+      generalUseOpen: { ...s.generalUseOpen, [key]: true } }));
+  }
+  removeGeneralUseEntry(key, idx) {
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], generalUseEntries: { ...s.generalUseEntries, [key]: (s.generalUseEntries[key] || []).filter((_, i) => i !== idx) } }));
+  }
+  updateGeneralUseEntry(key, idx, field, value) {
+    this.setState(s => {
+      const list = [...(s.generalUseEntries[key] || [])];
+      list[idx] = { ...list[idx], [field]: field === 'amount' ? (value === '' ? 0 : Number(value)) : value };
+      return { undoStack: this.pushUndo(s), redoStack: [], generalUseEntries: { ...s.generalUseEntries, [key]: list } };
+    });
+  }
+
+  diffInfo(calc, actualStr) {
+    const actual = actualStr === '' || actualStr == null ? null : Number(actualStr);
+    if (actual == null || !isFinite(actual)) return { actual: '', diffFmt: '-', pctFmt: '-', diffColor: 'inherit' };
+    const diff = actual - calc;
+    const pct = calc !== 0 ? (diff / calc) * 100 : (actual !== 0 ? Infinity : 0);
+    const color = Math.abs(pct) < 3 ? '#728' : (diff > 0 ? '#c0392b' : '#3f7d2b');
+    return { actual: actualStr, diffFmt: (diff > 0 ? '+' : '') + fmt(diff, 1), pctFmt: !isFinite(pct) ? 'ไม่มียอดคำนวณ' : (pct > 0 ? '+' : '') + fmt(pct, 1) + '%', diffColor: color };
+  }
+  thresholdBg(pctLost, key) {
+    const cat = key ? String(key).split(':')[1] : null;
+    const threshold = cat ? this.getThresholdFor(cat) : (this.state.alertThresholdPct || Infinity);
+    if (pctLost == null || !isFinite(pctLost) || Math.abs(pctLost) < threshold) return 'transparent';
+    return pctLost > 0 ? '#eaf7ea' : '#fbeaea';
+  }
+  setActual(key, value) { this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], actual: { ...s.actual, [key]: value } })); }
+
+  buildRow(key, label, calcVal, extraFmt) {
+    const hasStockEntry = this.state.stock[key] && (this.state.stock[key].opening != null || this.state.stock[key].received != null || this.state.stock[key].closing != null);
+    const actualStr = (this.state.resultView === 'stock' || hasStockEntry) ? this.computedActualFromStock(key) : (this.state.actual[key] ?? '');
+    const info = this.diffInfo(calcVal, actualStr);
+    const stockVals = this.state.stock[key] || {};
+    const generalUseEntriesRaw = this.state.generalUseEntries[key] || [];
+    const generalUse = generalUseEntriesRaw.reduce((s, e) => s + (e.amount || 0), 0);
+    const actualNum = info.actual === '' || info.actual == null ? null : Number(info.actual);
+    const A = actualNum != null ? calcVal - actualNum : null;
+    const realDiff = A != null ? A + generalUse : null;
+    const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
+    return {
+      key, label, calcFmt: fmt(calcVal, 1), actual: info.actual,
+      actualFmt: (info.actual === '' || info.actual == null || isNaN(Number(info.actual))) ? '-' : fmt(Number(info.actual), 1),
+      diffFmt: info.diffFmt, pctFmt: info.pctFmt, diffColor: info.diffColor,
+      onActualChange: v => this.setActual(key, v),
+      opening: stockVals.opening ?? '', received: stockVals.received ?? '', closing: stockVals.closing ?? '',
+      onOpeningChange: v => this.updateStock(key, 'opening', v), onReceivedChange: v => this.updateStock(key, 'received', v), onClosingChange: v => this.updateStock(key, 'closing', v),
+      generalUse,
+      generalUseEntries: generalUseEntriesRaw.map((e, idx) => ({
+        amount: e.amount, reason: e.reason,
+        onAmountChange: v => this.updateGeneralUseEntry(key, idx, 'amount', v),
+        onReasonChange: v => this.updateGeneralUseEntry(key, idx, 'reason', v),
+        onRemove: () => this.removeGeneralUseEntry(key, idx),
+      })),
+      onAddGeneralUseEntry: () => this.addGeneralUseEntry(key),
+      generalUseOpen: !!this.state.generalUseOpen[key],
+      generalUseSummaryFmt: fmt(generalUse, 1),
+      onToggleGeneralUseOpen: () => this.toggleGeneralUseOpen(key),
+      realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, 1)) : '-',
+      pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 1) + '%') : '-',
+      rowBg: this.thresholdBg(pctLost, key),
+      ...extraFmt,
+    };
+  }
+
+  buildMainPage(r) {
+    if (!r) return null;
+    const wireMmMap = this.state.stirrupWireMm || {}, thickMap = this.state.plateThicknessMm || {}, specMap = this.state.whiskerSpecs || {};
+    const dl = this._mod ? this._mod.diamLabel : (x => x);
+    const rebarRowsM = r.rebar.map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true }));
+    this.state.extraRebarItems.forEach(item => {
+      const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
+      rebarRowsM.push({ ...row, isExtra: true, spec: item.spec, onSpecChange: v => this.updateExtraRebarSpec(item.id, v), onRemoveExtra: () => this.removeExtraRebarItem(item.id) });
+    });
+    const pcBuckets = { 4: 0, 5: 0, 7: 0 };
+    r.pc.forEach(x => { pcBuckets[4] += x.pc4Kg; pcBuckets[5] += x.pc5Kg; pcBuckets[7] += x.pc7Kg; });
+    const pcRowsM = Object.entries(pcBuckets).filter(([, v]) => v > 0).map(([mm, v]) => this.buildRow('main:pc:' + mm, 'PC.wire' + mm + 'มม.', v, { unit: 'กก.' }));
+    const stirrupBuckets = {};
+    r.stirrup.forEach(x => { const mm = wireMmMap[x.diam] || 'ไม่ระบุ'; stirrupBuckets[mm] = (stirrupBuckets[mm] || 0) + x.weightKg; });
+    const stirrupRowsM = Object.entries(stirrupBuckets).sort((a, b) => a[0].localeCompare(b[0])).map(([mm, v]) => this.buildRow('main:stirrup:' + mm, 'ปลอก' + mm + (mm !== 'ไม่ระบุ' ? ' มม.' : ''), v, { unit: 'กก.' }));
+    const plateBuckets = { 6: { count: 0, weight: 0 }, 8: { count: 0, weight: 0 }, 9: { count: 0, weight: 0 } };
+    r.plates.forEach(x => { const t = thickMap[x.diam] || 'ไม่ระบุ'; if (!plateBuckets[t]) plateBuckets[t] = { count: 0, weight: 0 }; plateBuckets[t].count += x.count; plateBuckets[t].weight += x.weightKg; });
+    const bigSheetKg = this.state.plateBigSheetKg || {};
+    const mokFn = this._mod ? this._mod.isMok : (() => false);
+    const plateWeightsM = this.state.plateWeights || {};
+    const plateRowsM = Object.entries(plateBuckets).sort((a, b) => Number(b[0]) - Number(a[0])).map(([t, v]) => {
+      const kgPerBigSheet = bigSheetKg[t] || null;
+      const bigSheets = kgPerBigSheet ? v.weight / kgPerBigSheet : 0;
+      const label = 'เพลท' + t + (t !== 'ไม่ระบุ' ? ' มม.' : '') + ' (แผ่นใหญ่ 5x20ฟุต)';
+      const row = this.buildRow('main:plate:' + t, label, bigSheets, { unit: 'แผ่น' });
+      const diams = Object.keys(thickMap).filter(d => thickMap[d] === t && (Number(t) !== 9 || mokFn(d)));
+      let openW = 0, closeW = 0;
+      diams.forEach(d => { const st = this.state.plateStockDiam[d] || {}; const w = plateWeightsM[d] || 0; openW += (st.open || 0) * w; closeW += (st.close || 0) * w; });
+      const openSheets = kgPerBigSheet ? openW / kgPerBigSheet : 0, closeSheets = kgPerBigSheet ? closeW / kgPerBigSheet : 0;
+      const stockInOut = closeSheets - openSheets;
+      const generalUseKg = (this.state.plateGeneralUseEntries[t] || []).reduce((s, e) => s + (e.kg || 0), 0);
+      const generalUseSheets = kgPerBigSheet ? generalUseKg / kgPerBigSheet : 0;
+      const actualNum = row.actual === '' || row.actual == null ? null : Number(row.actual);
+      const A = actualNum != null ? bigSheets - actualNum : null;
+      const realDiff = A != null ? A + generalUseSheets + stockInOut : null;
+      const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
+      const plateEntries = (this.state.plateGeneralUseEntries[t] || []).map((e, idx) => ({
+        kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
+        onNoteChange: v => this.updatePlateGeneralUseEntry(t, idx, 'note', v), onRemove: () => this.removePlateGeneralUseEntry(t, idx),
+      }));
+      return {
+        ...row, thickness: t,
+        generalUseFmt: fmt(generalUseSheets, 2), plateGeneralUseOpen: !!this.state.plateGeneralUseOpen[t],
+        onTogglePlateGeneralUseOpen: () => this.togglePlateGeneralUseOpen(t), plateGeneralUseEntries: plateEntries,
+        onAddPlateGeneralUseEntry: () => this.addPlateGeneralUseEntry(t),
+        stockInOutFmt: (stockInOut >= 0 ? '+' : '') + fmt(stockInOut, 2),
+        realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, 2)) : '-',
+        pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 2) + '%') : '-',
+        rowBg: this.thresholdBg(pctLost, 'main:plate'),
+        generalUseSummaryFmt: fmt(generalUseSheets, 2),
+      };
+    });
+    const whiskerBuckets = {};
+    r.whisker.forEach(x => { const spec = specMap[x.diam] || 'ไม่ระบุ'; if (!whiskerBuckets[spec]) whiskerBuckets[spec] = { count: 0, weight: 0 }; whiskerBuckets[spec].count += x.count; whiskerBuckets[spec].weight += x.weightKg; });
+    const whiskerRowsM = Object.entries(whiskerBuckets).map(([spec, v]) => this.buildRow('main:whisker:' + spec, spec, v.weight, { unit: 'กก.' }));
+    const mok = this._mod ? this._mod.isMok : (() => false);
+    const allMokDiams = Object.keys(this.state.plateWeights || {}).filter(mok);
+    const collarCountByDiam = Object.fromEntries(r.collar.map(x => [x.diam, x.count]));
+    const collarRowsM = allMokDiams.map(diam => this.buildRow('main:collar:' + diam, 'Colla ' + dl(diam).replace(' มอก.', '').replace('-', ''), collarCountByDiam[diam] || 0, { unit: 'ชุด' }));
+    return { rebarRowsM, pcRowsM, stirrupRowsM, plateRowsM, whiskerRowsM, collarRowsM };
+  }
+
+  buildPlateReconcile(r) {
+    if (!r || !this._mod) return [];
+    const mok = this._mod.isMok, dl = this._mod.diamLabel;
+    const thickMap = this.state.plateThicknessMm || {}, plateWeights = this.state.plateWeights || {}, bigSheetKg = this.state.plateBigSheetKg || {};
+    const thicknesses = [...new Set(Object.values(thickMap).filter(Boolean))].sort((a, b) => Number(b) - Number(a));
+    return thicknesses.map(t => {
+      const diams = Object.keys(thickMap).filter(d => thickMap[d] === t && (Number(t) !== 9 || mok(d)));
+      const rows = diams.map(diam => {
+        const st = this.state.plateStockDiam[diam] || {}; const open = st.open || 0, close = st.close || 0, w = plateWeights[diam] || 0;
+        return { diam, label: dl(diam), open, close, openWeight: open * w, closeWeight: close * w,
+          onOpenChange: v => this.updatePlateStockDiam(diam, 'open', v), onCloseChange: v => this.updatePlateStockDiam(diam, 'close', v) };
+      });
+      const openWeightTotal = rows.reduce((s, x) => s + x.openWeight, 0), closeWeightTotal = rows.reduce((s, x) => s + x.closeWeight, 0);
+      const kgPerSheet = bigSheetKg[t] || 1;
+      const openSheets = openWeightTotal / kgPerSheet, closeSheets = closeWeightTotal / kgPerSheet;
+      const plateCalcBig = (r.plates || []).filter(x => thickMap[x.diam] === t).reduce((s, x) => s + x.weightKg, 0) / kgPerSheet;
+      const plateKey = 'main:plate:' + t;
+      const hasStockEntryP = this.state.stock[plateKey] && (this.state.stock[plateKey].opening != null || this.state.stock[plateKey].received != null || this.state.stock[plateKey].closing != null);
+      const actualStr = (this.state.resultView === 'stock' || hasStockEntryP) ? this.computedActualFromStock(plateKey) : (this.state.actual[plateKey] ?? '');
+      const actualSheets = actualStr === '' || actualStr == null ? null : Number(actualStr);
+      const A = actualSheets != null ? plateCalcBig - actualSheets : null;
+      const B = closeSheets - openSheets;
+      const sumABSheets = A != null ? A + B : null, sumABKg = sumABSheets != null ? sumABSheets * kgPerSheet : null;
+      const entries = (this.state.plateGeneralUseEntries[t] || []).map((e, idx) => ({
+        kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
+        onNoteChange: v => this.updatePlateGeneralUseEntry(t, idx, 'note', v), onRemove: () => this.removePlateGeneralUseEntry(t, idx),
+      }));
+      const generalUseKg = entries.reduce((s, e) => s + (e.kg || 0), 0);
+      const unexplainedKg = sumABKg != null ? sumABKg + generalUseKg : null;
+      return { t, rows, openWeightFmt: fmt(openWeightTotal, 1), closeWeightFmt: fmt(closeWeightTotal, 1),
+        openSheetsFmt: fmt(openSheets, 2), closeSheetsFmt: fmt(closeSheets, 2), plateCalcBigFmt: fmt(plateCalcBig, 2),
+        AFmt: A != null ? fmt(A, 2) : '-', BFmt: fmt(B, 2), sumABSheetsFmt: sumABSheets != null ? fmt(sumABSheets, 2) : '-',
+        sumABKgFmt: sumABKg != null ? fmt(sumABKg, 1) : '-', generalUseEntries: entries, generalUseKgFmt: fmt(generalUseKg, 1),
+        onAddGeneralUseEntry: () => this.addPlateGeneralUseEntry(t), unexplainedKgFmt: unexplainedKg != null ? fmt(unexplainedKg, 1) : '-' };
+    });
+  }
+
+  computePeriodSummary(s) {
+    if (!s.result) return null;
+    const mp = this.buildMainPage(s.result);
+    return CATS.map(c => {
+      const rows = mp[c.key + 'RowsM'] || [];
+      let totalCalc = 0, totalRealDiff = 0, hasDiff = false;
+      rows.forEach(row => {
+        totalCalc += parseFmtNum(row.calcFmt) || 0;
+        const rd = parseFmtNum(row.realDiffFmt);
+        if (rd != null) { totalRealDiff += rd; hasDiff = true; }
+      });
+      const pct = hasDiff && totalCalc ? (totalRealDiff / totalCalc) * 100 : null;
+      return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct };
+    });
+  }
+  filterMainPage(mp) {
+    if (!mp) return mp;
+    const q = (this.state.mainSearchQuery || '').trim().toLowerCase();
+    if (!q) return mp;
+    const f = rows => (rows || []).filter(row => String(row.label || '').toLowerCase().includes(q));
+    const out = { ...mp };
+    CATS.forEach(c => { out[c.key + 'RowsM'] = f(mp[c.key + 'RowsM']); });
+    return out;
+  }
+  computeMaterialStatus(mp) {
+    if (!mp) return { normal: 0, alert: 0, total: 0, alertRows: [] };
+    let alert = 0, total = 0; const alertRows = [];
+    CATS.forEach(cat => (mp[cat.key + 'RowsM'] || []).forEach(row => {
+      const pct = parseFmtNum(row.pctLostFmt ?? row.pctFmt);
+      if (pct == null) return;
+      total++;
+      if (Math.abs(pct) >= this.getThresholdFor(cat.key)) { alert++; alertRows.push({ category: cat.label, label: row.label, pctFmt: row.pctLostFmt ?? row.pctFmt }); }
+    }));
+    return { normal: total - alert, alert, total, alertRows };
+  }
+  buildTrendRows() {
+    const s = this.state;
+    const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
+    const currentSummary = this.computePeriodSummary(s);
+    const periodCols = [...closedLabels, s.periodLabel];
+    return CATS.map(m => ({
+      label: m.label,
+      cells: periodCols.map(pl => {
+        const summary = pl === s.periodLabel ? currentSummary : s.periodSummaries[pl];
+        const item = summary && summary.find(x => x.key === m.key);
+        const pct = item ? item.pct : null;
+        return { period: pl, pctFmt: pct != null && isFinite(pct) ? ((pct > 0 ? '+' : '') + fmt(pct, 1) + '%') : '-' };
+      }),
+    }));
+  }
+
+  exportExcel() {
+    const r = this.state.result; if (!r) return;
+    const mp = this.buildMainPage(r);
+    const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sections = [
+      { title: 'PC.wire', rows: mp.pcRowsM }, { title: 'ลวดปลอก', rows: mp.stirrupRowsM },
+      { title: 'แผ่นเพลท', rows: mp.plateRowsM }, { title: 'เหล็กหนวดกุ้ง', rows: mp.whiskerRowsM },
+      { title: 'เหล็ก Collar', rows: mp.collarRowsM }, { title: 'เหล็กเสริม', rows: mp.rebarRowsM },
+    ];
+    let html = '<html><head><meta charset="UTF-8"></head><body>';
+    sections.forEach(sec => {
+      if (!sec.rows || !sec.rows.length) return;
+      html += '<table border="1"><tr><td colspan="8"><b>' + esc(sec.title) + '</b></td></tr>';
+      html += '<tr><th>รายการ</th><th>คำนวณ</th><th>ใช้จริง</th><th>ส่วนต่าง</th><th>ใช้งานอื่น-เสียหาย</th><th>เข้า-ออกสต็อก</th><th>ส่วนต่างจริง</th><th>% หาย</th></tr>';
+      sec.rows.forEach(row => {
+        html += '<tr>' + [row.label, row.calcFmt, row.actual, row.diffFmt, row.generalUseFmt ?? row.generalUseSummaryFmt, row.stockInOutFmt ?? '', row.realDiffFmt, row.pctLostFmt].map(v => '<td>' + esc(v) + '</td>').join('') + '</tr>';
+      });
+      html += '</table><br/>';
+    });
+    html += '</body></html>';
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'วัตถุดิบเสาเข็ม.xls'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  async handleFile(e) {
+    const file = e.target.files[0]; if (!file) return;
+    this.setState({ loading: true, error: '', fileName: file.name });
+    try {
+      const mod = this._mod || await waitForPileCalc(); this._mod = mod;
+      const rows = await mod.readPileListXlsx(file);
+      if (!rows.length) throw new Error('ไม่พบข้อมูลรายการเสาในไฟล์ (ตรวจสอบหัวคอลัมน์ รหัสสินค้า/จำนวน)');
+      const result = mod.calcPileList(rows, this.currentConfig());
+      this.setState({ loading: false, result, actual: {}, rawRows: rows });
+      if (!this.state.periodLabel) this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add', periodPickerRequired: true });
+    } catch (err) { this.setState({ loading: false, error: 'เกิดข้อผิดพลาด: ' + err.message }); }
+  }
+
+  confirmPeriodPicker() {
+    const finalLabel = THAI_MONTHS[this.state.periodPickerMonth] + ' ' + this.state.periodPickerYear;
+    if (this.state.periodPickerPurpose === 'add') {
+      if (!this.state.periodLabel) {
+        this.setState(s => ({ periodLabel: finalLabel, periods: [...new Set([...(s.periods || []), finalLabel])], periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false }));
+        return;
+      }
+      this.switchPeriod(finalLabel);
+      this.setState({ periodPickerOpen: false, periodPickerPurpose: null });
+      return;
+    }
+    if (!confirm('ปิดงวด "' + (this.state.periodLabel || 'ปัจจุบัน') + '" และยกยอดคงเหลือไปเป็นยอดยกมาของงวด "' + finalLabel + '"?')) return;
+    this.setState(s => {
+      const undoStack = this.pushUndo(s);
+      const newStock = {}; Object.keys(s.stock).forEach(k => { newStock[k] = { opening: s.stock[k].closing ?? '', received: '', closing: '' }; });
+      const newPlateStockDiam = {}; Object.keys(s.plateStockDiam).forEach(d => { const close = s.plateStockDiam[d].close ?? 0; newPlateStockDiam[d] = { open: close, close }; });
+      const oldLabel = s.periodLabel || 'งวดที่ยังไม่ตั้งชื่อ';
+      const snapshot = { stock: s.stock, plateStockDiam: s.plateStockDiam, actual: s.actual, generalUseEntries: s.generalUseEntries, plateGeneralUseEntries: s.plateGeneralUseEntries };
+      const periodHistory = { ...s.periodHistory, [oldLabel]: snapshot };
+      const periods = [...new Set([...(s.periods || []), oldLabel, finalLabel])];
+      const periodSummaries = { ...s.periodSummaries, [oldLabel]: this.computePeriodSummary(s) };
+      return { stock: newStock, plateStockDiam: newPlateStockDiam, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, generalUseOpen: {},
+        periodLabel: finalLabel, periodHistory, periods, periodSummaries, periodLocked: { ...s.periodLocked, [oldLabel]: true },
+        periodPickerOpen: false, periodPickerPurpose: null, undoStack, redoStack: [] };
+    });
+  }
+  switchPeriod(newLabel) {
+    if (newLabel === this.state.periodLabel) return;
+    this.setState(s => {
+      const undoStack = this.pushUndo(s);
+      const oldLabel = s.periodLabel || 'งวดที่ยังไม่ตั้งชื่อ';
+      const snapshot = { stock: s.stock, plateStockDiam: s.plateStockDiam, actual: s.actual, generalUseEntries: s.generalUseEntries, plateGeneralUseEntries: s.plateGeneralUseEntries };
+      const periodHistory = { ...s.periodHistory, [oldLabel]: snapshot };
+      const loaded = periodHistory[newLabel] || { stock: {}, plateStockDiam: {}, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {} };
+      const periods = [...new Set([...(s.periods || []), oldLabel, newLabel])];
+      return { periodHistory, periodLabel: newLabel, periods, stock: loaded.stock, plateStockDiam: loaded.plateStockDiam,
+        actual: loaded.actual, generalUseEntries: loaded.generalUseEntries, plateGeneralUseEntries: loaded.plateGeneralUseEntries,
+        generalUseOpen: {}, undoStack };
+    });
+  }
+  closeMonthCarryForward() {
+    const curIdx = THAI_MONTHS.indexOf((this.state.periodLabel || '').split(' ')[0]);
+    const curYear = parseInt((this.state.periodLabel || '').split(' ')[1], 10);
+    let nextMonth = 0, nextYear = new Date().getFullYear() + 543;
+    if (curIdx >= 0 && !isNaN(curYear)) { nextMonth = (curIdx + 1) % 12; nextYear = curIdx === 11 ? curYear + 1 : curYear; }
+    this.setState({ periodPickerOpen: true, periodPickerPurpose: 'close', periodPickerMonth: nextMonth, periodPickerYear: nextYear });
+  }
+  deleteCurrentPeriod() {
+    const label = this.state.periodLabel;
+    if (!confirm('ลบข้อมูลทั้งหมดของงวด "' + label + '" ทิ้งถาวร? การกระทำนี้ย้อนกลับไม่ได้')) return;
+    this.setState(s => {
+      const periods = (s.periods || []).filter(p => p !== label);
+      const periodHistory = { ...s.periodHistory }; delete periodHistory[label];
+      const periodSummaries = { ...s.periodSummaries }; delete periodSummaries[label];
+      if (!periods.length) {
+        try { localStorage.removeItem('pileCalcState_v1'); } catch (e) {}
+        return { periods: [], periodHistory: {}, periodSummaries: {}, periodLabel: null, stock: {}, plateStockDiam: {},
+          actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, generalUseOpen: {}, undoStack: [], redoStack: [],
+          periodLocked: {}, result: null, rawRows: null, error: null, resultView: 'main' };
+      }
+      const nextLabel = periods[0];
+      const loaded = periodHistory[nextLabel] || { stock: {}, plateStockDiam: {}, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {} };
+      return { periods, periodHistory, periodSummaries, periodLabel: nextLabel, stock: loaded.stock, plateStockDiam: loaded.plateStockDiam,
+        actual: loaded.actual, generalUseEntries: loaded.generalUseEntries, plateGeneralUseEntries: loaded.plateGeneralUseEntries,
+        generalUseOpen: {}, undoStack: [], redoStack: [] };
+    });
+  }
+
+  render() {
+    const s = this.state, r = s.result, mod = this._mod;
+    if (!mod && !r) return <div style={{ padding: 40, textAlign: 'center', color: '#78839A' }}>กำลังโหลด...</div>;
+    const mp = r ? this.filterMainPage(this.buildMainPage(r)) : null;
+    const status = mp ? this.computeMaterialStatus(this.buildMainPage(r)) : { normal: 0, alert: 0 };
+    const stockMode = s.resultView === 'stock';
+    const openGU = (row) => {
+      if (row.key && row.key.startsWith('main:plate:')) this.togglePlateGeneralUseOpen(row.thickness);
+      else this.toggleGeneralUseOpen(row.key);
+    };
+    return (
+      <div style={{ fontFamily: "'IBM Plex Sans Thai','Sarabun',sans-serif", color: '#1f2733', maxWidth: 1200, margin: '0 auto', padding: '32px 24px 80px', display: 'flex', flexDirection: 'column', gap: 26 }}>
+
+        <div style={card()} data-no-print="true">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#2f5fd0', color: 'white', fontWeight: 600, fontSize: 15, padding: '11px 20px', borderRadius: 8, cursor: 'pointer' }}>
+              เลือกไฟล์ Excel
+              <input type="file" accept=".xlsx" onChange={e => this.handleFile(e)} style={{ display: 'none' }} />
+            </label>
+            <div style={{ fontSize: 14, color: '#78839A' }}>{s.loading ? 'กำลังอ่านไฟล์...' : (s.fileName ? 'ไฟล์: ' + s.fileName : 'ยังไม่ได้เลือกไฟล์')}</div>
+          </div>
+          {s.error && <div style={{ color: '#c0392b', fontSize: 14, marginTop: 10 }}>{s.error}</div>}
+          <div style={{ fontSize: 13, color: '#8892a0', marginTop: 10 }}>ไฟล์ต้องมีคอลัมน์: รหัสสินค้า, รายการสินค้า, จำนวน</div>
+          <button onClick={() => this.toggleSettings()} style={{ ...btnGhost(), marginTop: 12 }}>{s.showSettings ? 'ซ่อนตั้งค่าคงที่' : 'ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)'}</button>
+        </div>
+
+        {s.showSettings && <SettingsPanel app={this} />}
+
+        {s.periodPickerOpen && (
+          <Modal onClose={() => { if (!s.periodPickerRequired) this.setState({ periodPickerOpen: false, periodPickerPurpose: null }); }}>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>{s.periodPickerRequired ? 'ก่อนเริ่ม เลือกเดือน/ปีของข้อมูลชุดนี้' : (s.periodPickerPurpose === 'close' ? 'เลือกเดือน/ปีของงวดถัดไป' : 'เลือกเดือน/ปีของงวดที่ต้องการดู')}</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <select value={s.periodPickerMonth} onChange={e => this.setState({ periodPickerMonth: Number(e.target.value) })} style={{ ...inp(null), flex: 1 }}>
+                {THAI_MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+              <input type="number" value={s.periodPickerYear} onChange={e => this.setState({ periodPickerYear: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="ปี พ.ศ." style={inp(110)} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+              {!s.periodPickerRequired && <button onClick={() => this.setState({ periodPickerOpen: false, periodPickerPurpose: null })} style={btnGhost()}>ยกเลิก</button>}
+              <button onClick={() => this.confirmPeriodPicker()} style={btnPrimary()}>ยืนยัน</button>
+            </div>
+          </Modal>
+        )}
+
+        {r && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={kpi()}><div style={kpiLbl()}>แถวข้อมูลที่ใช้ได้</div><div style={kpiVal()}>{r.usedRows} / {r.totalRows}</div></div>
+              <div style={kpi()}><div style={kpiLbl()}>จำนวนเสาเข็มรวม</div><div style={kpiVal()}>{fmt(r.totalPiles, 0)} ต้น</div></div>
+              <div style={kpi()}><div style={kpiLbl()}>รายการที่ข้าม</div><div style={{ ...kpiVal(), color: r.skippedRows.length ? '#b87412' : 'inherit' }}>{r.skippedRows.length}</div></div>
+            </div>
+
+            {(r.warnings.length > 0 || r.skippedRows.length > 0) && (
+              <div style={{ border: '1px solid #e8c98a', background: '#fdf6e8', borderRadius: 10, padding: '16px 20px' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: '#8a6114' }}>ต้องตรวจสอบ ({r.warnings.length + r.skippedRows.length} รายการ)</div>
+                {r.warnings.map((w, i) => <div key={i} style={{ fontSize: 13, color: '#8a6114', padding: '3px 0' }}>• {w}</div>)}
+                {r.skippedRows.map((sr, i) => <div key={'sk' + i} style={{ fontSize: 13, color: '#8a6114', padding: '3px 0' }}>• ข้ามแถว "{sr.code}": {sr.reason}</div>)}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-no-print="true">
+              {[['main', 'หน้าหลัก (รวมทุกวัตถุดิบ)'], ['stock', '📦 นับสต็อก'], ['trend', '📈 แนวโน้มย้อนหลัง']].map(([v, lbl]) => (
+                <button key={v} onClick={() => this.setResultView(v)} style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid #d8dde6', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: s.resultView === v ? '#2f5fd0' : 'white', color: s.resultView === v ? 'white' : '#333' }}>{lbl}</button>
+              ))}
+            </div>
+
+            {s.resultView === 'trend' && <TrendView app={this} />}
+
+            {(s.resultView === 'main' || s.resultView === 'stock') && (
+              <React.Fragment>
+                {s.resultView === 'main' && (
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={kpi()}><div style={kpiLbl()}>วัตถุดิบปกติ</div><div style={{ ...kpiVal(), color: '#3f7d2b' }}>{status.normal}</div></div>
+                    <div style={{ ...kpi(), cursor: 'pointer', position: 'relative' }} onClick={() => this.toggleAlertList()}>
+                      <div style={kpiLbl()}>เกินเกณฑ์แจ้งเตือน ({s.alertThresholdPct}%)</div>
+                      <div style={{ ...kpiVal(), color: '#c0392b' }}>{status.alert}</div>
+                      {s.showAlertList && (
+                        <Modal onClose={(e) => { e.stopPropagation(); this.toggleAlertList(); }}>
+                          <div style={{ fontSize: 17, fontWeight: 700 }}>รายการที่เกินเกณฑ์ {s.alertThresholdPct}%</div>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 10 }}>
+                            <thead><tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}><th style={{ padding: '6px 4px' }}>ประเภท</th><th style={{ padding: '6px 4px' }}>รายการ</th><th style={{ padding: '6px 4px', textAlign: 'right' }}>%</th></tr></thead>
+                            <tbody>{status.alertRows.map((ar, i) => <tr key={i} style={{ borderTop: '1px solid #f2f2f2' }}><td style={{ padding: '6px 4px', color: '#78839A' }}>{ar.category}</td><td style={{ padding: '6px 4px' }}>{ar.label}</td><td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 700, color: '#c0392b' }}>{ar.pctFmt}</td></tr>)}</tbody>
+                          </table>
+                        </Modal>
+                      )}
+                    </div>
+                    <div style={{ ...kpi(), flex: 1.5, display: 'flex', alignItems: 'center' }}>
+                      <input type="text" value={s.mainSearchQuery} onChange={e => this.setMainSearchQuery(e.target.value)} placeholder="🔍 ค้นหารายการวัตถุดิบ..." style={{ width: '100%', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 14 }} />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 10, padding: '12px 18px' }} data-no-print="true">
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#244c9b' }}>📅 กำลังดูข้อมูลงวด:</div>
+                  <select value={s.periodLabel || ''} onChange={e => this.switchPeriod(e.target.value)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #2f5fd0', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#244c9b', background: 'white' }}>
+                    {(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <button onClick={() => this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add' })} style={btnDashed()}>+ งวดใหม่</button>
+                  <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>
+                  {s.undoStack.length > 0 && <button onClick={() => this.undoLastAction()} style={{ ...btnGhost('#8a6114'), border: '1px solid #e0c07a', background: '#fdf6e8' }}>↩ ย้อนกลับ ({s.undoStack.length})</button>}
+                  {s.redoStack.length > 0 && <button onClick={() => this.redoLastAction()} style={{ ...btnGhost('#244c9b'), border: '1px solid #b9cdf0', background: '#eef3fc' }}>↪ ทำซ้ำ ({s.redoStack.length})</button>}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
+                  {stockMode && <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>}
+                </div>
+
+                {s.periodLocked[s.periodLabel] && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 8, background: '#fdf6e8', border: '1px solid #e0c07a' }} data-no-print="true">
+                    <div style={{ fontSize: 13, color: '#8a6114' }}>🔒 งวด "{s.periodLabel}" ปิดแล้ว — ข้อมูลนี้ใช้อ้างอิงเท่านั้น</div>
+                    <button onClick={() => this.toggleCurrentPeriodLock()} style={btnGhost('#8a6114')}>ปลดล็อก</button>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }} data-no-print="true">
+                  <button onClick={() => this.exportExcel()} style={btnGhost()}>ดาวน์โหลด Excel</button>
+                  <button onClick={() => window.print()} style={btnGhost()}>พิมพ์ / บันทึกเป็น PDF</button>
+                </div>
+
+                <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />
+                {stockMode && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
+                <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
+                <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />
+                <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
+                <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
+                <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
+                  extraRebarButton={<button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />
+
+                {mp.plateRowsM.map((row, i) => row.plateGeneralUseOpen && (
+                  <GeneralUseModalPlate key={'p' + i} row={row} onClose={() => this.togglePlateGeneralUseOpen(row.thickness)} />
+                ))}
+                {[...mp.whiskerRowsM, ...mp.collarRowsM, ...mp.pcRowsM, ...mp.stirrupRowsM, ...mp.rebarRowsM].map((row, i) => row.generalUseOpen && (
+                  <GeneralUseModal key={'g' + i} title={row.label} entries={row.generalUseEntries} onAdd={row.onAddGeneralUseEntry} onClose={row.onToggleGeneralUseOpen} unit="" />
+                ))}
+              </React.Fragment>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+}
+function GeneralUseModalPlate({ row, onClose }) {
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>ใช้งานอื่น-เสียหาย — {row.label}</div>
+      <div style={{ fontSize: 14, color: '#78839A' }}>ระบุน้ำหนัก (กก.) และสาเหตุทีละรายการ ระบบจะรวมยอดและแปลงเป็นแผ่นใหญ่ให้อัตโนมัติ</div>
+      {row.plateGeneralUseEntries.map((e, i) => (
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input type="number" value={e.kg} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(130, true)} />
+          <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} />
+          <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
+        <button onClick={row.onAddPlateGeneralUseEntry} style={btnDashed()}>+ เพิ่มรายการ</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>รวม: {row.generalUseFmt} แผ่นใหญ่</div>
+          <button onClick={onClose} style={btnPrimary()}>เสร็จสิ้น</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+function PlateReconcileCard({ pr }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, border: '1px solid #e0c07a', borderRadius: 10, padding: 16, background: '#fdf9ee' }}>
+      <div style={{ fontSize: 15, fontWeight: 700 }}>กระทบยอดเพลท {pr.t} มม. (สต็อกแผ่นสำเร็จรูปต่อขนาดเสา)</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead><tr style={{ textAlign: 'left' }}><th style={{ padding: '5px 8px', color: '#78839A' }}>ขนาดเสา</th><th style={{ padding: '5px 8px', textAlign: 'right', color: '#78839A' }}>แผ่นคงเหลือต้นงวด</th><th style={{ padding: '5px 8px', textAlign: 'right', color: '#78839A' }}>แผ่นคงเหลือปลายงวด</th></tr></thead>
+        <tbody>{pr.rows.map((row, i) => (
+          <tr key={i} style={{ borderTop: '1px solid #eee' }}>
+            <td style={{ padding: '4px 8px' }}>{row.label}</td>
+            <td style={{ padding: '3px 8px', textAlign: 'right' }}><input type="number" value={row.open} onChange={e => row.onOpenChange(e.target.value)} style={inp(80, true)} /></td>
+            <td style={{ padding: '3px 8px', textAlign: 'right' }}><input type="number" value={row.close} onChange={e => row.onCloseChange(e.target.value)} style={inp(80, true)} /></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {[
+        ['น้ำหนักคงเหลือต้นงวด', pr.openWeightFmt + ' กก. (' + pr.openSheetsFmt + ' แผ่นใหญ่)'],
+        ['น้ำหนักคงเหลือปลายงวด', pr.closeWeightFmt + ' กก. (' + pr.closeSheetsFmt + ' แผ่นใหญ่)'],
+        ['คำนวณตามรายการผลิต', pr.plateCalcBigFmt + ' แผ่นใหญ่'],
+        ['(A) คำนวณ − ยอดใช้จริง', pr.AFmt + ' แผ่น'],
+        ['(B) สต็อกปลาย − ต้นงวด', pr.BFmt + ' แผ่น'],
+        ['สรุป (A) + (B)', pr.sumABSheetsFmt + ' แผ่น = ' + pr.sumABKgFmt + ' กก.'],
+      ].map(([lbl, val], i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}><span style={{ color: '#78839A' }}>{lbl}</span><span style={{ fontWeight: 700 }}>{val}</span></div>)}
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#8a6114', textTransform: 'uppercase', marginTop: 6 }}>ใช้งานอื่น-เสียหาย</div>
+      {pr.generalUseEntries.map((e, i) => (
+        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="number" value={e.kg} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(90, true)} />
+          <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="สาเหตุ" style={{ ...inp(null), flex: 1 }} />
+          <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>
+        </div>
+      ))}
+      <button onClick={pr.onAddGeneralUseEntry} style={{ ...btnDashed(), alignSelf: 'flex-start' }}>+ เพิ่มสาเหตุ</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid #e0c07a', paddingTop: 8 }}><span>รวมใช้งานอื่น-เสียหาย</span><span style={{ fontWeight: 700 }}>{pr.generalUseKgFmt} กก.</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, padding: '12px 14px', background: '#fbeaea', border: '1px solid #e0a3a3' }}>
+        <span style={{ fontSize: 14, fontWeight: 700 }}>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</span>
+        <span style={{ fontSize: 17, fontWeight: 800, color: '#c0392b' }}>{pr.unexplainedKgFmt} กก.</span>
+      </div>
+    </div>
+  );
+}
+function TrendView({ app }) {
+  const s = app.state;
+  const rows = app.buildTrendRows();
+  const periodCols = [...(s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel), s.periodLabel];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
+        <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}><th style={{ padding: '10px 14px', fontSize: 13 }}>วัตถุดิบ</th>{periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}</tr></thead>
+        <tbody>{rows.map((row, i) => (
+          <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
+            <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 600 }}>{row.label}</td>
+            {row.cells.map((c, j) => <td key={j} style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right' }}>{c.pctFmt}</td>)}
+          </tr>
+        ))}</tbody>
+      </table>
+      <div style={{ fontSize: 12, color: '#78839A' }}>% ผิดพลาด = ส่วนต่างจริง ÷ ยอดคำนวณ ต่อวัตถุดิบ ในแต่ละงวด (คอลัมน์ขวาสุดคืองวดปัจจุบัน)</div>
+    </div>
+  );
+}
+function SettingsPanel({ app }) {
+  const s = app.state, mod = app._mod;
+  if (!mod) return null;
+  const mok = mod.isMok, dl = mod.diamLabel;
+  const groupBy = rows => [
+    { title: 'มาตรฐาน มอก.', rows: rows.filter(r => r.isMok) },
+    { title: 'โรงงาน (ไม่มี มอก.)', rows: rows.filter(r => !r.isMok) },
+  ].filter(g => g.rows.length);
+  const tabs = [['rebar', 'เหล็กเสริม'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['pcWire', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['alert', 'เกณฑ์แจ้งเตือน']];
+  const lockBtn = (key) => { const ui = app.buildLockUi(key); return <button onClick={ui.onToggle} style={{ ...btnGhost(), fontSize: 12 }}>{ui.label}</button>; };
+  return (
+    <div style={card()} data-no-print="true">
+      <div style={{ fontSize: 17, fontWeight: 700 }}>ตั้งค่าคงที่การคำนวณ</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderBottom: '1px solid #eee', paddingBottom: 12, marginTop: 12 }}>
+        {tabs.map(([k, lbl]) => (
+          <button key={k} onClick={() => app.setSettingsTab(k)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid ' + (s.settingsTab === k ? '#2f5fd0' : '#d8dde6'), fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: s.settingsTab === k ? '#2f5fd0' : 'white', color: s.settingsTab === k ? 'white' : '#333' }}>{lbl}</button>
+        ))}
+      </div>
+      <div style={{ marginTop: 16 }}>
+        {s.settingsTab === 'rebar' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>น้ำหนักเหล็กเสริม (กก./เมตร)</b>{lockBtn('rebar')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10, opacity: s.locks.rebar ? 0.5 : 1, pointerEvents: s.locks.rebar ? 'none' : 'auto' }}>
+              {Object.entries(s.rebarWeights || {}).map(([k, v]) => (
+                <div key={k}><div style={{ fontSize: 12, color: '#78839A' }}>{k}</div><input type="number" step="0.001" value={v ?? ''} onChange={e => app.updateRebarWeight(k, e.target.value)} style={{ ...inp(null), width: '100%' }} /></div>
+              ))}
+            </div>
+          </div>
+        )}
+        {s.settingsTab === 'plate' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>น้ำหนักเพลทแผ่นใหญ่ 5x20ฟุต (กก./แผ่น)</b>{lockBtn('plate')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 10, opacity: s.locks.plate ? 0.5 : 1, pointerEvents: s.locks.plate ? 'none' : 'auto' }}>
+              {Object.entries(s.plateBigSheetKg || {}).map(([mm, v]) => (
+                <div key={mm}><div style={{ fontSize: 12, color: '#78839A' }}>{mm} มม.</div><input type="number" step="0.1" value={v ?? ''} onChange={e => app.updatePlateBigSheetKg(mm, e.target.value)} style={{ ...inp(null), width: '100%' }} /></div>
+              ))}
+            </div>
+            <b>น้ำหนักแผ่นเพลทต่อแผ่น (กก.) ตามขนาดเสา</b>
+            <div style={{ opacity: s.locks.plate ? 0.5 : 1, pointerEvents: s.locks.plate ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {groupBy(Object.entries(s.plateWeights || {}).map(([k, v]) => ({ key: k, value: v, isMok: mok(k) }))).map((g, i) => (
+                <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{g.title}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+                    {g.rows.map(row => (
+                      <div key={row.key}>
+                        <div style={{ fontSize: 12, color: '#78839A' }}>{dl(row.key)}</div>
+                        <input type="number" step="0.001" value={row.value ?? ''} onChange={e => app.updatePlateWeight(row.key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
+                        {!row.isMok ? (
+                          <select value={String((s.plateThicknessMm || {})[row.key] ?? '')} onChange={e => app.updatePlateThickness(row.key, e.target.value)} style={{ ...inp(null), width: '100%', fontSize: 11, marginTop: 4 }}>
+                            <option value="">— หนา (มม.) —</option><option value="6">6 มม.</option><option value="8">8 มม.</option><option value="9">9 มม.</option>
+                          </select>
+                        ) : <div style={{ fontSize: 11, color: '#8892a0', marginTop: 4 }}>9 มม. (มาตรฐาน มอก.)</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {s.settingsTab === 'whisker' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>น้ำหนักเหล็กหนวดกุ้งต่อชิ้น (กก.)</b>{lockBtn('whisker')}</div>
+            <div style={{ opacity: s.locks.whisker ? 0.5 : 1, pointerEvents: s.locks.whisker ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {groupBy(Object.entries(s.whiskerWeights || {}).map(([k, v]) => ({ key: k, value: v, isMok: mok(k) }))).map((g, i) => (
+                <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{g.title}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+                    {g.rows.map(row => (
+                      <div key={row.key}>
+                        <div style={{ fontSize: 12, color: '#78839A' }}>{dl(row.key)}</div>
+                        <input type="number" step="0.001" value={row.value ?? ''} onChange={e => app.updateWhiskerWeight(row.key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
+                        <select value={(s.whiskerSpecs || {})[row.key] || ''} onChange={e => app.updateWhiskerSpec(row.key, e.target.value)} style={{ ...inp(null), width: '100%', fontSize: 11, marginTop: 4 }}>
+                          <option value="">— เลือกขนาดเหล็ก —</option>
+                          <option value="DB12x0.31m.">DB12x0.31m.</option><option value="DB16x0.41m.">DB16x0.41m.</option>
+                          <option value="DB20x0.46m.">DB20x0.46m.</option><option value="DB25x0.51m.">DB25x0.51m.</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {s.settingsTab === 'pcWire' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>น้ำหนักลวด PC.wire ต่อเมตร (กก./ม.)</b>{lockBtn('pcKgPerM')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10, opacity: s.locks.pcKgPerM ? 0.5 : 1, pointerEvents: s.locks.pcKgPerM ? 'none' : 'auto' }}>
+              {Object.entries(s.pcWireKgPerM || {}).map(([mm, v]) => (
+                <div key={mm}><div style={{ fontSize: 12, color: '#78839A' }}>PC.wire {mm} มม.</div><input type="number" step="0.001" value={v ?? ''} onChange={e => app.updatePcKgPerM(mm, e.target.value)} style={{ ...inp(null), width: '100%' }} /></div>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: '#8892a0', marginTop: 14 }}>จำนวนเส้นลวดต่อเสาแต่ละขนาด/ความยาว — แก้ไขจากไฟล์ pile-calc.js โดยตรงหากต้องปรับเงื่อนไขละเอียด</div>
+          </div>
+        )}
+        {s.settingsTab === 'stirrup' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>ขนาดลวดปลอกต่อเสาแต่ละขนาด</b>{lockBtn('stirrup')}</div>
+            <div style={{ opacity: s.locks.stirrup ? 0.5 : 1, pointerEvents: s.locks.stirrup ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Object.entries(s.stirrupWireMm || {}).sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([diam, mm]) => (
+                <div key={diam} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, width: 100 }}>{dl(diam)}</span>
+                  <select value={mm} onChange={e => app.updateStirrupWireMm(diam, e.target.value)} style={inp(140)}>
+                    <option value="">— เลือก —</option><option value="2.8">2.8 มม.</option><option value="3.0">3.0 มม.</option><option value="4.0">4.0 มม.</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {s.settingsTab === 'alert' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: '#f4f6f9' }}>
+              <span style={{ fontSize: 13 }}>แจ้งเตือนเมื่อ % ผิดพลาดเกิน:</span>
+              <input type="number" value={s.alertThresholdPct} onChange={e => app.setAlertThreshold(e.target.value)} style={inp(70, true)} />
+              <span style={{ fontSize: 13, color: '#78839A' }}>%</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 8, padding: 12, borderRadius: 8, background: '#f4f6f9' }}>
+              {CATS.map(c => (
+                <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, width: 80 }}>{c.label}</span>
+                  <input type="number" value={s.alertThresholdByCategory[c.key] ?? ''} onChange={e => app.setAlertThresholdCategory(c.key, e.target.value)} placeholder={'เริ่มต้น ' + s.alertThresholdPct + '%'} style={inp(80, true)} />
+                  <span style={{ fontSize: 12, color: '#78839A' }}>%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+const card = () => ({ border: '1px solid #e3e7ee', borderRadius: 10, padding: 24, background: 'white' });
+const kpi = () => ({ flex: 1, minWidth: 160, border: '1px solid #e3e7ee', borderRadius: 10, padding: '16px 20px', background: 'white' });
+const kpiLbl = () => ({ fontSize: 13, color: '#78839A' });
+const kpiVal = () => ({ fontSize: 24, fontWeight: 700 });
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -8119,7 +8119,7 @@ window.__dataReady.then(data => {
           </div>
         </div>
       </header>
-      <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}</nav>
+      <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}<a href="pile-materials.html" className="tabs__btn" style={{textDecoration:'none',display:'inline-block'}}>สต็อกวัตถุดิบเสาเข็ม</a></nav>
       <main>
         {tab==='meeting'&&<HeadOfficeMeetingTab/>}
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
