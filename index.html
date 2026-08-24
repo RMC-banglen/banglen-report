@@ -5417,7 +5417,7 @@ window.__dataReady.then(data => {
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขนส่ง','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
   const PERM_LIST=[{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'quality',v:'รายงานปัญหา'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'}];
-  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'}];
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
@@ -8079,7 +8079,7 @@ window.__dataReady.then(data => {
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const getFirstTab=(user)=>{
       const tp={...DEFAULT_TAB_PERMS,...(user?.tab_perms||{})};
-      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','calibration','repair','transport','plateusage'];
+      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','calibration','repair','transport','plateusage','accident','pileMaterials'];
       return user?.role==='admin'?'meeting':(ordered.find(k=>tp[k]!==false)||'meeting');
     };
     const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
@@ -8095,7 +8095,7 @@ window.__dataReady.then(data => {
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
     const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
-    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'},{id:'accident',label:'รายงานอุบัติเหตุ'}];
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'},{id:'accident',label:'รายงานอุบัติเหตุ'},{id:'pileMaterials',label:'สต็อกวัตถุดิบเสาเข็ม'}];
     const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
@@ -8119,7 +8119,7 @@ window.__dataReady.then(data => {
           </div>
         </div>
       </header>
-      <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}<a href="pile-materials.html" className="tabs__btn" style={{textDecoration:'none',display:'inline-block'}}>สต็อกวัตถุดิบเสาเข็ม</a></nav>
+      <nav className="tabs">{tabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}</nav>
       <main>
         {tab==='meeting'&&<HeadOfficeMeetingTab/>}
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
@@ -8133,6 +8133,7 @@ window.__dataReady.then(data => {
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
         {tab==='accident'&&<AccidentReportTab currentUser={currentUser}/>}
+        {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><iframe src="pile-materials.html" title="สต็อกวัตถุดิบเสาเข็ม" style={{width:'100%',height:'calc(100vh - 160px)',border:'1px solid #e2e8f0',borderRadius:12,background:'#fff'}}/></div>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
