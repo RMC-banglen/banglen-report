@@ -51,7 +51,7 @@ window.__PileCalc = PileCalcMod;
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 // ใช้ Supabase โปรเจกต์เดียวกับระบบหลัก (index.html) — เก็บสถานะทั้งหมดเป็น JSON ก้อนเดียวในตาราง pile_materials_state
-// แทน localStorage เดิม (ซึ่งอยู่แค่เครื่อง/เบราว์เซอร์เดียว เปิดเครื่องอื่นหรือล้างแคชแล้วข้อมูลหาย)
+// เก็บออนไลน์ล้วน (ไม่ใช้ localStorage) เหมือนข้อมูลส่วนอื่นของระบบ
 const SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
 const DB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -219,13 +219,8 @@ class App extends React.Component {
       stirrupWireMm: Object.fromEntries(Object.entries(PC.STIRRUP_WIRE_MM).map(([d, v]) => [d, v.toFixed(1)])),
       plateThicknessMm: { ...PC.PLATE_THICKNESS_MM },
     });
-    // โหลดจาก localStorage ก่อนทันที (เร็ว, กันจอว่างระหว่างรอเน็ต) แล้วค่อยดึงจาก Supabase มาทับถ้ามีของใหม่กว่า
-    this.applyPersistedObj(this.readLocal());
     await this.loadFromSupabase();
     this._persistReady = true;
-  }
-  readLocal() {
-    try { const raw = localStorage.getItem('pileCalcState_v1'); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
   applyPersistedObj(saved) {
     if (!saved) return;
@@ -239,21 +234,20 @@ class App extends React.Component {
       this.setState({ syncStatus: 'loading' });
       const { data, error } = await DB.from('pile_materials_state').select('data').eq('id', PILE_STATE_ROW_ID).maybeSingle();
       if (error) throw error;
-      if (data && data.data) { this.applyPersistedObj(data.data); this.setState({ syncStatus: 'synced' }); }
-      else this.setState({ syncStatus: 'synced' }); // ยังไม่เคยมีข้อมูลบน Supabase — ใช้ของ localStorage ต่อไปก่อน
+      if (data && data.data) this.applyPersistedObj(data.data);
+      this.setState({ syncStatus: 'synced' });
     } catch (e) {
-      console.warn('โหลดข้อมูลจาก Supabase ไม่สำเร็จ ใช้ข้อมูลที่บันทึกไว้ในเครื่องแทน', e);
+      console.warn('โหลดข้อมูลจาก Supabase ไม่สำเร็จ', e);
       this.setState({ syncStatus: 'offline' });
     }
   }
   savePersisted() {
     const out = {};
     this.persistKeys.forEach(k => { out[k] = this.state[k]; });
-    try { localStorage.setItem('pileCalcState_v1', JSON.stringify(out)); } catch (e) {}
     this.setState({ syncStatus: 'saving' });
     DB.from('pile_materials_state').upsert({ id: PILE_STATE_ROW_ID, data: out, updated_at: new Date().toISOString() })
       .then(({ error }) => { if (error) throw error; this.setState({ syncStatus: 'synced' }); })
-      .catch(e => { console.warn('บันทึกขึ้น Supabase ไม่สำเร็จ (บันทึกไว้ในเครื่องแล้ว จะลองใหม่เมื่อแก้ไขครั้งถัดไป)', e); this.setState({ syncStatus: 'offline' }); });
+      .catch(e => { console.warn('บันทึกขึ้น Supabase ไม่สำเร็จ', e); this.setState({ syncStatus: 'offline' }); });
   }
   componentDidUpdate() {
     if (!this._persistReady) return;
@@ -690,7 +684,6 @@ class App extends React.Component {
       const periodHistory = { ...s.periodHistory }; delete periodHistory[label];
       const periodSummaries = { ...s.periodSummaries }; delete periodSummaries[label];
       if (!periods.length) {
-        try { localStorage.removeItem('pileCalcState_v1'); } catch (e) {}
         return { periods: [], periodHistory: {}, periodSummaries: {}, periodLabel: null, stock: {}, plateStockDiam: {},
           actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, generalUseOpen: {}, undoStack: [], redoStack: [],
           periodLocked: {}, result: null, rawRows: null, error: null, resultView: 'main' };
@@ -932,7 +925,7 @@ function SyncBadge({ status }) {
     loading: { text: '🔄 กำลังโหลดข้อมูล...', color: '#78839A' },
     saving: { text: '🔄 กำลังบันทึกขึ้น Supabase...', color: '#78839A' },
     synced: { text: '☁️ บันทึกขึ้น Supabase แล้ว (sync ข้ามเครื่อง)', color: '#1f9d55' },
-    offline: { text: '⚠️ บันทึกขึ้น Supabase ไม่ได้ — ข้อมูลอยู่ในเครื่องนี้เท่านั้นตอนนี้', color: '#c0392b' },
+    offline: { text: '⚠️ เชื่อมต่อ Supabase ไม่ได้ — ตรวจการเชื่อมต่ออินเทอร์เน็ต', color: '#c0392b' },
   };
   const cur = map[status] || map.loading;
   return <span style={{ fontSize: 12, color: cur.color, marginLeft: 'auto' }}>{cur.text}</span>;
