@@ -220,6 +220,7 @@ class App extends React.Component {
       plateThicknessMm: { ...PC.PLATE_THICKNESS_MM },
     });
     await this.loadFromSupabase();
+    this._lastSavedSnapshot = JSON.stringify(this.persistKeys.map(k => this.state[k]));
     this._persistReady = true;
   }
   applyPersistedObj(saved) {
@@ -244,6 +245,7 @@ class App extends React.Component {
   savePersisted() {
     const out = {};
     this.persistKeys.forEach(k => { out[k] = this.state[k]; });
+    this._lastSavedSnapshot = JSON.stringify(this.persistKeys.map(k => out[k]));
     this.setState({ syncStatus: 'saving' });
     DB.from('pile_materials_state').upsert({ id: PILE_STATE_ROW_ID, data: out, updated_at: new Date().toISOString() })
       .then(({ error }) => { if (error) throw error; this.setState({ syncStatus: 'synced' }); })
@@ -251,6 +253,8 @@ class App extends React.Component {
   }
   componentDidUpdate() {
     if (!this._persistReady) return;
+    const snapshot = JSON.stringify(this.persistKeys.map(k => this.state[k]));
+    if (snapshot === this._lastSavedSnapshot) return;
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this.savePersisted(), 600);
   }
