@@ -491,6 +491,10 @@ function onOpen() {
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
     .addItem('🔽 ตั้ง Dropdown ประเภท', 'setupTypeDropdowns')
+    .addSeparator()
+    .addItem('🔍 ตรวจสุขภาพชีท', 'checkDamageSheets')
+    .addItem('🧹 เติมเลขบิลที่เว้นว่าง', 'fillBlankBillRowsREB')
+    .addSeparator()
     .addItem('📋 ดู Log', 'showLog')
     .addToUi();
 
@@ -1224,4 +1228,120 @@ function applyDropdown(ss, sheetName, headerName, list) {
 
   return '✅ ' + sheetName.slice(0, 22) + '… คอลัมน์ "' + headerName + '"'
        + (bad ? '\n   ⚠️ มี ' + bad + ' ช่องที่ค่าไม่ตรงรายการ (ขึ้นสามเหลี่ยมแดง) — แก้ให้ตรงด้วย' : '\n   ทุกช่องตรงรายการแล้ว');
+}
+
+// ============================================================
+// เติมเลขบิล + ข้อมูลกำกับ ให้แถวที่เว้นว่างในชีท REB-ROB
+//
+// ชีทนี้เขียนเลขบิลไว้ "แถวสุดท้าย" ของกลุ่ม แถวบนเว้นว่าง
+// ทำให้ระบบจับกลุ่มผิด → เติมค่าจากแถวล่างขึ้นบนให้ครบทุกแถว
+//
+// วิธีใช้: เมนู 📊 Sync Dashboard → 🧹 เติมเลขบิลที่เว้นว่าง
+//   1. ครั้งแรกจะแสดงตัวอย่างว่าจะแก้แถวไหนบ้าง (ยังไม่เขียนทับ)
+//   2. กดยืนยันแล้วจึงเขียนลงชีท
+// ============================================================
+
+var REB_SHEET_NAME = 'รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB';
+
+function fillBlankBillRowsREB() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REB_SHEET_NAME);
+  var ui = SpreadsheetApp.getUi();
+  if (!sh) { ui.alert('⚠️ ไม่พบ Sheet ' + REB_SHEET_NAME); return; }
+
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow < 2) { ui.alert('ไม่มีข้อมูล'); return; }
+
+  var values  = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = values[0].map(function(h) { return String(h).trim(); });
+
+  var cBill   = headers.indexOf('เลขที่ใบรับคืน');
+  var cAmount = headers.indexOf('ยอดเงินสุทธิ');
+  if (cBill < 0 || cAmount < 0) { ui.alert('⚠️ ไม่พบคอลัมน์ "เลขที่ใบรับคืน" หรือ "ยอดเงินสุทธิ"'); return; }
+
+  // คอลัมน์ที่ต้องเติมตามเลขบิล (เว้น "เดือน/ปี" ไว้ เพราะเป็นสูตรที่คำนวณจากเลขบิลเอง)
+  var fillNames = ['เลขที่ใบรับคืน', 'ประเภท', 'ชื่อลูกค้า', 'หน่วยงานของลูกค้า', 'ชื่อพนักงาน'];
+  var cCause = headers.findIndex(function(h) { return h.indexOf('สาเหตุ') >= 0; });
+  var fillCols = fillNames.map(function(n) { return headers.indexOf(n); }).filter(function(i) { return i >= 0; });
+  if (cCause >= 0) fillCols.push(cCause);
+
+  // ไล่จากล่างขึ้นบน — แถวที่เลขบิลว่างจะรับค่าจากแถวถัดไปด้านล่าง
+  var below = null, plan = [], orphan = [];
+  for (var r = lastRow - 1; r >= 1; r--) {          // index ใน values (แถวจริง = r+1)
+    var bill   = String(values[r][cBill] || '').trim();
+    var amount = toNum(values[r][cAmount]);
+
+    if (bill) { below = r; continue; }
+    if (amount === 0) continue;                      // แถวว่างเปล่า ข้าม
+
+    if (below === null) { orphan.push(r + 1); continue; }   // ไม่มีบิลด้านล่างให้อ้างอิง
+
+    var changes = [];
+    fillCols.forEach(function(c) {
+      if (String(values[r][c] || '').trim() === '') {
+        var v = values[below][c];
+        if (String(v || '').trim() !== '') changes.push({ col: c, val: v });
+      }
+    });
+    if (changes.length) plan.push({ row: r + 1, bill: String(values[below][cBill]).trim(), changes: changes });
+  }
+  plan.reverse();
+
+  if (plan.length === 0) {
+    ui.alert('✅ ไม่มีแถวที่ต้องเติม — เลขบิลครบทุกแถวแล้ว'
+      + (orphan.length ? '\n\n⚠️ แต่มีแถวที่หาบิลอ้างอิงไม่ได้: ' + orphan.join(', ') : ''));
+    return;
+  }
+
+  var preview = plan.slice(0, 15).map(function(p) {
+    return '  แถว ' + p.row + ' → ' + p.bill + '  (' + p.changes.length + ' ช่อง)';
+  }).join('\n');
+
+  var ans = ui.alert(
+    'เติมเลขบิลที่เว้นว่าง',
+    'จะเติมข้อมูลให้ ' + plan.length + ' แถว โดยดึงจากแถวที่มีเลขบิล "ด้านล่าง"\n\n'
+    + preview + (plan.length > 15 ? '\n  … และอีก ' + (plan.length - 15) + ' แถว' : '')
+    + (orphan.length ? '\n\n⚠️ แถวที่หาบิลอ้างอิงไม่ได้ (ไม่แก้): ' + orphan.join(', ') : '')
+    + '\n\nดำเนินการต่อหรือไม่?',
+    ui.ButtonSet.YES_NO);
+
+  if (ans !== ui.Button.YES) { ui.alert('ยกเลิกแล้ว — ไม่มีการแก้ไข'); return; }
+
+  plan.forEach(function(p) {
+    p.changes.forEach(function(ch) {
+      sh.getRange(p.row, ch.col + 1).setValue(ch.val);
+    });
+  });
+
+  ui.alert('✅ เติมเรียบร้อย ' + plan.length + ' แถว\n\nอย่าลืมกด 🔄 Sync ทันที เพื่ออัปเดต Dashboard');
+}
+
+// ============================================================
+// ตรวจสุขภาพชีท — หาแถวที่ระบบอาจอ่านผิด
+// ============================================================
+function checkDamageSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var out = [];
+
+  [[REB_SHEET_NAME, 'เลขที่ใบรับคืน', 'ยอดเงินสุทธิ'],
+   ['เสียหายในโรงงานบางเลน รหัสID', 'เลขที่บิล', 'ยอดเงินสุทธิ']].forEach(function(cfg) {
+    var sh = ss.getSheetByName(cfg[0]);
+    if (!sh) { out.push('⚠️ ไม่พบ Sheet ' + cfg[0]); return; }
+
+    var values = readValuesExpandingMerges(sh);
+    var headers = values[0].map(function(h) { return String(h).trim(); });
+    var cBill = headers.indexOf(cfg[1]), cAmt = headers.indexOf(cfg[2]);
+    if (cBill < 0 || cAmt < 0) { out.push('⚠️ ' + cfg[0] + ': ไม่พบคอลัมน์'); return; }
+
+    var bad = [];
+    for (var r = 1; r < values.length; r++) {
+      var amt = toNum(values[r][cAmt]);
+      if (amt !== 0 && String(values[r][cBill] || '').trim() === '') bad.push(r + 1);
+    }
+    out.push(bad.length
+      ? '⚠️ ' + cfg[0].slice(0, 26) + '…\n   มียอดเงินแต่ไม่มีเลขบิล ' + bad.length + ' แถว: ' + bad.slice(0, 25).join(', ') + (bad.length > 25 ? ' …' : '')
+      : '✅ ' + cfg[0].slice(0, 26) + '… เลขบิลครบทุกแถวที่มียอดเงิน');
+  });
+
+  SpreadsheetApp.getUi().alert(out.join('\n\n'));
 }
