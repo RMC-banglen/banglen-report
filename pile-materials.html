@@ -81,9 +81,28 @@ const CATS = [
 
 /* ---------- small UI ---------- */
 function Modal({ onClose, children }) {
+  const boxRef = useRef(null);
+  useEffect(() => {
+    // หน้านี้ถูกฝังในหน้าแม่ผ่าน iframe แบบยืดความสูงเต็มเนื้อหา (ไม่มีสกรอลล์ในตัวเอง)
+    // ทำให้ position:fixed อ้างอิงความสูงทั้งหมดของ iframe แทนที่จะเป็นจอที่มองเห็นจริง
+    // กล่อง modal เลยไปโผล่กลางเนื้อหาทั้งหมด (อาจอยู่นอกจอ) แทนที่จะอยู่กลางจอที่ผู้ใช้เห็น
+    // จึงต้องเลื่อนหน้าแม่ให้กล่องนี้ขึ้นมากลางจอเอง
+    try {
+      const fe = window.frameElement;
+      const parentWin = window.parent;
+      if (fe && parentWin && parentWin !== window && boxRef.current) {
+        const boxRect = boxRef.current.getBoundingClientRect();
+        const frameRect = fe.getBoundingClientRect();
+        const boxCenterInParent = frameRect.top + boxRect.top + boxRect.height / 2;
+        const desiredCenter = parentWin.innerHeight / 2;
+        const delta = boxCenterInParent - desiredCenter;
+        if (Math.abs(delta) > 30) parentWin.scrollBy({ top: delta, behavior: 'smooth' });
+      }
+    } catch (e) { /* ข้ามคนละ origin หรือไม่ได้อยู่ใน iframe */ }
+  }, []);
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: 'white', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 26, display: 'flex', flexDirection: 'column', gap: 14, width: 560, maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', textAlign: 'left' }} onClick={e => e.stopPropagation()}>
+      <div ref={boxRef} style={{ background: 'white', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 26, display: 'flex', flexDirection: 'column', gap: 14, width: 560, maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', textAlign: 'left' }} onClick={e => e.stopPropagation()}>
         {children}
       </div>
     </div>
