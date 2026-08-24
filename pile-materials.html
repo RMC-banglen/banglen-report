@@ -535,6 +535,29 @@ class App extends React.Component {
     return { rebarRowsM, pcRowsM, stirrupRowsM, plateRowsM, whiskerRowsM, collarRowsM };
   }
 
+  buildDetailPage(r) {
+    if (!r || !this._mod) return null;
+    const dl = this._mod.diamLabel;
+    const plateThicknessD = this.state.plateThicknessMm || {};
+    const wireMmD = this.state.stirrupWireMm || {};
+    const rebarRowsD = r.rebar.map(x => this.buildRow('detail:rebar:' + x.spec, x.spec, x.weightKg, { piecesFmt: fmt(x.pieces, 0) }));
+    const plateRowsD = r.plates.map(x => this.buildRow('detail:plate:' + x.diam, dl(x.diam) + (plateThicknessD[x.diam] ? ' (เพลท ' + plateThicknessD[x.diam] + ' มม.)' : ''), x.weightKg, { countFmt: fmt(x.count, 0) }));
+    const whiskerRowsD = r.whisker.map(x => this.buildRow('detail:whisker:' + x.diam, dl(x.diam), x.weightKg, { countFmt: fmt(x.count, 0), spec: x.spec || 'ไม่ระบุในไฟล์ต้นฉบับ' }));
+    const collarRowsD = r.collar.map(x => ({ ...this.buildRow('detail:collar:' + x.diam, dl(x.diam), x.count), calcFmt: fmt(x.count, 0) }));
+    const pcRowsD = [];
+    r.pc.forEach(x => {
+      pcRowsD.push(this.buildRow('detail:pc4:' + x.diam, 'PC.wire4 - เสา ' + dl(x.diam), x.pc4Kg));
+      pcRowsD.push(this.buildRow('detail:pc5:' + x.diam, 'PC.wire5 - เสา ' + dl(x.diam), x.pc5Kg));
+    });
+    const pc7Total = r.pc.reduce((s, x) => s + x.pc7Kg, 0);
+    pcRowsD.push(this.buildRow('detail:pc7:total', 'PC.wire7 (รายการพิเศษ)', pc7Total));
+    const pc7NoteExtra = pc7Total === 0
+      ? 'ในไฟล์นี้ไม่มีข้อความ "PcWire 7 มม." อยู่เลย จึงคำนวณได้ 0 — กรอกยอดใช้จริงเพื่อเทียบได้'
+      : 'พบข้อความ "PcWire 7 มม." ในไฟล์นี้ คำนวณจากข้อความที่ระบุไว้ในชื่อสินค้าโดยตรง (ไม่ใช่สูตรมาตรฐาน)';
+    const stirrupRowsD = r.stirrup.map(x => this.buildRow('detail:stirrup:' + x.diam, dl(x.diam) + (wireMmD[x.diam] ? ' (ลวด ' + wireMmD[x.diam] + ' มม.)' : ''), x.weightKg));
+    return { rebarRowsD, plateRowsD, whiskerRowsD, collarRowsD, pcRowsD, pc7NoteExtra, stirrupRowsD };
+  }
+
   buildPlateReconcile(r) {
     if (!r || !this._mod) return [];
     const mok = this._mod.isMok, dl = this._mod.diamLabel;
@@ -790,12 +813,13 @@ class App extends React.Component {
             )}
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-no-print="true">
-              {[['main', 'หน้าหลัก (รวมทุกวัตถุดิบ)'], ['stock', '📦 นับสต็อก'], ['trend', '📈 แนวโน้มย้อนหลัง']].map(([v, lbl]) => (
+              {[['main', 'หน้าหลัก (รวมทุกวัตถุดิบ)'], ['stock', '📦 นับสต็อก'], ['detail', 'ตามรายการเสา'], ['trend', '📈 แนวโน้มย้อนหลัง']].map(([v, lbl]) => (
                 <button key={v} onClick={() => this.setResultView(v)} style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid #d8dde6', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: s.resultView === v ? '#2f5fd0' : 'white', color: s.resultView === v ? 'white' : '#333' }}>{lbl}</button>
               ))}
             </div>
 
             {s.resultView === 'trend' && <TrendView app={this} />}
+            {s.resultView === 'detail' && <DetailView app={this} />}
 
             {(s.resultView === 'main' || s.resultView === 'stock') && (
               <React.Fragment>
@@ -930,6 +954,55 @@ function PlateReconcileCard({ pr }) {
         <span style={{ fontSize: 14, fontWeight: 700 }}>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</span>
         <span style={{ fontSize: 17, fontWeight: 800, color: '#c0392b' }}>{pr.unexplainedKgFmt} กก.</span>
       </div>
+    </div>
+  );
+}
+function DetailTable({ title, subtitle, rows, columns }) {
+  if (!rows || !rows.length) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 13, color: '#78839A' }}>{subtitle}</div>}
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
+        <thead>
+          <tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
+            {columns.map(c => <th key={c.key} style={{ padding: '10px 14px', fontSize: 13, textAlign: c.right ? 'right' : 'left' }}>{c.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} style={{ borderTop: '1px solid #eef0f4', verticalAlign: 'top' }}>
+              {columns.map(c => <td key={c.key} style={{ padding: '9px 14px', fontSize: c.key === 'spec' ? 13 : 14, color: c.key === 'spec' ? '#78839A' : 'inherit', textAlign: c.right ? 'right' : 'left' }}>{row[c.key]}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+function DetailView({ app }) {
+  const dp = app.buildDetailPage(app.state.result);
+  if (!dp) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+      <DetailTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={dp.plateRowsD} columns={[
+        { key: 'label', label: 'ขนาดเสา' }, { key: 'countFmt', label: 'จำนวน (แผ่น)', right: true }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
+      <DetailTable title="เหล็กหนวดกุ้ง" subtitle="เชื่อมติดหัวเพลท จำนวนอิงจากจำนวนแผ่นเพลทที่คำนวณได้" rows={dp.whiskerRowsD} columns={[
+        { key: 'label', label: 'ขนาดเสา' }, { key: 'spec', label: 'ขนาด/ความยาวเหล็กที่ใช้' }, { key: 'countFmt', label: 'จำนวน (ชิ้น)', right: true }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
+      <DetailTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={dp.collarRowsD} columns={[
+        { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'จำนวนคำนวณ (ชุด)', right: true },
+      ]} />
+      <DetailTable title="ลวด PC.wire" subtitle={dp.pc7NoteExtra} rows={dp.pcRowsD} columns={[
+        { key: 'label', label: 'รายการ' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
+      <DetailTable title="ลวดปลอก" rows={dp.stirrupRowsD} columns={[
+        { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
+      <DetailTable title="เหล็กเสริมหลัก (DB/RB)" rows={dp.rebarRowsD} columns={[
+        { key: 'label', label: 'ขนาด/ความยาว' }, { key: 'piecesFmt', label: 'จำนวน (เส้น)', right: true }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
     </div>
   );
 }
