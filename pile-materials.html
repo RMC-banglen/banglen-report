@@ -317,6 +317,30 @@ class App extends React.Component {
   updatePlateBigSheetKg(mm, v) { this.setState(s => ({ plateBigSheetKg: { ...s.plateBigSheetKg, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
   updateStirrupWireMm(diam, v) { this.setState(s => ({ stirrupWireMm: { ...s.stirrupWireMm, [diam]: v } })); }
   updateStirrup(diam, len, v) { this.setState(s => ({ stirrupTable: { ...s.stirrupTable, [diam]: { ...s.stirrupTable[diam], [len]: v === '' ? null : Number(v) } } }), () => this.recompute()); }
+  addStirrupLength(diam, len) {
+    len = Number(len); if (!len) return;
+    this.setState(s => { const cur = s.stirrupTable[diam] || {}; if (cur[len] != null) return null;
+      return { stirrupTable: { ...s.stirrupTable, [diam]: { ...cur, [len]: 0 } } }; }, () => this.recompute());
+  }
+  removeStirrupLength(diam, len) {
+    this.setState(s => { const cur = { ...(s.stirrupTable[diam] || {}) }; delete cur[len];
+      return { stirrupTable: { ...s.stirrupTable, [diam]: cur } }; }, () => this.recompute());
+  }
+  setPcWireCondType(id, type) {
+    this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => {
+      if (c.id !== id) return c;
+      const base = { id: c.id, diam: c.diam, pc4: c.pc4, pc5: c.pc5 };
+      if (type === 'exact') return { ...base, exact: c.exact ?? c.max ?? c.min ?? 0 };
+      if (type === 'max') return { ...base, max: c.max ?? c.exact ?? c.min ?? 0 };
+      if (type === 'min') return { ...base, min: c.min ?? c.exact ?? c.max ?? 0 };
+      return base;
+    }) }), () => this.recompute());
+  }
+  addPcWireRow(diam) {
+    this.setState(s => { const nextId = Math.max(-1, ...s.pcWireTable.map(c => c.id)) + 1;
+      return { pcWireTable: [...s.pcWireTable, { id: nextId, diam, pc4: 0, pc5: 0 }] }; }, () => this.recompute());
+  }
+  removePcWireRow(id) { this.setState(s => ({ pcWireTable: s.pcWireTable.filter(c => c.id !== id) }), () => this.recompute()); }
 
   buildLockUi(key) {
     const locked = this.state.locks[key];
@@ -969,19 +993,73 @@ function SettingsPanel({ app }) {
                 <div key={mm}><div style={{ fontSize: 12, color: '#78839A' }}>PC.wire {mm} มม.</div><input type="number" step="0.001" value={v ?? ''} onChange={e => app.updatePcKgPerM(mm, e.target.value)} style={{ ...inp(null), width: '100%' }} /></div>
               ))}
             </div>
-            <div style={{ fontSize: 12, color: '#8892a0', marginTop: 14 }}>จำนวนเส้นลวดต่อเสาแต่ละขนาด/ความยาว — แก้ไขจากไฟล์ pile-calc.js โดยตรงหากต้องปรับเงื่อนไขละเอียด</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, marginBottom: 10 }}><b>จำนวนเส้นลวดต่อเสาแต่ละขนาด/ความยาว</b>{lockBtn('pcWire')}</div>
+            <div style={{ opacity: s.locks.pcWire ? 0.5 : 1, pointerEvents: s.locks.pcWire ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Object.entries(
+                (s.pcWireTable || []).reduce((acc, c) => { (acc[c.diam] = acc[c.diam] || []).push(c); return acc; }, {})
+              ).sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([diam, rows]) => (
+                <div key={diam} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{dl(diam)}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {rows.map(c => {
+                      const condType = c.exact !== undefined ? 'exact' : c.max !== undefined ? 'max' : c.min !== undefined ? 'min' : 'all';
+                      const condVal = c.exact ?? c.max ?? c.min ?? '';
+                      return (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <select value={condType} onChange={e => app.setPcWireCondType(c.id, e.target.value)} style={inp(150)}>
+                            <option value="all">ทุกความยาว</option>
+                            <option value="exact">ยาวเท่ากับ (ม.)</option>
+                            <option value="max">ยาวน้อยกว่า (ม.)</option>
+                            <option value="min">ยาวมากกว่า/เท่ากับ (ม.)</option>
+                          </select>
+                          {condType !== 'all' && (
+                            <input type="number" step="0.1" value={condVal} onChange={e => app.updatePcWire(c.id, condType, e.target.value)} style={inp(80)} placeholder="ม." />
+                          )}
+                          <span style={{ fontSize: 12, color: '#78839A' }}>PC4</span>
+                          <input type="number" value={c.pc4 ?? 0} onChange={e => app.updatePcWire(c.id, 'pc4', e.target.value)} style={inp(70)} />
+                          <span style={{ fontSize: 12, color: '#78839A' }}>PC5</span>
+                          <input type="number" value={c.pc5 ?? 0} onChange={e => app.updatePcWire(c.id, 'pc5', e.target.value)} style={inp(70)} />
+                          <button onClick={() => app.removePcWireRow(c.id)} style={{ ...btnGhost(), fontSize: 12, color: '#c0392b' }}>ลบ</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button onClick={() => app.addPcWireRow(diam)} style={{ ...btnGhost(), fontSize: 12, marginTop: 8 }}>+ เพิ่มเงื่อนไข</button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {s.settingsTab === 'stirrup' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>ขนาดลวดปลอกต่อเสาแต่ละขนาด</b>{lockBtn('stirrup')}</div>
-            <div style={{ opacity: s.locks.stirrup ? 0.5 : 1, pointerEvents: s.locks.stirrup ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ opacity: s.locks.stirrup ? 0.5 : 1, pointerEvents: s.locks.stirrup ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
               {Object.entries(s.stirrupWireMm || {}).sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([diam, mm]) => (
                 <div key={diam} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 13, width: 100 }}>{dl(diam)}</span>
                   <select value={mm} onChange={e => app.updateStirrupWireMm(diam, e.target.value)} style={inp(140)}>
                     <option value="">— เลือก —</option><option value="2.8">2.8 มม.</option><option value="3.0">3.0 มม.</option><option value="4.0">4.0 มม.</option>
                   </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>น้ำหนักลวดปลอกต่อต้น (กก.) ตามความยาวปัดลง</b>{lockBtn('stirrup')}</div>
+            <div style={{ opacity: s.locks.stirrup ? 0.5 : 1, pointerEvents: s.locks.stirrup ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Object.entries(s.stirrupTable || {}).sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([diam, lenMap]) => (
+                <div key={diam} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{dl(diam)}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 8 }}>
+                    {Object.entries(lenMap || {}).sort((a, b) => Number(a[0]) - Number(b[0])).map(([len, v]) => (
+                      <div key={len}>
+                        <div style={{ fontSize: 12, color: '#78839A', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>ยาว {len} ม.</span>
+                          <span onClick={() => app.removeStirrupLength(diam, len)} style={{ color: '#c0392b', cursor: 'pointer' }}>ลบ</span>
+                        </div>
+                        <input type="number" step="0.001" value={v ?? ''} onChange={e => app.updateStirrup(diam, len, e.target.value)} style={{ ...inp(null), width: '100%' }} />
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => { const len = window.prompt('ความยาว (ม.) ที่จะเพิ่มสำหรับ ' + dl(diam) + ' ?'); if (len) app.addStirrupLength(diam, len); }} style={{ ...btnGhost(), fontSize: 12, marginTop: 8 }}>+ เพิ่มความยาว</button>
                 </div>
               ))}
             </div>
