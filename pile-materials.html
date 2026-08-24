@@ -234,6 +234,7 @@ class App extends React.Component {
     'periodLabel', 'periods', 'periodHistory', 'periodLocked', 'periodSummaries', 'extraRebarItems', 'alertThresholdPct',
     'rebarWeights', 'plateWeights', 'whiskerWeights', 'whiskerSpecs', 'pcWireKgPerM', 'pcWireTable', 'stirrupTable', 'stirrupWireMm', 'plateThicknessMm',
     'plateBigSheetKg', 'locks'];
+  fileInputRef = React.createRef();
 
   async componentDidMount() {
     PC = await waitForPileCalc();
@@ -683,6 +684,11 @@ class App extends React.Component {
       if (!this.state.periodLabel) this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add', periodPickerRequired: true });
     } catch (err) { this.setState({ loading: false, error: 'เกิดข้อผิดพลาด: ' + err.message }); }
   }
+  cancelFirstFileLoad() {
+    // ยกเลิกตอนเลือกไฟล์ผิด (ตอนยังไม่เคยตั้งงวดมาก่อน) — เคลียร์ไฟล์/ผลลัพธ์ที่เพิ่งโหลด ให้เลือกไฟล์ใหม่ได้ทันที
+    if (this.fileInputRef && this.fileInputRef.current) this.fileInputRef.current.value = '';
+    this.setState({ fileName: '', error: '', result: null, rawRows: null, actual: {}, periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false });
+  }
 
   confirmPeriodPicker() {
     const finalLabel = THAI_MONTHS[this.state.periodPickerMonth] + ' ' + this.state.periodPickerYear;
@@ -768,7 +774,7 @@ class App extends React.Component {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#2f5fd0', color: 'white', fontWeight: 600, fontSize: 15, padding: '11px 20px', borderRadius: 8, cursor: 'pointer' }}>
               เลือกไฟล์ Excel
-              <input type="file" accept=".xlsx" onChange={e => this.handleFile(e)} style={{ display: 'none' }} />
+              <input ref={this.fileInputRef} type="file" accept=".xlsx" onChange={e => this.handleFile(e)} style={{ display: 'none' }} />
             </label>
             <div style={{ fontSize: 14, color: '#78839A' }}>{s.loading ? 'กำลังอ่านไฟล์...' : (s.fileName ? 'ไฟล์: ' + s.fileName : 'ยังไม่ได้เลือกไฟล์')}</div>
             <SyncBadge status={s.syncStatus} />
@@ -791,6 +797,7 @@ class App extends React.Component {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
               {!s.periodPickerRequired && <button onClick={() => this.setState({ periodPickerOpen: false, periodPickerPurpose: null })} style={btnGhost()}>ยกเลิก</button>}
+              {s.periodPickerRequired && <button onClick={() => this.cancelFirstFileLoad()} style={btnGhost()}>ยกเลิก (เลือกไฟล์ผิด)</button>}
               <button onClick={() => this.confirmPeriodPicker()} style={btnPrimary()}>ยืนยัน</button>
             </div>
           </Modal>
