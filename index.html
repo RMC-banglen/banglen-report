@@ -64,12 +64,12 @@
   .seg__btn:hover { color: var(--ink); }
   .seg__btn.is-active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(22,34,51,0.12); }
 
-  /* tabs */
-  .tabs { display: flex; gap: 4px; border-bottom: 1.5px solid var(--line); margin-bottom: 24px; }
-  .tabs__btn { border: 0; background: transparent; font-family: var(--font); font-size: 15px; font-weight: 600; color: var(--muted-text); padding: 12px 18px; cursor: pointer; position: relative; transition: color .15s; }
+  /* tabs — เลื่อนแนวนอนบรรทัดเดียว กันข้อความตัดบรรทัดจนอ่านยากตอนมีแท็บเยอะ */
+  .tabs { display: flex; gap: 2px; border-bottom: 1.5px solid var(--line); margin-bottom: 24px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+  .tabs__btn { border: 0; background: transparent; font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--muted-text); padding: 12px 14px; cursor: pointer; position: relative; transition: color .15s; white-space: nowrap; flex-shrink: 0; }
   .tabs__btn:hover { color: var(--ink); }
   .tabs__btn.is-active { color: var(--primary); }
-  .tabs__btn.is-active::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: -1.5px; height: 2.5px; background: var(--primary); border-radius: 3px 3px 0 0; }
+  .tabs__btn.is-active::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1.5px; height: 2.5px; background: var(--primary); border-radius: 3px 3px 0 0; }
 
   /* grid */
   .grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 18px; }
