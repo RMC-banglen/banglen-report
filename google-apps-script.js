@@ -1252,7 +1252,8 @@ function fillBlankBillRowsREB() {
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   if (lastRow < 2) { ui.alert('ไม่มีข้อมูล'); return; }
 
-  var values  = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  // อ่านแบบกระจายค่า merge — แถวที่อยู่ในกลุ่ม merge ถือว่ามีเลขบิลแล้ว ไม่ต้องเติมซ้ำ
+  var values  = readValuesExpandingMerges(sh);
   var headers = values[0].map(function(h) { return String(h).trim(); });
 
   var cBill   = headers.indexOf('เลขที่ใบรับคืน');
