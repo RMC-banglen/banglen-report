@@ -81,28 +81,37 @@ const CATS = [
 
 /* ---------- small UI ---------- */
 function Modal({ onClose, children }) {
-  const boxRef = useRef(null);
+  // หน้านี้ถูกฝังในหน้าแม่ผ่าน iframe แบบยืดความสูงเต็มเนื้อหา (ไม่มีสกรอลล์ในตัวเอง หน้าแม่เลื่อนแทน)
+  // ทำให้ position:fixed ปกติอ้างอิงความสูงทั้งหมดของ iframe แทนที่จะเป็นจอที่มองเห็นจริง
+  // (เดิมเคยลองสั่งเลื่อนหน้าแม่ไปหากล่องครั้งเดียว แต่ชนกับเนื้อหาที่ยังโตขึ้นระหว่างนั้นพอดี ทำให้กล่องขยับหนีไปเรื่อยๆ)
+  // แก้ใหม่: ให้กล่องคำนวณ "ส่วนที่มองเห็นจริง" ของ iframe จากหน้าแม่ แล้วตามตำแหน่งนั้นตลอดเวลาแทน (เหมือน sticky ตามการเลื่อนจอ) ไม่แย่งเลื่อนจอผู้ใช้
+  const [viewport, setViewport] = useState(null); // { top, height } เป็นพิกัดภายใน iframe เอง ของส่วนที่ผู้ใช้มองเห็นอยู่ตอนนี้
   useEffect(() => {
-    // หน้านี้ถูกฝังในหน้าแม่ผ่าน iframe แบบยืดความสูงเต็มเนื้อหา (ไม่มีสกรอลล์ในตัวเอง)
-    // ทำให้ position:fixed อ้างอิงความสูงทั้งหมดของ iframe แทนที่จะเป็นจอที่มองเห็นจริง
-    // กล่อง modal เลยไปโผล่กลางเนื้อหาทั้งหมด (อาจอยู่นอกจอ) แทนที่จะอยู่กลางจอที่ผู้ใช้เห็น
-    // จึงต้องเลื่อนหน้าแม่ให้กล่องนี้ขึ้นมากลางจอเอง
-    try {
-      const fe = window.frameElement;
-      const parentWin = window.parent;
-      if (fe && parentWin && parentWin !== window && boxRef.current) {
-        const boxRect = boxRef.current.getBoundingClientRect();
-        const frameRect = fe.getBoundingClientRect();
-        const boxCenterInParent = frameRect.top + boxRect.top + boxRect.height / 2;
-        const desiredCenter = parentWin.innerHeight / 2;
-        const delta = boxCenterInParent - desiredCenter;
-        if (Math.abs(delta) > 30) parentWin.scrollBy({ top: delta, behavior: 'smooth' });
-      }
-    } catch (e) { /* ข้ามคนละ origin หรือไม่ได้อยู่ใน iframe */ }
+    let fe, parentWin;
+    try { fe = window.frameElement; parentWin = window.parent; } catch (e) { return; }
+    if (!fe || !parentWin || parentWin === window) return; // ไม่ได้ฝังใน iframe (เช่นเปิดไฟล์นี้ตรงๆ) ใช้ fixed ปกติได้เลย
+    const update = () => {
+      try {
+        const frameRect = fe.getBoundingClientRect(); // ตำแหน่ง iframe บนจอจริงตอนนี้ (คิดรวมสกรอลล์ของหน้าแม่แล้ว)
+        const top = Math.max(0, -frameRect.top);
+        const height = Math.min(parentWin.innerHeight - Math.max(0, frameRect.top), fe.clientHeight - top);
+        if (height > 100) setViewport({ top, height });
+      } catch (e) {}
+    };
+    update();
+    parentWin.addEventListener('scroll', update, { passive: true });
+    parentWin.addEventListener('resize', update);
+    // เผื่อ iframe ยังโตขึ้นระหว่างเปิด modal (เช่นตารางข้อมูลกำลังคำนวณ) แต่หน้าแม่ปรับความสูง iframe ตามทุก 400ms เท่านั้น
+    const iv = setInterval(update, 200);
+    return () => { parentWin.removeEventListener('scroll', update); parentWin.removeEventListener('resize', update); clearInterval(iv); };
   }, []);
+  const overlayStyle = viewport
+    ? { position: 'absolute', top: viewport.top, left: 0, right: 0, height: viewport.height, zIndex: 200, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+    : { position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+  const maxBoxHeight = viewport ? Math.max(200, viewport.height * 0.85) : '80vh';
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div ref={boxRef} style={{ background: 'white', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 26, display: 'flex', flexDirection: 'column', gap: 14, width: 560, maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', textAlign: 'left' }} onClick={e => e.stopPropagation()}>
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={{ background: 'white', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 26, display: 'flex', flexDirection: 'column', gap: 14, width: 560, maxWidth: '90vw', maxHeight: maxBoxHeight, overflow: 'auto', textAlign: 'left' }} onClick={e => e.stopPropagation()}>
         {children}
       </div>
     </div>
