@@ -491,6 +491,7 @@ function onOpen() {
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
     .addItem('🔽 ตั้ง Dropdown ประเภท', 'setupTypeDropdowns')
+    .addItem('👷 ตั้ง Dropdown ชื่อพนักงาน (เสาร้าว)', 'setupCrackWorkerDropdown')
     .addSeparator()
     .addItem('🔍 ตรวจสุขภาพชีท', 'checkDamageSheets')
     .addItem('🧹 เติมเลขบิลที่เว้นว่าง', 'fillBlankBillRowsREB')
@@ -1424,4 +1425,73 @@ function checkDamageSheets() {
   });
 
   SpreadsheetApp.getUi().alert(out.join('\n\n'));
+}
+
+// ============================================================
+// Dropdown "ชื่อพนักงาน" ในชีท REB-ROB
+// ใส่ให้เฉพาะแถวที่ ประเภท = เสาร้าวในกอง/จากขนส่ง/ปีกแตก
+// ============================================================
+
+var CRACK_WORKERS = ['จา', 'ตึ๋ง', 'ฐา', 'เภิก', 'ฉลอง', 'หนึ่ง', 'นึก', 'นุ'];
+
+function setupCrackWorkerColumn(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 'ไม่มีข้อมูล';
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+                  .map(function(h) { return String(h).trim(); });
+  var colType = headers.indexOf('ประเภท') + 1;
+  var colEmp  = headers.indexOf('ชื่อพนักงาน') + 1;
+  if (colType === 0) return '⚠️ ไม่พบคอลัมน์ "ประเภท"';
+  if (colEmp === 0)  return '⚠️ ไม่พบคอลัมน์ "ชื่อพนักงาน"';
+
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(CRACK_WORKERS, true)
+    .setAllowInvalid(false)
+    .setHelpText('เลือกชื่อพนักงานจากรายการ — แก้รายชื่อได้ที่ตัวแปร CRACK_WORKERS ใน Apps Script')
+    .build();
+
+  var isCrack = function(v) { return /เสาร้าว/.test(String(v || '')); };
+
+  // ล้าง merge + validation เดิมในคอลัมน์ชื่อพนักงานก่อน
+  sheet.getRange(2, colEmp, lastRow - 1, 1).breakApart();
+  sheet.getRange(2, colEmp, lastRow - 1, 1).clearDataValidations();
+
+  var typeVals = sheet.getRange(2, colType, lastRow - 1, 1).getValues();
+  var merges   = sheet.getRange(2, colType, lastRow - 1, 1).getMergedRanges();
+  var handled  = {};
+  var count    = 0;
+
+  // กลุ่มที่ merge คอลัมน์ประเภทไว้ → merge ช่องชื่อพนักงานตามให้ด้วย
+  merges.forEach(function(mr) {
+    var startRow = mr.getRow(), numRows = mr.getNumRows();
+    var v = sheet.getRange(startRow, colType).getValue();
+    if (isCrack(v)) {
+      if (numRows > 1) sheet.getRange(startRow, colEmp, numRows, 1).merge();
+      sheet.getRange(startRow, colEmp).setDataValidation(rule);
+      count++;
+    }
+    for (var r = startRow; r < startRow + numRows; r++) handled[r] = true;
+  });
+
+  // แถวเดี่ยว
+  for (var i = 0; i < typeVals.length; i++) {
+    var row = i + 2;
+    if (handled[row]) continue;
+    if (isCrack(typeVals[i][0])) {
+      sheet.getRange(row, colEmp).setDataValidation(rule);
+      count++;
+    }
+  }
+
+  return '✅ ใส่ dropdown ชื่อพนักงานให้ ' + count + ' แถว (ประเภท = เสาร้าวในกอง/จากขนส่ง/ปีกแตก)';
+}
+
+function setupCrackWorkerDropdown() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REB_SHEET_NAME);
+  if (!sh) { SpreadsheetApp.getUi().alert('⚠️ ไม่พบ Sheet ' + REB_SHEET_NAME); return; }
+  var msg = '';
+  withFilterSuspended(sh, function() { msg = setupCrackWorkerColumn(sh); });
+  SpreadsheetApp.getUi().alert(msg);
 }
