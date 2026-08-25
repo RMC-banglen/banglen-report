@@ -806,7 +806,7 @@ window.__dataReady.then(data => {
       causeItems=paired; causeSegments=paired;
     }
     return <div className="grid">
-      <div className="kpi-row" style={{gridTemplateColumns:'repeat(6,1fr)'}}>
+      <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))'}}>
         <KpiCard label="คิวผลิตจริงรวม" value={fmt(totalProduced)} unit=" m³" sub={`เฉลี่ย ${fmt(totalProduced/yd.months[yd.months.length-1].m)} m³/เดือน`} accent={PALETTE.produced}/>
         <KpiCard label="คิวขนส่งรวม" value={fmt(totalTransport)} unit=" m³" sub={`เฉลี่ย ${fmt(avg(transport))} m³/เดือน`} accent={PALETTE.transport}/>
         <KpiCard label="ผลิต − ขนส่ง (สุทธิ)" value={(net>=0?'+':'')+fmt(net)} unit=" m³" sub={net>=0?'ผลิตมากกว่าขนส่ง':'ขนส่งมากกว่าผลิต'} accent={net>=0?PALETTE.produced:PALETTE.cancel}/>
