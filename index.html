@@ -1966,10 +1966,15 @@ window.__dataReady.then(data => {
   function PileMaterialsFrame({canEdit}){
     // ให้ iframe ยืดความสูงตามเนื้อหาจริง เพื่อให้เลื่อนหน้าจอเดียว (แทนที่จะมี scrollbar ซ้อนกัน 2 อัน)
     const ref=React.useRef(null);
+    const lastH=React.useRef(0);
     const resize=()=>{
       try{
         const doc=ref.current&&ref.current.contentWindow&&ref.current.contentWindow.document;
-        if(doc)ref.current.style.height=(doc.documentElement.scrollHeight+20)+'px';
+        if(!doc||!doc.body)return;
+        // ต้องวัดจาก body เท่านั้น — documentElement.scrollHeight จะยืดตามความสูง iframe ที่เพิ่งตั้งไป
+        // ทำให้โตขึ้นเรื่อยๆ ทุกรอบจนหน้าเลื่อนลงเอง
+        const h=Math.max(doc.body.scrollHeight,doc.body.offsetHeight)+20;
+        if(Math.abs(h-lastH.current)>2){lastH.current=h;ref.current.style.height=h+'px';}
       }catch(e){}
     };
     React.useEffect(()=>{
