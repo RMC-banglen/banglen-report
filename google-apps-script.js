@@ -17,6 +17,17 @@ const SS_DAMAGE_ID = '1VYLouTO0BpHkLPnsEZWA2-JsTHqmPM0U1v8GfyTRIoM';
 // MAIN: sync ข้อมูลทั้งหมดจาก Sheet → Supabase
 // ============================================================
 function syncAll() {
+  var ok = withScriptLock(function() { syncAllCore(); }, 2000);
+  if (!ok) {
+    try { SpreadsheetApp.getUi().alert('⏳ มีการ sync กำลังทำงานอยู่ — รอสักครู่แล้วลองใหม่'); } catch (e) {}
+    return;
+  }
+  try { SpreadsheetApp.getUi().alert('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว'); } catch (e) {
+    Logger.log('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว');
+  }
+}
+
+function syncAllCore() {
   const ss = SpreadsheetApp.openById(SS_MAIN_ID);
 
   writeComputedColumns(ss);
@@ -31,12 +42,7 @@ function syncAll() {
   syncDamageItems(ss);
   syncDamageSales(ss);
   syncPendingWork(ss);
-
-  try {
-    SpreadsheetApp.getUi().alert('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว');
-  } catch(e) {
-    Logger.log('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว');
-  }
+  Logger.log('✅ Sync core เสร็จ');
 }
 
 // ============================================================
@@ -464,9 +470,9 @@ function onEdit(e) {
 
   if (!validSheets.includes(sheetName)) return;
 
-  // debounce: รอ 2 วินาทีก่อน sync เพื่อไม่ให้ sync บ่อยเกินไป
-  SpreadsheetApp.flush();
-  syncAll_silent();
+  // ห้าม sync ทันที — เดิมแก้ 1 เซลล์ = sync 1 รอบ ทำให้หลายรอบทับกันจนข้อมูลเบิ้ล
+  // เปลี่ยนเป็นตั้งเวลาไว้ แก้รวดเดียวหลายเซลล์จะ sync แค่ครั้งเดียวหลังหยุดพิมพ์
+  scheduleSync();
 }
 
 function syncAll_silent() {
@@ -490,6 +496,12 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
+    .addItem('🔽 ตั้ง Dropdown ประเภท', 'setupTypeDropdowns')
+    .addItem('👷 ตั้ง Dropdown ชื่อพนักงาน (เสาร้าว)', 'setupCrackWorkerDropdown')
+    .addSeparator()
+    .addItem('🔍 ตรวจสุขภาพชีท', 'checkDamageSheets')
+    .addItem('🧹 เติมเลขบิลที่เว้นว่าง', 'fillBlankBillRowsREB')
+    .addSeparator()
     .addItem('📋 ดู Log', 'showLog')
     .addToUi();
 
@@ -537,6 +549,34 @@ function mergeCauseToH() {
 }
 
 // ผสานเซลล์คอลัมน์ I ตาม H และใส่ dropdown เฉพาะแถวที่ G = "ผู้รับเหมา"
+// ============================================================
+// ปิดเงื่อนไขตัวกรองชั่วคราว แล้วคืนค่าเดิมให้ครบ
+// ใช้ครอบงานที่แตะโครงสร้างชีท (merge / ซ่อนแถว) ซึ่งทำบนแถวที่ถูกกรองซ่อนไม่ได้
+// ============================================================
+function withFilterSuspended(sheet, fn) {
+  var f = sheet.getFilter();
+  if (!f) { fn(); return; }
+
+  var saved = [];
+  var lastCol = sheet.getLastColumn();
+  for (var c = 1; c <= lastCol; c++) {
+    var cr = null;
+    try { cr = f.getColumnFilterCriteria(c); } catch (e) {}
+    if (cr) { saved.push({ col: c, criteria: cr }); f.removeColumnFilterCriteria(c); }
+  }
+
+  try {
+    fn();
+  } finally {
+    var cur = sheet.getFilter();
+    if (cur) {
+      saved.forEach(function(s) {
+        try { cur.setColumnFilterCriteria(s.col, s.criteria); } catch (e) {}
+      });
+    }
+  }
+}
+
 function setupContractorColumn(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
@@ -553,9 +593,12 @@ function setupContractorColumn(sheet) {
     .setAllowInvalid(true)
     .build();
 
-  // ล้าง dropdown ทุกคอลัมน์ที่ไม่ใช่ colI ก่อน (ป้องกัน dropdown ค้างที่ชื่อพนักงาน)
+  // ล้าง dropdown เดิมให้เกลี้ยงก่อนทั้งสองคอลัมน์ ตลอดทั้งชีท (ไม่ใช่แค่ถึง lastRow)
+  // ถ้าล้างเฉพาะแถวที่ประเภทไม่ตรง แถวที่อยู่ในกลุ่ม merge จะถูกข้าม ทำให้ dropdown เก่าค้าง
+  const maxRows = sheet.getMaxRows();
   const colJ = headers.indexOf('ชื่อพนักงาน') + 1;
-  if (colJ > 0) sheet.getRange(2, colJ, lastRow - 1, 1).clearDataValidations();
+  if (colJ > 0) sheet.getRange(2, colJ, maxRows - 1, 1).clearDataValidations();
+  sheet.getRange(2, colI, maxRows - 1, 1).clearDataValidations();
 
   // อ่าน merge ranges ของคอลัมน์ H
   const merges = sheet.getRange(2, colH, lastRow - 1, 1).getMergedRanges();
@@ -698,6 +741,41 @@ function parseDateCell(val) {
 // Sync Sheet "รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB"
 // และ "เสียหายในโรงงานบางเลน รหัสID" → damage_items
 // ============================================================
+// อ่านค่าจากชีทโดยกระจายค่าของเซลล์ที่ merge ไว้ให้ครบทุกแถว/คอลัมน์ในกลุ่ม
+// (Sheets คืนค่าให้เฉพาะเซลล์ซ้ายบนของ merge ที่เหลือเป็นค่าว่าง)
+// skipHeaders = ชื่อหัวคอลัมน์ที่ "ห้าม" กระจายค่า merge
+// สำคัญมากสำหรับคอลัมน์ยอดเงิน/จำนวน: เซลล์ที่ merge ไว้คือค่าเดียวของทั้งกลุ่ม
+// ถ้ากระจายลงทุกแถวจะกลายเป็นนับซ้ำตามจำนวนแถวที่ merge
+function readValuesExpandingMerges(sheet, skipHeaders) {
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return values;
+
+  const skip = {};
+  if (skipHeaders && skipHeaders.length) {
+    const headers = values[0].map(function(h) { return String(h).trim(); });
+    skipHeaders.forEach(function(name) {
+      const i = headers.indexOf(name);
+      if (i >= 0) skip[i + 1] = true;      // เก็บเป็นเลขคอลัมน์ฐาน 1
+    });
+  }
+
+  sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn())
+    .getMergedRanges().forEach(function(m) {
+      const r0 = m.getRow(), c0 = m.getColumn();
+      const v = values[r0 - 1][c0 - 1];
+      for (let r = r0; r < r0 + m.getNumRows(); r++) {
+        for (let c = c0; c < c0 + m.getNumColumns(); c++) {
+          if (skip[c]) continue;
+          if (values[r - 1] !== undefined) values[r - 1][c - 1] = v;
+        }
+      }
+    });
+  return values;
+}
+
+// คอลัมน์ที่เป็นตัวเลขต่อแถว — ห้ามกระจายค่า merge
+var NO_MERGE_SPREAD = ['ยอดเงินสุทธิ', 'จำนวน/คัน', 'หักเงินผู้รับเหมา'];
+
 function syncDamageItems(ss) {
   const records = [];
 
@@ -707,7 +785,7 @@ function syncDamageItems(ss) {
   if (!sheetRR) {
     Logger.log('⚠️ ไม่พบ Sheet REB-ROB');
   } else {
-    const rows = sheetRR.getDataRange().getValues();
+    const rows = readValuesExpandingMerges(sheetRR, NO_MERGE_SPREAD);
     const headers = rows[0].map(h => String(h).trim());
     // หา index คอลัมน์
     const ci = {};
@@ -785,7 +863,7 @@ function syncDamageItems(ss) {
   if (!sheetID) {
     Logger.log('⚠️ ไม่พบ Sheet ID');
   } else {
-    const rows = sheetID.getDataRange().getValues();
+    const rows = readValuesExpandingMerges(sheetID, NO_MERGE_SPREAD);
     const headers = rows[0].map(h => String(h).trim());
     const ci = {};
     headers.forEach((h, i) => { ci[h] = i; });
@@ -844,7 +922,7 @@ function syncDamageItems(ss) {
   if (records.length === 0) { Logger.log('damage_items: ไม่มีข้อมูล'); return; }
 
   // ลบทั้งหมดก่อน แล้ว insert ใหม่
-  truncateDamageItems();
+  truncateVerified('damage_items');
   insertInBatches('damage_items', records, 200);
   Logger.log(`✅ damage_items: sync รวม ${records.length} แถว`);
 }
@@ -893,7 +971,8 @@ function addPersonnelColumns(ss) {
     }
 
     // dropdown ชุดผู้รับเหมา เฉพาะแถวที่ G = ผู้รับเหมา
-    setupContractorColumn(sheetID);
+    // ต้องปิดตัวกรองชั่วคราว — Sheets ผสานเซลล์บนแถวที่ถูกกรองซ่อนไว้ไม่ได้
+    withFilterSuspended(sheetID, function() { setupContractorColumn(sheetID); });
   }
 }
 
@@ -1106,19 +1185,68 @@ function buildMonthMenu() {
   menu.addToUi();
 }
 
+// ============================================================
+// กรองเดือนผ่าน "ตัวกรอง" ของ Google Sheets เอง (ไม่ใช่ซ่อนแถวตรงๆ)
+// เพื่อให้กรองซ้อนกับคอลัมน์อื่นได้ เช่น เดือน + ประเภทเสียหาย
+// และไม่ไปปลดแถวที่ตัวกรองอื่นซ่อนไว้
+// ============================================================
+
+// คืนตัวกรองของชีท ถ้ายังไม่มีหรือครอบไม่ครบข้อมูล จะสร้างใหม่ให้ครอบทั้งตาราง
+function getOrCreateFilter(sh) {
+  var f = sh.getFilter();
+  if (f) {
+    var rg = f.getRange();
+    var coversAll = rg.getRow() === 1
+      && rg.getLastRow() >= sh.getLastRow()
+      && rg.getLastColumn() >= sh.getLastColumn();
+    if (coversAll) return f;
+    f.remove();   // ครอบไม่ครบทุกแถว → สร้างใหม่
+  }
+  return sh.getDataRange().createFilter();
+}
+
+// ชีทนี้เก็บเดือนแบบไหน
+//   'yearmonth' = คอลัมน์ A ปี + B เดือน (ตัวเลข)
+//   'thaimonth' = คอลัมน์ A เป็น "สิงหาคม 2569"
+function detectMonthFormat(sh) {
+  var n = Math.min(sh.getLastRow() - 1, 50);
+  if (n < 1) return 'thaimonth';
+  var v = sh.getRange(2, 1, n, 2).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (typeof v[i][0] === 'number' && typeof v[i][1] === 'number'
+        && v[i][0] > 2400 && v[i][1] >= 1 && v[i][1] <= 12) return 'yearmonth';
+  }
+  return 'thaimonth';
+}
+
 function filterMonthKey(key) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   if (!sh || sh.getLastRow() <= 1) return;
-  var keys = readMonthKeys(sh);
-  for (var i = 0; i < keys.length; i++) {
-    if (keys[i] === key) sh.showRows(i + 2, 1);
-    else sh.hideRows(i + 2, 1);
+
+  sh.showRows(2, sh.getLastRow() - 1);   // ล้างการซ่อนแถวแบบเก่าที่อาจค้างอยู่
+  var f = getOrCreateFilter(sh);
+  var p = key.split('-'), year = Number(p[0]), month = Number(p[1]);
+
+  if (detectMonthFormat(sh) === 'yearmonth') {
+    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(year).build());
+    f.setColumnFilterCriteria(2, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(month).build());
+  } else {
+    // ใส่ '' ไว้ด้วย เพื่อให้แถวที่คอลัมน์ A ว่าง (เซลล์ merge / แถวต่อเนื่อง) ยังแสดงอยู่
+    var label = MONTH_MENU_TH[month] + ' ' + year;
+    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().setVisibleValues([label, '']).build());
+    f.removeColumnFilterCriteria(2);
   }
 }
 
+// ล้างเฉพาะเงื่อนไขของคอลัมน์เดือน — ตัวกรองคอลัมน์อื่น (เช่น ประเภทเสียหาย) ยังอยู่ครบ
 function monthShowAll() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (sh && sh.getLastRow() > 1) sh.showRows(2, sh.getLastRow() - 1);
+  if (!sh || sh.getLastRow() <= 1) return;
+  sh.showRows(2, sh.getLastRow() - 1);
+  var f = sh.getFilter();
+  if (!f) return;
+  f.removeColumnFilterCriteria(1);
+  if (detectMonthFormat(sh) === 'yearmonth') f.removeColumnFilterCriteria(2);
 }
 
 function monthShowLatest() {
@@ -1128,7 +1256,8 @@ function monthShowLatest() {
   readMonthKeys(sh).forEach(function(k) { if (k && k > latest) latest = k; });
   if (!latest) { SpreadsheetApp.getUi().alert('ไม่พบข้อมูลเดือนในคอลัมน์ A'); return; }
   filterMonthKey(latest);
-  SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะ ' + fmtMonthKey(latest));
+  SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะ ' + fmtMonthKey(latest)
+    + '\n\nใช้ตัวกรองของ Sheets แล้ว — กรองคอลัมน์อื่นซ้อนได้เลย');
 }
 
  function showM_2565_01(){filterMonthKey('2565-01');} function showM_2565_02(){filterMonthKey('2565-02');} function showM_2565_03(){filterMonthKey('2565-03');} function showM_2565_04(){filterMonthKey('2565-04');} function showM_2565_05(){filterMonthKey('2565-05');} function showM_2565_06(){filterMonthKey('2565-06');} function showM_2565_07(){filterMonthKey('2565-07');} function showM_2565_08(){filterMonthKey('2565-08');} function showM_2565_09(){filterMonthKey('2565-09');} function showM_2565_10(){filterMonthKey('2565-10');} function showM_2565_11(){filterMonthKey('2565-11');} function showM_2565_12(){filterMonthKey('2565-12');}
@@ -1139,3 +1268,346 @@ function monthShowLatest() {
  function showM_2570_01(){filterMonthKey('2570-01');} function showM_2570_02(){filterMonthKey('2570-02');} function showM_2570_03(){filterMonthKey('2570-03');} function showM_2570_04(){filterMonthKey('2570-04');} function showM_2570_05(){filterMonthKey('2570-05');} function showM_2570_06(){filterMonthKey('2570-06');} function showM_2570_07(){filterMonthKey('2570-07');} function showM_2570_08(){filterMonthKey('2570-08');} function showM_2570_09(){filterMonthKey('2570-09');} function showM_2570_10(){filterMonthKey('2570-10');} function showM_2570_11(){filterMonthKey('2570-11');} function showM_2570_12(){filterMonthKey('2570-12');}
  function showM_2571_01(){filterMonthKey('2571-01');} function showM_2571_02(){filterMonthKey('2571-02');} function showM_2571_03(){filterMonthKey('2571-03');} function showM_2571_04(){filterMonthKey('2571-04');} function showM_2571_05(){filterMonthKey('2571-05');} function showM_2571_06(){filterMonthKey('2571-06');} function showM_2571_07(){filterMonthKey('2571-07');} function showM_2571_08(){filterMonthKey('2571-08');} function showM_2571_09(){filterMonthKey('2571-09');} function showM_2571_10(){filterMonthKey('2571-10');} function showM_2571_11(){filterMonthKey('2571-11');} function showM_2571_12(){filterMonthKey('2571-12');}
  function showM_2572_01(){filterMonthKey('2572-01');} function showM_2572_02(){filterMonthKey('2572-02');} function showM_2572_03(){filterMonthKey('2572-03');} function showM_2572_04(){filterMonthKey('2572-04');} function showM_2572_05(){filterMonthKey('2572-05');} function showM_2572_06(){filterMonthKey('2572-06');} function showM_2572_07(){filterMonthKey('2572-07');} function showM_2572_08(){filterMonthKey('2572-08');} function showM_2572_09(){filterMonthKey('2572-09');} function showM_2572_10(){filterMonthKey('2572-10');} function showM_2572_11(){filterMonthKey('2572-11');} function showM_2572_12(){filterMonthKey('2572-12');}
+
+// ============================================================
+// ทำคอลัมน์ "ประเภท" เป็น Dropdown — กันพิมพ์ผิด/พิมพ์ไม่ตรงกัน
+// รันจากเมนู 📊 Sync Dashboard → 🔽 ตั้ง Dropdown ประเภท
+// ============================================================
+
+// ประเภทของชีท REB-ROB (รับคืน-เสียหายหน้างาน)
+var TYPES_REB_ROB = [
+  'รับคืนสินค้าใช้ได้',
+  'เสาเข็ม Fail',
+  'เสาร้าวในกอง/จากขนส่ง/ปีกแตก',
+  'ปั้นจั่นลากหัก/ชน',
+  'เสาเข็มหัวแตก',
+  'ตอกเอียง/เทสต์ไม่ผ่าน/ผิดหมุด',
+  'ตอกสไลด์'
+];
+
+// ประเภทของชีท ID (เสียหายในโรงงาน)
+var TYPES_ID = [
+  'ผู้รับเหมา',
+  'พนักงานบริษัท',
+  'เสาเสียในสต็อค',
+  'เสาเข็มหายจากนับสต็อค',
+  'เสาเข็มสั่งผลิตผิด/ส่งผิด/ปรับปรุง',
+  'ย้ายไปบ่อตะกั่ว'
+];
+
+function setupTypeDropdowns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var msg = [];
+
+  msg.push(applyDropdown(ss, 'รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB', 'ประเภท', TYPES_REB_ROB));
+  msg.push(applyDropdown(ss, 'เสียหายในโรงงานบางเลน รหัสID', 'ประเภทเสียหาย', TYPES_ID));
+
+  SpreadsheetApp.getUi().alert(msg.join('\n'));
+}
+
+// ใส่ Data Validation ให้คอลัมน์ที่ระบุ (หาโดยชื่อหัวคอลัมน์)
+function applyDropdown(ss, sheetName, headerName, list) {
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) return '⚠️ ไม่พบ Sheet: ' + sheetName;
+
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+                  .map(function(h) { return String(h).trim(); });
+  var col = headers.indexOf(headerName) + 1;
+  if (col === 0) return '⚠️ ไม่พบคอลัมน์ "' + headerName + '" ใน ' + sheetName;
+
+  var lastRow = Math.max(sh.getLastRow(), 2);
+  var rows = lastRow - 1 + 500;   // เผื่อแถวใหม่อีก 500 แถว
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(list, true)     // true = โชว์ลูกศร dropdown
+    .setAllowInvalid(false)             // พิมพ์นอกรายการไม่ได้ ค่าเดิมที่ผิดจะขึ้นสามเหลี่ยมแดง
+    .setHelpText('เลือกจากรายการเท่านั้น — ถ้าต้องเพิ่มประเภทใหม่ ให้แก้ที่ Apps Script')
+    .build();
+  sh.getRange(2, col, rows, 1).setDataValidation(rule);
+
+  // นับค่าที่ไม่ตรงรายการ เพื่อให้รู้ว่าต้องไปแก้กี่ช่อง
+  var vals = sh.getRange(2, col, Math.max(sh.getLastRow() - 1, 1), 1).getValues();
+  var bad = 0;
+  vals.forEach(function(r) {
+    var v = String(r[0]).trim();
+    if (v && list.indexOf(v) < 0) bad++;
+  });
+
+  return '✅ ' + sheetName.slice(0, 22) + '… คอลัมน์ "' + headerName + '"'
+       + (bad ? '\n   ⚠️ มี ' + bad + ' ช่องที่ค่าไม่ตรงรายการ (ขึ้นสามเหลี่ยมแดง) — แก้ให้ตรงด้วย' : '\n   ทุกช่องตรงรายการแล้ว');
+}
+
+// ============================================================
+// เติมเลขบิล + ข้อมูลกำกับ ให้แถวที่เว้นว่างในชีท REB-ROB
+//
+// ชีทนี้เขียนเลขบิลไว้ "แถวสุดท้าย" ของกลุ่ม แถวบนเว้นว่าง
+// ทำให้ระบบจับกลุ่มผิด → เติมค่าจากแถวล่างขึ้นบนให้ครบทุกแถว
+//
+// วิธีใช้: เมนู 📊 Sync Dashboard → 🧹 เติมเลขบิลที่เว้นว่าง
+//   1. ครั้งแรกจะแสดงตัวอย่างว่าจะแก้แถวไหนบ้าง (ยังไม่เขียนทับ)
+//   2. กดยืนยันแล้วจึงเขียนลงชีท
+// ============================================================
+
+var REB_SHEET_NAME = 'รับคืนสินค้า-เสียหายหน้างาน บางเลน รหัสREB-ROB';
+
+function fillBlankBillRowsREB() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REB_SHEET_NAME);
+  var ui = SpreadsheetApp.getUi();
+  if (!sh) { ui.alert('⚠️ ไม่พบ Sheet ' + REB_SHEET_NAME); return; }
+
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow < 2) { ui.alert('ไม่มีข้อมูล'); return; }
+
+  // อ่านแบบกระจายค่า merge — แถวที่อยู่ในกลุ่ม merge ถือว่ามีเลขบิลแล้ว ไม่ต้องเติมซ้ำ
+  var values  = readValuesExpandingMerges(sh, NO_MERGE_SPREAD);
+  var headers = values[0].map(function(h) { return String(h).trim(); });
+
+  var cBill   = headers.indexOf('เลขที่ใบรับคืน');
+  var cAmount = headers.indexOf('ยอดเงินสุทธิ');
+  if (cBill < 0 || cAmount < 0) { ui.alert('⚠️ ไม่พบคอลัมน์ "เลขที่ใบรับคืน" หรือ "ยอดเงินสุทธิ"'); return; }
+
+  // คอลัมน์ที่ต้องเติมตามเลขบิล (เว้น "เดือน/ปี" ไว้ เพราะเป็นสูตรที่คำนวณจากเลขบิลเอง)
+  var fillNames = ['เลขที่ใบรับคืน', 'ประเภท', 'ชื่อลูกค้า', 'หน่วยงานของลูกค้า', 'ชื่อพนักงาน'];
+  var cCause = headers.findIndex(function(h) { return h.indexOf('สาเหตุ') >= 0; });
+  var fillCols = fillNames.map(function(n) { return headers.indexOf(n); }).filter(function(i) { return i >= 0; });
+  if (cCause >= 0) fillCols.push(cCause);
+
+  // ไล่จากล่างขึ้นบน — แถวที่เลขบิลว่างจะรับค่าจากแถวถัดไปด้านล่าง
+  var below = null, plan = [], orphan = [];
+  for (var r = lastRow - 1; r >= 1; r--) {          // index ใน values (แถวจริง = r+1)
+    var bill   = String(values[r][cBill] || '').trim();
+    var amount = toNum(values[r][cAmount]);
+
+    if (bill) { below = r; continue; }
+    if (amount === 0) continue;                      // แถวว่างเปล่า ข้าม
+
+    if (below === null) { orphan.push(r + 1); continue; }   // ไม่มีบิลด้านล่างให้อ้างอิง
+
+    var changes = [];
+    fillCols.forEach(function(c) {
+      if (String(values[r][c] || '').trim() === '') {
+        var v = values[below][c];
+        if (String(v || '').trim() !== '') changes.push({ col: c, val: v });
+      }
+    });
+    if (changes.length) plan.push({ row: r + 1, bill: String(values[below][cBill]).trim(), changes: changes });
+  }
+  plan.reverse();
+
+  if (plan.length === 0) {
+    ui.alert('✅ ไม่มีแถวที่ต้องเติม — เลขบิลครบทุกแถวแล้ว'
+      + (orphan.length ? '\n\n⚠️ แต่มีแถวที่หาบิลอ้างอิงไม่ได้: ' + orphan.join(', ') : ''));
+    return;
+  }
+
+  var preview = plan.slice(0, 15).map(function(p) {
+    return '  แถว ' + p.row + ' → ' + p.bill + '  (' + p.changes.length + ' ช่อง)';
+  }).join('\n');
+
+  var ans = ui.alert(
+    'เติมเลขบิลที่เว้นว่าง',
+    'จะเติมข้อมูลให้ ' + plan.length + ' แถว โดยดึงจากแถวที่มีเลขบิล "ด้านล่าง"\n\n'
+    + preview + (plan.length > 15 ? '\n  … และอีก ' + (plan.length - 15) + ' แถว' : '')
+    + (orphan.length ? '\n\n⚠️ แถวที่หาบิลอ้างอิงไม่ได้ (ไม่แก้): ' + orphan.join(', ') : '')
+    + '\n\nดำเนินการต่อหรือไม่?',
+    ui.ButtonSet.YES_NO);
+
+  if (ans !== ui.Button.YES) { ui.alert('ยกเลิกแล้ว — ไม่มีการแก้ไข'); return; }
+
+  plan.forEach(function(p) {
+    p.changes.forEach(function(ch) {
+      sh.getRange(p.row, ch.col + 1).setValue(ch.val);
+    });
+  });
+
+  ui.alert('✅ เติมเรียบร้อย ' + plan.length + ' แถว\n\nอย่าลืมกด 🔄 Sync ทันที เพื่ออัปเดต Dashboard');
+}
+
+// ============================================================
+// ตรวจสุขภาพชีท — หาแถวที่ระบบอาจอ่านผิด
+// ============================================================
+function checkDamageSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var out = [];
+
+  [[REB_SHEET_NAME, 'เลขที่ใบรับคืน', 'ยอดเงินสุทธิ'],
+   ['เสียหายในโรงงานบางเลน รหัสID', 'เลขที่บิล', 'ยอดเงินสุทธิ']].forEach(function(cfg) {
+    var sh = ss.getSheetByName(cfg[0]);
+    if (!sh) { out.push('⚠️ ไม่พบ Sheet ' + cfg[0]); return; }
+
+    var values = readValuesExpandingMerges(sh, NO_MERGE_SPREAD);
+    var headers = values[0].map(function(h) { return String(h).trim(); });
+    var cBill = headers.indexOf(cfg[1]), cAmt = headers.indexOf(cfg[2]);
+    if (cBill < 0 || cAmt < 0) { out.push('⚠️ ' + cfg[0] + ': ไม่พบคอลัมน์'); return; }
+
+    var bad = [];
+    for (var r = 1; r < values.length; r++) {
+      var amt = toNum(values[r][cAmt]);
+      if (amt !== 0 && String(values[r][cBill] || '').trim() === '') bad.push(r + 1);
+    }
+    out.push(bad.length
+      ? '⚠️ ' + cfg[0].slice(0, 26) + '…\n   มียอดเงินแต่ไม่มีเลขบิล ' + bad.length + ' แถว: ' + bad.slice(0, 25).join(', ') + (bad.length > 25 ? ' …' : '')
+      : '✅ ' + cfg[0].slice(0, 26) + '… เลขบิลครบทุกแถวที่มียอดเงิน');
+  });
+
+  SpreadsheetApp.getUi().alert(out.join('\n\n'));
+}
+
+// ============================================================
+// Dropdown "ชื่อพนักงาน" ในชีท REB-ROB
+// ใส่ให้เฉพาะแถวที่ ประเภท = เสาร้าวในกอง/จากขนส่ง/ปีกแตก
+// ============================================================
+
+var CRACK_WORKERS = ['จา', 'ตึ๋ง', 'ฐา', 'เภิก', 'ฉลอง', 'หนึ่ง', 'นึก', 'นุ'];
+
+function setupCrackWorkerColumn(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 'ไม่มีข้อมูล';
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+                  .map(function(h) { return String(h).trim(); });
+  var colType = headers.indexOf('ประเภท') + 1;
+  var colEmp  = headers.indexOf('ชื่อพนักงาน') + 1;
+  if (colType === 0) return '⚠️ ไม่พบคอลัมน์ "ประเภท"';
+  if (colEmp === 0)  return '⚠️ ไม่พบคอลัมน์ "ชื่อพนักงาน"';
+
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(CRACK_WORKERS, true)
+    .setAllowInvalid(false)
+    .setHelpText('เลือกชื่อพนักงานจากรายการ — แก้รายชื่อได้ที่ตัวแปร CRACK_WORKERS ใน Apps Script')
+    .build();
+
+  var isCrack = function(v) { return /เสาร้าว/.test(String(v || '')); };
+
+  // ล้าง merge + validation เดิมในคอลัมน์ชื่อพนักงานก่อน — ตลอดทั้งชีท ไม่ให้ของเก่าค้าง
+  var maxRows = sheet.getMaxRows();
+  sheet.getRange(2, colEmp, lastRow - 1, 1).breakApart();
+  sheet.getRange(2, colEmp, maxRows - 1, 1).clearDataValidations();
+
+  var typeVals = sheet.getRange(2, colType, lastRow - 1, 1).getValues();
+  var merges   = sheet.getRange(2, colType, lastRow - 1, 1).getMergedRanges();
+  var handled  = {};
+  var count    = 0;
+
+  // กลุ่มที่ merge คอลัมน์ประเภทไว้ → merge ช่องชื่อพนักงานตามให้ด้วย
+  merges.forEach(function(mr) {
+    var startRow = mr.getRow(), numRows = mr.getNumRows();
+    var v = sheet.getRange(startRow, colType).getValue();
+    if (isCrack(v)) {
+      if (numRows > 1) sheet.getRange(startRow, colEmp, numRows, 1).merge();
+      sheet.getRange(startRow, colEmp).setDataValidation(rule);
+      count++;
+    }
+    for (var r = startRow; r < startRow + numRows; r++) handled[r] = true;
+  });
+
+  // แถวเดี่ยว
+  for (var i = 0; i < typeVals.length; i++) {
+    var row = i + 2;
+    if (handled[row]) continue;
+    if (isCrack(typeVals[i][0])) {
+      sheet.getRange(row, colEmp).setDataValidation(rule);
+      count++;
+    }
+  }
+
+  return '✅ ใส่ dropdown ชื่อพนักงานให้ ' + count + ' แถว (ประเภท = เสาร้าวในกอง/จากขนส่ง/ปีกแตก)';
+}
+
+function setupCrackWorkerDropdown() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REB_SHEET_NAME);
+  if (!sh) { SpreadsheetApp.getUi().alert('⚠️ ไม่พบ Sheet ' + REB_SHEET_NAME); return; }
+  var msg = '';
+  withFilterSuspended(sh, function() { msg = setupCrackWorkerColumn(sh); });
+  SpreadsheetApp.getUi().alert(msg);
+}
+
+// ============================================================
+// ป้องกัน Sync ซ้อนกัน + ตรวจว่าลบข้อมูลเก่าหมดจริงก่อนใส่ใหม่
+// (ต้นเหตุที่ข้อมูลเบิ้ลทุกรายการ: 2 รอบทำงานทับกัน ลบพร้อมกัน แล้วต่างคนต่างใส่)
+// ============================================================
+
+// ครอบงานที่ห้ามทำพร้อมกัน — ถ้ามีรอบอื่นทำอยู่จะข้าม ไม่ทำซ้ำ
+function withScriptLock(fn, waitMs) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(waitMs || 1000)) {
+    Logger.log('⏭️ ข้ามรอบนี้ — มีการ sync อื่นกำลังทำงานอยู่');
+    return false;
+  }
+  try { fn(); } finally { lock.releaseLock(); }
+  return true;
+}
+
+// นับจำนวนแถวในตาราง (ใช้ header Content-Range ของ PostgREST)
+function countRows(table) {
+  try {
+    var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + table + '?select=id', {
+      method: 'get',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'count=exact',
+        'Range-Unit': 'items',
+        'Range': '0-0'
+      },
+      muteHttpExceptions: true
+    });
+    var h = res.getAllHeaders();
+    var cr = h['content-range'] || h['Content-Range'] || '';
+    var m = String(cr).match(/\/(\d+)$/);
+    return m ? Number(m[1]) : -1;
+  } catch (err) {
+    Logger.log('countRows error: ' + err.message);
+    return -1;
+  }
+}
+
+// ลบให้เกลี้ยงจริง — ลบแล้วนับซ้ำ ถ้ายังเหลือให้ลบใหม่ (สูงสุด 3 รอบ)
+function truncateVerified(table) {
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + table + '?id=gt.0', {
+      method: 'delete',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=minimal'
+      },
+      muteHttpExceptions: true
+    });
+    Utilities.sleep(400);
+
+    var left = countRows(table);
+    if (left === 0) { Logger.log('🧹 ' + table + ': ลบเกลี้ยงแล้ว (รอบ ' + attempt + ')'); return; }
+    if (left < 0)   { Logger.log('⚠️ ' + table + ': นับจำนวนแถวไม่ได้ — ทำต่อ'); return; }
+    Logger.log('⚠️ ' + table + ': ยังเหลือ ' + left + ' แถว — ลบใหม่');
+  }
+  throw new Error('ลบข้อมูลเก่าใน ' + table + ' ไม่หมด — หยุดไว้ก่อนเพื่อกันข้อมูลซ้ำ');
+}
+
+// ============================================================
+// หน่วงการ sync อัตโนมัติ — แก้หลายเซลล์รวดเดียวจะ sync แค่ครั้งเดียว
+// ============================================================
+var PENDING_SYNC_FN = 'runPendingSync';
+var PENDING_SYNC_DELAY_MS = 60 * 1000;   // sync หลังหยุดพิมพ์ 1 นาที
+
+function clearPendingSyncTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === PENDING_SYNC_FN) ScriptApp.deleteTrigger(t);
+  });
+}
+
+function scheduleSync() {
+  try {
+    clearPendingSyncTriggers();
+    ScriptApp.newTrigger(PENDING_SYNC_FN).timeBased().after(PENDING_SYNC_DELAY_MS).create();
+    Logger.log('⏳ ตั้งเวลา sync อีก ' + (PENDING_SYNC_DELAY_MS / 1000) + ' วินาที');
+  } catch (err) {
+    Logger.log('scheduleSync error: ' + err.message);
+  }
+}
+
+function runPendingSync() {
+  clearPendingSyncTriggers();
+  withScriptLock(function() { syncAll_silent(); }, 100);
+}

@@ -456,6 +456,21 @@ function niceMax(max,ticks=4){
   return Math.ceil(max/(s*mag))*(s*mag);
 }
 function axisTicks(min,max,count=4){const a=[];for(let i=0;i<=count;i++)a.push(min+((max-min)*i)/count);return a;}
+// รวมรายการเสียหายที่อยู่บิลเดียวกัน (แถวที่ merge ในชีทจะได้เลขบิลเดียวกัน)
+// แถวที่ไม่มีเลขบิลถือเป็นรายการเดี่ยว ไม่ถูกยุบรวมกับใคร
+function groupByBill(rows){
+  const out=[],idx={};
+  (rows||[]).forEach((r,i)=>{
+    const bill=String(r.bill_no||'').trim();
+    const key=bill||`__solo_${i}`;
+    if(idx[key]===undefined){idx[key]=out.length;out.push({bill,rows:[],amount:0});}
+    const g=out[idx[key]];
+    g.rows.push(r);
+    g.amount+=Number(r.amount)||0;
+  });
+  return out;
+}
+
 function niceLineTicks(lo,dataHi){
   const range=dataHi-lo,rough=range/5;
   if(range<=0)return{ticks:[lo,lo+1],hi:lo+1};
@@ -1724,6 +1739,7 @@ window.__dataReady.then(data => {
   function DamageRankView({items, totalAll, selCust, setSelCust}){
     const [selCause, setSelCause] = useState(null);
     const [selCustInCause, setSelCustInCause] = useState(null);
+    const [selBillInCause, setSelBillInCause] = useState(null);
 
     const causeRanked = Object.entries(
       items.reduce((acc,r)=>{ const k=r.cause||'ไม่ระบุ'; acc[k]=(acc[k]||0)+(r.amount||0); return acc; },{})
@@ -1789,19 +1805,51 @@ window.__dataReady.then(data => {
               <div style={{display:'flex',flexDirection:'column',gap:'6px',maxHeight:380,overflowY:'auto'}}>
                 {causeCustomers.flatMap((c,i)=>(
                   c.name==='ไม่ระบุลูกค้า'
-                  ? c.rows.map((r,ri)=>(
-                    <div key={`id-${i}-${ri}`} style={{background:'#fff4f4',borderRadius:8,border:'1px solid #fcd5d5',padding:'8px 12px'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                        <span style={{padding:'2px 7px',borderRadius:8,fontSize:'11px',fontWeight:700,
-                          background:r.code_type==='ID'?'#fce7f3':'#dbeafe',
-                          color:r.code_type==='ID'?'#9d174d':'#1d4ed8'}}>{r.code_type||'ID'}</span>
-                        <span style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(r.amount)} ฿</span>
+                  ? groupByBill(c.rows).map((g,gi)=>{
+                    const key=`${i}-${g.bill||gi}`;
+                    const open=selBillInCause===key;
+                    const head=g.rows[0];
+                    // บิลเดียวมีแถวเดียว → แสดงตรงๆ ไม่ต้องกดขยาย
+                    if(g.rows.length===1) return (
+                      <div key={`id-${key}`} style={{background:'#fff4f4',borderRadius:8,border:'1px solid #fcd5d5',padding:'8px 12px'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                          <span style={{padding:'2px 7px',borderRadius:8,fontSize:'11px',fontWeight:700,
+                            background:head.code_type==='ID'?'#fce7f3':'#dbeafe',
+                            color:head.code_type==='ID'?'#9d174d':'#1d4ed8'}}>{head.code_type||'ID'}</span>
+                          <span style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(head.amount)} ฿</span>
+                        </div>
+                        {head.contractor_team&&<div style={{fontSize:'11px',color:'#2f5fd0',fontWeight:600,marginBottom:2}}>👷 {head.contractor_team}</div>}
+                        <div style={{fontSize:'12px',color:'#374151',marginBottom:2}}>{head.reason||head.cause||'ไม่ระบุ'}</div>
+                        <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{g.bill?g.bill+' · ':''}{MONTHS_TH_SHORT[(head.month||1)-1]}-{String(head.year).slice(-2)}</div>
                       </div>
-                      {r.reason && <div style={{fontSize:'12px',color:'#374151',marginBottom:2}}>{r.reason}</div>}
-                      {!r.reason && <div style={{fontSize:'12px',color:'#374151',marginBottom:2}}>{r.cause||'ไม่ระบุ'}</div>}
-                      <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
-                    </div>
-                  ))
+                    );
+                    // หลายแถวในบิลเดียวกัน → รวมยอด กดขยายดูรายการย่อย
+                    return <div key={`id-${key}`}>
+                      <div onClick={()=>setSelBillInCause(open?null:key)}
+                        style={{background:open?'#ffeaea':'#fff4f4',borderRadius:8,border:`1.5px solid ${open?'#f0a0a0':'#fcd5d5'}`,padding:'8px 12px',cursor:'pointer'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                          <span style={{padding:'2px 7px',borderRadius:8,fontSize:'11px',fontWeight:700,
+                            background:head.code_type==='ID'?'#fce7f3':'#dbeafe',
+                            color:head.code_type==='ID'?'#9d174d':'#1d4ed8'}}>{head.code_type||'ID'}</span>
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <span style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(g.amount)} ฿</span>
+                            <span style={{fontSize:'11px',color:'#c0392b'}}>{open?'▲':'▼'}</span>
+                          </div>
+                        </div>
+                        {head.contractor_team&&<div style={{fontSize:'11px',color:'#2f5fd0',fontWeight:600,marginBottom:2}}>👷 {head.contractor_team}</div>}
+                        <div style={{fontSize:'12px',color:'#374151',marginBottom:2}}>{head.reason||head.cause||'ไม่ระบุ'}</div>
+                        <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{g.bill?g.bill+' · ':''}{MONTHS_TH_SHORT[(head.month||1)-1]}-{String(head.year).slice(-2)} · รวม {g.rows.length} รายการ</div>
+                      </div>
+                      {open&&<div style={{marginTop:4,display:'flex',flexDirection:'column',gap:4,paddingLeft:8}}>
+                        {g.rows.map((r,ri)=>(
+                          <div key={ri} style={{background:'#fff',borderRadius:7,border:'1px solid #fcd5d5',padding:'6px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <span style={{fontSize:'11px',color:'var(--muted-text)'}}>รายการที่ {ri+1}</span>
+                            <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(r.amount)} ฿</span>
+                          </div>
+                        ))}
+                      </div>}
+                    </div>;
+                  })
                   : [<div key={`cust-${i}`}>
                     <div onClick={()=>setSelCustInCause(selCustInCause===c.name?null:c.name)}
                       style={{background:selCustInCause===c.name?'#eef3fc':'#fff',borderRadius:8,
@@ -1918,10 +1966,15 @@ window.__dataReady.then(data => {
   function PileMaterialsFrame({canEdit}){
     // ให้ iframe ยืดความสูงตามเนื้อหาจริง เพื่อให้เลื่อนหน้าจอเดียว (แทนที่จะมี scrollbar ซ้อนกัน 2 อัน)
     const ref=React.useRef(null);
+    const lastH=React.useRef(0);
     const resize=()=>{
       try{
         const doc=ref.current&&ref.current.contentWindow&&ref.current.contentWindow.document;
-        if(doc)ref.current.style.height=(doc.documentElement.scrollHeight+20)+'px';
+        if(!doc||!doc.body)return;
+        // ต้องวัดจาก body เท่านั้น — documentElement.scrollHeight จะยืดตามความสูง iframe ที่เพิ่งตั้งไป
+        // ทำให้โตขึ้นเรื่อยๆ ทุกรอบจนหน้าเลื่อนลงเอง
+        const h=Math.max(doc.body.scrollHeight,doc.body.offsetHeight)+20;
+        if(Math.abs(h-lastH.current)>2){lastH.current=h;ref.current.style.height=h+'px';}
       }catch(e){}
     };
     React.useEffect(()=>{
