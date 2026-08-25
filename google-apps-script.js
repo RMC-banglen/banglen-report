@@ -587,9 +587,12 @@ function setupContractorColumn(sheet) {
     .setAllowInvalid(true)
     .build();
 
-  // ล้าง dropdown ทุกคอลัมน์ที่ไม่ใช่ colI ก่อน (ป้องกัน dropdown ค้างที่ชื่อพนักงาน)
+  // ล้าง dropdown เดิมให้เกลี้ยงก่อนทั้งสองคอลัมน์ ตลอดทั้งชีท (ไม่ใช่แค่ถึง lastRow)
+  // ถ้าล้างเฉพาะแถวที่ประเภทไม่ตรง แถวที่อยู่ในกลุ่ม merge จะถูกข้าม ทำให้ dropdown เก่าค้าง
+  const maxRows = sheet.getMaxRows();
   const colJ = headers.indexOf('ชื่อพนักงาน') + 1;
-  if (colJ > 0) sheet.getRange(2, colJ, lastRow - 1, 1).clearDataValidations();
+  if (colJ > 0) sheet.getRange(2, colJ, maxRows - 1, 1).clearDataValidations();
+  sheet.getRange(2, colI, maxRows - 1, 1).clearDataValidations();
 
   // อ่าน merge ranges ของคอลัมน์ H
   const merges = sheet.getRange(2, colH, lastRow - 1, 1).getMergedRanges();
@@ -1453,9 +1456,10 @@ function setupCrackWorkerColumn(sheet) {
 
   var isCrack = function(v) { return /เสาร้าว/.test(String(v || '')); };
 
-  // ล้าง merge + validation เดิมในคอลัมน์ชื่อพนักงานก่อน
+  // ล้าง merge + validation เดิมในคอลัมน์ชื่อพนักงานก่อน — ตลอดทั้งชีท ไม่ให้ของเก่าค้าง
+  var maxRows = sheet.getMaxRows();
   sheet.getRange(2, colEmp, lastRow - 1, 1).breakApart();
-  sheet.getRange(2, colEmp, lastRow - 1, 1).clearDataValidations();
+  sheet.getRange(2, colEmp, maxRows - 1, 1).clearDataValidations();
 
   var typeVals = sheet.getRange(2, colType, lastRow - 1, 1).getValues();
   var merges   = sheet.getRange(2, colType, lastRow - 1, 1).getMergedRanges();
