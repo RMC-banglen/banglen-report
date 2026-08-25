@@ -1129,19 +1129,68 @@ function buildMonthMenu() {
   menu.addToUi();
 }
 
+// ============================================================
+// กรองเดือนผ่าน "ตัวกรอง" ของ Google Sheets เอง (ไม่ใช่ซ่อนแถวตรงๆ)
+// เพื่อให้กรองซ้อนกับคอลัมน์อื่นได้ เช่น เดือน + ประเภทเสียหาย
+// และไม่ไปปลดแถวที่ตัวกรองอื่นซ่อนไว้
+// ============================================================
+
+// คืนตัวกรองของชีท ถ้ายังไม่มีหรือครอบไม่ครบข้อมูล จะสร้างใหม่ให้ครอบทั้งตาราง
+function getOrCreateFilter(sh) {
+  var f = sh.getFilter();
+  if (f) {
+    var rg = f.getRange();
+    var coversAll = rg.getRow() === 1
+      && rg.getLastRow() >= sh.getLastRow()
+      && rg.getLastColumn() >= sh.getLastColumn();
+    if (coversAll) return f;
+    f.remove();   // ครอบไม่ครบทุกแถว → สร้างใหม่
+  }
+  return sh.getDataRange().createFilter();
+}
+
+// ชีทนี้เก็บเดือนแบบไหน
+//   'yearmonth' = คอลัมน์ A ปี + B เดือน (ตัวเลข)
+//   'thaimonth' = คอลัมน์ A เป็น "สิงหาคม 2569"
+function detectMonthFormat(sh) {
+  var n = Math.min(sh.getLastRow() - 1, 50);
+  if (n < 1) return 'thaimonth';
+  var v = sh.getRange(2, 1, n, 2).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (typeof v[i][0] === 'number' && typeof v[i][1] === 'number'
+        && v[i][0] > 2400 && v[i][1] >= 1 && v[i][1] <= 12) return 'yearmonth';
+  }
+  return 'thaimonth';
+}
+
 function filterMonthKey(key) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   if (!sh || sh.getLastRow() <= 1) return;
-  var keys = readMonthKeys(sh);
-  for (var i = 0; i < keys.length; i++) {
-    if (keys[i] === key) sh.showRows(i + 2, 1);
-    else sh.hideRows(i + 2, 1);
+
+  sh.showRows(2, sh.getLastRow() - 1);   // ล้างการซ่อนแถวแบบเก่าที่อาจค้างอยู่
+  var f = getOrCreateFilter(sh);
+  var p = key.split('-'), year = Number(p[0]), month = Number(p[1]);
+
+  if (detectMonthFormat(sh) === 'yearmonth') {
+    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(year).build());
+    f.setColumnFilterCriteria(2, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(month).build());
+  } else {
+    // ใส่ '' ไว้ด้วย เพื่อให้แถวที่คอลัมน์ A ว่าง (เซลล์ merge / แถวต่อเนื่อง) ยังแสดงอยู่
+    var label = MONTH_MENU_TH[month] + ' ' + year;
+    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().setVisibleValues([label, '']).build());
+    f.removeColumnFilterCriteria(2);
   }
 }
 
+// ล้างเฉพาะเงื่อนไขของคอลัมน์เดือน — ตัวกรองคอลัมน์อื่น (เช่น ประเภทเสียหาย) ยังอยู่ครบ
 function monthShowAll() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (sh && sh.getLastRow() > 1) sh.showRows(2, sh.getLastRow() - 1);
+  if (!sh || sh.getLastRow() <= 1) return;
+  sh.showRows(2, sh.getLastRow() - 1);
+  var f = sh.getFilter();
+  if (!f) return;
+  f.removeColumnFilterCriteria(1);
+  if (detectMonthFormat(sh) === 'yearmonth') f.removeColumnFilterCriteria(2);
 }
 
 function monthShowLatest() {
@@ -1151,7 +1200,8 @@ function monthShowLatest() {
   readMonthKeys(sh).forEach(function(k) { if (k && k > latest) latest = k; });
   if (!latest) { SpreadsheetApp.getUi().alert('ไม่พบข้อมูลเดือนในคอลัมน์ A'); return; }
   filterMonthKey(latest);
-  SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะ ' + fmtMonthKey(latest));
+  SpreadsheetApp.getUi().alert('✅ แสดงเฉพาะ ' + fmtMonthKey(latest)
+    + '\n\nใช้ตัวกรองของ Sheets แล้ว — กรองคอลัมน์อื่นซ้อนได้เลย');
 }
 
  function showM_2565_01(){filterMonthKey('2565-01');} function showM_2565_02(){filterMonthKey('2565-02');} function showM_2565_03(){filterMonthKey('2565-03');} function showM_2565_04(){filterMonthKey('2565-04');} function showM_2565_05(){filterMonthKey('2565-05');} function showM_2565_06(){filterMonthKey('2565-06');} function showM_2565_07(){filterMonthKey('2565-07');} function showM_2565_08(){filterMonthKey('2565-08');} function showM_2565_09(){filterMonthKey('2565-09');} function showM_2565_10(){filterMonthKey('2565-10');} function showM_2565_11(){filterMonthKey('2565-11');} function showM_2565_12(){filterMonthKey('2565-12');}
