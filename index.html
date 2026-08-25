@@ -2191,7 +2191,7 @@ window.__dataReady.then(data => {
         const rebRobBadAmt=rebRobBad.reduce((a,r)=>a+(r.amount||0),0);
         const idTotal=idRaw.reduce((a,r)=>a+(r.amount||0),0);
         const boardDiff=(rebRobBadAmt+idTotal)-dmgTotal;
-        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(7,1fr)'}}>
+        return <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
           <KpiCard label={`เสียหายรวม ${dmgLabel}`} value={bahtFmt(dmgTotal)} unit=" ฿"
             sub={`ยอดขาย: ${dmgSales?bahtFmt(dmgSales)+' ฿':'ไม่มีข้อมูล'}`} accent={PALETTE.cancel}/>
           <KpiCard label={`% เสียหาย ${dmgLabel}`} value={dmgPct!=null?dmgPct.toFixed(3):'–'} unit="%"
@@ -2255,7 +2255,7 @@ window.__dataReady.then(data => {
               : pctDelta>0 ? `% เสียหายเพิ่มขึ้น (${prevM.label}: ${prevM.pct!=null?prevM.pct.toFixed(3)+'%':'–'})`
               : pctDelta<0 ? `% เสียหายลดลง (${prevM.label}: ${prevM.pct!=null?prevM.pct.toFixed(3)+'%':'–'})`
               : `% เสียหายเท่ากับ ${prevM.label}`;
-            return <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+            return <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
               <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
                 sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
               <KpiCard label="% เสียหายเฉลี่ย" value={avgPct!=null?avgPct.toFixed(3):'–'} unit="%"
@@ -2278,7 +2278,7 @@ window.__dataReady.then(data => {
             </div>;
           })()
         : view==='worker' ? null
-        : <div className="kpi-row" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+        : <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
             <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
               sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
             <KpiCard label="% เสียหายเฉลี่ย" value={avgPct!=null?avgPct.toFixed(3):'–'} unit="%"
@@ -2470,7 +2470,7 @@ window.__dataReady.then(data => {
 
         return <>
           {/* KPI summary row */}
-          <div className="kpi-row" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+          <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
             <div style={{background:'#fff',borderRadius:14,padding:'18px 22px',border:'1.5px solid #e2e8f0',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>พนักงานทั้งหมด</div>
               <div style={{fontSize:32,fontWeight:800,color:'#1e293b'}}>{empList.length} <span style={{fontSize:15,fontWeight:500}}>คน</span></div>
@@ -2712,7 +2712,7 @@ window.__dataReady.then(data => {
         const yoyLabel = curYear ? `ปี ${curYear} vs ปี ${prevYear}` : 'ทุกปี';
 
         return <>
-          <div className="kpi-row" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+          <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
             <div style={{background:'#fff2f2',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fca5a5'}}>
               <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>ชุดที่ทำเสียหายมากสุด</div>
               <div style={{fontSize:20,fontWeight:800,color:'#c0392b'}}>{mostTeam?.name||'–'}</div>
@@ -3190,7 +3190,7 @@ window.__dataReady.then(data => {
 
     return <div style={{padding:'24px 20px'}}>
       {/* KPI row */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:14,marginBottom:24}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:14,marginBottom:24}}>
         {[
           {label:'Strength เฉลี่ย',value:strAvg!=null?fmt(strAvg,1):'–',unit:'ksc',sub:dBelow>0?`ต่ำกว่าเกณฑ์ 450 จำนวน ${dBelow} ช่วง`:'ผ่านเกณฑ์ทุกช่วง',accent:dBelow>0?'#c0392b':'#3f7d2b'},
           {label:'ปูนเฉลี่ย (ทั้งหมด)',value:cementAvg?fmt(cementAvg,1):'–',unit:'kg/m³',sub:'ค่าเฉลี่ยใช้ปูนรวม',accent:'#2f5fd0'},
@@ -5379,7 +5379,7 @@ window.__dataReady.then(data => {
 
       {/* KPI + task list (hidden for raft view) */}
       {dept!=='raft'&&<div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:16}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12,marginBottom:16}}>
         {[
           {label:'งานค้างทั้งหมด',     val:filtered.filter(t=>t.status!=='done').length, color:'#dc2626', bg:'#fef2f2'},
           {label:'ยังไม่ได้ดำเนินการ', val:byStatus('todo').length,   color:'#7c3aed', bg:'#f5f3ff'},
