@@ -737,21 +737,38 @@ function parseDateCell(val) {
 // ============================================================
 // อ่านค่าจากชีทโดยกระจายค่าของเซลล์ที่ merge ไว้ให้ครบทุกแถว/คอลัมน์ในกลุ่ม
 // (Sheets คืนค่าให้เฉพาะเซลล์ซ้ายบนของ merge ที่เหลือเป็นค่าว่าง)
-function readValuesExpandingMerges(sheet) {
+// skipHeaders = ชื่อหัวคอลัมน์ที่ "ห้าม" กระจายค่า merge
+// สำคัญมากสำหรับคอลัมน์ยอดเงิน/จำนวน: เซลล์ที่ merge ไว้คือค่าเดียวของทั้งกลุ่ม
+// ถ้ากระจายลงทุกแถวจะกลายเป็นนับซ้ำตามจำนวนแถวที่ merge
+function readValuesExpandingMerges(sheet, skipHeaders) {
   const values = sheet.getDataRange().getValues();
   if (!values.length) return values;
+
+  const skip = {};
+  if (skipHeaders && skipHeaders.length) {
+    const headers = values[0].map(function(h) { return String(h).trim(); });
+    skipHeaders.forEach(function(name) {
+      const i = headers.indexOf(name);
+      if (i >= 0) skip[i + 1] = true;      // เก็บเป็นเลขคอลัมน์ฐาน 1
+    });
+  }
+
   sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn())
     .getMergedRanges().forEach(function(m) {
       const r0 = m.getRow(), c0 = m.getColumn();
       const v = values[r0 - 1][c0 - 1];
       for (let r = r0; r < r0 + m.getNumRows(); r++) {
         for (let c = c0; c < c0 + m.getNumColumns(); c++) {
+          if (skip[c]) continue;
           if (values[r - 1] !== undefined) values[r - 1][c - 1] = v;
         }
       }
     });
   return values;
 }
+
+// คอลัมน์ที่เป็นตัวเลขต่อแถว — ห้ามกระจายค่า merge
+var NO_MERGE_SPREAD = ['ยอดเงินสุทธิ', 'จำนวน/คัน', 'หักเงินผู้รับเหมา'];
 
 function syncDamageItems(ss) {
   const records = [];
@@ -762,7 +779,7 @@ function syncDamageItems(ss) {
   if (!sheetRR) {
     Logger.log('⚠️ ไม่พบ Sheet REB-ROB');
   } else {
-    const rows = readValuesExpandingMerges(sheetRR);
+    const rows = readValuesExpandingMerges(sheetRR, NO_MERGE_SPREAD);
     const headers = rows[0].map(h => String(h).trim());
     // หา index คอลัมน์
     const ci = {};
@@ -840,7 +857,7 @@ function syncDamageItems(ss) {
   if (!sheetID) {
     Logger.log('⚠️ ไม่พบ Sheet ID');
   } else {
-    const rows = readValuesExpandingMerges(sheetID);
+    const rows = readValuesExpandingMerges(sheetID, NO_MERGE_SPREAD);
     const headers = rows[0].map(h => String(h).trim());
     const ci = {};
     headers.forEach((h, i) => { ci[h] = i; });
@@ -1336,7 +1353,7 @@ function fillBlankBillRowsREB() {
   if (lastRow < 2) { ui.alert('ไม่มีข้อมูล'); return; }
 
   // อ่านแบบกระจายค่า merge — แถวที่อยู่ในกลุ่ม merge ถือว่ามีเลขบิลแล้ว ไม่ต้องเติมซ้ำ
-  var values  = readValuesExpandingMerges(sh);
+  var values  = readValuesExpandingMerges(sh, NO_MERGE_SPREAD);
   var headers = values[0].map(function(h) { return String(h).trim(); });
 
   var cBill   = headers.indexOf('เลขที่ใบรับคืน');
@@ -1412,7 +1429,7 @@ function checkDamageSheets() {
     var sh = ss.getSheetByName(cfg[0]);
     if (!sh) { out.push('⚠️ ไม่พบ Sheet ' + cfg[0]); return; }
 
-    var values = readValuesExpandingMerges(sh);
+    var values = readValuesExpandingMerges(sh, NO_MERGE_SPREAD);
     var headers = values[0].map(function(h) { return String(h).trim(); });
     var cBill = headers.indexOf(cfg[1]), cAmt = headers.indexOf(cfg[2]);
     if (cBill < 0 || cAmt < 0) { out.push('⚠️ ' + cfg[0] + ': ไม่พบคอลัมน์'); return; }
