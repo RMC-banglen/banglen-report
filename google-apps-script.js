@@ -17,6 +17,17 @@ const SS_DAMAGE_ID = '1VYLouTO0BpHkLPnsEZWA2-JsTHqmPM0U1v8GfyTRIoM';
 // MAIN: sync ข้อมูลทั้งหมดจาก Sheet → Supabase
 // ============================================================
 function syncAll() {
+  var ok = withScriptLock(function() { syncAllCore(); }, 2000);
+  if (!ok) {
+    try { SpreadsheetApp.getUi().alert('⏳ มีการ sync กำลังทำงานอยู่ — รอสักครู่แล้วลองใหม่'); } catch (e) {}
+    return;
+  }
+  try { SpreadsheetApp.getUi().alert('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว'); } catch (e) {
+    Logger.log('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว');
+  }
+}
+
+function syncAllCore() {
   const ss = SpreadsheetApp.openById(SS_MAIN_ID);
 
   writeComputedColumns(ss);
@@ -31,12 +42,7 @@ function syncAll() {
   syncDamageItems(ss);
   syncDamageSales(ss);
   syncPendingWork(ss);
-
-  try {
-    SpreadsheetApp.getUi().alert('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว');
-  } catch(e) {
-    Logger.log('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว');
-  }
+  Logger.log('✅ Sync core เสร็จ');
 }
 
 // ============================================================
@@ -464,9 +470,9 @@ function onEdit(e) {
 
   if (!validSheets.includes(sheetName)) return;
 
-  // debounce: รอ 2 วินาทีก่อน sync เพื่อไม่ให้ sync บ่อยเกินไป
-  SpreadsheetApp.flush();
-  syncAll_silent();
+  // ห้าม sync ทันที — เดิมแก้ 1 เซลล์ = sync 1 รอบ ทำให้หลายรอบทับกันจนข้อมูลเบิ้ล
+  // เปลี่ยนเป็นตั้งเวลาไว้ แก้รวดเดียวหลายเซลล์จะ sync แค่ครั้งเดียวหลังหยุดพิมพ์
+  scheduleSync();
 }
 
 function syncAll_silent() {
@@ -916,7 +922,7 @@ function syncDamageItems(ss) {
   if (records.length === 0) { Logger.log('damage_items: ไม่มีข้อมูล'); return; }
 
   // ลบทั้งหมดก่อน แล้ว insert ใหม่
-  truncateDamageItems();
+  truncateVerified('damage_items');
   insertInBatches('damage_items', records, 200);
   Logger.log(`✅ damage_items: sync รวม ${records.length} แถว`);
 }
@@ -1515,4 +1521,93 @@ function setupCrackWorkerDropdown() {
   var msg = '';
   withFilterSuspended(sh, function() { msg = setupCrackWorkerColumn(sh); });
   SpreadsheetApp.getUi().alert(msg);
+}
+
+// ============================================================
+// ป้องกัน Sync ซ้อนกัน + ตรวจว่าลบข้อมูลเก่าหมดจริงก่อนใส่ใหม่
+// (ต้นเหตุที่ข้อมูลเบิ้ลทุกรายการ: 2 รอบทำงานทับกัน ลบพร้อมกัน แล้วต่างคนต่างใส่)
+// ============================================================
+
+// ครอบงานที่ห้ามทำพร้อมกัน — ถ้ามีรอบอื่นทำอยู่จะข้าม ไม่ทำซ้ำ
+function withScriptLock(fn, waitMs) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(waitMs || 1000)) {
+    Logger.log('⏭️ ข้ามรอบนี้ — มีการ sync อื่นกำลังทำงานอยู่');
+    return false;
+  }
+  try { fn(); } finally { lock.releaseLock(); }
+  return true;
+}
+
+// นับจำนวนแถวในตาราง (ใช้ header Content-Range ของ PostgREST)
+function countRows(table) {
+  try {
+    var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + table + '?select=id', {
+      method: 'get',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'count=exact',
+        'Range-Unit': 'items',
+        'Range': '0-0'
+      },
+      muteHttpExceptions: true
+    });
+    var h = res.getAllHeaders();
+    var cr = h['content-range'] || h['Content-Range'] || '';
+    var m = String(cr).match(/\/(\d+)$/);
+    return m ? Number(m[1]) : -1;
+  } catch (err) {
+    Logger.log('countRows error: ' + err.message);
+    return -1;
+  }
+}
+
+// ลบให้เกลี้ยงจริง — ลบแล้วนับซ้ำ ถ้ายังเหลือให้ลบใหม่ (สูงสุด 3 รอบ)
+function truncateVerified(table) {
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + table + '?id=gt.0', {
+      method: 'delete',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=minimal'
+      },
+      muteHttpExceptions: true
+    });
+    Utilities.sleep(400);
+
+    var left = countRows(table);
+    if (left === 0) { Logger.log('🧹 ' + table + ': ลบเกลี้ยงแล้ว (รอบ ' + attempt + ')'); return; }
+    if (left < 0)   { Logger.log('⚠️ ' + table + ': นับจำนวนแถวไม่ได้ — ทำต่อ'); return; }
+    Logger.log('⚠️ ' + table + ': ยังเหลือ ' + left + ' แถว — ลบใหม่');
+  }
+  throw new Error('ลบข้อมูลเก่าใน ' + table + ' ไม่หมด — หยุดไว้ก่อนเพื่อกันข้อมูลซ้ำ');
+}
+
+// ============================================================
+// หน่วงการ sync อัตโนมัติ — แก้หลายเซลล์รวดเดียวจะ sync แค่ครั้งเดียว
+// ============================================================
+var PENDING_SYNC_FN = 'runPendingSync';
+var PENDING_SYNC_DELAY_MS = 60 * 1000;   // sync หลังหยุดพิมพ์ 1 นาที
+
+function clearPendingSyncTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === PENDING_SYNC_FN) ScriptApp.deleteTrigger(t);
+  });
+}
+
+function scheduleSync() {
+  try {
+    clearPendingSyncTriggers();
+    ScriptApp.newTrigger(PENDING_SYNC_FN).timeBased().after(PENDING_SYNC_DELAY_MS).create();
+    Logger.log('⏳ ตั้งเวลา sync อีก ' + (PENDING_SYNC_DELAY_MS / 1000) + ' วินาที');
+  } catch (err) {
+    Logger.log('scheduleSync error: ' + err.message);
+  }
+}
+
+function runPendingSync() {
+  clearPendingSyncTriggers();
+  withScriptLock(function() { syncAll_silent(); }, 100);
 }
