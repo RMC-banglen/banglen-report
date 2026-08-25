@@ -542,6 +542,34 @@ function mergeCauseToH() {
 }
 
 // ผสานเซลล์คอลัมน์ I ตาม H และใส่ dropdown เฉพาะแถวที่ G = "ผู้รับเหมา"
+// ============================================================
+// ปิดเงื่อนไขตัวกรองชั่วคราว แล้วคืนค่าเดิมให้ครบ
+// ใช้ครอบงานที่แตะโครงสร้างชีท (merge / ซ่อนแถว) ซึ่งทำบนแถวที่ถูกกรองซ่อนไม่ได้
+// ============================================================
+function withFilterSuspended(sheet, fn) {
+  var f = sheet.getFilter();
+  if (!f) { fn(); return; }
+
+  var saved = [];
+  var lastCol = sheet.getLastColumn();
+  for (var c = 1; c <= lastCol; c++) {
+    var cr = null;
+    try { cr = f.getColumnFilterCriteria(c); } catch (e) {}
+    if (cr) { saved.push({ col: c, criteria: cr }); f.removeColumnFilterCriteria(c); }
+  }
+
+  try {
+    fn();
+  } finally {
+    var cur = sheet.getFilter();
+    if (cur) {
+      saved.forEach(function(s) {
+        try { cur.setColumnFilterCriteria(s.col, s.criteria); } catch (e) {}
+      });
+    }
+  }
+}
+
 function setupContractorColumn(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
@@ -916,7 +944,8 @@ function addPersonnelColumns(ss) {
     }
 
     // dropdown ชุดผู้รับเหมา เฉพาะแถวที่ G = ผู้รับเหมา
-    setupContractorColumn(sheetID);
+    // ต้องปิดตัวกรองชั่วคราว — Sheets ผสานเซลล์บนแถวที่ถูกกรองซ่อนไว้ไม่ได้
+    withFilterSuspended(sheetID, function() { setupContractorColumn(sheetID); });
   }
 }
 
