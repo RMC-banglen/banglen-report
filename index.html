@@ -2430,7 +2430,7 @@ window.__dataReady.then(data => {
 
       {/* Worker sub-tab nav */}
       {view==='worker' && <div style={{gridColumn:'1 / -1',display:'flex',gap:8,marginBottom:4}}>
-        {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'}].map(({v,l})=>(
+        {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'},{v:'driver',l:'วิเคราะห์คนขับรถ'}].map(({v,l})=>(
           <button key={v} onClick={()=>setWorkerTab(v)} style={{padding:'7px 20px',borderRadius:20,border:`1.5px solid ${workerTab===v?'#0f766e':'#e2e8f0'}`,background:workerTab===v?'#0f766e':'#fff',color:workerTab===v?'#fff':'#334155',fontSize:13,fontWeight:workerTab===v?700:400,cursor:'pointer'}}>
             {l}
           </button>
@@ -2837,6 +2837,89 @@ window.__dataReady.then(data => {
               {blocks.slice(1).map(b=>renderBlock(b))}
             </div>;
           })()}
+        </>;
+      })()}
+
+      {/* Driver (คนขับรถ) analysis — แยกออกมาจากผู้รับเหมา เพราะสาเหตุ (ขนส่ง/เสาร้าวในกอง) ไม่มีคำว่า "ผู้รับเหมา" ในข้อความ */}
+      {view==='worker' && workerTab==='driver' && (()=>{
+        const curYear  = filterYear==='ALL' ? null : Number(filterYear);
+        const prevYear = curYear ? curYear-1 : null;
+        const baseFilter = r => r.contractor_team==='คนขับรถ' && (selMonths.size===0 || selMonths.has(r.month));
+        const dItems = rawItems.filter(r => baseFilter(r) && (curYear===null || r.year===curYear));
+        const pItems = prevYear ? rawItems.filter(r => baseFilter(r) && r.year===prevYear) : [];
+
+        if (dItems.length===0) return <ChartCard title="วิเคราะห์คนขับรถ" subtitle="ยังไม่มีข้อมูล — เลือก 'คนขับรถ' ในคอลัมน์ 'ชุดผู้รับเหมา' ของชีท ID แล้ว Sync ใหม่" span="full">
+          <div style={{color:'#94a3b8',fontSize:15,padding:'32px 0',textAlign:'center'}}>ไม่มีข้อมูล</div>
+        </ChartCard>;
+
+        const nameOf = r => r.employee_name || 'ไม่ระบุชื่อคนขับ';
+        const buildMap = arr => { const m={}; arr.forEach(r=>{ const n=nameOf(r); if(!m[n])m[n]={name:n,count:0,amount:0}; m[n].count++; m[n].amount+=r.amount||0; }); return m; };
+        const dMap = buildMap(dItems);
+        const pMap = buildMap(pItems);
+        const allNames = [...new Set([...Object.keys(dMap),...Object.keys(pMap)])];
+        const dList = allNames.map(n=>({ name:n, count:dMap[n]?.count||0, amount:dMap[n]?.amount||0, prevCount:pMap[n]?.count||0, prevAmount:pMap[n]?.amount||0 })).sort((a,b)=>b.amount-a.amount);
+        const maxAmt = Math.max(...dList.map(t=>Math.max(t.amount,t.prevAmount)),1);
+        const totalAmt = dItems.reduce((s,r)=>s+(r.amount||0),0);
+        const prevTotalAmt = pItems.reduce((s,r)=>s+(r.amount||0),0);
+        const mostDriver  = dList[0]||null;
+        const leastDriver = dList.filter(t=>t.amount>0).slice(-1)[0]||null;
+        const DRIVER_COLORS = ['#c0392b','#e67e22','#f39c12','#8e44ad','#2980b9'];
+        const totalDiff = prevTotalAmt>0 ? totalAmt-prevTotalAmt : null;
+        const yoyLabel = curYear ? `ปี ${curYear} vs ปี ${prevYear}` : 'ทุกปี';
+
+        return <>
+          <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
+            <div style={{background:'#fff2f2',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fca5a5'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>คนขับที่ทำเสียหายมากสุด</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#c0392b'}}>{mostDriver?.name||'–'}</div>
+              <div style={{fontSize:13,color:'#c0392b',fontWeight:700}}>{mostDriver?`${mostDriver.count} เคส • ${bahtFmt(mostDriver.amount)}`:''}</div>
+            </div>
+            <div style={{background:'#f0fdf4',borderRadius:14,padding:'18px 22px',border:'1.5px solid #86efac'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>คนขับที่ทำเสียหายน้อยสุด</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#16a34a'}}>{leastDriver&&leastDriver!==mostDriver?leastDriver.name:'–'}</div>
+              <div style={{fontSize:13,color:'#16a34a',fontWeight:700}}>{leastDriver&&leastDriver!==mostDriver?`${leastDriver.count} เคส • ${bahtFmt(leastDriver.amount)}`:''}</div>
+            </div>
+            <div style={{background:'#fdf8ee',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fde68a'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>รวมมูลค่าความเสียหาย</div>
+              <div style={{fontSize:24,fontWeight:800,color:'#b45309'}}>{bahtFmt(totalAmt)}</div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>{dItems.length} รายการ • {dList.filter(t=>t.amount>0).length} คน</div>
+            </div>
+            <div style={{background: totalDiff===null?'#f8fafc':totalDiff<=0?'#f0fdf4':'#fff2f2', borderRadius:14,padding:'18px 22px',border:`1.5px solid ${totalDiff===null?'#e2e8f0':totalDiff<=0?'#86efac':'#fca5a5'}`}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เทียบปีที่แล้ว ({yoyLabel})</div>
+              <div style={{fontSize:22,fontWeight:800,color:totalDiff===null?'#94a3b8':totalDiff<=0?'#16a34a':'#c0392b'}}>
+                {totalDiff===null?'–':(totalDiff>=0?'+':'')+bahtFmt(totalDiff)}
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>ปีก่อน: {prevTotalAmt>0?bahtFmt(prevTotalAmt):'ไม่มีข้อมูล'}</div>
+            </div>
+          </div>
+          <ChartCard title={`ความเสียหายแยกตามคนขับรถ (${yoyLabel})`} subtitle="แท่งเข้ม = ปีนี้ • แท่งจาง = ปีที่แล้ว" span="full">
+            {dList.map((t,i)=>{
+              const diff = t.prevAmount>0 ? t.amount-t.prevAmount : null;
+              const diffPct = t.prevAmount>0 ? ((t.amount-t.prevAmount)/t.prevAmount*100) : null;
+              return <div key={i} style={{marginBottom:18}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{display:'inline-block',width:12,height:12,borderRadius:'50%',background:DRIVER_COLORS[i%DRIVER_COLORS.length]}}/>
+                    <span style={{fontSize:15,fontWeight:i===0?800:600,color:'#1e293b'}}>{i+1}. {t.name}</span>
+                    <span style={{fontSize:12,color:'#64748b',background:'#f1f5f9',padding:'2px 7px',borderRadius:10}}>{t.count} เคส</span>
+                    {diff!==null&&<span style={{fontSize:12,fontWeight:700,color:diff<=0?'#16a34a':'#c0392b'}}>
+                      {diff>=0?'+':''}{bahtFmt(diff)} ({diffPct>=0?'+':''}{diffPct.toFixed(1)}%)
+                    </span>}
+                  </div>
+                  <span style={{fontSize:15,fontWeight:800,color:DRIVER_COLORS[i%DRIVER_COLORS.length]}}>{bahtFmt(t.amount)}</span>
+                </div>
+                <div style={{background:'#f1f5f9',borderRadius:6,height:12,overflow:'hidden',marginBottom:3}}>
+                  <div style={{height:'100%',borderRadius:6,background:DRIVER_COLORS[i%DRIVER_COLORS.length],width:`${t.amount/maxAmt*100}%`,transition:'width .4s'}}/>
+                </div>
+                {t.prevAmount>0&&<div style={{background:'#e2e8f0',borderRadius:6,height:7,overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:6,background:DRIVER_COLORS[i%DRIVER_COLORS.length],opacity:.35,width:`${t.prevAmount/maxAmt*100}%`}}/>
+                </div>}
+              </div>;
+            })}
+            <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid #e2e8f0',fontSize:12,color:'#94a3b8'}}>
+              แท่งเข้ม = ปีนี้ ({bahtFmt(totalAmt)}) • แท่งจาง = ปีที่แล้ว ({prevTotalAmt>0?bahtFmt(prevTotalAmt):'ไม่มีข้อมูล'})
+            </div>
+          </ChartCard>
         </>;
       })()}
 
