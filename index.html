@@ -2430,7 +2430,7 @@ window.__dataReady.then(data => {
 
       {/* Worker sub-tab nav */}
       {view==='worker' && <div style={{gridColumn:'1 / -1',display:'flex',gap:8,marginBottom:4}}>
-        {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'}].map(({v,l})=>(
+        {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'},{v:'driver',l:'วิเคราะห์คนขับรถ'}].map(({v,l})=>(
           <button key={v} onClick={()=>setWorkerTab(v)} style={{padding:'7px 20px',borderRadius:20,border:`1.5px solid ${workerTab===v?'#0f766e':'#e2e8f0'}`,background:workerTab===v?'#0f766e':'#fff',color:workerTab===v?'#fff':'#334155',fontSize:13,fontWeight:workerTab===v?700:400,cursor:'pointer'}}>
             {l}
           </button>
@@ -2441,7 +2441,8 @@ window.__dataReady.then(data => {
       {view==='worker' && workerTab==='employee' && (()=>{
         const curYear  = filterYear==='ALL' ? null : Number(filterYear);
         const prevYear = curYear ? curYear-1 : null;
-        const empBase  = r => notReturnOk(r) && (r.code_type==='REB'||r.code_type==='ROB') && r.employee_name && (selMonths.size===0||selMonths.has(r.month));
+        const isCrackCause = c => /ร้าว|ปีกแตก/i.test(c||''); // เสาร้าวในกอง/จากขนส่ง/ปีกแตก — แยกไปแท็บคนขับรถต่างหาก ไม่รวมในตารางนี้
+        const empBase  = r => notReturnOk(r) && (r.code_type==='REB'||r.code_type==='ROB') && r.employee_name && !isCrackCause(r.cause) && (selMonths.size===0||selMonths.has(r.month));
         const empItems = rawItems.filter(r => empBase(r) && (curYear===null||r.year===curYear));
         const empPrev  = prevYear ? rawItems.filter(r => empBase(r) && r.year===prevYear) : [];
 
@@ -2837,6 +2838,93 @@ window.__dataReady.then(data => {
               {blocks.slice(1).map(b=>renderBlock(b))}
             </div>;
           })()}
+        </>;
+      })()}
+
+      {/* Driver (คนขับรถ) analysis — สาเหตุ "เสาร้าวในกอง/จากขนส่ง/ปีกแตก" แยกออกมาจากตารางพนักงาน (Blowcount) ต่างหาก */}
+      {view==='worker' && workerTab==='driver' && (()=>{
+        const curYear  = filterYear==='ALL' ? null : Number(filterYear);
+        const prevYear = curYear ? curYear-1 : null;
+        const isCrackCause = c => /ร้าว|ปีกแตก/i.test(c||'');
+        const drvBase  = r => notReturnOk(r) && (r.code_type==='REB'||r.code_type==='ROB') && r.employee_name && isCrackCause(r.cause) && (selMonths.size===0||selMonths.has(r.month));
+        const drvItems = rawItems.filter(r => drvBase(r) && (curYear===null||r.year===curYear));
+        const drvPrev  = prevYear ? rawItems.filter(r => drvBase(r) && r.year===prevYear) : [];
+
+        if (drvItems.length===0) return <ChartCard title="วิเคราะห์คนขับรถ" subtitle="ยังไม่มีข้อมูล — ยังไม่มีเคสสาเหตุ 'เสาร้าวในกอง/จากขนส่ง/ปีกแตก' ในช่วงที่เลือก" span="full">
+          <div style={{color:'#94a3b8',fontSize:15,padding:'32px 0',textAlign:'center'}}>ไม่มีข้อมูล</div>
+        </ChartCard>;
+
+        const buildDrvMap = arr => { const m={}; arr.forEach(r=>{ const e=r.employee_name; if(!m[e])m[e]={name:e,count:0,amount:0}; m[e].count++; m[e].amount+=r.amount||0; }); return m; };
+        const drvMap  = buildDrvMap(drvItems);
+        const prevMap = buildDrvMap(drvPrev);
+
+        const drvList = Object.values(drvMap).sort((a,b)=>b.count-a.count);
+        const mostDrv  = drvList[0]||null;
+        const leastDrv = drvList[drvList.length-1]||null;
+        const totalDiff = drvPrev.length>0 ? drvItems.length-drvPrev.length : null;
+        const yoyLabel  = curYear ? `ปี ${curYear} vs ${prevYear}` : 'ทุกปี';
+        const totalAmt  = drvItems.reduce((a,r)=>a+(r.amount||0),0);
+
+        return <>
+          <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
+            <div style={{background:'#fff',borderRadius:14,padding:'18px 22px',border:'1.5px solid #e2e8f0',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>คนขับ/พนักงานที่เกี่ยวข้อง</div>
+              <div style={{fontSize:32,fontWeight:800,color:'#1e293b'}}>{drvList.length} <span style={{fontSize:15,fontWeight:500}}>คน</span></div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>{drvItems.length} รายการ • {bahtFmt(totalAmt)} ฿</div>
+            </div>
+            <div style={{background:'#fff2f2',borderRadius:14,padding:'18px 22px',border:'1.5px solid #fca5a5',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เสาร้าวมากสุด</div>
+              <div style={{fontSize:22,fontWeight:800,color:'#c0392b'}}>{mostDrv?.name||'–'}</div>
+              <div style={{fontSize:13,color:'#c0392b',fontWeight:700}}>{mostDrv?`${mostDrv.count} เคส`:''}</div>
+            </div>
+            <div style={{background:'#f0fdf4',borderRadius:14,padding:'18px 22px',border:'1.5px solid #86efac',boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เสาร้าวน้อยสุด</div>
+              <div style={{fontSize:22,fontWeight:800,color:'#16a34a'}}>{leastDrv&&leastDrv!==mostDrv?leastDrv.name:drvList.length>1?leastDrv?.name:'–'}</div>
+              <div style={{fontSize:13,color:'#16a34a',fontWeight:700}}>{drvList.length>1?`${leastDrv.count} เคส`:drvList.length===1?'มีคนเดียวในช่วงนี้':''}</div>
+            </div>
+            <div style={{background:totalDiff===null?'#f8fafc':totalDiff<=0?'#f0fdf4':'#fff2f2',borderRadius:14,padding:'18px 22px',border:`1.5px solid ${totalDiff===null?'#e2e8f0':totalDiff<=0?'#86efac':'#fca5a5'}`,boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
+              <div style={{fontSize:13,color:'#64748b',marginBottom:4}}>เทียบปีที่แล้ว ({yoyLabel})</div>
+              <div style={{fontSize:22,fontWeight:800,color:totalDiff===null?'#94a3b8':totalDiff<=0?'#16a34a':'#c0392b'}}>
+                {totalDiff===null?'–':(totalDiff>=0?'+':'')+totalDiff+' เคส'}
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>ปีก่อน: {drvPrev.length>0?drvPrev.length+' เคส':'ไม่มีข้อมูล'}</div>
+            </div>
+          </div>
+
+          <ChartCard title={`เสาร้าวในกอง/จากขนส่ง/ปีกแตก แยกตามคนขับ ${yoyLabel}`} subtitle="เรียงตามจำนวนเคสมากสุด" span="full">
+            <div className="table-wrap"><table className="dt">
+              <thead><tr>
+                <th className="ta-l">คนขับ/พนักงาน</th>
+                <th style={{textAlign:'center'}}>จำนวนเคส</th>
+                {prevYear&&<th style={{textAlign:'center',color:'#64748b'}}>ปีก่อน<br/>(เคส)</th>}
+                {prevYear&&<th style={{textAlign:'center'}}>±เทียบปีก่อน</th>}
+                <th>สัดส่วน</th>
+                <th>มูลค่ารวม (฿)</th>
+              </tr></thead>
+              <tbody>{drvList.map((d,i)=>{
+                const prev = prevMap[d.name]||{count:0};
+                const diff = prev.count>0||drvPrev.length>0 ? d.count-(prev.count||0) : null;
+                return <tr key={i} style={{background:i===0?'#fff8f8':i%2===0?'#fafafa':'#fff'}}>
+                  <td className="ta-l" style={{fontWeight:700,fontSize:14}}>{d.name}</td>
+                  <td style={{textAlign:'center',fontWeight:800,fontSize:18,color:'#c0392b'}}>{d.count}</td>
+                  {prevYear&&<td style={{textAlign:'center',color:'#94a3b8',fontSize:14}}>{prev.count||'–'}</td>}
+                  {prevYear&&<td style={{textAlign:'center',fontWeight:700,fontSize:14,color:diff===null?'#94a3b8':diff<=0?'#16a34a':'#c0392b'}}>
+                    {diff===null?'–':(diff>=0?'+':'')+diff}
+                  </td>}
+                  <td style={{minWidth:100}}>{drvItems.length?Math.round(d.count/drvItems.length*100):0}%</td>
+                  <td className="strong">{bahtFmt(d.amount)}</td>
+                </tr>;
+              })}</tbody>
+              <tfoot><tr>
+                <td className="ta-l" style={{fontWeight:700}}>รวม</td>
+                <td style={{textAlign:'center',fontWeight:800,fontSize:16}}>{drvItems.length}</td>
+                {prevYear&&<td style={{textAlign:'center',color:'#94a3b8'}}>{drvPrev.length}</td>}
+                {prevYear&&<td style={{textAlign:'center',fontWeight:700,color:drvItems.length<=drvPrev.length?'#16a34a':'#c0392b'}}>{drvPrev.length>0?(drvItems.length>=drvPrev.length?'+':'')+(drvItems.length-drvPrev.length):'–'}</td>}
+                <td></td>
+                <td className="strong">{bahtFmt(totalAmt)}</td>
+              </tr></tfoot>
+            </table></div>
+          </ChartCard>
         </>;
       })()}
 
