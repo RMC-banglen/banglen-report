@@ -5709,6 +5709,8 @@ window.__dataReady.then(data => {
     const [form,setForm]=useState(EMPTY);
     const [filterCat,setFilterCat]=useState('ALL');
     const [filterSt,setFilterSt]=useState('ALL');
+    const [saving,setSaving]=useState(false);
+    const [errMsg,setErrMsg]=useState('');
     const [srcDates,setSrcDates]=useState({});   // {sand_fm:'2026-08-15'}
     useEffect(()=>{db.from('calibration_items').select('*').order('name').then(({data})=>{setItems(data||[]);setLoading(false);});},[]);
     useEffect(()=>{db.from('sand_fm_tests').select('test_date').order('test_date',{ascending:false}).limit(1)
@@ -5727,14 +5729,24 @@ window.__dataReady.then(data => {
     const intLabel=item=>{const n=item.interval_value,t=item.interval_type;return t==='day'?`ทุก ${n} วัน`:t==='month'?`ทุก ${n} เดือน`:`ทุก ${n} ปี`;};
     const canEdit=currentUser?.role==='admin'||currentUser?.role==='editor';
     const handleSave=async()=>{
+      setSaving(true);setErrMsg('');
       const next=calcNext(form.last_cal_date,form.interval_type,Number(form.interval_value));
       const row={...form,interval_value:Number(form.interval_value),next_cal_date:next,updated_at:new Date().toISOString()};
-      if(editId){await db.from('calibration_items').update(row).eq('id',editId);setItems(prev=>prev.map(x=>x.id===editId?{...x,...row}:x));}
-      else{const{data}=await db.from('calibration_items').insert({...row,created_at:new Date().toISOString()}).select().single();if(data)setItems(prev=>[...prev,data]);}
-      setShowForm(false);setEditId(null);setForm(EMPTY);
+      if(editId){
+        const{error}=await db.from('calibration_items').update(row).eq('id',editId);
+        setSaving(false);
+        if(error){setErrMsg('❌ บันทึกไม่สำเร็จ: '+error.message);return;}
+        setItems(prev=>prev.map(x=>x.id===editId?{...x,...row}:x));
+      }else{
+        const{data,error}=await db.from('calibration_items').insert({...row,created_at:new Date().toISOString()}).select().single();
+        setSaving(false);
+        if(error){setErrMsg('❌ บันทึกไม่สำเร็จ: '+error.message);return;}
+        if(data)setItems(prev=>[...prev,data]);
+      }
+      setShowForm(false);setEditId(null);setForm(EMPTY);setErrMsg('');
     };
     const handleDel=async id=>{if(!confirm('ลบรายการนี้?'))return;await db.from('calibration_items').delete().eq('id',id);setItems(prev=>prev.filter(x=>x.id!==id));};
-    const openEdit=item=>{const raw=items.find(x=>x.id===item.id)||item;setForm({name:raw.name,category:raw.category||'เครื่องวัด',interval_type:raw.interval_type||'month',interval_value:raw.interval_value||12,last_cal_date:raw.last_cal_date||'',responsible:raw.responsible||'',note:raw.note||'',link_source:raw.link_source||''});setEditId(raw.id);setShowForm(true);};
+    const openEdit=item=>{const raw=items.find(x=>x.id===item.id)||item;setForm({name:raw.name,category:raw.category||'เครื่องวัด',interval_type:raw.interval_type||'month',interval_value:raw.interval_value||12,last_cal_date:raw.last_cal_date||'',responsible:raw.responsible||'',note:raw.note||'',link_source:raw.link_source||''});setEditId(raw.id);setErrMsg('');setShowForm(true);};
     // รายการที่ผูกกับแหล่งข้อมูลอื่น → ใช้วันที่ล่าสุดจากแหล่งนั้นแทน แล้วคำนวณครั้งถัดไปใหม่
     const effItems=items.map(x=>{
       const src=x.link_source&&srcDates[x.link_source];
@@ -5750,7 +5762,7 @@ window.__dataReady.then(data => {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
         <div><div style={{fontSize:22,fontWeight:800,color:'#1e293b'}}>🔧 รอบงานประจำ</div>
           <div style={{fontSize:13,color:'#64748b',marginTop:2}}>ติดตามรอบงาน PM, สอบเทียบ และงานประจำทั้งหมด</div></div>
-        {canEdit&&<button onClick={()=>{setForm(EMPTY);setEditId(null);setShowForm(true);}} style={{padding:'10px 20px',borderRadius:10,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>+ เพิ่มเครื่องมือ</button>}
+        {canEdit&&<button onClick={()=>{setForm(EMPTY);setEditId(null);setErrMsg('');setShowForm(true);}} style={{padding:'10px 20px',borderRadius:10,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>+ เพิ่มเครื่องมือ</button>}
       </div>
       {/* Summary Cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:12,marginBottom:24}}>
@@ -5856,9 +5868,10 @@ window.__dataReady.then(data => {
                 </div>}
                </>}
           </div>
+          {errMsg&&<div style={{marginBottom:14,fontSize:14,fontWeight:600,color:'#dc2626',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,padding:'10px 12px'}}>{errMsg}</div>}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={()=>{setShowForm(false);setEditId(null);}} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={handleSave} disabled={!form.name} style={{padding:'10px 20px',borderRadius:8,border:'none',background:form.name?'#2f5fd0':'#94a3b8',color:'#fff',fontSize:14,fontWeight:700,cursor:form.name?'pointer':'default'}}>บันทึก</button>
+            <button onClick={()=>{setShowForm(false);setEditId(null);setErrMsg('');}} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={handleSave} disabled={!form.name||saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:form.name&&!saving?'#2f5fd0':'#94a3b8',color:'#fff',fontSize:14,fontWeight:700,cursor:form.name&&!saving?'pointer':'default'}}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
           </div>
         </div>
       </div>}
