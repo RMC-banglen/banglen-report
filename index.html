@@ -5731,7 +5731,9 @@ window.__dataReady.then(data => {
     const handleSave=async()=>{
       setSaving(true);setErrMsg('');
       const next=calcNext(form.last_cal_date,form.interval_type,Number(form.interval_value));
-      const row={...form,interval_value:Number(form.interval_value),next_cal_date:next,updated_at:new Date().toISOString()};
+      // last_cal_date เป็นคอลัมน์ type date ในฐานข้อมูล ส่ง '' ไปตรงๆ ไม่ได้ (ต้องเป็นวันที่จริงหรือ null)
+      // ตอนเลือก "ที่มาของวันที่ล่าสุด" แบบเชื่อมอัตโนมัติ ฟอร์มจะไม่ให้กรอกวันที่เอง ค่าเลยว่างเปล่า
+      const row={...form,last_cal_date:form.last_cal_date||null,interval_value:Number(form.interval_value),next_cal_date:next,updated_at:new Date().toISOString()};
       if(editId){
         const{error}=await db.from('calibration_items').update(row).eq('id',editId);
         setSaving(false);
