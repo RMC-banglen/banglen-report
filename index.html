@@ -5611,7 +5611,7 @@ window.__dataReady.then(data => {
   const PERM_LIST=[{k:'quality',v:'รายงานปัญหา'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
   const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',concrete:'concrete'};
-  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'cementAdd',v:'เหตุผลเพิ่มปูน'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
@@ -5874,6 +5874,111 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>{setShowForm(false);setEditId(null);setErrMsg('');}} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={handleSave} disabled={!form.name||saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:form.name&&!saving?'#2f5fd0':'#94a3b8',color:'#fff',fontSize:14,fontWeight:700,cursor:form.name&&!saving?'pointer':'default'}}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+    </div>;
+  }
+
+  function CementAdditionTab({currentUser}){
+    const db=DB;
+    const EMPTY={add_date:new Date().toISOString().slice(0,10),raft_num:'',reason:'',pile_item:'',customer_name:'',note:''};
+    const [items,setItems]=useState([]);
+    const [loading,setLoading]=useState(true);
+    const [showForm,setShowForm]=useState(false);
+    const [editId,setEditId]=useState(null);
+    const [form,setForm]=useState(EMPTY);
+    const [saving,setSaving]=useState(false);
+    const [errMsg,setErrMsg]=useState('');
+    const [confirmDel,setConfirmDel]=useState(null);
+    const canEdit=currentUser?.role==='admin'||currentUser?.role==='editor';
+    const load=()=>{db.from('cement_addition_log').select('*').order('add_date',{ascending:false}).then(({data})=>{setItems(data||[]);setLoading(false);});};
+    useEffect(load,[]);
+    const fmtDate=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return`${p[2]}/${p[1]}/${Number(p[0])+543}`;};
+    const openNew=()=>{setForm(EMPTY);setEditId(null);setErrMsg('');setShowForm(true);};
+    const openEdit=item=>{setForm({add_date:item.add_date||'',raft_num:item.raft_num||'',reason:item.reason||'',pile_item:item.pile_item||'',customer_name:item.customer_name||'',note:item.note||''});setEditId(item.id);setErrMsg('');setShowForm(true);};
+    const handleSave=async()=>{
+      if(!form.add_date){setErrMsg('❌ กรุณาเลือกวันที่เพิ่มปูน');return;}
+      setSaving(true);setErrMsg('');
+      // แปลงค่าว่างเป็น null ก่อนส่งเข้า Supabase เสมอ (เคยพังเพราะส่ง '' เข้าคอลัมน์ type date/int มาแล้ว)
+      const row={add_date:form.add_date,raft_num:form.raft_num?Number(form.raft_num):null,reason:form.reason||null,pile_item:form.pile_item||null,customer_name:form.customer_name||null,note:form.note||null,updated_at:new Date().toISOString()};
+      if(editId){
+        const{error}=await db.from('cement_addition_log').update(row).eq('id',editId);
+        setSaving(false);
+        if(error){setErrMsg('❌ บันทึกไม่สำเร็จ: '+error.message);return;}
+      }else{
+        const{error}=await db.from('cement_addition_log').insert({...row,created_at:new Date().toISOString()});
+        setSaving(false);
+        if(error){setErrMsg('❌ บันทึกไม่สำเร็จ: '+error.message);return;}
+      }
+      setShowForm(false);setEditId(null);setForm(EMPTY);setErrMsg('');
+      load();
+    };
+    const handleDel=async id=>{await db.from('cement_addition_log').delete().eq('id',id);setConfirmDel(null);load();};
+    const inp={width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:14,outline:'none',boxSizing:'border-box'};
+    if(loading)return<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>กำลังโหลด...</div>;
+    return<div style={{padding:'24px 0'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
+        <div><div style={{fontSize:22,fontWeight:800,color:'#1e293b'}}>🧱 เหตุผลเพิ่มปูน</div>
+          <div style={{fontSize:13,color:'#64748b',marginTop:2}}>บันทึกเหตุผลทุกครั้งที่ต้องเพิ่มปูนนอกสูตรระหว่างผลิต</div></div>
+        {canEdit&&<button onClick={openNew} style={{padding:'10px 20px',borderRadius:10,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
+      </div>
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden'}}>
+        <div className="table-wrap"><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+          <thead><tr style={{background:'#f8fafc'}}>
+            {['วันที่เพิ่มปูน','แพผลิต','เหตุผลที่เพิ่มปูน','รายการเสา','ชื่อลูกค้า',''].map((h,i)=><th key={i} style={{padding:'12px '+(i===0?'16px':'8px'),textAlign:i===0||i===2||i===3||i===4?'left':'center',color:'#64748b',fontWeight:600,borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {items.length===0&&<tr><td colSpan={6} style={{padding:32,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีรายการ — กด "+ เพิ่มรายการ" เพื่อเริ่ม</td></tr>}
+            {items.map((item,i)=>(
+              <tr key={item.id} style={{background:i%2===0?'#fff':'#fafafa'}}>
+                <td style={{padding:'12px 16px',fontWeight:600,color:'#1e293b',whiteSpace:'nowrap'}}>{fmtDate(item.add_date)}</td>
+                <td style={{padding:'12px 8px',textAlign:'center',whiteSpace:'nowrap',color:'#475569'}}>{item.raft_num?`แพที่ ${item.raft_num}`:'–'}</td>
+                <td style={{padding:'12px 8px',color:'#334155'}}>{item.reason||'–'}</td>
+                <td style={{padding:'12px 8px',color:'#334155'}}>{item.pile_item||'–'}</td>
+                <td style={{padding:'12px 8px',color:'#334155'}}>{item.customer_name||'–'}</td>
+                <td style={{padding:'12px 8px',textAlign:'center'}}>
+                  {canEdit&&<div style={{display:'flex',gap:6,justifyContent:'center'}}>
+                    <button onClick={()=>openEdit(item)} style={{fontSize:12,padding:'5px 12px',borderRadius:8,border:'1px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer'}}>แก้ไข</button>
+                    <button onClick={()=>setConfirmDel(item.id)} style={{fontSize:12,padding:'5px 12px',borderRadius:8,border:'1px solid #fecaca',background:'#fff',color:'#dc2626',cursor:'pointer'}}>ลบ</button>
+                  </div>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      </div>
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bdDown=true;}} onClick={e=>{if(e.currentTarget._bdDown){e.currentTarget._bdDown=false;setShowForm(false);setErrMsg('');}}}>
+        <div style={{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:18,fontWeight:800,color:'#1e293b',marginBottom:20}}>{editId?'✏️ แก้ไขรายการ':'➕ เพิ่มรายการเพิ่มปูน'}</div>
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>วันที่เพิ่มปูน *</label>
+            <input type="date" value={form.add_date} onChange={e=>setForm({...form,add_date:e.target.value})} style={inp}/>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>แพผลิตที่เพิ่มปูน</label>
+            <select value={form.raft_num} onChange={e=>setForm({...form,raft_num:e.target.value})} style={{...inp,background:'#fff'}}>
+              <option value="">ไม่ระบุ</option>
+              {Array.from({length:18},(_,i)=>i+1).map(n=><option key={n} value={n}>แพที่ {n}</option>)}
+            </select>
+          </div>
+          {[{label:'เหตุผลที่เพิ่มปูน',key:'reason',ph:'เช่น คอนกรีตข้นเกินไป, ปรับ slump'},{label:'รายการเสา',key:'pile_item',ph:'เช่น I-22 มอก. ยาว 6.00 ม.'},{label:'ชื่อลูกค้า',key:'customer_name',ph:'ชื่อลูกค้า'},{label:'หมายเหตุ',key:'note',ph:'รายละเอียดเพิ่มเติม'}].map(f=><div key={f.key} style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>{f.label}</label>
+            <input value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})} placeholder={f.ph} style={inp}/>
+          </div>)}
+          {errMsg&&<div style={{marginBottom:14,fontSize:14,fontWeight:600,color:'#dc2626',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,padding:'10px 12px'}}>{errMsg}</div>}
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>{setShowForm(false);setEditId(null);setErrMsg('');}} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={handleSave} disabled={!form.add_date||saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:form.add_date&&!saving?'#2f5fd0':'#94a3b8',color:'#fff',fontSize:14,fontWeight:700,cursor:form.add_date&&!saving?'pointer':'default'}}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+      {confirmDel&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:210,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+        <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:360}}>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:16}}>ลบรายการนี้?</div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button onClick={()=>setConfirmDel(null)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={()=>handleDel(confirmDel)} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบ</button>
           </div>
         </div>
       </div>}
@@ -8289,7 +8394,7 @@ window.__dataReady.then(data => {
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const getFirstTab=(user)=>{
       const tp={...DEFAULT_TAB_PERMS,...(user?.tab_perms||{})};
-      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','calibration','repair','transport','plateusage','accident','pileMaterials'];
+      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','calibration','cementAdd','repair','transport','plateusage','accident','pileMaterials'];
       return user?.role==='admin'?'meeting':(ordered.find(k=>tp[k]!==false)||'meeting');
     };
     const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
@@ -8305,7 +8410,7 @@ window.__dataReady.then(data => {
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
     const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
-    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'},{id:'accident',label:'รายงานอุบัติเหตุ'},{id:'pileMaterials',label:'สต็อกวัตถุดิบเสาเข็ม'}];
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'calibration',label:'รอบงานประจำ'},{id:'cementAdd',label:'เหตุผลเพิ่มปูน'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'},{id:'accident',label:'รายงานอุบัติเหตุ'},{id:'pileMaterials',label:'สต็อกวัตถุดิบเสาเข็ม'}];
     const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
@@ -8339,6 +8444,7 @@ window.__dataReady.then(data => {
         {tab==='concrete'&&<ConcreteView year={year} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
         {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
+        {tab==='cementAdd'&&<CementAdditionTab currentUser={currentUser}/>}
         {tab==='repair'&&<RepairExpenseTab canEditBL={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_banglen||(currentUser.permissions||{}).repair))} canEditBT={currentUser.role==='admin'||(currentUser.role==='editor'&&((currentUser.permissions||{}).repair_bottakua||(currentUser.permissions||{}).repair))}/>}
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
