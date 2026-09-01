@@ -2346,7 +2346,7 @@ window.__dataReady.then(data => {
           const pct = sale>0?(v/sale*100).toFixed(2)+'%':'–';
           return <>
             <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:bold?700:400,background:bg||'',padding:'3px 6px',whiteSpace:'nowrap'}}>
-              {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:2}):'–'}
+              {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
             </td>
             <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'11px',color:'var(--muted-text)',background:bg||'',padding:'3px 4px',whiteSpace:'nowrap'}}>
               {sale>0&&v>0?pct:''}
@@ -2380,7 +2380,7 @@ window.__dataReady.then(data => {
                 <td className="ta-l strong" style={{position:'sticky',left:0,background:'#e6f4ea',zIndex:1,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
                 {cols.map((c,i)=>{const s=colSales(c);return <React.Fragment key={i}>
                   <td colSpan={2} style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea'}}>
-                    {s?Number(s).toLocaleString('th-TH',{maximumFractionDigits:2}):'–'}
+                    {s?Number(s).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
                   </td>
                 </React.Fragment>;})}
               </tr>
