@@ -910,12 +910,12 @@ class App extends React.Component {
                   <button onClick={() => window.print()} style={btnGhost()}>พิมพ์ / บันทึกเป็น PDF</button>
                 </div>
 
+                <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
+                <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />
                 {stockMode && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
                 <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
                   extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />
 
@@ -1023,6 +1023,12 @@ function DetailView({ app }) {
   if (!dp) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+      <DetailTable title="ลวด PC.wire" subtitle={dp.pc7NoteExtra} rows={dp.pcRowsD} columns={[
+        { key: 'label', label: 'รายการ' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
+      <DetailTable title="ลวดปลอก" rows={dp.stirrupRowsD} columns={[
+        { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
       <DetailTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={dp.plateRowsD} columns={[
         { key: 'label', label: 'ขนาดเสา' }, { key: 'countFmt', label: 'จำนวน (แผ่น)', right: true }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
       ]} />
@@ -1031,12 +1037,6 @@ function DetailView({ app }) {
       ]} />
       <DetailTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={dp.collarRowsD} columns={[
         { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'จำนวนคำนวณ (ชุด)', right: true },
-      ]} />
-      <DetailTable title="ลวด PC.wire" subtitle={dp.pc7NoteExtra} rows={dp.pcRowsD} columns={[
-        { key: 'label', label: 'รายการ' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
-      ]} />
-      <DetailTable title="ลวดปลอก" rows={dp.stirrupRowsD} columns={[
-        { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
       ]} />
       <DetailTable title="เหล็กเสริมหลัก (DB/RB)" rows={dp.rebarRowsD} columns={[
         { key: 'label', label: 'ขนาด/ความยาว' }, { key: 'piecesFmt', label: 'จำนวน (เส้น)', right: true }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
