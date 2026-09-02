@@ -456,6 +456,14 @@ function niceMax(max,ticks=4){
   return Math.ceil(max/(s*mag))*(s*mag);
 }
 function axisTicks(min,max,count=4){const a=[];for(let i=0;i<=count;i++)a.push(min+((max-min)*i)/count);return a;}
+// ข้อความจำนวนต่อท้ายชื่อสินค้า เช่น " · 2 ต้น" — ว่างถ้าไม่มีจำนวน
+function qtyTxt(q){
+  const n=Number(q);
+  if(!q||!isFinite(n)||n===0) return '';
+  const s=Number.isInteger(n)?String(n):String(Math.round(n*100)/100);
+  return ' · '+s+' ต้น';
+}
+
 // รวมรายการเสียหายที่อยู่บิลเดียวกัน (แถวที่ merge ในชีทจะได้เลขบิลเดียวกัน)
 // แถวที่ไม่มีเลขบิลถือเป็นรายการเดี่ยว ไม่ถูกยุบรวมกับใคร
 function groupByBill(rows){
@@ -1818,7 +1826,7 @@ window.__dataReady.then(data => {
                             color:head.code_type==='ID'?'#9d174d':'#1d4ed8'}}>{head.code_type||'ID'}</span>
                           <span style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(head.amount)} ฿</span>
                         </div>
-                        {head.product_name&&<div style={{fontSize:'12px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {head.product_name}</div>}
+                        {head.product_name&&<div style={{fontSize:'12px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {head.product_name}{qtyTxt(head.qty)}</div>}
                         {head.contractor_team&&<div style={{fontSize:'11px',color:'#2f5fd0',fontWeight:600,marginBottom:2}}>👷 {head.contractor_team}</div>}
                         <div style={{fontSize:'12px',color:'#374151',marginBottom:2}}>{head.reason||head.cause||'ไม่ระบุ'}</div>
                         <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{g.bill?g.bill+' · ':''}{MONTHS_TH_SHORT[(head.month||1)-1]}-{String(head.year).slice(-2)}</div>
@@ -1845,7 +1853,7 @@ window.__dataReady.then(data => {
                         {g.rows.map((r,ri)=>(
                           <div key={ri} style={{background:'#fff',borderRadius:7,border:'1px solid #fcd5d5',padding:'6px 10px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
                             <span style={{fontSize:'11px',color:r.product_name?'#1f2937':'var(--muted-text)',flex:1,minWidth:0}}>
-                              {r.product_name?'🧱 '+r.product_name:'รายการที่ '+(ri+1)}
+                              {r.product_name?'🧱 '+r.product_name+qtyTxt(r.qty):'รายการที่ '+(ri+1)+qtyTxt(r.qty)}
                             </span>
                             <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b',whiteSpace:'nowrap'}}>{bahtFmt(r.amount)} ฿</span>
                           </div>
@@ -1874,7 +1882,7 @@ window.__dataReady.then(data => {
                               {bahtFmt(r.amount)} ฿
                             </span>
                           </div>
-                          {r.product_name && <div style={{fontSize:'11px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}</div>}
+                          {r.product_name && <div style={{fontSize:'11px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                           {r.reason && <div style={{fontSize:'11px',color:'#374151',marginBottom:2}}>{r.reason}</div>}
                           <div style={{fontSize:'10px',color:'var(--muted-text)'}}>{r.bill_no?r.bill_no+' · ':''}{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
                         </div>
