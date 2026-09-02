@@ -2002,13 +2002,230 @@ window.__dataReady.then(data => {
       style={{width:'100%',minHeight:400,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
   }
 
+  // ============================================================
+  // วิเคราะห์ขนาดเสา — แยกหน้าตัด / ความยาว จากชื่อสินค้า
+  // เช่น "เสาเข็ม I-0.26 x 11.00 เมตร ท่อนเชื่อม มอก."
+  //      → หน้าตัด I-0.26 · ยาว 11.00 ม. · ท่อนเชื่อม
+  // ============================================================
+  const PILE_BAR_COLORS=['#c0392b','#e07b39','#e5a72c','#2f9e6f','#2f5fd0','#7c3aed','#0891b2','#be185d','#65a30d','#64748b'];
+
+  function parsePile(name){
+    const s=String(name||'');
+    const m=s.match(/([IS])\s*-\s*([\d.]+)\s*[xX×]\s*([\d.]+)/);
+    const joint=/ท่อนเดี่ยว/.test(s)?'ท่อนเดี่ยว':(/ท่อนเชื่อม/.test(s)?'ท่อนเชื่อม':'ไม่ระบุ');
+    if(!m) return {sec:'ไม่ระบุขนาด',len:null,joint,ok:false};
+    return {sec:m[1]+'-'+m[2],len:parseFloat(m[3]),joint,ok:true};
+  }
+
+  function PileSizeView({items}){
+    const CAUSE_CRACK='เสาร้าวในกอง/จากขนส่ง/ปีกแตก';
+    const causes=[...new Set(items.map(r=>r.cause).filter(Boolean))].sort();
+    const defCause=causes.find(c=>/เสาร้าว/.test(c))||'__all__';
+    const [cause,setCause]=useState(defCause);
+    const [metric,setMetric]=useState('amount');   // amount | qty | count
+    const [openSec,setOpenSec]=useState(null);
+
+    const rows=items.filter(r=>cause==='__all__'||r.cause===cause)
+                    .map(r=>({...r,p:parsePile(r.product_name)}));
+    const total=rows.reduce((a,b)=>a+(Number(b.amount)||0),0);
+    const totalQty=rows.reduce((a,b)=>a+(Number(b.qty)||0),0);
+    const unparsed=rows.filter(r=>!r.p.ok).length;
+
+    const group=keyFn=>{
+      const g={};
+      rows.forEach(r=>{
+        const k=keyFn(r.p); if(k==null) return;
+        if(!g[k]) g[k]={key:k,amount:0,qty:0,count:0,rows:[]};
+        g[k].amount+=Number(r.amount)||0;
+        g[k].qty   +=Number(r.qty)||0;
+        g[k].count++;
+        g[k].rows.push(r);
+      });
+      return Object.values(g);
+    };
+    const val=g=>metric==='amount'?g.amount:metric==='qty'?g.qty:g.count;
+    const bySec=group(p=>p.sec).sort((a,b)=>val(b)-val(a));
+    const byJoint=group(p=>p.joint).sort((a,b)=>b.amount-a.amount);
+    const maxVal=Math.max(1,...bySec.map(val));
+
+    // ตารางไขว้ หน้าตัด × ความยาว
+    const lens=[...new Set(rows.filter(r=>r.p.len!=null).map(r=>r.p.len))].sort((a,b)=>a-b);
+    const secsForGrid=bySec.filter(g=>g.key!=='ไม่ระบุขนาด').map(g=>g.key);
+    const cell={};
+    rows.forEach(r=>{ if(r.p.len==null) return;
+      const k=r.p.sec+'|'+r.p.len;
+      cell[k]=(cell[k]||0)+(Number(r.amount)||0);
+    });
+    const maxCell=Math.max(1,...Object.values(cell));
+
+    const fmt=n=>Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:0});
+    const th={padding:'9px 10px',textAlign:'right',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap',fontSize:13};
+    const td={padding:'8px 10px',textAlign:'right',whiteSpace:'nowrap',fontSize:13.5};
+    const seg=(v,label,cur,set)=>(
+      <button key={v} onClick={()=>set(v)} style={{padding:'5px 13px',borderRadius:20,fontSize:13,cursor:'pointer',fontFamily:'inherit',
+        border:`1.5px solid ${cur===v?'#2f5fd0':'#e2e8f0'}`,background:cur===v?'#2f5fd0':'#fff',
+        color:cur===v?'#fff':'#334155',fontWeight:cur===v?700:400}}>{label}</button>
+    );
+
+    if(rows.length===0) return <ChartCard title="วิเคราะห์ขนาดเสา" span="full">
+      <div style={{padding:28,color:'#94a3b8'}}>ไม่มีข้อมูลในช่วงที่เลือก</div></ChartCard>;
+
+    return <>
+      <ChartCard span="full" title="วิเคราะห์ขนาดเสาที่เสียหาย"
+        subtitle="แยกตามหน้าตัดและความยาว จากชื่อสินค้า — ใช้หาว่าขนาดไหนเสียหายมากที่สุด">
+
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',marginBottom:16}}>
+          <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600}}>สาเหตุ</span>
+          <select value={cause} onChange={e=>{setCause(e.target.value);setOpenSec(null);}}
+            style={{padding:'7px 11px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,background:'#fff',fontFamily:'inherit',maxWidth:340}}>
+            <option value="__all__">ทุกสาเหตุรวมกัน</option>
+            {causes.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+          <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600,marginLeft:6}}>เรียงตาม</span>
+          <div style={{display:'flex',gap:6}}>
+            {seg('amount','มูลค่า',metric,setMetric)}
+            {seg('qty','จำนวนต้น',metric,setMetric)}
+            {seg('count','จำนวนครั้ง',metric,setMetric)}
+          </div>
+        </div>
+
+        {/* KPI */}
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
+          {[['มูลค่าเสียหายรวม',fmt(total)+' ฿','#c0392b'],
+            ['จำนวนต้น',fmt(totalQty)+' ต้น','#1a56db'],
+            ['จำนวนครั้ง',fmt(rows.length)+' รายการ','#7c3aed'],
+            ['เฉลี่ยต่อต้น',(totalQty?fmt(total/totalQty):'–')+' ฿','#059669']].map(([l,v,c])=>(
+            <div key={l} style={{flex:'1 1 170px',border:'1px solid #e6e8ee',borderRadius:12,padding:'13px 17px'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>{l}</div>
+              <div style={{fontSize:26,fontWeight:800,color:c,lineHeight:1.15}}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* กราฟแท่งแยกตามหน้าตัด */}
+        <div style={{marginBottom:20}}>
+          {bySec.map((g,i)=>{
+            const v=val(g), pct=total>0?g.amount/total*100:0;
+            const unit=metric==='amount'?' ฿':metric==='qty'?' ต้น':' ครั้ง';
+            return <div key={g.key} style={{display:'flex',alignItems:'center',gap:12,marginBottom:7}}>
+              <div style={{width:96,fontSize:13.5,fontWeight:700,color:'#1e293b',textAlign:'right'}}>{i+1}. {g.key}</div>
+              <div style={{flex:1,background:'#eef0f5',borderRadius:6,height:20,overflow:'hidden'}}>
+                <div style={{width:(v/maxVal*100)+'%',height:'100%',background:PILE_BAR_COLORS[i%PILE_BAR_COLORS.length],borderRadius:6}}/>
+              </div>
+              <div style={{width:120,textAlign:'right',fontSize:13.5,fontWeight:700,color:'#c0392b'}}>{fmt(v)}{unit}</div>
+              <div style={{width:52,textAlign:'right',fontSize:12.5,color:'#8b91a1'}}>{pct.toFixed(1)}%</div>
+            </div>;
+          })}
+        </div>
+
+        {/* ตาราง — คลิกหน้าตัดเพื่อกางดูความยาว */}
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead><tr style={{background:'#f4f6fa'}}>
+              <th style={{...th,textAlign:'left'}}>หน้าตัด</th>
+              <th style={th}>จำนวนต้น</th><th style={th}>จำนวนครั้ง</th>
+              <th style={th}>มูลค่า (฿)</th><th style={th}>บาท/ต้น</th><th style={th}>% ของสาเหตุนี้</th>
+            </tr></thead>
+            <tbody>
+              {bySec.map(g=>{
+                const open=openSec===g.key;
+                const byLen=(()=>{ const m={};
+                  g.rows.forEach(r=>{const k=r.p.len==null?'ไม่ระบุ':r.p.len.toFixed(2)+' ม.';
+                    if(!m[k])m[k]={key:k,len:r.p.len,amount:0,qty:0,count:0};
+                    m[k].amount+=Number(r.amount)||0;m[k].qty+=Number(r.qty)||0;m[k].count++;});
+                  return Object.values(m).sort((a,b)=>b.amount-a.amount);})();
+                return <React.Fragment key={g.key}>
+                  <tr onClick={()=>setOpenSec(open?null:g.key)}
+                    style={{borderBottom:'1px solid #eef0f5',cursor:'pointer',background:open?'#eef3fc':'transparent'}}>
+                    <td style={{...td,textAlign:'left',fontWeight:700}}>{open?'▲':'▼'} {g.key}</td>
+                    <td style={td}>{fmt(g.qty)}</td>
+                    <td style={td}>{fmt(g.count)}</td>
+                    <td style={{...td,fontWeight:700,color:'#c0392b'}}>{fmt(g.amount)}</td>
+                    <td style={td}>{g.qty?fmt(g.amount/g.qty):'–'}</td>
+                    <td style={td}>{total>0?(g.amount/total*100).toFixed(1)+'%':'–'}</td>
+                  </tr>
+                  {open&&byLen.map(L=>(
+                    <tr key={g.key+L.key} style={{borderBottom:'1px solid #f4f6fa',background:'#fafbfd'}}>
+                      <td style={{...td,textAlign:'left',paddingLeft:34,color:'#5f6470'}}>ยาว {L.key}</td>
+                      <td style={{...td,color:'#5f6470'}}>{fmt(L.qty)}</td>
+                      <td style={{...td,color:'#5f6470'}}>{fmt(L.count)}</td>
+                      <td style={{...td,color:'#5f6470'}}>{fmt(L.amount)}</td>
+                      <td style={{...td,color:'#5f6470'}}>{L.qty?fmt(L.amount/L.qty):'–'}</td>
+                      <td style={{...td,color:'#5f6470'}}>{total>0?(L.amount/total*100).toFixed(1)+'%':'–'}</td>
+                    </tr>
+                  ))}
+                </React.Fragment>;
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {unparsed>0&&<div style={{marginTop:12,fontSize:13,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'9px 13px'}}>
+          ⚠️ มี {unparsed} รายการที่อ่านขนาดจากชื่อสินค้าไม่ได้ — รวมไว้ในกลุ่ม “ไม่ระบุขนาด” ตรวจการพิมพ์ชื่อในชีทได้
+        </div>}
+
+        <div style={{marginTop:12,fontSize:13,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'10px 14px',lineHeight:1.7}}>
+          💡 ตัวเลขนี้บอกว่า <b>ขนาดไหนเสียหายมากที่สุดเป็นบาท</b> ซึ่งมักแปรตามยอดผลิต —
+          ขนาดที่ผลิตเยอะย่อมเสียหายเยอะตาม ยังไม่ได้แปลว่าขนาดนั้นเปราะกว่า
+          ถ้าต้องการรู้ว่า<b>ขนาดไหนเสี่ยงจริง</b> ต้องหารด้วยจำนวนต้นที่ผลิตของขนาดนั้น
+        </div>
+      </ChartCard>
+
+      {/* ตารางไขว้ หน้าตัด × ความยาว */}
+      {secsForGrid.length>0&&lens.length>0&&
+      <ChartCard span="full" title="ตารางไขว้ หน้าตัด × ความยาว" subtitle="สีเข้ม = มูลค่าเสียหายสูง • ช่องว่าง = ไม่มีรายการ">
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',fontSize:12.5}}>
+            <thead><tr>
+              <th style={{padding:'7px 10px',textAlign:'left',position:'sticky',left:0,background:'#f4f6fa',borderBottom:'2px solid #e2e5ee',fontWeight:700,color:'#42465a'}}>หน้าตัด</th>
+              {lens.map(L=><th key={L} style={{padding:'7px 9px',textAlign:'right',borderBottom:'2px solid #e2e5ee',fontWeight:700,color:'#42465a',whiteSpace:'nowrap'}}>{L.toFixed(2)} ม.</th>)}
+              <th style={{padding:'7px 10px',textAlign:'right',borderBottom:'2px solid #e2e5ee',fontWeight:800,color:'#c0392b'}}>รวม</th>
+            </tr></thead>
+            <tbody>
+              {secsForGrid.map(sec=>{
+                const rowSum=lens.reduce((a,L)=>a+(cell[sec+'|'+L]||0),0);
+                return <tr key={sec}>
+                  <td style={{padding:'7px 10px',fontWeight:700,position:'sticky',left:0,background:'#fff',borderBottom:'1px solid #eef0f5',whiteSpace:'nowrap'}}>{sec}</td>
+                  {lens.map(L=>{
+                    const v=cell[sec+'|'+L]||0;
+                    const a=v?0.12+0.68*(v/maxCell):0;
+                    return <td key={L} style={{padding:'7px 9px',textAlign:'right',borderBottom:'1px solid #eef0f5',
+                      background:v?`rgba(192,57,43,${a.toFixed(3)})`:'transparent',
+                      color:v&&a>0.45?'#fff':'#42465a',fontWeight:v?600:400,whiteSpace:'nowrap'}}>
+                      {v?fmt(v):'–'}</td>;
+                  })}
+                  <td style={{padding:'7px 10px',textAlign:'right',fontWeight:800,color:'#c0392b',borderBottom:'1px solid #eef0f5',whiteSpace:'nowrap'}}>{fmt(rowSum)}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>}
+
+      {/* ท่อนเชื่อม vs ท่อนเดี่ยว */}
+      <ChartCard span="full" title="เทียบชนิดท่อน" subtitle="ท่อนเชื่อม / ท่อนเดี่ยว">
+        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+          {byJoint.map(g=>(
+            <div key={g.key} style={{flex:'1 1 190px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+              <div style={{fontSize:14,fontWeight:700,color:'#1e293b',marginBottom:6}}>{g.key}</div>
+              <div style={{fontSize:24,fontWeight:800,color:'#c0392b',lineHeight:1.15}}>{fmt(g.amount)} <span style={{fontSize:14}}>฿</span></div>
+              <div style={{fontSize:13,color:'#5f6470',marginTop:5}}>
+                {fmt(g.qty)} ต้น · {fmt(g.count)} ครั้ง · {total>0?(g.amount/total*100).toFixed(1):'–'}%
+              </div>
+            </div>
+          ))}
+        </div>
+      </ChartCard>
+    </>;
+  }
+
   function DamageDetailTab({currentUser}){
     const isAdmin=currentUser?.role==='admin';
     const tp={...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
     const dmgSubTabs=[
       {value:'damage',label:'มูลค่าเสียหาย'},{value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},
       {value:'summary',label:'ตารางสรุป'},{value:'cause',label:'แยกสาเหตุ'},
-      {value:'customer',label:'แยกลูกค้า'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
+      {value:'customer',label:'แยกลูกค้า'},{value:'size',label:'วิเคราะห์ขนาดเสา'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
       {value:'detail',label:'ตารางรายการ'}
     ].filter(t=>isAdmin||tp['dmg_'+t.value]!==false);
     const [view,setView]   = useState('damage');
@@ -2292,7 +2509,7 @@ window.__dataReady.then(data => {
                 delta={pctDelta!=null?{dir:pctDelta<=0?-1:1,text:''}:null}/>
             </div>;
           })()
-        : view==='worker' ? null
+        : view==='worker'||view==='size' ? null
         : <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
             <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
               sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
@@ -2444,6 +2661,7 @@ window.__dataReady.then(data => {
       {view==='customer' && <CustomerView items={items} totalAll={totalAll}/>}
 
       {/* Worker sub-tab nav */}
+      {view==='size' && <PileSizeView items={items}/>}
       {view==='worker' && <div style={{gridColumn:'1 / -1',display:'flex',gap:8,marginBottom:4}}>
         {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'},{v:'driver',l:'วิเคราะห์คนขับรถ'}].map(({v,l})=>(
           <button key={v} onClick={()=>setWorkerTab(v)} style={{padding:'7px 20px',borderRadius:20,border:`1.5px solid ${workerTab===v?'#0f766e':'#e2e8f0'}`,background:workerTab===v?'#0f766e':'#fff',color:workerTab===v?'#fff':'#334155',fontSize:13,fontWeight:workerTab===v?700:400,cursor:'pointer'}}>
@@ -5627,7 +5845,7 @@ window.__dataReady.then(data => {
   // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
   const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',concrete:'concrete'};
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'cementAdd',v:'เหตุผลเพิ่มปูน'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
-  const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
+  const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_size',v:'วิเคราะห์ขนาดเสา'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
 
