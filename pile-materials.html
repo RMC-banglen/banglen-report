@@ -66,6 +66,18 @@ function waitForPileCalc() {
   });
 }
 
+// จำนวนทศนิยมของแต่ละหมวดวัสดุ — คิดจาก key เช่น 'main:plate:0.22'
+// เพลท / หนวดกุ้ง / PC.wire / ปลอก = 2 ตำแหน่ง | Collar / เหล็กเสริม = ไม่มีทศนิยม
+const MAT_DIGITS = {
+  plate: 2, whisker: 2, stirrup: 2,
+  pc: 2, pc4: 2, pc5: 2, pc7: 2,
+  collar: 0, rebar: 0, rebarExtra: 0,
+};
+function digitsForKey(key) {
+  const cat = String(key || '').split(':')[1];
+  return MAT_DIGITS[cat] ?? 1;
+}
+
 function fmt(n, digits) {
   if (n == null || !isFinite(n)) return '-';
   return n.toLocaleString('th-TH', { minimumFractionDigits: digits ?? 1, maximumFractionDigits: digits ?? 1 });
@@ -440,13 +452,14 @@ class App extends React.Component {
     });
   }
 
-  diffInfo(calc, actualStr) {
+  diffInfo(calc, actualStr, digits) {
+    const d = digits ?? 1;
     const actual = actualStr === '' || actualStr == null ? null : Number(actualStr);
     if (actual == null || !isFinite(actual)) return { actual: '', diffFmt: '-', pctFmt: '-', diffColor: 'inherit' };
     const diff = actual - calc;
     const pct = calc !== 0 ? (diff / calc) * 100 : (actual !== 0 ? Infinity : 0);
     const color = Math.abs(pct) < 3 ? '#728' : (diff > 0 ? '#c0392b' : '#3f7d2b');
-    return { actual: actualStr, diffFmt: (diff > 0 ? '+' : '') + fmt(diff, 1), pctFmt: !isFinite(pct) ? 'ไม่มียอดคำนวณ' : (pct > 0 ? '+' : '') + fmt(pct, 1) + '%', diffColor: color };
+    return { actual: actualStr, diffFmt: (diff > 0 ? '+' : '') + fmt(diff, d), pctFmt: !isFinite(pct) ? 'ไม่มียอดคำนวณ' : (pct > 0 ? '+' : '') + fmt(pct, 1) + '%', diffColor: color };
   }
   thresholdBg(pctLost, key) {
     const cat = key ? String(key).split(':')[1] : null;
@@ -459,7 +472,8 @@ class App extends React.Component {
   buildRow(key, label, calcVal, extraFmt) {
     const hasStockEntry = this.state.stock[key] && (this.state.stock[key].opening != null || this.state.stock[key].received != null || this.state.stock[key].closing != null);
     const actualStr = (this.state.resultView === 'stock' || hasStockEntry) ? this.computedActualFromStock(key) : (this.state.actual[key] ?? '');
-    const info = this.diffInfo(calcVal, actualStr);
+    const dg = digitsForKey(key);
+    const info = this.diffInfo(calcVal, actualStr, dg);
     const stockVals = this.state.stock[key] || {};
     const generalUseEntriesRaw = this.state.generalUseEntries[key] || [];
     const generalUse = generalUseEntriesRaw.reduce((s, e) => s + (e.amount || 0), 0);
@@ -468,8 +482,8 @@ class App extends React.Component {
     const realDiff = A != null ? A + generalUse : null;
     const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
     return {
-      key, label, calcFmt: fmt(calcVal, 1), actual: info.actual,
-      actualFmt: (info.actual === '' || info.actual == null || isNaN(Number(info.actual))) ? '-' : fmt(Number(info.actual), 1),
+      key, label, calcFmt: fmt(calcVal, dg), actual: info.actual,
+      actualFmt: (info.actual === '' || info.actual == null || isNaN(Number(info.actual))) ? '-' : fmt(Number(info.actual), dg),
       diffFmt: info.diffFmt, pctFmt: info.pctFmt, diffColor: info.diffColor,
       onActualChange: v => this.setActual(key, v),
       opening: stockVals.opening ?? '', received: stockVals.received ?? '', closing: stockVals.closing ?? '',
@@ -483,9 +497,9 @@ class App extends React.Component {
       })),
       onAddGeneralUseEntry: () => this.addGeneralUseEntry(key),
       generalUseOpen: !!this.state.generalUseOpen[key],
-      generalUseSummaryFmt: fmt(generalUse, 1),
+      generalUseSummaryFmt: fmt(generalUse, dg),
       onToggleGeneralUseOpen: () => this.toggleGeneralUseOpen(key),
-      realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, 1)) : '-',
+      realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, dg)) : '-',
       pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 1) + '%') : '-',
       rowBg: this.thresholdBg(pctLost, key),
       ...extraFmt,
