@@ -1129,8 +1129,9 @@ window.__dataReady.then(data => {
                         </span>
                       </div>
                       <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>{r.cause||'ไม่ระบุสาเหตุ'}</div>
+                      {r.product_name && <div style={{fontSize:'12px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                       {r.reason && <div style={{fontSize:'11px',color:'#374151',marginBottom:2,fontStyle:'italic'}}>{r.reason}</div>}
-                      <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
+                      <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{r.bill_no?r.bill_no+' · ':''}{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
                     </div>
                   );
 
@@ -1674,6 +1675,7 @@ window.__dataReady.then(data => {
                                   {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
                                 </span>
                               </div>
+                              {r.product_name && <div style={{fontSize:'11px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                               {r.reason && <div style={{fontSize:'11px',color:'#374151'}}>{r.reason}</div>}
                             </div>
                           ));
@@ -1703,6 +1705,7 @@ window.__dataReady.then(data => {
                                         {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
                                       </span>
                                     </div>
+                                    {r.product_name && <div style={{fontSize:'11px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                                     {r.reason && <div style={{fontSize:'11px',color:'#374151'}}>{r.reason}</div>}
                                   </div>
                                 ))}
