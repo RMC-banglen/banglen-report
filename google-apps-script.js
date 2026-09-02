@@ -794,6 +794,7 @@ function syncDamageItems(ss) {
     // คอลัมน์อาจใช้ชื่อต่างกัน — map อัตโนมัติ
     const colMonthYear      = ci['เดือน/ปี']        ?? 0;
     const colBillNo         = ci['เลขที่ใบรับคืน']  ?? 1;
+    const colProduct        = ci['รายการสินค้า']    ?? 2;
     const colAmount         = ci['ยอดเงินสุทธิ']    ?? 4;
     const colType           = ci['ประเภท']           ?? 5;
     const colCause          = headers.findIndex(h => h.includes('สาเหตุ'));  // G
@@ -849,6 +850,7 @@ function syncDamageItems(ss) {
         reason:           lastCause,
         amount:           amount,
         bill_no:          lastBillNo,
+        product_name:     String(r[colProduct] || '').trim() || null,
         contractor_team:  lastContractor,
         employee_name:    lastEmployee,
       });
@@ -869,6 +871,7 @@ function syncDamageItems(ss) {
     headers.forEach((h, i) => { ci[h] = i; });
 
     const colBillNo      = ci['เลขที่บิล']         ?? 0;
+    const colProductID   = ci['รายการสินค้า']      ?? 2;
     const colAmount      = ci['ยอดเงินสุทธิ']      ?? 3;
     const colType        = ci['ประเภทเสียหาย']     ?? 5;
     const colCause       = ci['สาเหตุ']            ?? 6;
@@ -912,6 +915,7 @@ function syncDamageItems(ss) {
         reason:           cause,
         amount:           amount,
         bill_no:          bill || null,
+        product_name:     String(r[colProductID] || '').trim() || null,
         contractor_team:  contractorID,
         employee_name:    employeeID,
       });
