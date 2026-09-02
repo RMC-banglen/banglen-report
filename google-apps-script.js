@@ -1235,9 +1235,17 @@ function filterMonthKey(key) {
     f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(year).build());
     f.setColumnFilterCriteria(2, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(month).build());
   } else {
-    // ใส่ '' ไว้ด้วย เพื่อให้แถวที่คอลัมน์ A ว่าง (เซลล์ merge / แถวต่อเนื่อง) ยังแสดงอยู่
+    // Sheets ไม่รองรับ setVisibleValues → ต้องระบุกลับด้านเป็น "ค่าที่ให้ซ่อน"
+    // เว้นค่าว่างไว้ไม่ซ่อน เพื่อให้แถวที่คอลัมน์ A ว่าง (เซลล์ merge / แถวต่อเนื่อง) ยังแสดงอยู่
     var label = MONTH_MENU_TH[month] + ' ' + year;
-    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().setVisibleValues([label, '']).build());
+    var colA = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    var seen = {}, hidden = [];
+    colA.forEach(function(r) {
+      var v = (r[0] === null || r[0] === undefined) ? '' : String(r[0]).trim();
+      if (v === '' || v === label) return;
+      if (!seen[v]) { seen[v] = true; hidden.push(v); }
+    });
+    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().setHiddenValues(hidden).build());
     f.removeColumnFilterCriteria(2);
   }
 }
