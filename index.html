@@ -4092,7 +4092,9 @@ window.__dataReady.then(data => {
             <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
               <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>เฉลี่ยใช้ปูนจริง</div>
               <div style={{fontSize:30,fontWeight:800,color:'#1a56db',lineHeight:1.1}}>{n1(sumAvg)}<span style={{fontSize:15,fontWeight:600,marginLeft:5}}>กก./m³</span></div>
-              <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>เกณฑ์ปีก่อน {n1(cfg.baseline_kg_m3)}</div>
+              <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>เกณฑ์ปีก่อน {n1(cfg.baseline_kg_m3)}
+                {canEdit&&<button onClick={()=>setCfgDraft({...cfg})} style={{marginLeft:7,border:'none',background:'none',color:'#1a56db',cursor:'pointer',fontSize:13,textDecoration:'underline',padding:0,fontFamily:'inherit'}}>แก้เกณฑ์</button>}
+              </div>
             </div>
             <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px',
               background:sumDiff==null?'#fff':(sumDiff>=0?'#f2fbf6':'#fdf2f2')}}>
@@ -4113,7 +4115,13 @@ window.__dataReady.then(data => {
               background:sum.savedBaht>=0?'#f2fbf6':'#fdf2f2'}}>
               <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>เงินที่ลดได้รวม</div>
               <div style={{fontSize:30,fontWeight:800,color:sum.savedBaht>=0?'#059669':'#d13438',lineHeight:1.1}}>{n0(sum.savedBaht)}<span style={{fontSize:15,fontWeight:600,marginLeft:5}}>บาท</span></div>
-              <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>{cfg.price_per_kg>0?`@ ${n2(cfg.price_per_kg)} บาท/กก.`:'⚠️ ยังไม่ได้ใส่ราคาปูน'}</div>
+              {cfg.price_per_kg>0
+                ? <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>@ {n2(cfg.price_per_kg)} บาท/กก.
+                    {canEdit&&<button onClick={()=>setCfgDraft({...cfg})} style={{marginLeft:7,border:'none',background:'none',color:'#1a56db',cursor:'pointer',fontSize:13,textDecoration:'underline',padding:0,fontFamily:'inherit'}}>แก้ราคา</button>}
+                  </div>
+                : canEdit
+                  ? <button onClick={()=>setCfgDraft({...cfg})} style={{marginTop:6,padding:'5px 12px',borderRadius:8,border:'1px solid #fbbf24',background:'#fffbeb',color:'#92400e',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>⚠️ ยังไม่ได้ใส่ราคาปูน — กดใส่เลย</button>
+                  : <div style={{fontSize:13,marginTop:4,color:'#92400e'}}>⚠️ ยังไม่ได้ใส่ราคาปูน</div>}
             </div>
           </div>
 
