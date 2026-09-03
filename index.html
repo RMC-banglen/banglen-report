@@ -2237,6 +2237,21 @@ window.__dataReady.then(data => {
     });
     const [selMonths,setSelMonths] = useState(new Set()); // เดือนที่เลือก (empty = ทุกเดือน)
     const [yoyMode,setYoyMode] = useState(false); // ตารางสรุป: เทียบปีต่อปี (ไม่แสดงคอลัมน์เดือน)
+    // วัดความสูงจริงของหัวตาราง 2 แถว (ตารางสรุปความเสียหายรายเดือน) แทนเดาเป็นพิกเซลตายตัว
+    // กันแถว "ยอดขายเสาเข็ม" ที่ล็อกติดด้านบน เลื่อนเพี้ยนไม่ตรงกับหัวตารางจริงตอนฟอนต์/ซูมต่างจากที่เดาไว้
+    const dmgTheadRef=React.useRef(null), dmgRow1Ref=React.useRef(null);
+    const [dmgHeadH,setDmgHeadH]=useState({row1:25,total:50});
+    React.useLayoutEffect(()=>{
+      const measure=()=>{
+        if(dmgRow1Ref.current&&dmgTheadRef.current){
+          const row1=dmgRow1Ref.current.offsetHeight, total=dmgTheadRef.current.offsetHeight;
+          if(row1&&total) setDmgHeadH(h=>(h.row1!==row1||h.total!==total)?{row1,total}:h);
+        }
+      };
+      measure();
+      window.addEventListener('resize',measure);
+      return ()=>window.removeEventListener('resize',measure);
+    });
     const [showMonthPicker,setShowMonthPicker] = useState(false);
     const [selCust,setSelCust] = useState(null);
 
@@ -2593,8 +2608,8 @@ window.__dataReady.then(data => {
           </div>
           <div className="table-wrap" style={{overflow:'auto',maxHeight:'70vh'}}>
           <table className="dt" style={{fontSize:'12px',minWidth:'800px',borderCollapse:'collapse'}}>
-            <thead>
-              <tr style={{background:'#f5f5f5'}}>
+            <thead ref={dmgTheadRef}>
+              <tr ref={dmgRow1Ref} style={{background:'#f5f5f5'}}>
                 <th className="ta-l" style={{minWidth:'180px',position:'sticky',left:0,top:0,background:'#f5f5f5',zIndex:3}}>รายการ</th>
                 {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',position:'sticky',top:0,zIndex:2,
                   background:(c.type==='year'||c.type==='yearAny')?'#d9ead3':c.type==='prevYear'?'#fce5cd':'#f5f5f5',
@@ -2602,16 +2617,17 @@ window.__dataReady.then(data => {
                   borderLeft:'1px solid #ddd',minWidth:'100px'}}>{c.label}</th>)}
               </tr>
               <tr style={{background:'#fafafa',fontSize:'10px',color:'var(--muted-text)'}}>
-                <th style={{position:'sticky',left:0,top:'25px',background:'#fafafa',zIndex:3}}></th>
-                {cols.map((c,i)=><React.Fragment key={i}><th style={{textAlign:'right',borderLeft:'1px solid #ddd',position:'sticky',top:'25px',background:'#fafafa',zIndex:2}}>บาท</th><th style={{textAlign:'right',position:'sticky',top:'25px',background:'#fafafa',zIndex:2}}>%</th></React.Fragment>)}
+                <th style={{position:'sticky',left:0,top:dmgHeadH.row1,background:'#fafafa',zIndex:3}}></th>
+                {cols.map((c,i)=><React.Fragment key={i}><th style={{textAlign:'right',borderLeft:'1px solid #ddd',position:'sticky',top:dmgHeadH.row1,background:'#fafafa',zIndex:2}}>บาท</th><th style={{textAlign:'right',position:'sticky',top:dmgHeadH.row1,background:'#fafafa',zIndex:2}}>%</th></React.Fragment>)}
               </tr>
             </thead>
             <tbody>
-              {/* แถวยอดขาย — ล็อกติดด้านบน (sticky) ใต้หัวตาราง 2 แถว กันเลื่อนลงแล้วยอดขายหายไป เทียบ % กับแถวอื่นด้านล่างไม่ได้ */}
+              {/* แถวยอดขาย — ล็อกติดด้านบน (sticky) ใต้หัวตาราง 2 แถว กันเลื่อนลงแล้วยอดขายหายไป เทียบ % กับแถวอื่นด้านล่างไม่ได้
+                  top ใช้ความสูงหัวตารางที่วัดจริง (dmgHeadH.total) แทนเลขเดา กันเลื่อนเพี้ยนตอนฟอนต์/ซูมไม่ตรงกับที่ประมาณไว้ */}
               <tr style={{background:'#e6f4ea'}}>
-                <td className="ta-l strong" style={{position:'sticky',left:0,top:'50px',background:'#e6f4ea',zIndex:2,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
+                <td className="ta-l strong" style={{position:'sticky',left:0,top:dmgHeadH.total,background:'#e6f4ea',zIndex:2,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
                 {cols.map((c,i)=>{const s=colSales(c);return <React.Fragment key={i}>
-                  <td colSpan={2} style={{position:'sticky',top:'50px',textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea',zIndex:1}}>
+                  <td colSpan={2} style={{position:'sticky',top:dmgHeadH.total,textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea',zIndex:1}}>
                     {s?Number(s).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
                   </td>
                 </React.Fragment>;})}
