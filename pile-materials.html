@@ -1198,6 +1198,7 @@ function VolumeView({ app }) {
 
   const thS = { padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#42465a', borderBottom: '2px solid #e2e5ee', whiteSpace: 'nowrap', fontSize: 13 };
   const tdS = { padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: 14 };
+  const fmtKg = tons => tons == null ? null : fmt(tons * 1000, 0) + ' กก.';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -1209,15 +1210,19 @@ function VolumeView({ app }) {
         </div>
         <div style={kpi()}><div style={kpiLbl()}>หิน 3/4" รวม</div>
           <div style={{ ...kpiVal(), color: sumRock34 == null ? '#c0392b' : '#42465a' }}>{sumRock34 == null ? '–' : fmt(sumRock34, 2) + ' ตัน'}</div>
+          {sumRock34 != null && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{fmtKg(sumRock34)}</div>}
         </div>
         <div style={kpi()}><div style={kpiLbl()}>หิน 1" รวม</div>
           <div style={{ ...kpiVal(), color: sumRock1 == null ? '#c0392b' : '#42465a' }}>{sumRock1 == null ? '–' : fmt(sumRock1, 2) + ' ตัน'}</div>
+          {sumRock1 != null && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{fmtKg(sumRock1)}</div>}
         </div>
         <div style={kpi()}><div style={kpiLbl()}>ทรายรวม</div>
           <div style={{ ...kpiVal(), color: sumSand == null ? '#c0392b' : '#42465a' }}>{sumSand == null ? '–' : fmt(sumSand, 2) + ' ตัน'}</div>
+          {sumSand != null && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{fmtKg(sumSand)}</div>}
         </div>
         <div style={kpi()}><div style={kpiLbl()}>ปูนรวม</div>
           <div style={{ ...kpiVal(), color: sumCement == null ? '#c0392b' : '#42465a' }}>{sumCement == null ? '–' : fmt(sumCement, 2) + ' ตัน'}</div>
+          {sumCement != null && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{fmtKg(sumCement)}</div>}
         </div>
       </div>
 
@@ -1276,10 +1281,22 @@ function VolumeView({ app }) {
                       </td>
                       <td style={{ ...tdS, fontWeight: 700, color: v == null ? '#b6bcc8' : '#2f5fd0' }}>{v == null ? '–' : fmt(v, 2)}</td>
                       <td style={tdS}>{(v != null && sumVol) ? fmt(v / sumVol * 100, 1) + '%' : '–'}</td>
-                      <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.rock34) == null ? '–' : fmt(tonsOf(v, mix.rock34), 2)}</td>
-                      <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.rock1) == null ? '–' : fmt(tonsOf(v, mix.rock1), 2)}</td>
-                      <td style={{ ...tdS, color: '#5f6470' }}>{gSand == null ? '–' : fmt(gSand, 2)}</td>
-                      <td style={{ ...tdS, color: '#5f6470' }}>{gCement == null ? '–' : fmt(gCement, 2)}</td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>
+                        {tonsOf(v, mix.rock34) == null ? '–' : fmt(tonsOf(v, mix.rock34), 2)}
+                        {tonsOf(v, mix.rock34) != null && <div style={{ fontSize: 10.5, color: '#b6bcc8' }}>{fmtKg(tonsOf(v, mix.rock34))}</div>}
+                      </td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>
+                        {tonsOf(v, mix.rock1) == null ? '–' : fmt(tonsOf(v, mix.rock1), 2)}
+                        {tonsOf(v, mix.rock1) != null && <div style={{ fontSize: 10.5, color: '#b6bcc8' }}>{fmtKg(tonsOf(v, mix.rock1))}</div>}
+                      </td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>
+                        {gSand == null ? '–' : fmt(gSand, 2)}
+                        {gSand != null && <div style={{ fontSize: 10.5, color: '#b6bcc8' }}>{fmtKg(gSand)}</div>}
+                      </td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>
+                        {gCement == null ? '–' : fmt(gCement, 2)}
+                        {gCement != null && <div style={{ fontSize: 10.5, color: '#b6bcc8' }}>{fmtKg(gCement)}</div>}
+                      </td>
                     </tr>
                     {open && g.rows.slice().sort((a, b) => a.length - b.length || (a.isWelded ? 1 : 0) - (b.isWelded ? 1 : 0)).map(p => {
                       const a = Number(areas[g.diam]);
@@ -1322,10 +1339,22 @@ function VolumeView({ app }) {
                 <td style={tdS}></td>
                 <td style={{ ...tdS, fontWeight: 800, color: '#2f5fd0' }}>{sumVol == null ? '–' : fmt(sumVol, 2)}</td>
                 <td style={tdS}></td>
-                <td style={{ ...tdS, fontWeight: 800 }}>{sumRock34 == null ? '–' : fmt(sumRock34, 2)}</td>
-                <td style={{ ...tdS, fontWeight: 800 }}>{sumRock1 == null ? '–' : fmt(sumRock1, 2)}</td>
-                <td style={{ ...tdS, fontWeight: 800 }}>{sumSand == null ? '–' : fmt(sumSand, 2)}</td>
-                <td style={{ ...tdS, fontWeight: 800 }}>{sumCement == null ? '–' : fmt(sumCement, 2)}</td>
+                <td style={{ ...tdS, fontWeight: 800 }}>
+                  {sumRock34 == null ? '–' : fmt(sumRock34, 2)}
+                  {sumRock34 != null && <div style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>{fmtKg(sumRock34)}</div>}
+                </td>
+                <td style={{ ...tdS, fontWeight: 800 }}>
+                  {sumRock1 == null ? '–' : fmt(sumRock1, 2)}
+                  {sumRock1 != null && <div style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>{fmtKg(sumRock1)}</div>}
+                </td>
+                <td style={{ ...tdS, fontWeight: 800 }}>
+                  {sumSand == null ? '–' : fmt(sumSand, 2)}
+                  {sumSand != null && <div style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>{fmtKg(sumSand)}</div>}
+                </td>
+                <td style={{ ...tdS, fontWeight: 800 }}>
+                  {sumCement == null ? '–' : fmt(sumCement, 2)}
+                  {sumCement != null && <div style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>{fmtKg(sumCement)}</div>}
+                </td>
               </tr>
             </tbody>
           </table>
