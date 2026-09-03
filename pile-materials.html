@@ -668,10 +668,37 @@ class App extends React.Component {
     });
   }
 
+  // สรุปคิวผลิต + ความยาวรวมของงวด (เก็บไว้เทียบข้ามเดือน)
+  // รายการเสาของงวด — ถ้าผลลัพธ์ที่บันทึกไว้เป็นเวอร์ชันเก่า (ไม่มี piles) ให้คำนวณใหม่จากรายการดิบ
+  pilesOf(s) {
+    if (s.result && s.result.piles && s.result.piles.length) return s.result.piles;
+    if (this._mod && s.rawRows && s.rawRows.length) {
+      try { return (this._mod.calcPileList(s.rawRows, this.currentConfig()) || {}).piles || null; } catch (e) { return null; }
+    }
+    return null;
+  }
+  computePileTotals(s) {
+    const piles = this.pilesOf(s);
+    if (!piles || !piles.length) return null;
+    const r = { piles };
+    const areas = s.pileAreaM2 || {};
+    let qty = 0, length = 0, volume = 0, missing = 0;
+    const seen = new Set();
+    r.piles.forEach(p => {
+      qty += p.qty;
+      length += p.totalLength;
+      const a = Number(areas[p.diam]);
+      if (a > 0) volume += a * p.totalLength;
+      else if (!seen.has(p.diam)) { seen.add(p.diam); missing++; }
+    });
+    return { qty, length, volume: missing ? null : volume, missing };
+  }
   computePeriodSummary(s) {
     if (!s.result) return null;
     const mp = this.buildMainPage(s.result);
-    return CATS.map(c => {
+    const piles = this.computePileTotals(s);
+    const base = piles ? [{ key: '__piles', label: 'สรุปเสาเข็ม', piles }] : [];
+    return base.concat(CATS.map(c => {
       const rows = mp[c.key + 'RowsM'] || [];
       let totalCalc = 0, totalRealDiff = 0, hasDiff = false;
       rows.forEach(row => {
@@ -681,7 +708,25 @@ class App extends React.Component {
       });
       const pct = hasDiff && totalCalc ? (totalRealDiff / totalCalc) * 100 : null;
       return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct };
-    });
+    }));
+  }
+  // แถวเทียบคิวผลิต/ความยาว ข้ามงวด
+  buildPileTrendRows() {
+    const s = this.state;
+    const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
+    const cols = [...closedLabels, s.periodLabel];
+    const totalsFor = pl => {
+      if (pl === s.periodLabel) return this.computePileTotals(s);
+      const sum = s.periodSummaries[pl];
+      const e = sum && sum.find ? sum.find(x => x.key === '__piles') : null;
+      return e ? e.piles : null;
+    };
+    const defs = [
+      { label: 'จำนวนเสาเข็ม (ต้น)', pick: t => t && fmt(t.qty, 0) },
+      { label: 'ความยาวรวม (ม.)', pick: t => t && fmt(t.length, 2) },
+      { label: 'คิวผลิต (m³)', pick: t => t ? (t.volume == null ? 'ยังไม่ตั้งหน้าตัด' : fmt(t.volume, 2)) : null },
+    ];
+    return { cols, rows: defs.map(d => ({ label: d.label, cells: cols.map(pl => ({ period: pl, text: d.pick(totalsFor(pl)) || '-' })) })) };
   }
   filterMainPage(mp) {
     if (!mp) return mp;
@@ -1244,6 +1289,29 @@ function TrendView({ app }) {
         ))}</tbody>
       </table>
       <div style={{ fontSize: 12, color: '#78839A' }}>% ผิดพลาด = ส่วนต่างจริง ÷ ยอดคำนวณ ต่อวัตถุดิบ ในแต่ละงวด (คอลัมน์ขวาสุดคืองวดปัจจุบัน)</div>
+
+      {(() => {
+        const pt = app.buildPileTrendRows();
+        if (!pt.rows.some(r => r.cells.some(c => c.text !== '-'))) return null;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>คิวผลิต & ความยาวเสาเข็ม — เทียบรายงวด</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
+              <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
+                {pt.cols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}
+              </tr></thead>
+              <tbody>{pt.rows.map((row, i) => (
+                <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
+                  <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 600 }}>{row.label}</td>
+                  {row.cells.map((c, j) => <td key={j} style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right' }}>{c.text}</td>)}
+                </tr>
+              ))}</tbody>
+            </table>
+            <div style={{ fontSize: 12, color: '#78839A' }}>ตัวเลขของแต่ละงวดมาจากไฟล์รายการเสาที่อัปโหลดในงวดนั้น</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
