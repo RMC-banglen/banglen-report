@@ -231,12 +231,12 @@ export function parsePileRow(code, name, qty, config) {
     stirrup = { diam, weightKg: perPile * qty };
   }
 
-  return { skip: false, code, name, qty, diam, length, totalLength, rebars, plate, whisker, collar, pc, stirrup, warnings };
+  return { skip: false, code, name, qty, diam, length, totalLength, isWelded, rebars, plate, whisker, collar, pc, stirrup, warnings };
 }
 
 export function calcPileList(inputRows, config) {
   const rebarAgg = new Map(), plateAgg = new Map(), whiskerAgg = new Map(), collarAgg = new Map(), pcAgg = new Map(), stirrupAgg = new Map();
-  const pileAgg = new Map();   // สรุปจำนวนต้น + ความยาวรวม แยกตาม ขนาดเสา × ความยาว
+  const pileAgg = new Map();   // สรุปจำนวนต้น + ความยาวรวม แยกตาม ขนาดเสา × ความยาว × ท่อนเดียว/ท่อนต่อเชื่อม
   const warnings = [];
   let totalPiles = 0, usedRows = 0, skippedRows = [];
 
@@ -247,10 +247,11 @@ export function calcPileList(inputRows, config) {
     totalPiles += res.qty;
     warnings.push(...res.warnings);
 
-    // สะสมจำนวนต้น + ความยาวรวม (ความยาว × จำนวน) แยกตามขนาดเสาและความยาว
+    // สะสมจำนวนต้น + ความยาวรวม (ความยาว × จำนวน) แยกตามขนาดเสา × ความยาว × ท่อนเดียว/ท่อนต่อเชื่อม
+    // (แยกท่อนเดียว/ท่อนต่อเชื่อมไว้ เพราะบางขนาดเสาใช้สูตรปูนต่างกันระหว่างสองแบบนี้)
     {
-      const pk = res.diam + '|' + res.length.toFixed(2);
-      const pe = pileAgg.get(pk) || { diam: res.diam, length: res.length, qty: 0, totalLength: 0 };
+      const pk = res.diam + '|' + res.length.toFixed(2) + '|' + (res.isWelded ? 'W' : 'S');
+      const pe = pileAgg.get(pk) || { diam: res.diam, length: res.length, isWelded: res.isWelded, qty: 0, totalLength: 0 };
       pe.qty += res.qty;
       pe.totalLength += res.totalLength;
       pileAgg.set(pk, pe);
@@ -297,7 +298,7 @@ export function calcPileList(inputRows, config) {
     totalPiles,
     skippedRows,
     warnings: [...new Set(warnings)],
-    piles: [...pileAgg.values()].sort((a, b) => String(a.diam).localeCompare(String(b.diam), 'th') || a.length - b.length),
+    piles: [...pileAgg.values()].sort((a, b) => String(a.diam).localeCompare(String(b.diam), 'th') || a.length - b.length || (a.isWelded ? 1 : 0) - (b.isWelded ? 1 : 0)),
     rebar: sortByKey([...rebarAgg.values()], 'spec'),
     plates: sortByKey([...plateAgg.values()], 'diam'),
     whisker: sortByKey([...whiskerAgg.values()], 'diam'),

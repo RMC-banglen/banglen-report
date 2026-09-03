@@ -270,7 +270,8 @@ class App extends React.Component {
     rawRows: null, rebarWeights: null, plateWeights: null, whiskerWeights: null, whiskerSpecs: null,
     pcWireKgPerM: null, pcWireTable: null, stirrupTable: null, stirrupWireMm: null, plateThicknessMm: null,
     pileAreaM2: {},   // พื้นที่หน้าตัดเสาแต่ละขนาด (ตร.ม.) — ใช้คำนวณคิว
-    concreteMix: { rock34: 940, rock1: 330, sand: 822 },   // สูตรคอนกรีต (กก./ม³) — ใช้คิดหิน/ทรายจากคิวผลิต
+    concreteMix: { rock34: 940, rock1: 330, sand: 822, cement: 325, cementAlt: 280 },   // สูตรคอนกรีต (กก./ม³) — ใช้คิดหิน/ทราย/ปูนจากคิวผลิต
+    // cementAlt = สูตรปูนพิเศษ (เฉพาะ I-18/S-18 ท่อนเดียว) หิน/ทรายเท่าสูตรปกติ ต่างแค่ปูน
     plateBigSheetKg: { 6: 438, 8: 584, 9: 657 },
     syncStatus: 'loading',
   };
@@ -1131,10 +1132,12 @@ function VolumeView({ app }) {
   const saved = app.state.result;
   // ผลลัพธ์ที่บันทึกไว้ก่อนหน้านี้ยังไม่มีส่วนสรุปเสา — คำนวณใหม่จากรายการดิบให้เอง
   const r = React.useMemo(() => {
-    if (saved && saved.piles && saved.piles.length) return saved;
+    // คำนวณใหม่จากรายการดิบก่อนเสมอถ้ามี (ให้ได้ผลตามตรรกะคำนวณล่าสุดเช่นแยกท่อนเดียว/ท่อนต่อเชื่อม)
+    // ผลบันทึกเก่า (saved) ใช้เป็นสำรองกรณีไม่มีรายการดิบเก็บไว้ (งวดเก่าก่อนมี rawRows)
     if (mod && app.state.rawRows && app.state.rawRows.length) {
       try { return mod.calcPileList(app.state.rawRows, app.currentConfig()); } catch (e) { return saved; }
     }
+    if (saved && saved.piles && saved.piles.length) return saved;
     return saved;
   }, [saved, mod, app.state.rawRows]);
 
@@ -1162,11 +1165,26 @@ function VolumeView({ app }) {
   const sumVol = volList.some(v => v != null) ? volList.reduce((s, v) => s + (v || 0), 0) : null;
   const missing = groups.filter(g => volOf(g) == null).length;
 
-  // คิดหิน/ทรายจากคิว × สูตรคอนกรีต (กก./ม³) — สูตรเดียวใช้กับทุกขนาดเสา ตั้งค่าได้ที่ปุ่มตั้งค่าคงที่ → แท็บหน้าตัดเสา
+  // คิดหิน/ทราย/ปูนจากคิว × สูตรคอนกรีต (กก./ม³) — ตั้งค่าได้ที่ปุ่มตั้งค่าคงที่ → แท็บหน้าตัดเสา
+  // หิน/ทรายใช้อัตราเดียวกับทุกขนาดเสา ส่วนปูนมีสูตรพิเศษ (cementAlt) เฉพาะ I-18/S-18 "ท่อนเดียว" เท่านั้น
   const mix = app.state.concreteMix || {};
   const mixSet = mix.rock34 > 0 && mix.rock1 > 0 && mix.sand > 0;
+  const cementSet = mix.cement > 0;
   const tonsOf = (v, kgPerM3) => (v != null && kgPerM3 > 0) ? v * kgPerM3 / 1000 : null;
   const sumRock34 = tonsOf(sumVol, mix.rock34), sumRock1 = tonsOf(sumVol, mix.rock1), sumSand = tonsOf(sumVol, mix.sand);
+
+  // ขนาดเสาที่มีสูตรปูนพิเศษ (I-18 / S-18 ทุกแบบ มอก./โรงงาน) — ใช้ cementAlt แทน cement ปกติ เฉพาะท่อนเดียว
+  const ALT_CEMENT_DIAMS = new Set(['อ18', 'อม18', 'อสม18']);
+  const cementRateFor = (diam, isWelded) =>
+    (ALT_CEMENT_DIAMS.has(diam) && !isWelded && mix.cementAlt > 0) ? mix.cementAlt : mix.cement;
+  // ปูนต้องคิดแยกทีละแถวความยาว×ท่อนเดียว/ต่อเชื่อม เพราะแต่ละแถวอาจใช้อัตราปูนไม่เท่ากัน (หิน/ทรายไม่ต้องแยก เพราะอัตราเท่ากันทุกกรณี)
+  const cementOf = g => {
+    const a = Number(areas[g.diam]);
+    if (!(a > 0) || !cementSet) return null;
+    return g.rows.reduce((sum, p) => sum + (tonsOf(a * p.totalLength, cementRateFor(g.diam, p.isWelded)) || 0), 0);
+  };
+  const cementList = groups.map(cementOf);
+  const sumCement = cementList.some(v => v != null) ? cementList.reduce((s, v) => s + (v || 0), 0) : null;
 
   const thS = { padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#42465a', borderBottom: '2px solid #e2e5ee', whiteSpace: 'nowrap', fontSize: 13 };
   const tdS = { padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: 14 };
@@ -1188,6 +1206,9 @@ function VolumeView({ app }) {
         <div style={kpi()}><div style={kpiLbl()}>ทรายรวม</div>
           <div style={{ ...kpiVal(), color: sumSand == null ? '#c0392b' : '#42465a' }}>{sumSand == null ? '–' : fmt(sumSand, 2) + ' ตัน'}</div>
         </div>
+        <div style={kpi()}><div style={kpiLbl()}>ปูนรวม</div>
+          <div style={{ ...kpiVal(), color: sumCement == null ? '#c0392b' : '#42465a' }}>{sumCement == null ? '–' : fmt(sumCement, 2) + ' ตัน'}</div>
+        </div>
       </div>
 
       {missing > 0 && (
@@ -1199,6 +1220,12 @@ function VolumeView({ app }) {
       {!mixSet && (
         <div style={{ padding: '11px 15px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: 13.5, color: '#92400e', lineHeight: 1.7 }}>
           ⚠️ ยังไม่ได้ตั้งค่าสูตรคอนกรีต — ช่องหิน/ทรายจะขึ้น “–” จนกว่าจะตั้งค่า
+          <br />ตั้งได้ที่ปุ่ม <b>ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)</b> ด้านบน → แท็บ <b>หน้าตัดเสา</b> → ส่วน <b>สูตรคอนกรีต</b>
+        </div>
+      )}
+      {!cementSet && (
+        <div style={{ padding: '11px 15px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: 13.5, color: '#92400e', lineHeight: 1.7 }}>
+          ⚠️ ยังไม่ได้ตั้งค่าปูน (กก./ม³) — ช่องปูนจะขึ้น “–” จนกว่าจะตั้งค่า
           <br />ตั้งได้ที่ปุ่ม <b>ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)</b> ด้านบน → แท็บ <b>หน้าตัดเสา</b> → ส่วน <b>สูตรคอนกรีต</b>
         </div>
       )}
@@ -1218,12 +1245,14 @@ function VolumeView({ app }) {
                 <th style={thS}>หิน 3/4" (ตัน)</th>
                 <th style={thS}>หิน 1" (ตัน)</th>
                 <th style={thS}>ทราย (ตัน)</th>
+                <th style={thS}>ปูน (ตัน)</th>
               </tr>
             </thead>
             <tbody>
               {groups.map(g => {
                 const v = volOf(g);
                 const open = openDiam === g.diam;
+                const gCement = cementOf(g);
                 return (
                   <React.Fragment key={g.diam}>
                     <tr onClick={() => setOpenDiam(open ? null : g.diam)}
@@ -1239,13 +1268,18 @@ function VolumeView({ app }) {
                       <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.rock34) == null ? '–' : fmt(tonsOf(v, mix.rock34), 2)}</td>
                       <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.rock1) == null ? '–' : fmt(tonsOf(v, mix.rock1), 2)}</td>
                       <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.sand) == null ? '–' : fmt(tonsOf(v, mix.sand), 2)}</td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>{gCement == null ? '–' : fmt(gCement, 2)}</td>
                     </tr>
-                    {open && g.rows.slice().sort((a, b) => a.length - b.length).map(p => {
+                    {open && g.rows.slice().sort((a, b) => a.length - b.length || (a.isWelded ? 1 : 0) - (b.isWelded ? 1 : 0)).map(p => {
                       const a = Number(areas[g.diam]);
                       const pv = a > 0 ? a * p.totalLength : null;
+                      const pCementRate = cementRateFor(g.diam, p.isWelded);
+                      const isAltRate = ALT_CEMENT_DIAMS.has(g.diam) && !p.isWelded && mix.cementAlt > 0;
                       return (
-                        <tr key={p.length} style={{ borderTop: '1px solid #f4f6fa', background: '#fafbfd' }}>
-                          <td style={{ ...tdS, textAlign: 'left', paddingLeft: 40, color: '#5f6470' }}>ยาว {fmt(p.length, 2)} ม.</td>
+                        <tr key={p.length + '_' + (p.isWelded ? 'w' : 's')} style={{ borderTop: '1px solid #f4f6fa', background: '#fafbfd' }}>
+                          <td style={{ ...tdS, textAlign: 'left', paddingLeft: 40, color: '#5f6470' }}>
+                            ยาว {fmt(p.length, 2)} ม. <span style={{ fontSize: 11.5, color: p.isWelded ? '#8a6d1f' : '#2f5fd0' }}>· {p.isWelded ? 'ท่อนต่อเชื่อม' : 'ท่อนเดียว'}</span>
+                          </td>
                           <td style={{ ...tdS, color: '#5f6470' }}>{fmt(p.qty, 0)}</td>
                           <td style={{ ...tdS, color: '#5f6470' }}>{fmt(p.totalLength, 2)}</td>
                           <td style={{ ...tdS, color: '#b6bcc8' }}>—</td>
@@ -1254,6 +1288,10 @@ function VolumeView({ app }) {
                           <td style={{ ...tdS, color: '#b6bcc8' }}>{tonsOf(pv, mix.rock34) == null ? '–' : fmt(tonsOf(pv, mix.rock34), 2)}</td>
                           <td style={{ ...tdS, color: '#b6bcc8' }}>{tonsOf(pv, mix.rock1) == null ? '–' : fmt(tonsOf(pv, mix.rock1), 2)}</td>
                           <td style={{ ...tdS, color: '#b6bcc8' }}>{tonsOf(pv, mix.sand) == null ? '–' : fmt(tonsOf(pv, mix.sand), 2)}</td>
+                          <td style={{ ...tdS, color: isAltRate ? '#1f9d55' : '#b6bcc8' }}>
+                            {tonsOf(pv, pCementRate) == null ? '–' : fmt(tonsOf(pv, pCementRate), 2)}
+                            {isAltRate && <span style={{ fontSize: 10.5 }}> (280)</span>}
+                          </td>
                         </tr>
                       );
                     })}
@@ -1270,12 +1308,14 @@ function VolumeView({ app }) {
                 <td style={{ ...tdS, fontWeight: 800 }}>{sumRock34 == null ? '–' : fmt(sumRock34, 2)}</td>
                 <td style={{ ...tdS, fontWeight: 800 }}>{sumRock1 == null ? '–' : fmt(sumRock1, 2)}</td>
                 <td style={{ ...tdS, fontWeight: 800 }}>{sumSand == null ? '–' : fmt(sumSand, 2)}</td>
+                <td style={{ ...tdS, fontWeight: 800 }}>{sumCement == null ? '–' : fmt(sumCement, 2)}</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div style={{ fontSize: 13, color: '#78839A', lineHeight: 1.7 }}>
-          คลิกที่แถวขนาดเสาเพื่อกางดูแยกตามความยาว · ความยาวรวม = ความยาวเสา × จำนวนต้น · คิว = หน้าตัด × ความยาวรวม
+          คลิกที่แถวขนาดเสาเพื่อกางดูแยกตามความยาว (พร้อมระบุท่อนเดียว/ท่อนต่อเชื่อม) · ความยาวรวม = ความยาวเสา × จำนวนต้น · คิว = หน้าตัด × ความยาวรวม
+          <br />ปูน: I-18/S-18 ท่อนเดียว ใช้สูตรปูน {mix.cementAlt || 280} กก./ม³ (ตัวเลขสีเขียว) ส่วนท่อนต่อเชื่อมและขนาดอื่นใช้สูตรปกติ {mix.cement || 325} กก./ม³
         </div>
       </div>
     </div>
@@ -1567,16 +1607,27 @@ function SettingsPanel({ app }) {
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e3e7ee' }}>
               <b>สูตรคอนกรีต (กก./ม³)</b>
               <div style={{ fontSize: 12.5, color: '#78839A', margin: '6px 0 10px', lineHeight: 1.7 }}>
-                ใช้คิดปริมาณหิน/ทรายจากคิวผลิตในแท็บ “คิวผลิต & ความยาว” — ค่าเริ่มต้นตามสูตรมาตรฐานของโรงงาน
+                ใช้คิดปริมาณหิน/ทราย/ปูนจากคิวผลิตในแท็บ “คิวผลิต & ความยาว” — ค่าเริ่มต้นตามสูตรมาตรฐานของโรงงาน
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
-                {[['rock34', 'หิน 3/4"'], ['rock1', 'หิน 1"'], ['sand', 'ทราย']].map(([key, label]) => (
+                {[['cement', 'ปูน'], ['rock34', 'หิน 3/4"'], ['rock1', 'หิน 1"'], ['sand', 'ทราย']].map(([key, label]) => (
                   <div key={key} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 8 }}>
                     <div style={{ fontSize: 12, color: '#78839A' }}>{label}</div>
                     <input type="number" step="1" min="0" placeholder="กก./ม³" value={(s.concreteMix || {})[key] ?? ''}
                       onChange={e => app.updateConcreteMix(key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
                   </div>
                 ))}
+              </div>
+              <div style={{ marginTop: 16, padding: 12, background: '#fbf8ee', border: '1px solid #ece0b8', borderRadius: 8 }}>
+                <b style={{ fontSize: 13 }}>สูตรปูนพิเศษ — I-18 / S-18 “ท่อนเดียว” เท่านั้น</b>
+                <div style={{ fontSize: 12.5, color: '#8a6d1f', margin: '6px 0 10px', lineHeight: 1.7 }}>
+                  ใช้แทนค่าปูนด้านบน เฉพาะเสาขนาด I-18 หรือ S-18 ที่เป็นท่อนเดียว (ไม่ใช่ท่อนต่อเชื่อม) — ถ้าเป็นท่อนต่อเชื่อมยังใช้สูตรปูนปกติเหมือนขนาดอื่น ส่วนหิน/ทรายใช้อัตราเดียวกับสูตรปกติทุกกรณี
+                </div>
+                <div style={{ maxWidth: 150 }}>
+                  <div style={{ fontSize: 12, color: '#78839A' }}>ปูน (I-18/S-18 ท่อนเดียว)</div>
+                  <input type="number" step="1" min="0" placeholder="กก./ม³" value={(s.concreteMix || {}).cementAlt ?? ''}
+                    onChange={e => app.updateConcreteMix('cementAlt', e.target.value)} style={{ ...inp(null), width: '100%' }} />
+                </div>
               </div>
             </div>
           </div>
