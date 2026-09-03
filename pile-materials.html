@@ -270,6 +270,7 @@ class App extends React.Component {
     rawRows: null, rebarWeights: null, plateWeights: null, whiskerWeights: null, whiskerSpecs: null,
     pcWireKgPerM: null, pcWireTable: null, stirrupTable: null, stirrupWireMm: null, plateThicknessMm: null,
     pileAreaM2: {},   // พื้นที่หน้าตัดเสาแต่ละขนาด (ตร.ม.) — ใช้คำนวณคิว
+    concreteMix: { rock34: 940, rock1: 330, sand: 822 },   // สูตรคอนกรีต (กก./ม³) — ใช้คิดหิน/ทรายจากคิวผลิต
     plateBigSheetKg: { 6: 438, 8: 584, 9: 657 },
     syncStatus: 'loading',
   };
@@ -277,7 +278,7 @@ class App extends React.Component {
   persistKeys = ['result', 'rawRows', 'fileName', 'actual', 'stock', 'plateStockDiam', 'generalUseEntries', 'plateGeneralUseEntries',
     'periodLabel', 'periods', 'periodHistory', 'periodLocked', 'periodSummaries', 'extraRebarItems', 'alertThresholdPct',
     'rebarWeights', 'plateWeights', 'whiskerWeights', 'whiskerSpecs', 'pcWireKgPerM', 'pcWireTable', 'stirrupTable', 'stirrupWireMm', 'plateThicknessMm',
-    'plateBigSheetKg', 'locks', 'pileAreaM2'];
+    'plateBigSheetKg', 'locks', 'pileAreaM2', 'concreteMix'];
   fileInputRef = React.createRef();
 
   async componentDidMount() {
@@ -420,6 +421,7 @@ class App extends React.Component {
   updatePcWire(id, field, v) { if (READONLY) return; this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => c.id === id ? { ...c, [field]: v === '' ? 0 : Number(v) } : c) }), () => this.recompute()); }
   updatePlateThickness(diam, v) { if (READONLY) return; this.setState(s => ({ plateThicknessMm: { ...s.plateThicknessMm, [diam]: Number(v) } })); }
   updatePileArea(diam, v) { if (READONLY) return; this.setState(s => ({ pileAreaM2: { ...(s.pileAreaM2 || {}), [diam]: v === '' ? null : Number(v) } })); }
+  updateConcreteMix(key, v) { if (READONLY) return; this.setState(s => ({ concreteMix: { ...(s.concreteMix || {}), [key]: v === '' ? null : Number(v) } })); }
   // รายชื่อขนาดเสาทั้งหมดที่ควรตั้งค่าหน้าตัด — เอาจากตารางน้ำหนักเพลท (ครบทุกขนาด) รวมกับที่พบในไฟล์งวดนี้
   allPileDiams() {
     const set = new Set(Object.keys(this.state.plateWeights || {}));
@@ -1160,6 +1162,12 @@ function VolumeView({ app }) {
   const sumVol = volList.some(v => v != null) ? volList.reduce((s, v) => s + (v || 0), 0) : null;
   const missing = groups.filter(g => volOf(g) == null).length;
 
+  // คิดหิน/ทรายจากคิว × สูตรคอนกรีต (กก./ม³) — สูตรเดียวใช้กับทุกขนาดเสา ตั้งค่าได้ที่ปุ่มตั้งค่าคงที่ → แท็บหน้าตัดเสา
+  const mix = app.state.concreteMix || {};
+  const mixSet = mix.rock34 > 0 && mix.rock1 > 0 && mix.sand > 0;
+  const tonsOf = (v, kgPerM3) => (v != null && kgPerM3 > 0) ? v * kgPerM3 / 1000 : null;
+  const sumRock34 = tonsOf(sumVol, mix.rock34), sumRock1 = tonsOf(sumVol, mix.rock1), sumSand = tonsOf(sumVol, mix.sand);
+
   const thS = { padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#42465a', borderBottom: '2px solid #e2e5ee', whiteSpace: 'nowrap', fontSize: 13 };
   const tdS = { padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: 14 };
 
@@ -1171,12 +1179,27 @@ function VolumeView({ app }) {
         <div style={kpi()}><div style={kpiLbl()}>คิวผลิตรวม</div>
           <div style={{ ...kpiVal(), color: sumVol == null ? '#c0392b' : '#2f5fd0' }}>{sumVol == null ? 'ยังใส่หน้าตัดไม่ครบ' : fmt(sumVol, 2) + ' m³'}</div>
         </div>
+        <div style={kpi()}><div style={kpiLbl()}>หิน 3/4" รวม</div>
+          <div style={{ ...kpiVal(), color: sumRock34 == null ? '#c0392b' : '#42465a' }}>{sumRock34 == null ? '–' : fmt(sumRock34, 2) + ' ตัน'}</div>
+        </div>
+        <div style={kpi()}><div style={kpiLbl()}>หิน 1" รวม</div>
+          <div style={{ ...kpiVal(), color: sumRock1 == null ? '#c0392b' : '#42465a' }}>{sumRock1 == null ? '–' : fmt(sumRock1, 2) + ' ตัน'}</div>
+        </div>
+        <div style={kpi()}><div style={kpiLbl()}>ทรายรวม</div>
+          <div style={{ ...kpiVal(), color: sumSand == null ? '#c0392b' : '#42465a' }}>{sumSand == null ? '–' : fmt(sumSand, 2) + ' ตัน'}</div>
+        </div>
       </div>
 
       {missing > 0 && (
         <div style={{ padding: '11px 15px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: 13.5, color: '#92400e', lineHeight: 1.7 }}>
           ⚠️ ยังไม่ได้ตั้งค่าพื้นที่หน้าตัดของ {missing} ขนาด — ช่องคิวจะขึ้น “–” จนกว่าจะตั้งค่า
           <br />ตั้งได้ที่ปุ่ม <b>ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)</b> ด้านบน → แท็บ <b>หน้าตัดเสา</b> — กรอกครั้งเดียวใช้ได้ทุกงวด
+        </div>
+      )}
+      {!mixSet && (
+        <div style={{ padding: '11px 15px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: 13.5, color: '#92400e', lineHeight: 1.7 }}>
+          ⚠️ ยังไม่ได้ตั้งค่าสูตรคอนกรีต — ช่องหิน/ทรายจะขึ้น “–” จนกว่าจะตั้งค่า
+          <br />ตั้งได้ที่ปุ่ม <b>ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)</b> ด้านบน → แท็บ <b>หน้าตัดเสา</b> → ส่วน <b>สูตรคอนกรีต</b>
         </div>
       )}
 
@@ -1192,6 +1215,9 @@ function VolumeView({ app }) {
                 <th style={thS}>หน้าตัด (ตร.ม./ต้น)</th>
                 <th style={thS}>คิว (m³)</th>
                 <th style={thS}>% ของคิวรวม</th>
+                <th style={thS}>หิน 3/4" (ตัน)</th>
+                <th style={thS}>หิน 1" (ตัน)</th>
+                <th style={thS}>ทราย (ตัน)</th>
               </tr>
             </thead>
             <tbody>
@@ -1210,6 +1236,9 @@ function VolumeView({ app }) {
                       </td>
                       <td style={{ ...tdS, fontWeight: 700, color: v == null ? '#b6bcc8' : '#2f5fd0' }}>{v == null ? '–' : fmt(v, 2)}</td>
                       <td style={tdS}>{(v != null && sumVol) ? fmt(v / sumVol * 100, 1) + '%' : '–'}</td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.rock34) == null ? '–' : fmt(tonsOf(v, mix.rock34), 2)}</td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.rock1) == null ? '–' : fmt(tonsOf(v, mix.rock1), 2)}</td>
+                      <td style={{ ...tdS, color: '#5f6470' }}>{tonsOf(v, mix.sand) == null ? '–' : fmt(tonsOf(v, mix.sand), 2)}</td>
                     </tr>
                     {open && g.rows.slice().sort((a, b) => a.length - b.length).map(p => {
                       const a = Number(areas[g.diam]);
@@ -1222,6 +1251,9 @@ function VolumeView({ app }) {
                           <td style={{ ...tdS, color: '#b6bcc8' }}>—</td>
                           <td style={{ ...tdS, color: '#5f6470' }}>{pv == null ? '–' : fmt(pv, 2)}</td>
                           <td style={{ ...tdS, color: '#5f6470' }}>{(pv != null && sumVol) ? fmt(pv / sumVol * 100, 1) + '%' : '–'}</td>
+                          <td style={{ ...tdS, color: '#b6bcc8' }}>{tonsOf(pv, mix.rock34) == null ? '–' : fmt(tonsOf(pv, mix.rock34), 2)}</td>
+                          <td style={{ ...tdS, color: '#b6bcc8' }}>{tonsOf(pv, mix.rock1) == null ? '–' : fmt(tonsOf(pv, mix.rock1), 2)}</td>
+                          <td style={{ ...tdS, color: '#b6bcc8' }}>{tonsOf(pv, mix.sand) == null ? '–' : fmt(tonsOf(pv, mix.sand), 2)}</td>
                         </tr>
                       );
                     })}
@@ -1235,6 +1267,9 @@ function VolumeView({ app }) {
                 <td style={tdS}></td>
                 <td style={{ ...tdS, fontWeight: 800, color: '#2f5fd0' }}>{sumVol == null ? '–' : fmt(sumVol, 2)}</td>
                 <td style={tdS}></td>
+                <td style={{ ...tdS, fontWeight: 800 }}>{sumRock34 == null ? '–' : fmt(sumRock34, 2)}</td>
+                <td style={{ ...tdS, fontWeight: 800 }}>{sumRock1 == null ? '–' : fmt(sumRock1, 2)}</td>
+                <td style={{ ...tdS, fontWeight: 800 }}>{sumSand == null ? '–' : fmt(sumSand, 2)}</td>
               </tr>
             </tbody>
           </table>
@@ -1528,6 +1563,21 @@ function SettingsPanel({ app }) {
                   </div>
                 </div>
               ))}
+            </div>
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e3e7ee' }}>
+              <b>สูตรคอนกรีต (กก./ม³)</b>
+              <div style={{ fontSize: 12.5, color: '#78839A', margin: '6px 0 10px', lineHeight: 1.7 }}>
+                ใช้คิดปริมาณหิน/ทรายจากคิวผลิตในแท็บ “คิวผลิต & ความยาว” — ค่าเริ่มต้นตามสูตรมาตรฐานของโรงงาน
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+                {[['rock34', 'หิน 3/4"'], ['rock1', 'หิน 1"'], ['sand', 'ทราย']].map(([key, label]) => (
+                  <div key={key} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 8 }}>
+                    <div style={{ fontSize: 12, color: '#78839A' }}>{label}</div>
+                    <input type="number" step="1" min="0" placeholder="กก./ม³" value={(s.concreteMix || {})[key] ?? ''}
+                      onChange={e => app.updateConcreteMix(key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
