@@ -6595,6 +6595,7 @@ window.__dataReady.then(data => {
     const [form,setForm]=useState({id:null,year:2569,vehicle_type:'เทรลเลอร์',driver_name:'',sort_order:0,trips:{}});
     const [saving,setSaving]=useState(false);
     const [confirmDel,setConfirmDel]=useState(null); // {type,name}
+    const [rankExpanded,setRankExpanded]=useState({}); // {[vehicle_type]: true} — คลิกขยายดูอันดับทุกคนในการ์ด "ดูสรุปเดือน"
     const inp={width:'100%',padding:'8px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontSize:14,outline:'none',fontFamily:'inherit',boxSizing:'border-box'};
     const [workdays,setWorkdays]=useState([]); // transport_workdays: {year,month,days}
     const [dayNotes,setDayNotes]=useState([]); // transport_day_notes: เหตุผลวันว่าง เช่น หยุด/รถเสีย
@@ -7179,13 +7180,14 @@ window.__dataReady.then(data => {
                 </select>
               </div>
               {monthItems.length>0?(()=>{
-                // จัดอันดับแบบคะแนนเท่ากันได้เหรียญเดียวกัน (dense ranking) โชว์ถึงอันดับ 3
+                // จัดอันดับแบบคะแนนเท่ากันได้อันดับเดียวกัน (dense ranking) ค่าเริ่มต้นโชว์ถึงอันดับ 3 กดขยายดูทุกคนได้
+                const expanded=!!rankExpanded[t.k];
                 let rank=0,prev=null;
-                const ranked=[];
+                const ranked=[],rankedAll=[];
                 for(const it of monthItems){
                   if(it.trips!==prev){rank++;prev=it.trips;}
-                  if(rank>3)break;
-                  ranked.push({...it,rank});
+                  rankedAll.push({...it,rank});
+                  if(expanded||rank<=3)ranked.push({...it,rank});
                 }
                 // ผู้ช่วยขับรถสำรองของเดือนนี้ (โชว์เสมอ แม้ไม่ติด Top 3) พร้อมแยกว่าไปขับคันไหนกี่เที่ยว
                 const helpers={};
@@ -7197,10 +7199,13 @@ window.__dataReady.then(data => {
                 const helperList=Object.entries(helpers).sort((a,b)=>b[1].total-a[1].total);
                 return<div style={{display:'flex',flexDirection:'column',gap:7}}>
                   {ranked.map(it=><div key={it.name} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#475569'}}>
-                    <span style={{fontSize:16}}>{['🥇','🥈','🥉'][it.rank-1]}</span>
+                    <span style={{fontSize:16,minWidth:20,textAlign:'center'}}>{['🥇','🥈','🥉'][it.rank-1]||<span style={{fontSize:12,fontWeight:700,color:'#94a3b8'}}>{it.rank}</span>}</span>
                     <span style={{flex:1,fontWeight:600,color:'#1e293b'}}>{it.name}{it.helped>0&&<span title={`รวมเที่ยวที่ไปช่วยขับรถสำรอง ${fmt(it.helped)} เที่ยว`} style={{marginLeft:6,fontSize:11,color:'#0f766e',fontWeight:700}}>🤝 +{fmt(it.helped)}</span>}</span>
                     <b style={{color:t.color}}>{fmt(it.trips)} เที่ยว</b>
                   </div>)}
+                  {rankedAll.length>3&&<button onClick={()=>setRankExpanded(s=>({...s,[t.k]:!expanded}))} style={{alignSelf:'flex-start',fontSize:12,color:t.color,background:'none',border:'none',padding:'2px 0',cursor:'pointer',fontWeight:600}}>
+                    {expanded?'▲ ย่อ':`▼ ดูทั้งหมด (${rankedAll.length} คน)`}
+                  </button>}
                   {helperList.length>0&&<div style={{borderTop:'1px dashed #e2e8f0',paddingTop:6,marginTop:2}}>
                     <div style={{fontSize:11,fontWeight:700,color:'#0f766e',marginBottom:4}}>🤝 ช่วยขับรถสำรอง</div>
                     {helperList.map(([name,d])=><div key={name} style={{marginBottom:4}}>
