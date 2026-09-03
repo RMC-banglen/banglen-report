@@ -266,7 +266,7 @@ class App extends React.Component {
     periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
     periodPickerMonth: new Date().getMonth(), periodPickerYear: new Date().getFullYear() + 543,
     undoStack: [], redoStack: [],
-    locks: { rebar: true, plate: true, whisker: true, pcKgPerM: true, pcWire: true, stirrup: true },
+    locks: { rebar: true, plate: true, whisker: true, pcKgPerM: true, pcWire: true, stirrup: true, area: true },
     rawRows: null, rebarWeights: null, plateWeights: null, whiskerWeights: null, whiskerSpecs: null,
     pcWireKgPerM: null, pcWireTable: null, stirrupTable: null, stirrupWireMm: null, plateThicknessMm: null,
     pileAreaM2: {},   // พื้นที่หน้าตัดเสาแต่ละขนาด (ตร.ม.) — ใช้คำนวณคิว
@@ -420,6 +420,14 @@ class App extends React.Component {
   updatePcWire(id, field, v) { if (READONLY) return; this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => c.id === id ? { ...c, [field]: v === '' ? 0 : Number(v) } : c) }), () => this.recompute()); }
   updatePlateThickness(diam, v) { if (READONLY) return; this.setState(s => ({ plateThicknessMm: { ...s.plateThicknessMm, [diam]: Number(v) } })); }
   updatePileArea(diam, v) { if (READONLY) return; this.setState(s => ({ pileAreaM2: { ...(s.pileAreaM2 || {}), [diam]: v === '' ? null : Number(v) } })); }
+  // รายชื่อขนาดเสาทั้งหมดที่ควรตั้งค่าหน้าตัด — เอาจากตารางน้ำหนักเพลท (ครบทุกขนาด) รวมกับที่พบในไฟล์งวดนี้
+  allPileDiams() {
+    const set = new Set(Object.keys(this.state.plateWeights || {}));
+    const r = this.state.result;
+    if (r && r.piles) r.piles.forEach(p => set.add(p.diam));
+    (r && r.plates ? r.plates : []).forEach(p => set.add(p.diam));
+    return [...set];
+  }
   updatePlateBigSheetKg(mm, v) { if (READONLY) return; this.setState(s => ({ plateBigSheetKg: { ...s.plateBigSheetKg, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
   updateStirrupWireMm(diam, v) { if (READONLY) return; this.setState(s => ({ stirrupWireMm: { ...s.stirrupWireMm, [diam]: v } })); }
   updateStirrup(diam, len, v) { if (READONLY) return; this.setState(s => ({ stirrupTable: { ...s.stirrupTable, [diam]: { ...s.stirrupTable[diam], [len]: v === '' ? null : Number(v) } } }), () => this.recompute()); }
@@ -1122,8 +1130,8 @@ function VolumeView({ app }) {
 
       {missing > 0 && (
         <div style={{ padding: '11px 15px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: 13.5, color: '#92400e', lineHeight: 1.7 }}>
-          ⚠️ ยังไม่ได้ใส่พื้นที่หน้าตัดของ {missing} ขนาด — ช่องคิวจะขึ้น “–” จนกว่าจะกรอก
-          <br />กรอกในคอลัมน์ <b>หน้าตัด (ตร.ม./ต้น)</b> ด้านล่าง ระบบจะจำค่าไว้ให้ใช้งวดถัดไป
+          ⚠️ ยังไม่ได้ตั้งค่าพื้นที่หน้าตัดของ {missing} ขนาด — ช่องคิวจะขึ้น “–” จนกว่าจะตั้งค่า
+          <br />ตั้งได้ที่ปุ่ม <b>ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)</b> ด้านบน → แท็บ <b>หน้าตัดเสา</b> — กรอกครั้งเดียวใช้ได้ทุกงวด
         </div>
       )}
 
@@ -1152,10 +1160,8 @@ function VolumeView({ app }) {
                       <td style={{ ...tdS, textAlign: 'left', fontWeight: 700 }}>{open ? '▲' : '▼'} {dl(g.diam)}</td>
                       <td style={tdS}>{fmt(g.qty, 0)}</td>
                       <td style={tdS}>{fmt(g.totalLength, 2)}</td>
-                      <td style={{ ...tdS, padding: '5px 12px' }} onClick={e => e.stopPropagation()}>
-                        <input type="number" step="0.0001" min="0" value={areas[g.diam] ?? ''} disabled={READONLY}
-                          onChange={e => app.updatePileArea(g.diam, e.target.value)}
-                          placeholder="กรอก" style={{ ...inp(null), width: 110, textAlign: 'right' }} />
+                      <td style={{ ...tdS, color: areas[g.diam] > 0 ? '#42465a' : '#c0392b' }}>
+                        {areas[g.diam] > 0 ? fmt(areas[g.diam], 4) : 'ยังไม่ตั้งค่า'}
                       </td>
                       <td style={{ ...tdS, fontWeight: 700, color: v == null ? '#b6bcc8' : '#2f5fd0' }}>{v == null ? '–' : fmt(v, 2)}</td>
                       <td style={tdS}>{(v != null && sumVol) ? fmt(v / sumVol * 100, 1) + '%' : '–'}</td>
@@ -1264,7 +1270,7 @@ function SettingsPanel({ app }) {
     { title: 'มาตรฐาน มอก.', bg: '#eef6f7', color: '#1f7a8c', lineColor: '#d5e9ec', rows: entries.filter(([d]) => mok(d)).sort((a, b) => a[0].localeCompare(b[0], 'th')) },
     { title: 'โรงงาน (ไม่มี มอก.)', bg: '#f7f4ee', color: '#8a6d1f', lineColor: '#ece5d5', rows: entries.filter(([d]) => !mok(d)).sort((a, b) => a[0].localeCompare(b[0], 'th')) },
   ].filter(g => g.rows.length);
-  const tabs = [['rebar', 'เหล็กเสริม'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['pcWire', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['alert', 'เกณฑ์แจ้งเตือน']];
+  const tabs = [['rebar', 'เหล็กเสริม'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['pcWire', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['area', 'หน้าตัดเสา'], ['alert', 'เกณฑ์แจ้งเตือน']];
   const lockBtn = (key) => { const ui = app.buildLockUi(key); return <button onClick={ui.onToggle} style={{ ...btnGhost(), fontSize: 12 }}>{ui.label}</button>; };
   return (
     <div style={card()} data-no-print="true">
@@ -1424,6 +1430,31 @@ function SettingsPanel({ app }) {
                           ))}
                         </div>
                         <button onClick={() => { const len = window.prompt('ความยาว (ม.) ที่จะเพิ่มสำหรับ ' + dl(diam) + ' ?'); if (len) app.addStirrupLength(diam, len); }} style={{ ...btnGhost(), fontSize: 12, marginTop: 8, background: 'white' }}>+ เพิ่มความยาว</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {s.settingsTab === 'area' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>พื้นที่หน้าตัดเสาแต่ละขนาด (ตร.ม.)</b>{lockBtn('area')}</div>
+            <div style={{ fontSize: 12.5, color: '#78839A', marginBottom: 10, lineHeight: 1.7 }}>
+              ใช้คำนวณคิวผลิตในแท็บ “คิวผลิต & ความยาว” — คิว = พื้นที่หน้าตัด × ความยาวรวม<br />
+              กรอกครั้งเดียว ระบบจำไว้ใช้ทุกงวด
+            </div>
+            <div style={{ opacity: s.locks.area ? 0.5 : 1, pointerEvents: s.locks.area ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {groupBy(app.allPileDiams().map(k => ({ key: k, value: (s.pileAreaM2 || {})[k], isMok: mok(k) }))).map((g, i) => (
+                <div key={i} style={{ border: '1px solid #dce7ea', borderRadius: 8, padding: 12, background: g.bg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: g.color }}>{g.title}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+                    {g.rows.map(row => (
+                      <div key={row.key} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 8 }}>
+                        <div style={{ fontSize: 12, color: '#78839A' }}>{dl(row.key)}</div>
+                        <input type="number" step="0.0001" min="0" placeholder="ตร.ม." value={row.value ?? ''}
+                          onChange={e => app.updatePileArea(row.key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
                       </div>
                     ))}
                   </div>
