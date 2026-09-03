@@ -1978,7 +1978,7 @@ window.__dataReady.then(data => {
     </nav>;
   }
 
-  function PileMaterialsFrame({canEdit}){
+  function PileMaterialsFrame({canEdit,formulaAdmin}){
     // ให้ iframe ยืดความสูงตามเนื้อหาจริง เพื่อให้เลื่อนหน้าจอเดียว (แทนที่จะมี scrollbar ซ้อนกัน 2 อัน)
     const ref=React.useRef(null);
     const lastH=React.useRef(0);
@@ -1998,7 +1998,7 @@ window.__dataReady.then(data => {
     },[]);
     // ต่อ query แปลกๆ ท้าย src กันเบราว์เซอร์ใช้ pile-materials.html เก่าจากแคชของ iframe (hard refresh หน้าแม่ไม่ได้ล้างแคช iframe เสมอไป)
     const cacheBust=React.useMemo(()=>Date.now(),[]);
-    return <iframe ref={ref} src={`pile-materials.html?v=${cacheBust}${canEdit?'':'&readonly=1'}`} title="สต็อกวัตถุดิบเสาเข็ม" onLoad={resize}
+    return <iframe ref={ref} src={`pile-materials.html?v=${cacheBust}${canEdit?'':'&readonly=1'}${formulaAdmin?'&formulaAdmin=1':''}`} title="สต็อกวัตถุดิบเสาเข็ม" onLoad={resize}
       style={{width:'100%',minHeight:400,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
   }
 
@@ -6218,6 +6218,14 @@ window.__dataReady.then(data => {
           })}
         </div>
       </div>
+      {/* สิทธิ์พิเศษ: แก้ไขสูตร/ค่าคงที่วัตถุดิบ (เหล็กเสริม/เพลท/หนวดกุ้ง/PC.wire/ลวดปลอก/หน้าตัดเสา/สูตรคอนกรีต ในหน้าสต็อกวัตถุดิบ)
+          ไม่ผูกกับ isAdmin เหมือน PERM_LIST ด้านบน — ต้องติ๊กเฉพาะบัญชีนี้เท่านั้น แม้เป็น admin ก็ไม่ได้อัตโนมัติ */}
+      <div style={{marginTop:10,padding:'10px 12px',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10}}>
+        <div style={{fontSize:11,fontWeight:600,color:'#92400e',marginBottom:5}}>🔒 สิทธิ์พิเศษ — เฉพาะหัวแอดมิน (ไม่ผูกกับสิทธิ์ admin ทั่วไป ต้องติ๊กเองทีละบัญชี)</div>
+        <button onClick={()=>onTogglePerm(u.id,'perm','materialFormula',!perms.materialFormula)} style={{fontSize:12,padding:'5px 12px',borderRadius:20,border:`1.5px solid ${perms.materialFormula?'#b45309':'#e2e8f0'}`,background:perms.materialFormula?'#fef3c7':'#f8fafc',color:perms.materialFormula?'#b45309':'#94a3b8',cursor:'pointer',fontWeight:600}}>
+          แก้ไขสูตร/ค่าคงที่วัตถุดิบ {perms.materialFormula?'✓':'✗'}
+        </button>
+      </div>
       <div style={{marginTop:10}}>
         <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',marginBottom:5}}>หน้าที่เข้าดูได้</div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -9002,7 +9010,7 @@ window.__dataReady.then(data => {
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
         {tab==='accident'&&<AccidentReportTab currentUser={currentUser}/>}
-        {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pileMaterials)}/></div>}
+        {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pileMaterials)} formulaAdmin={!!(currentUser.permissions||{}).materialFormula}/></div>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>

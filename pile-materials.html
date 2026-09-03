@@ -58,6 +58,9 @@ const DB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PILE_STATE_ROW_ID = 'default';
 // สิทธิ์แก้ไข ส่งมาจากหน้าแม่ผ่าน query (?readonly=1) ตามสิทธิ์ผู้ใช้ที่ล็อกอินอยู่ — ถ้าไม่มี query นี้ (เช่นเปิดไฟล์นี้ตรงๆ) ถือว่าแก้ไขได้ตามปกติ
 const READONLY = new URLSearchParams(location.search).get('readonly') === '1';
+// สิทธิ์พิเศษ "แก้ไขสูตร/ค่าคงที่วัตถุดิบ" (?formulaAdmin=1) — ต้องติ๊กเฉพาะบัญชีนั้นในเมนูจัดการผู้ใช้ ไม่ผูกกับสิทธิ์ admin ทั่วไป
+// ปุ่ม "ตั้งค่าคงที่" (เหล็กเสริม/เพลท/หนวดกุ้ง/PC.wire/ลวดปลอก/หน้าตัดเสา/สูตรคอนกรีต) จะซ่อนไว้จนกว่าจะมีสิทธิ์นี้ ส่วนกรอกสต็อกรายวันยังใช้ READONLY เหมือนเดิม
+const CAN_EDIT_FORMULA = !READONLY && new URLSearchParams(location.search).get('formulaAdmin') === '1';
 let PC = null; // pile-calc module, loaded async below
 function waitForPileCalc() {
   return new Promise(resolve => {
@@ -266,7 +269,7 @@ class App extends React.Component {
     periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
     periodPickerMonth: new Date().getMonth(), periodPickerYear: new Date().getFullYear() + 543,
     undoStack: [], redoStack: [],
-    locks: { rebar: true, plate: true, whisker: true, pcKgPerM: true, pcWire: true, stirrup: true, area: true },
+    locks: { rebar: true, plate: true, whisker: true, pcKgPerM: true, pcWire: true, stirrup: true, area: true, concreteMix: true },
     rawRows: null, rebarWeights: null, plateWeights: null, whiskerWeights: null, whiskerSpecs: null,
     pcWireKgPerM: null, pcWireTable: null, stirrupTable: null, stirrupWireMm: null, plateThicknessMm: null,
     pileAreaM2: {},   // พื้นที่หน้าตัดเสาแต่ละขนาด (ตร.ม.) — ใช้คำนวณคิว
@@ -913,10 +916,10 @@ class App extends React.Component {
           </div>
           {s.error && <div style={{ color: '#c0392b', fontSize: 14, marginTop: 10 }}>{s.error}</div>}
           <div style={{ fontSize: 13, color: '#8892a0', marginTop: 10 }}>ไฟล์ต้องมีคอลัมน์: รหัสสินค้า, รายการสินค้า, จำนวน</div>
-          {!READONLY && <button onClick={() => this.toggleSettings()} style={{ ...btnGhost(), marginTop: 12 }}>{s.showSettings ? 'ซ่อนตั้งค่าคงที่' : 'ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)'}</button>}
+          {CAN_EDIT_FORMULA && <button onClick={() => this.toggleSettings()} style={{ ...btnGhost(), marginTop: 12 }}>{s.showSettings ? 'ซ่อนตั้งค่าคงที่' : 'ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)'}</button>}
         </div>
 
-        {s.showSettings && !READONLY && <SettingsPanel app={this} />}
+        {s.showSettings && CAN_EDIT_FORMULA && <SettingsPanel app={this} />}
 
         {s.periodPickerOpen && (
           <Modal onClose={() => { if (!s.periodPickerRequired) this.setState({ periodPickerOpen: false, periodPickerPurpose: null }); }}>
@@ -1619,10 +1622,13 @@ function SettingsPanel({ app }) {
               ))}
             </div>
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e3e7ee' }}>
-              <b>สูตรคอนกรีต (กก./ม³)</b>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <b>สูตรคอนกรีต (กก./ม³)</b>{lockBtn('concreteMix')}
+              </div>
               <div style={{ fontSize: 12.5, color: '#78839A', margin: '6px 0 10px', lineHeight: 1.7 }}>
                 ใช้คิดปริมาณหิน/ทราย/ปูนจากคิวผลิตในแท็บ “คิวผลิต & ความยาว” — ค่าเริ่มต้นตามสูตรมาตรฐานของโรงงาน
               </div>
+              <div style={{ opacity: s.locks.concreteMix ? 0.5 : 1, pointerEvents: s.locks.concreteMix ? 'none' : 'auto' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
                 {[['cement', 'ปูน'], ['rock34', 'หิน 3/4"'], ['rock1', 'หิน 1"'], ['sand', 'ทราย']].map(([key, label]) => (
                   <div key={key} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 8 }}>
@@ -1646,6 +1652,7 @@ function SettingsPanel({ app }) {
                     </div>
                   ))}
                 </div>
+              </div>
               </div>
             </div>
           </div>
