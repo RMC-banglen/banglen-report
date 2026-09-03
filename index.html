@@ -7661,7 +7661,7 @@ window.__dataReady.then(data => {
                 monthsData.length?<>{legend}<LineChart categories={cats} series={[
                   {label:'เทรลเลอร์',color:'#2563eb',data:monthsData.map(m=>{const v=avgOf(trailer,m);return v!=null?+v.toFixed(2):null;})},
                   {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>{const v=avgOf(wheel,m);return v!=null?+v.toFixed(2):null;})},
-                ]} height={260} decimals={2} showValues={true}/></>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
+                ]} height={260} decimals={2} showValues={true} boxedLabels={true}/></>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
             </>;
           })()}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:20}}>
