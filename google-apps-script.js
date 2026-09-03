@@ -794,6 +794,8 @@ function syncDamageItems(ss) {
     // คอลัมน์อาจใช้ชื่อต่างกัน — map อัตโนมัติ
     const colMonthYear      = ci['เดือน/ปี']        ?? 0;
     const colBillNo         = ci['เลขที่ใบรับคืน']  ?? 1;
+    const colProduct        = ci['รายการสินค้า']    ?? 2;
+    const colQty            = ci['จำนวน/คัน']       ?? 3;
     const colAmount         = ci['ยอดเงินสุทธิ']    ?? 4;
     const colType           = ci['ประเภท']           ?? 5;
     const colCause          = headers.findIndex(h => h.includes('สาเหตุ'));  // G
@@ -849,6 +851,8 @@ function syncDamageItems(ss) {
         reason:           lastCause,
         amount:           amount,
         bill_no:          lastBillNo,
+        product_name:     String(r[colProduct] || '').trim() || null,
+        qty:              toNum(r[colQty]) || null,
         contractor_team:  lastContractor,
         employee_name:    lastEmployee,
       });
@@ -869,6 +873,8 @@ function syncDamageItems(ss) {
     headers.forEach((h, i) => { ci[h] = i; });
 
     const colBillNo      = ci['เลขที่บิล']         ?? 0;
+    const colProductID   = ci['รายการสินค้า']      ?? 2;
+    const colQtyID       = ci['จำนวน/คัน']         ?? 3;
     const colAmount      = ci['ยอดเงินสุทธิ']      ?? 3;
     const colType        = ci['ประเภทเสียหาย']     ?? 5;
     const colCause       = ci['สาเหตุ']            ?? 6;
@@ -912,6 +918,8 @@ function syncDamageItems(ss) {
         reason:           cause,
         amount:           amount,
         bill_no:          bill || null,
+        product_name:     String(r[colProductID] || '').trim() || null,
+        qty:              toNum(r[colQtyID]) || null,
         contractor_team:  contractorID,
         employee_name:    employeeID,
       });
@@ -1231,9 +1239,17 @@ function filterMonthKey(key) {
     f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(year).build());
     f.setColumnFilterCriteria(2, SpreadsheetApp.newFilterCriteria().whenNumberEqualTo(month).build());
   } else {
-    // ใส่ '' ไว้ด้วย เพื่อให้แถวที่คอลัมน์ A ว่าง (เซลล์ merge / แถวต่อเนื่อง) ยังแสดงอยู่
+    // Sheets ไม่รองรับ setVisibleValues → ต้องระบุกลับด้านเป็น "ค่าที่ให้ซ่อน"
+    // เว้นค่าว่างไว้ไม่ซ่อน เพื่อให้แถวที่คอลัมน์ A ว่าง (เซลล์ merge / แถวต่อเนื่อง) ยังแสดงอยู่
     var label = MONTH_MENU_TH[month] + ' ' + year;
-    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().setVisibleValues([label, '']).build());
+    var colA = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    var seen = {}, hidden = [];
+    colA.forEach(function(r) {
+      var v = (r[0] === null || r[0] === undefined) ? '' : String(r[0]).trim();
+      if (v === '' || v === label) return;
+      if (!seen[v]) { seen[v] = true; hidden.push(v); }
+    });
+    f.setColumnFilterCriteria(1, SpreadsheetApp.newFilterCriteria().setHiddenValues(hidden).build());
     f.removeColumnFilterCriteria(2);
   }
 }

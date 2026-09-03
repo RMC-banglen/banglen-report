@@ -236,6 +236,7 @@ export function parsePileRow(code, name, qty, config) {
 
 export function calcPileList(inputRows, config) {
   const rebarAgg = new Map(), plateAgg = new Map(), whiskerAgg = new Map(), collarAgg = new Map(), pcAgg = new Map(), stirrupAgg = new Map();
+  const pileAgg = new Map();   // สรุปจำนวนต้น + ความยาวรวม แยกตาม ขนาดเสา × ความยาว
   const warnings = [];
   let totalPiles = 0, usedRows = 0, skippedRows = [];
 
@@ -245,6 +246,15 @@ export function calcPileList(inputRows, config) {
     usedRows++;
     totalPiles += res.qty;
     warnings.push(...res.warnings);
+
+    // สะสมจำนวนต้น + ความยาวรวม (ความยาว × จำนวน) แยกตามขนาดเสาและความยาว
+    {
+      const pk = res.diam + '|' + res.length.toFixed(2);
+      const pe = pileAgg.get(pk) || { diam: res.diam, length: res.length, qty: 0, totalLength: 0 };
+      pe.qty += res.qty;
+      pe.totalLength += res.totalLength;
+      pileAgg.set(pk, pe);
+    }
 
     if (res.rebars.length) {
       for (const rb of res.rebars) {
@@ -287,6 +297,7 @@ export function calcPileList(inputRows, config) {
     totalPiles,
     skippedRows,
     warnings: [...new Set(warnings)],
+    piles: [...pileAgg.values()].sort((a, b) => String(a.diam).localeCompare(String(b.diam), 'th') || a.length - b.length),
     rebar: sortByKey([...rebarAgg.values()], 'spec'),
     plates: sortByKey([...plateAgg.values()], 'diam'),
     whisker: sortByKey([...whiskerAgg.values()], 'diam'),

@@ -66,6 +66,46 @@ function waitForPileCalc() {
   });
 }
 
+// จำนวนทศนิยมของแต่ละหมวดวัสดุ — คิดจาก key เช่น 'main:plate:0.22'
+// เพลท / หนวดกุ้ง / PC.wire / ปลอก = 2 ตำแหน่ง | Collar / เหล็กเสริม = ไม่มีทศนิยม
+const MAT_DIGITS = {
+  plate: 2, whisker: 2, stirrup: 2,
+  pc: 2, pc4: 2, pc5: 2, pc7: 2,
+  collar: 0, rebar: 0, rebarExtra: 0,
+};
+function digitsForKey(key) {
+  const cat = String(key || '').split(':')[1];
+  return MAT_DIGITS[cat] ?? 1;
+}
+
+// แยกสเปคเหล็กเส้น "DB12x10.00 ม." → { pre:'DB', diam:12, len:10 }
+function parseRebarSpec(spec) {
+  const m = String(spec || '').match(/^([A-Za-z]*)\s*([\d.]+)\s*[xX×]\s*([\d.]+)/);
+  if (!m) return { pre: 'ZZ', diam: 9999, len: 9999, ok: false };
+  return { pre: m[1].toUpperCase(), diam: parseFloat(m[2]), len: parseFloat(m[3]), ok: true };
+}
+
+// เรียง: ชนิด (DB/RB) → ขนาด (12, 16, …) → ความยาว น้อยไปมาก
+function sortRebarBySpec(list, getSpec) {
+  return [...list].sort((a, b) => {
+    const A = parseRebarSpec(getSpec(a)), B = parseRebarSpec(getSpec(b));
+    return A.pre.localeCompare(B.pre) || A.diam - B.diam || A.len - B.len;
+  });
+}
+
+// ทำเครื่องหมายแถวแรกของแต่ละขนาด เพื่อขีดเส้นคั่นให้ดูง่าย
+function markRebarGroups(rows) {
+  let prev = null;
+  rows.forEach(row => {
+    const p = parseRebarSpec(row.label);
+    const key = p.pre + p.diam;
+    row.groupStart = prev !== null && key !== prev;
+    row.groupLabel = p.ok ? p.pre + p.diam : null;
+    prev = key;
+  });
+  return rows;
+}
+
 function fmt(n, digits) {
   if (n == null || !isFinite(n)) return '-';
   return n.toLocaleString('th-TH', { minimumFractionDigits: digits ?? 1, maximumFractionDigits: digits ?? 1 });
@@ -186,7 +226,7 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ borderTop: '1px solid #eef0f4', verticalAlign: 'top' }}>
+            <tr key={i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -226,9 +266,10 @@ class App extends React.Component {
     periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
     periodPickerMonth: new Date().getMonth(), periodPickerYear: new Date().getFullYear() + 543,
     undoStack: [], redoStack: [],
-    locks: { rebar: true, plate: true, whisker: true, pcKgPerM: true, pcWire: true, stirrup: true },
+    locks: { rebar: true, plate: true, whisker: true, pcKgPerM: true, pcWire: true, stirrup: true, area: true },
     rawRows: null, rebarWeights: null, plateWeights: null, whiskerWeights: null, whiskerSpecs: null,
     pcWireKgPerM: null, pcWireTable: null, stirrupTable: null, stirrupWireMm: null, plateThicknessMm: null,
+    pileAreaM2: {},   // พื้นที่หน้าตัดเสาแต่ละขนาด (ตร.ม.) — ใช้คำนวณคิว
     plateBigSheetKg: { 6: 438, 8: 584, 9: 657 },
     syncStatus: 'loading',
   };
@@ -236,7 +277,7 @@ class App extends React.Component {
   persistKeys = ['result', 'rawRows', 'fileName', 'actual', 'stock', 'plateStockDiam', 'generalUseEntries', 'plateGeneralUseEntries',
     'periodLabel', 'periods', 'periodHistory', 'periodLocked', 'periodSummaries', 'extraRebarItems', 'alertThresholdPct',
     'rebarWeights', 'plateWeights', 'whiskerWeights', 'whiskerSpecs', 'pcWireKgPerM', 'pcWireTable', 'stirrupTable', 'stirrupWireMm', 'plateThicknessMm',
-    'plateBigSheetKg', 'locks'];
+    'plateBigSheetKg', 'locks', 'pileAreaM2'];
   fileInputRef = React.createRef();
 
   async componentDidMount() {
@@ -378,6 +419,15 @@ class App extends React.Component {
   updatePcKgPerM(mm, v) { if (READONLY) return; this.setState(s => ({ pcWireKgPerM: { ...s.pcWireKgPerM, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
   updatePcWire(id, field, v) { if (READONLY) return; this.setState(s => ({ pcWireTable: s.pcWireTable.map(c => c.id === id ? { ...c, [field]: v === '' ? 0 : Number(v) } : c) }), () => this.recompute()); }
   updatePlateThickness(diam, v) { if (READONLY) return; this.setState(s => ({ plateThicknessMm: { ...s.plateThicknessMm, [diam]: Number(v) } })); }
+  updatePileArea(diam, v) { if (READONLY) return; this.setState(s => ({ pileAreaM2: { ...(s.pileAreaM2 || {}), [diam]: v === '' ? null : Number(v) } })); }
+  // รายชื่อขนาดเสาทั้งหมดที่ควรตั้งค่าหน้าตัด — เอาจากตารางน้ำหนักเพลท (ครบทุกขนาด) รวมกับที่พบในไฟล์งวดนี้
+  allPileDiams() {
+    const set = new Set(Object.keys(this.state.plateWeights || {}));
+    const r = this.state.result;
+    if (r && r.piles) r.piles.forEach(p => set.add(p.diam));
+    (r && r.plates ? r.plates : []).forEach(p => set.add(p.diam));
+    return [...set];
+  }
   updatePlateBigSheetKg(mm, v) { if (READONLY) return; this.setState(s => ({ plateBigSheetKg: { ...s.plateBigSheetKg, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
   updateStirrupWireMm(diam, v) { if (READONLY) return; this.setState(s => ({ stirrupWireMm: { ...s.stirrupWireMm, [diam]: v } })); }
   updateStirrup(diam, len, v) { if (READONLY) return; this.setState(s => ({ stirrupTable: { ...s.stirrupTable, [diam]: { ...s.stirrupTable[diam], [len]: v === '' ? null : Number(v) } } }), () => this.recompute()); }
@@ -440,13 +490,14 @@ class App extends React.Component {
     });
   }
 
-  diffInfo(calc, actualStr) {
+  diffInfo(calc, actualStr, digits) {
+    const d = digits ?? 1;
     const actual = actualStr === '' || actualStr == null ? null : Number(actualStr);
     if (actual == null || !isFinite(actual)) return { actual: '', diffFmt: '-', pctFmt: '-', diffColor: 'inherit' };
     const diff = actual - calc;
     const pct = calc !== 0 ? (diff / calc) * 100 : (actual !== 0 ? Infinity : 0);
     const color = Math.abs(pct) < 3 ? '#728' : (diff > 0 ? '#c0392b' : '#3f7d2b');
-    return { actual: actualStr, diffFmt: (diff > 0 ? '+' : '') + fmt(diff, 1), pctFmt: !isFinite(pct) ? 'ไม่มียอดคำนวณ' : (pct > 0 ? '+' : '') + fmt(pct, 1) + '%', diffColor: color };
+    return { actual: actualStr, diffFmt: (diff > 0 ? '+' : '') + fmt(diff, d), pctFmt: !isFinite(pct) ? 'ไม่มียอดคำนวณ' : (pct > 0 ? '+' : '') + fmt(pct, 1) + '%', diffColor: color };
   }
   thresholdBg(pctLost, key) {
     const cat = key ? String(key).split(':')[1] : null;
@@ -459,7 +510,8 @@ class App extends React.Component {
   buildRow(key, label, calcVal, extraFmt) {
     const hasStockEntry = this.state.stock[key] && (this.state.stock[key].opening != null || this.state.stock[key].received != null || this.state.stock[key].closing != null);
     const actualStr = (this.state.resultView === 'stock' || hasStockEntry) ? this.computedActualFromStock(key) : (this.state.actual[key] ?? '');
-    const info = this.diffInfo(calcVal, actualStr);
+    const dg = digitsForKey(key);
+    const info = this.diffInfo(calcVal, actualStr, dg);
     const stockVals = this.state.stock[key] || {};
     const generalUseEntriesRaw = this.state.generalUseEntries[key] || [];
     const generalUse = generalUseEntriesRaw.reduce((s, e) => s + (e.amount || 0), 0);
@@ -468,8 +520,8 @@ class App extends React.Component {
     const realDiff = A != null ? A + generalUse : null;
     const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
     return {
-      key, label, calcFmt: fmt(calcVal, 1), actual: info.actual,
-      actualFmt: (info.actual === '' || info.actual == null || isNaN(Number(info.actual))) ? '-' : fmt(Number(info.actual), 1),
+      key, label, calcFmt: fmt(calcVal, dg), actual: info.actual,
+      actualFmt: (info.actual === '' || info.actual == null || isNaN(Number(info.actual))) ? '-' : fmt(Number(info.actual), dg),
       diffFmt: info.diffFmt, pctFmt: info.pctFmt, diffColor: info.diffColor,
       onActualChange: v => this.setActual(key, v),
       opening: stockVals.opening ?? '', received: stockVals.received ?? '', closing: stockVals.closing ?? '',
@@ -483,9 +535,9 @@ class App extends React.Component {
       })),
       onAddGeneralUseEntry: () => this.addGeneralUseEntry(key),
       generalUseOpen: !!this.state.generalUseOpen[key],
-      generalUseSummaryFmt: fmt(generalUse, 1),
+      generalUseSummaryFmt: fmt(generalUse, dg),
       onToggleGeneralUseOpen: () => this.toggleGeneralUseOpen(key),
-      realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, 1)) : '-',
+      realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, dg)) : '-',
       pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 1) + '%') : '-',
       rowBg: this.thresholdBg(pctLost, key),
       ...extraFmt,
@@ -496,7 +548,8 @@ class App extends React.Component {
     if (!r) return null;
     const wireMmMap = this.state.stirrupWireMm || {}, thickMap = this.state.plateThicknessMm || {}, specMap = this.state.whiskerSpecs || {};
     const dl = this._mod ? this._mod.diamLabel : (x => x);
-    const rebarRowsM = r.rebar.map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true }));
+    const rebarRowsM = markRebarGroups(sortRebarBySpec(r.rebar, x => x.spec)
+      .map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true })));
     this.state.extraRebarItems.forEach(item => {
       const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
       rebarRowsM.push({ ...row, isExtra: true, spec: item.spec, onSpecChange: v => this.updateExtraRebarSpec(item.id, v), onRemoveExtra: () => this.removeExtraRebarItem(item.id) });
@@ -559,7 +612,8 @@ class App extends React.Component {
     const dl = this._mod.diamLabel;
     const plateThicknessD = this.state.plateThicknessMm || {};
     const wireMmD = this.state.stirrupWireMm || {};
-    const rebarRowsD = r.rebar.map(x => this.buildRow('detail:rebar:' + x.spec, x.spec, x.weightKg, { piecesFmt: fmt(x.pieces, 0) }));
+    const rebarRowsD = markRebarGroups(sortRebarBySpec(r.rebar, x => x.spec)
+      .map(x => this.buildRow('detail:rebar:' + x.spec, x.spec, x.weightKg, { piecesFmt: fmt(x.pieces, 0) })));
     const plateRowsD = r.plates.map(x => this.buildRow('detail:plate:' + x.diam, dl(x.diam) + (plateThicknessD[x.diam] ? ' (เพลท ' + plateThicknessD[x.diam] + ' มม.)' : ''), x.weightKg, { countFmt: fmt(x.count, 0) }));
     const whiskerRowsD = r.whisker.map(x => this.buildRow('detail:whisker:' + x.diam, dl(x.diam), x.weightKg, { countFmt: fmt(x.count, 0), spec: x.spec || 'ไม่ระบุในไฟล์ต้นฉบับ' }));
     const collarRowsD = r.collar.map(x => ({ ...this.buildRow('detail:collar:' + x.diam, dl(x.diam), x.count), calcFmt: fmt(x.count, 0) }));
@@ -614,10 +668,37 @@ class App extends React.Component {
     });
   }
 
+  // สรุปคิวผลิต + ความยาวรวมของงวด (เก็บไว้เทียบข้ามเดือน)
+  // รายการเสาของงวด — ถ้าผลลัพธ์ที่บันทึกไว้เป็นเวอร์ชันเก่า (ไม่มี piles) ให้คำนวณใหม่จากรายการดิบ
+  pilesOf(s) {
+    if (s.result && s.result.piles && s.result.piles.length) return s.result.piles;
+    if (this._mod && s.rawRows && s.rawRows.length) {
+      try { return (this._mod.calcPileList(s.rawRows, this.currentConfig()) || {}).piles || null; } catch (e) { return null; }
+    }
+    return null;
+  }
+  computePileTotals(s) {
+    const piles = this.pilesOf(s);
+    if (!piles || !piles.length) return null;
+    const r = { piles };
+    const areas = s.pileAreaM2 || {};
+    let qty = 0, length = 0, volume = 0, missing = 0;
+    const seen = new Set();
+    r.piles.forEach(p => {
+      qty += p.qty;
+      length += p.totalLength;
+      const a = Number(areas[p.diam]);
+      if (a > 0) volume += a * p.totalLength;
+      else if (!seen.has(p.diam)) { seen.add(p.diam); missing++; }
+    });
+    return { qty, length, volume: missing ? null : volume, missing };
+  }
   computePeriodSummary(s) {
     if (!s.result) return null;
     const mp = this.buildMainPage(s.result);
-    return CATS.map(c => {
+    const piles = this.computePileTotals(s);
+    const base = piles ? [{ key: '__piles', label: 'สรุปเสาเข็ม', piles }] : [];
+    return base.concat(CATS.map(c => {
       const rows = mp[c.key + 'RowsM'] || [];
       let totalCalc = 0, totalRealDiff = 0, hasDiff = false;
       rows.forEach(row => {
@@ -627,7 +708,25 @@ class App extends React.Component {
       });
       const pct = hasDiff && totalCalc ? (totalRealDiff / totalCalc) * 100 : null;
       return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct };
-    });
+    }));
+  }
+  // แถวเทียบคิวผลิต/ความยาว ข้ามงวด
+  buildPileTrendRows() {
+    const s = this.state;
+    const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
+    const cols = [...closedLabels, s.periodLabel];
+    const totalsFor = pl => {
+      if (pl === s.periodLabel) return this.computePileTotals(s);
+      const sum = s.periodSummaries[pl];
+      const e = sum && sum.find ? sum.find(x => x.key === '__piles') : null;
+      return e ? e.piles : null;
+    };
+    const defs = [
+      { label: 'จำนวนเสาเข็ม (ต้น)', pick: t => t && fmt(t.qty, 0) },
+      { label: 'ความยาวรวม (ม.)', pick: t => t && fmt(t.length, 2) },
+      { label: 'คิวผลิต (m³)', pick: t => t ? (t.volume == null ? 'ยังไม่ตั้งหน้าตัด' : fmt(t.volume, 2)) : null },
+    ];
+    return { cols, rows: defs.map(d => ({ label: d.label, cells: cols.map(pl => ({ period: pl, text: d.pick(totalsFor(pl)) || '-' })) })) };
   }
   filterMainPage(mp) {
     if (!mp) return mp;
@@ -850,13 +949,14 @@ class App extends React.Component {
             )}
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-no-print="true">
-              {[['main', 'หน้าหลัก (รวมทุกวัตถุดิบ)'], ['stock', '📦 นับสต็อก'], ['detail', 'ตามรายการเสา'], ['trend', '📈 แนวโน้มย้อนหลัง']].map(([v, lbl]) => (
+              {[['main', 'หน้าหลัก (รวมทุกวัตถุดิบ)'], ['stock', '📦 นับสต็อก'], ['detail', 'ตามรายการเสา'], ['volume', '🧮 คิวผลิต & ความยาว'], ['trend', '📈 แนวโน้มย้อนหลัง']].map(([v, lbl]) => (
                 <button key={v} onClick={() => this.setResultView(v)} style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid #d8dde6', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: s.resultView === v ? '#2f5fd0' : 'white', color: s.resultView === v ? 'white' : '#333' }}>{lbl}</button>
               ))}
             </div>
 
             {s.resultView === 'trend' && <TrendView app={this} />}
             {s.resultView === 'detail' && <DetailView app={this} />}
+            {s.resultView === 'volume' && <VolumeView app={this} />}
 
             {(s.resultView === 'main' || s.resultView === 'stock') && (
               <React.Fragment>
@@ -910,12 +1010,12 @@ class App extends React.Component {
                   <button onClick={() => window.print()} style={btnGhost()}>พิมพ์ / บันทึกเป็น PDF</button>
                 </div>
 
+                <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
+                <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />
                 {stockMode && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
                 <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
                   extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />
 
@@ -1009,7 +1109,7 @@ function DetailTable({ title, subtitle, rows, columns }) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ borderTop: '1px solid #eef0f4', verticalAlign: 'top' }}>
+            <tr key={i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top' }}>
               {columns.map(c => <td key={c.key} style={{ padding: '9px 14px', fontSize: c.key === 'spec' ? 13 : 14, color: c.key === 'spec' ? '#78839A' : 'inherit', textAlign: c.right ? 'right' : 'left' }}>{row[c.key]}</td>)}
             </tr>
           ))}
@@ -1018,11 +1118,146 @@ function DetailTable({ title, subtitle, rows, columns }) {
     </div>
   );
 }
+// ============================================================
+// คิวผลิต & ความยาวเสาเข็มรวม — แยกตามขนาดเสา
+//   ความยาวรวม = ความยาวเสา × จำนวนต้น
+//   คิว (m³)   = พื้นที่หน้าตัด (ตร.ม.) × ความยาวรวม
+// พื้นที่หน้าตัดกรอกเองต่อขนาด (ระบบไม่เดาให้ เพราะหน้าตัด I/S ไม่ใช่วงกลม)
+// ============================================================
+function VolumeView({ app }) {
+  const mod = app._mod;
+  const saved = app.state.result;
+  // ผลลัพธ์ที่บันทึกไว้ก่อนหน้านี้ยังไม่มีส่วนสรุปเสา — คำนวณใหม่จากรายการดิบให้เอง
+  const r = React.useMemo(() => {
+    if (saved && saved.piles && saved.piles.length) return saved;
+    if (mod && app.state.rawRows && app.state.rawRows.length) {
+      try { return mod.calcPileList(app.state.rawRows, app.currentConfig()); } catch (e) { return saved; }
+    }
+    return saved;
+  }, [saved, mod, app.state.rawRows]);
+
+  if (!r || !r.piles || !r.piles.length) {
+    return <div style={{ padding: 24, color: '#78839A' }}>ยังไม่มีข้อมูล — อัปโหลดไฟล์รายการเสาก่อน</div>;
+  }
+  const dl = mod ? mod.diamLabel : (x => x);
+  const areas = app.state.pileAreaM2 || {};
+  const [openDiam, setOpenDiam] = React.useState(null);
+
+  // รวมตามขนาดเสา
+  const byDiam = {};
+  r.piles.forEach(p => {
+    if (!byDiam[p.diam]) byDiam[p.diam] = { diam: p.diam, qty: 0, totalLength: 0, rows: [] };
+    byDiam[p.diam].qty += p.qty;
+    byDiam[p.diam].totalLength += p.totalLength;
+    byDiam[p.diam].rows.push(p);
+  });
+  const groups = Object.values(byDiam).sort((a, b) => String(a.diam).localeCompare(String(b.diam), 'th'));
+  const volOf = g => { const a = Number(areas[g.diam]); return (a > 0) ? a * g.totalLength : null; };
+
+  const sumQty = groups.reduce((s, g) => s + g.qty, 0);
+  const sumLen = groups.reduce((s, g) => s + g.totalLength, 0);
+  const volList = groups.map(volOf);
+  const sumVol = volList.some(v => v != null) ? volList.reduce((s, v) => s + (v || 0), 0) : null;
+  const missing = groups.filter(g => volOf(g) == null).length;
+
+  const thS = { padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#42465a', borderBottom: '2px solid #e2e5ee', whiteSpace: 'nowrap', fontSize: 13 };
+  const tdS = { padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: 14 };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div style={kpi()}><div style={kpiLbl()}>จำนวนเสาเข็มรวม</div><div style={kpiVal()}>{fmt(sumQty, 0)} ต้น</div></div>
+        <div style={kpi()}><div style={kpiLbl()}>ความยาวรวมทั้งหมด</div><div style={kpiVal()}>{fmt(sumLen, 2)} ม.</div></div>
+        <div style={kpi()}><div style={kpiLbl()}>คิวผลิตรวม</div>
+          <div style={{ ...kpiVal(), color: sumVol == null ? '#c0392b' : '#2f5fd0' }}>{sumVol == null ? 'ยังใส่หน้าตัดไม่ครบ' : fmt(sumVol, 2) + ' m³'}</div>
+        </div>
+      </div>
+
+      {missing > 0 && (
+        <div style={{ padding: '11px 15px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: 13.5, color: '#92400e', lineHeight: 1.7 }}>
+          ⚠️ ยังไม่ได้ตั้งค่าพื้นที่หน้าตัดของ {missing} ขนาด — ช่องคิวจะขึ้น “–” จนกว่าจะตั้งค่า
+          <br />ตั้งได้ที่ปุ่ม <b>ตั้งค่าคงที่ (แก้ไขค่าน้ำหนัก)</b> ด้านบน → แท็บ <b>หน้าตัดเสา</b> — กรอกครั้งเดียวใช้ได้ทุกงวด
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>สรุปตามขนาดเสา</div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
+            <thead>
+              <tr style={{ background: '#f4f6f9' }}>
+                <th style={{ ...thS, textAlign: 'left' }}>ขนาดเสา</th>
+                <th style={thS}>จำนวน (ต้น)</th>
+                <th style={thS}>ความยาวรวม (ม.)</th>
+                <th style={thS}>หน้าตัด (ตร.ม./ต้น)</th>
+                <th style={thS}>คิว (m³)</th>
+                <th style={thS}>% ของคิวรวม</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map(g => {
+                const v = volOf(g);
+                const open = openDiam === g.diam;
+                return (
+                  <React.Fragment key={g.diam}>
+                    <tr onClick={() => setOpenDiam(open ? null : g.diam)}
+                      style={{ borderTop: '1px solid #eef0f4', cursor: 'pointer', background: open ? '#eef3fc' : 'transparent' }}>
+                      <td style={{ ...tdS, textAlign: 'left', fontWeight: 700 }}>{open ? '▲' : '▼'} {dl(g.diam)}</td>
+                      <td style={tdS}>{fmt(g.qty, 0)}</td>
+                      <td style={tdS}>{fmt(g.totalLength, 2)}</td>
+                      <td style={{ ...tdS, color: areas[g.diam] > 0 ? '#42465a' : '#c0392b' }}>
+                        {areas[g.diam] > 0 ? fmt(areas[g.diam], 4) : 'ยังไม่ตั้งค่า'}
+                      </td>
+                      <td style={{ ...tdS, fontWeight: 700, color: v == null ? '#b6bcc8' : '#2f5fd0' }}>{v == null ? '–' : fmt(v, 2)}</td>
+                      <td style={tdS}>{(v != null && sumVol) ? fmt(v / sumVol * 100, 1) + '%' : '–'}</td>
+                    </tr>
+                    {open && g.rows.slice().sort((a, b) => a.length - b.length).map(p => {
+                      const a = Number(areas[g.diam]);
+                      const pv = a > 0 ? a * p.totalLength : null;
+                      return (
+                        <tr key={p.length} style={{ borderTop: '1px solid #f4f6fa', background: '#fafbfd' }}>
+                          <td style={{ ...tdS, textAlign: 'left', paddingLeft: 40, color: '#5f6470' }}>ยาว {fmt(p.length, 2)} ม.</td>
+                          <td style={{ ...tdS, color: '#5f6470' }}>{fmt(p.qty, 0)}</td>
+                          <td style={{ ...tdS, color: '#5f6470' }}>{fmt(p.totalLength, 2)}</td>
+                          <td style={{ ...tdS, color: '#b6bcc8' }}>—</td>
+                          <td style={{ ...tdS, color: '#5f6470' }}>{pv == null ? '–' : fmt(pv, 2)}</td>
+                          <td style={{ ...tdS, color: '#5f6470' }}>{(pv != null && sumVol) ? fmt(pv / sumVol * 100, 1) + '%' : '–'}</td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+              <tr style={{ background: '#f4f6f9', borderTop: '2px solid #e2e5ee' }}>
+                <td style={{ ...tdS, textAlign: 'left', fontWeight: 800 }}>รวมทั้งหมด</td>
+                <td style={{ ...tdS, fontWeight: 800 }}>{fmt(sumQty, 0)}</td>
+                <td style={{ ...tdS, fontWeight: 800 }}>{fmt(sumLen, 2)}</td>
+                <td style={tdS}></td>
+                <td style={{ ...tdS, fontWeight: 800, color: '#2f5fd0' }}>{sumVol == null ? '–' : fmt(sumVol, 2)}</td>
+                <td style={tdS}></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: 13, color: '#78839A', lineHeight: 1.7 }}>
+          คลิกที่แถวขนาดเสาเพื่อกางดูแยกตามความยาว · ความยาวรวม = ความยาวเสา × จำนวนต้น · คิว = หน้าตัด × ความยาวรวม
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DetailView({ app }) {
   const dp = app.buildDetailPage(app.state.result);
   if (!dp) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+      <DetailTable title="ลวด PC.wire" subtitle={dp.pc7NoteExtra} rows={dp.pcRowsD} columns={[
+        { key: 'label', label: 'รายการ' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
+      <DetailTable title="ลวดปลอก" rows={dp.stirrupRowsD} columns={[
+        { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
+      ]} />
       <DetailTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={dp.plateRowsD} columns={[
         { key: 'label', label: 'ขนาดเสา' }, { key: 'countFmt', label: 'จำนวน (แผ่น)', right: true }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
       ]} />
@@ -1031,12 +1266,6 @@ function DetailView({ app }) {
       ]} />
       <DetailTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={dp.collarRowsD} columns={[
         { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'จำนวนคำนวณ (ชุด)', right: true },
-      ]} />
-      <DetailTable title="ลวด PC.wire" subtitle={dp.pc7NoteExtra} rows={dp.pcRowsD} columns={[
-        { key: 'label', label: 'รายการ' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
-      ]} />
-      <DetailTable title="ลวดปลอก" rows={dp.stirrupRowsD} columns={[
-        { key: 'label', label: 'ขนาดเสา' }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
       ]} />
       <DetailTable title="เหล็กเสริมหลัก (DB/RB)" rows={dp.rebarRowsD} columns={[
         { key: 'label', label: 'ขนาด/ความยาว' }, { key: 'piecesFmt', label: 'จำนวน (เส้น)', right: true }, { key: 'calcFmt', label: 'น้ำหนักคำนวณ (กก.)', right: true },
@@ -1060,6 +1289,29 @@ function TrendView({ app }) {
         ))}</tbody>
       </table>
       <div style={{ fontSize: 12, color: '#78839A' }}>% ผิดพลาด = ส่วนต่างจริง ÷ ยอดคำนวณ ต่อวัตถุดิบ ในแต่ละงวด (คอลัมน์ขวาสุดคืองวดปัจจุบัน)</div>
+
+      {(() => {
+        const pt = app.buildPileTrendRows();
+        if (!pt.rows.some(r => r.cells.some(c => c.text !== '-'))) return null;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>คิวผลิต & ความยาวเสาเข็ม — เทียบรายงวด</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
+              <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
+                {pt.cols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}
+              </tr></thead>
+              <tbody>{pt.rows.map((row, i) => (
+                <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
+                  <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 600 }}>{row.label}</td>
+                  {row.cells.map((c, j) => <td key={j} style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right' }}>{c.text}</td>)}
+                </tr>
+              ))}</tbody>
+            </table>
+            <div style={{ fontSize: 12, color: '#78839A' }}>ตัวเลขของแต่ละงวดมาจากไฟล์รายการเสาที่อัปโหลดในงวดนั้น</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1086,7 +1338,7 @@ function SettingsPanel({ app }) {
     { title: 'มาตรฐาน มอก.', bg: '#eef6f7', color: '#1f7a8c', lineColor: '#d5e9ec', rows: entries.filter(([d]) => mok(d)).sort((a, b) => a[0].localeCompare(b[0], 'th')) },
     { title: 'โรงงาน (ไม่มี มอก.)', bg: '#f7f4ee', color: '#8a6d1f', lineColor: '#ece5d5', rows: entries.filter(([d]) => !mok(d)).sort((a, b) => a[0].localeCompare(b[0], 'th')) },
   ].filter(g => g.rows.length);
-  const tabs = [['rebar', 'เหล็กเสริม'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['pcWire', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['alert', 'เกณฑ์แจ้งเตือน']];
+  const tabs = [['rebar', 'เหล็กเสริม'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['pcWire', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['area', 'หน้าตัดเสา'], ['alert', 'เกณฑ์แจ้งเตือน']];
   const lockBtn = (key) => { const ui = app.buildLockUi(key); return <button onClick={ui.onToggle} style={{ ...btnGhost(), fontSize: 12 }}>{ui.label}</button>; };
   return (
     <div style={card()} data-no-print="true">
@@ -1246,6 +1498,31 @@ function SettingsPanel({ app }) {
                           ))}
                         </div>
                         <button onClick={() => { const len = window.prompt('ความยาว (ม.) ที่จะเพิ่มสำหรับ ' + dl(diam) + ' ?'); if (len) app.addStirrupLength(diam, len); }} style={{ ...btnGhost(), fontSize: 12, marginTop: 8, background: 'white' }}>+ เพิ่มความยาว</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {s.settingsTab === 'area' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><b>พื้นที่หน้าตัดเสาแต่ละขนาด (ตร.ม.)</b>{lockBtn('area')}</div>
+            <div style={{ fontSize: 12.5, color: '#78839A', marginBottom: 10, lineHeight: 1.7 }}>
+              ใช้คำนวณคิวผลิตในแท็บ “คิวผลิต & ความยาว” — คิว = พื้นที่หน้าตัด × ความยาวรวม<br />
+              กรอกครั้งเดียว ระบบจำไว้ใช้ทุกงวด
+            </div>
+            <div style={{ opacity: s.locks.area ? 0.5 : 1, pointerEvents: s.locks.area ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {groupBy(app.allPileDiams().map(k => ({ key: k, value: (s.pileAreaM2 || {})[k], isMok: mok(k) }))).map((g, i) => (
+                <div key={i} style={{ border: '1px solid #dce7ea', borderRadius: 8, padding: 12, background: g.bg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: g.color }}>{g.title}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+                    {g.rows.map(row => (
+                      <div key={row.key} style={{ background: 'white', border: '1px solid #e3e7ee', borderRadius: 6, padding: 8 }}>
+                        <div style={{ fontSize: 12, color: '#78839A' }}>{dl(row.key)}</div>
+                        <input type="number" step="0.0001" min="0" placeholder="ตร.ม." value={row.value ?? ''}
+                          onChange={e => app.updatePileArea(row.key, e.target.value)} style={{ ...inp(null), width: '100%' }} />
                       </div>
                     ))}
                   </div>

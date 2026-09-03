@@ -456,6 +456,14 @@ function niceMax(max,ticks=4){
   return Math.ceil(max/(s*mag))*(s*mag);
 }
 function axisTicks(min,max,count=4){const a=[];for(let i=0;i<=count;i++)a.push(min+((max-min)*i)/count);return a;}
+// ข้อความจำนวนต่อท้ายชื่อสินค้า เช่น " · 2 ต้น" — ว่างถ้าไม่มีจำนวน
+function qtyTxt(q){
+  const n=Number(q);
+  if(!q||!isFinite(n)||n===0) return '';
+  const s=Number.isInteger(n)?String(n):String(Math.round(n*100)/100);
+  return ' · '+s+' ต้น';
+}
+
 // รวมรายการเสียหายที่อยู่บิลเดียวกัน (แถวที่ merge ในชีทจะได้เลขบิลเดียวกัน)
 // แถวที่ไม่มีเลขบิลถือเป็นรายการเดี่ยว ไม่ถูกยุบรวมกับใคร
 function groupByBill(rows){
@@ -1121,8 +1129,9 @@ window.__dataReady.then(data => {
                         </span>
                       </div>
                       <div style={{fontSize:'13px',fontWeight:600,color:'var(--ink)',marginBottom:2}}>{r.cause||'ไม่ระบุสาเหตุ'}</div>
+                      {r.product_name && <div style={{fontSize:'12px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                       {r.reason && <div style={{fontSize:'11px',color:'#374151',marginBottom:2,fontStyle:'italic'}}>{r.reason}</div>}
-                      <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
+                      <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{r.bill_no?r.bill_no+' · ':''}{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
                     </div>
                   );
 
@@ -1666,6 +1675,7 @@ window.__dataReady.then(data => {
                                   {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
                                 </span>
                               </div>
+                              {r.product_name && <div style={{fontSize:'11px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                               {r.reason && <div style={{fontSize:'11px',color:'#374151'}}>{r.reason}</div>}
                             </div>
                           ));
@@ -1695,6 +1705,7 @@ window.__dataReady.then(data => {
                                         {Number(r.amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿
                                       </span>
                                     </div>
+                                    {r.product_name && <div style={{fontSize:'11px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                                     {r.reason && <div style={{fontSize:'11px',color:'#374151'}}>{r.reason}</div>}
                                   </div>
                                 ))}
@@ -1818,6 +1829,7 @@ window.__dataReady.then(data => {
                             color:head.code_type==='ID'?'#9d174d':'#1d4ed8'}}>{head.code_type||'ID'}</span>
                           <span style={{fontFamily:'var(--num)',fontSize:'13px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(head.amount)} ฿</span>
                         </div>
+                        {head.product_name&&<div style={{fontSize:'12px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {head.product_name}{qtyTxt(head.qty)}</div>}
                         {head.contractor_team&&<div style={{fontSize:'11px',color:'#2f5fd0',fontWeight:600,marginBottom:2}}>👷 {head.contractor_team}</div>}
                         <div style={{fontSize:'12px',color:'#374151',marginBottom:2}}>{head.reason||head.cause||'ไม่ระบุ'}</div>
                         <div style={{fontSize:'11px',color:'var(--muted-text)'}}>{g.bill?g.bill+' · ':''}{MONTHS_TH_SHORT[(head.month||1)-1]}-{String(head.year).slice(-2)}</div>
@@ -1842,9 +1854,11 @@ window.__dataReady.then(data => {
                       </div>
                       {open&&<div style={{marginTop:4,display:'flex',flexDirection:'column',gap:4,paddingLeft:8}}>
                         {g.rows.map((r,ri)=>(
-                          <div key={ri} style={{background:'#fff',borderRadius:7,border:'1px solid #fcd5d5',padding:'6px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                            <span style={{fontSize:'11px',color:'var(--muted-text)'}}>รายการที่ {ri+1}</span>
-                            <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b'}}>{bahtFmt(r.amount)} ฿</span>
+                          <div key={ri} style={{background:'#fff',borderRadius:7,border:'1px solid #fcd5d5',padding:'6px 10px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                            <span style={{fontSize:'11px',color:r.product_name?'#1f2937':'var(--muted-text)',flex:1,minWidth:0}}>
+                              {r.product_name?'🧱 '+r.product_name+qtyTxt(r.qty):'รายการที่ '+(ri+1)+qtyTxt(r.qty)}
+                            </span>
+                            <span style={{fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,color:'#c0392b',whiteSpace:'nowrap'}}>{bahtFmt(r.amount)} ฿</span>
                           </div>
                         ))}
                       </div>}
@@ -1871,8 +1885,9 @@ window.__dataReady.then(data => {
                               {bahtFmt(r.amount)} ฿
                             </span>
                           </div>
+                          {r.product_name && <div style={{fontSize:'11px',color:'#1f2937',fontWeight:600,marginBottom:2}}>🧱 {r.product_name}{qtyTxt(r.qty)}</div>}
                           {r.reason && <div style={{fontSize:'11px',color:'#374151',marginBottom:2}}>{r.reason}</div>}
-                          <div style={{fontSize:'10px',color:'var(--muted-text)'}}>{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
+                          <div style={{fontSize:'10px',color:'var(--muted-text)'}}>{r.bill_no?r.bill_no+' · ':''}{MONTHS_TH_SHORT[(r.month||1)-1]}-{String(r.year).slice(-2)}</div>
                         </div>
                       ))}
                     </div>}
@@ -1987,13 +2002,230 @@ window.__dataReady.then(data => {
       style={{width:'100%',minHeight:400,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
   }
 
+  // ============================================================
+  // วิเคราะห์ขนาดเสา — แยกหน้าตัด / ความยาว จากชื่อสินค้า
+  // เช่น "เสาเข็ม I-0.26 x 11.00 เมตร ท่อนเชื่อม มอก."
+  //      → หน้าตัด I-0.26 · ยาว 11.00 ม. · ท่อนเชื่อม
+  // ============================================================
+  const PILE_BAR_COLORS=['#c0392b','#e07b39','#e5a72c','#2f9e6f','#2f5fd0','#7c3aed','#0891b2','#be185d','#65a30d','#64748b'];
+
+  function parsePile(name){
+    const s=String(name||'');
+    const m=s.match(/([IS])\s*-\s*([\d.]+)\s*[xX×]\s*([\d.]+)/);
+    const joint=/ท่อนเดี่ยว/.test(s)?'ท่อนเดี่ยว':(/ท่อนเชื่อม/.test(s)?'ท่อนเชื่อม':'ไม่ระบุ');
+    if(!m) return {sec:'ไม่ระบุขนาด',len:null,joint,ok:false};
+    return {sec:m[1]+'-'+m[2],len:parseFloat(m[3]),joint,ok:true};
+  }
+
+  function PileSizeView({items}){
+    const CAUSE_CRACK='เสาร้าวในกอง/จากขนส่ง/ปีกแตก';
+    const causes=[...new Set(items.map(r=>r.cause).filter(Boolean))].sort();
+    const defCause=causes.find(c=>/เสาร้าว/.test(c))||'__all__';
+    const [cause,setCause]=useState(defCause);
+    const [metric,setMetric]=useState('amount');   // amount | qty | count
+    const [openSec,setOpenSec]=useState(null);
+
+    const rows=items.filter(r=>cause==='__all__'||r.cause===cause)
+                    .map(r=>({...r,p:parsePile(r.product_name)}));
+    const total=rows.reduce((a,b)=>a+(Number(b.amount)||0),0);
+    const totalQty=rows.reduce((a,b)=>a+(Number(b.qty)||0),0);
+    const unparsed=rows.filter(r=>!r.p.ok).length;
+
+    const group=keyFn=>{
+      const g={};
+      rows.forEach(r=>{
+        const k=keyFn(r.p); if(k==null) return;
+        if(!g[k]) g[k]={key:k,amount:0,qty:0,count:0,rows:[]};
+        g[k].amount+=Number(r.amount)||0;
+        g[k].qty   +=Number(r.qty)||0;
+        g[k].count++;
+        g[k].rows.push(r);
+      });
+      return Object.values(g);
+    };
+    const val=g=>metric==='amount'?g.amount:metric==='qty'?g.qty:g.count;
+    const bySec=group(p=>p.sec).sort((a,b)=>val(b)-val(a));
+    const byJoint=group(p=>p.joint).sort((a,b)=>b.amount-a.amount);
+    const maxVal=Math.max(1,...bySec.map(val));
+
+    // ตารางไขว้ หน้าตัด × ความยาว
+    const lens=[...new Set(rows.filter(r=>r.p.len!=null).map(r=>r.p.len))].sort((a,b)=>a-b);
+    const secsForGrid=bySec.filter(g=>g.key!=='ไม่ระบุขนาด').map(g=>g.key);
+    const cell={};
+    rows.forEach(r=>{ if(r.p.len==null) return;
+      const k=r.p.sec+'|'+r.p.len;
+      cell[k]=(cell[k]||0)+(Number(r.amount)||0);
+    });
+    const maxCell=Math.max(1,...Object.values(cell));
+
+    const fmt=n=>Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:0});
+    const th={padding:'9px 10px',textAlign:'right',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap',fontSize:13};
+    const td={padding:'8px 10px',textAlign:'right',whiteSpace:'nowrap',fontSize:13.5};
+    const seg=(v,label,cur,set)=>(
+      <button key={v} onClick={()=>set(v)} style={{padding:'5px 13px',borderRadius:20,fontSize:13,cursor:'pointer',fontFamily:'inherit',
+        border:`1.5px solid ${cur===v?'#2f5fd0':'#e2e8f0'}`,background:cur===v?'#2f5fd0':'#fff',
+        color:cur===v?'#fff':'#334155',fontWeight:cur===v?700:400}}>{label}</button>
+    );
+
+    if(rows.length===0) return <ChartCard title="วิเคราะห์ขนาดเสา" span="full">
+      <div style={{padding:28,color:'#94a3b8'}}>ไม่มีข้อมูลในช่วงที่เลือก</div></ChartCard>;
+
+    return <>
+      <ChartCard span="full" title="วิเคราะห์ขนาดเสาที่เสียหาย"
+        subtitle="แยกตามหน้าตัดและความยาว จากชื่อสินค้า — ใช้หาว่าขนาดไหนเสียหายมากที่สุด">
+
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',marginBottom:16}}>
+          <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600}}>สาเหตุ</span>
+          <select value={cause} onChange={e=>{setCause(e.target.value);setOpenSec(null);}}
+            style={{padding:'7px 11px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,background:'#fff',fontFamily:'inherit',maxWidth:340}}>
+            <option value="__all__">ทุกสาเหตุรวมกัน</option>
+            {causes.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+          <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600,marginLeft:6}}>เรียงตาม</span>
+          <div style={{display:'flex',gap:6}}>
+            {seg('amount','มูลค่า',metric,setMetric)}
+            {seg('qty','จำนวนต้น',metric,setMetric)}
+            {seg('count','จำนวนครั้ง',metric,setMetric)}
+          </div>
+        </div>
+
+        {/* KPI */}
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
+          {[['มูลค่าเสียหายรวม',fmt(total)+' ฿','#c0392b'],
+            ['จำนวนต้น',fmt(totalQty)+' ต้น','#1a56db'],
+            ['จำนวนครั้ง',fmt(rows.length)+' รายการ','#7c3aed'],
+            ['เฉลี่ยต่อต้น',(totalQty?fmt(total/totalQty):'–')+' ฿','#059669']].map(([l,v,c])=>(
+            <div key={l} style={{flex:'1 1 170px',border:'1px solid #e6e8ee',borderRadius:12,padding:'13px 17px'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>{l}</div>
+              <div style={{fontSize:26,fontWeight:800,color:c,lineHeight:1.15}}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* กราฟแท่งแยกตามหน้าตัด */}
+        <div style={{marginBottom:20}}>
+          {bySec.map((g,i)=>{
+            const v=val(g), pct=total>0?g.amount/total*100:0;
+            const unit=metric==='amount'?' ฿':metric==='qty'?' ต้น':' ครั้ง';
+            return <div key={g.key} style={{display:'flex',alignItems:'center',gap:12,marginBottom:7}}>
+              <div style={{width:96,fontSize:13.5,fontWeight:700,color:'#1e293b',textAlign:'right'}}>{i+1}. {g.key}</div>
+              <div style={{flex:1,background:'#eef0f5',borderRadius:6,height:20,overflow:'hidden'}}>
+                <div style={{width:(v/maxVal*100)+'%',height:'100%',background:PILE_BAR_COLORS[i%PILE_BAR_COLORS.length],borderRadius:6}}/>
+              </div>
+              <div style={{width:120,textAlign:'right',fontSize:13.5,fontWeight:700,color:'#c0392b'}}>{fmt(v)}{unit}</div>
+              <div style={{width:52,textAlign:'right',fontSize:12.5,color:'#8b91a1'}}>{pct.toFixed(1)}%</div>
+            </div>;
+          })}
+        </div>
+
+        {/* ตาราง — คลิกหน้าตัดเพื่อกางดูความยาว */}
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead><tr style={{background:'#f4f6fa'}}>
+              <th style={{...th,textAlign:'left'}}>หน้าตัด</th>
+              <th style={th}>จำนวนต้น</th><th style={th}>จำนวนครั้ง</th>
+              <th style={th}>มูลค่า (฿)</th><th style={th}>บาท/ต้น</th><th style={th}>% ของสาเหตุนี้</th>
+            </tr></thead>
+            <tbody>
+              {bySec.map(g=>{
+                const open=openSec===g.key;
+                const byLen=(()=>{ const m={};
+                  g.rows.forEach(r=>{const k=r.p.len==null?'ไม่ระบุ':r.p.len.toFixed(2)+' ม.';
+                    if(!m[k])m[k]={key:k,len:r.p.len,amount:0,qty:0,count:0};
+                    m[k].amount+=Number(r.amount)||0;m[k].qty+=Number(r.qty)||0;m[k].count++;});
+                  return Object.values(m).sort((a,b)=>b.amount-a.amount);})();
+                return <React.Fragment key={g.key}>
+                  <tr onClick={()=>setOpenSec(open?null:g.key)}
+                    style={{borderBottom:'1px solid #eef0f5',cursor:'pointer',background:open?'#eef3fc':'transparent'}}>
+                    <td style={{...td,textAlign:'left',fontWeight:700}}>{open?'▲':'▼'} {g.key}</td>
+                    <td style={td}>{fmt(g.qty)}</td>
+                    <td style={td}>{fmt(g.count)}</td>
+                    <td style={{...td,fontWeight:700,color:'#c0392b'}}>{fmt(g.amount)}</td>
+                    <td style={td}>{g.qty?fmt(g.amount/g.qty):'–'}</td>
+                    <td style={td}>{total>0?(g.amount/total*100).toFixed(1)+'%':'–'}</td>
+                  </tr>
+                  {open&&byLen.map(L=>(
+                    <tr key={g.key+L.key} style={{borderBottom:'1px solid #f4f6fa',background:'#fafbfd'}}>
+                      <td style={{...td,textAlign:'left',paddingLeft:34,color:'#5f6470'}}>ยาว {L.key}</td>
+                      <td style={{...td,color:'#5f6470'}}>{fmt(L.qty)}</td>
+                      <td style={{...td,color:'#5f6470'}}>{fmt(L.count)}</td>
+                      <td style={{...td,color:'#5f6470'}}>{fmt(L.amount)}</td>
+                      <td style={{...td,color:'#5f6470'}}>{L.qty?fmt(L.amount/L.qty):'–'}</td>
+                      <td style={{...td,color:'#5f6470'}}>{total>0?(L.amount/total*100).toFixed(1)+'%':'–'}</td>
+                    </tr>
+                  ))}
+                </React.Fragment>;
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {unparsed>0&&<div style={{marginTop:12,fontSize:13,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'9px 13px'}}>
+          ⚠️ มี {unparsed} รายการที่อ่านขนาดจากชื่อสินค้าไม่ได้ — รวมไว้ในกลุ่ม “ไม่ระบุขนาด” ตรวจการพิมพ์ชื่อในชีทได้
+        </div>}
+
+        <div style={{marginTop:12,fontSize:13,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'10px 14px',lineHeight:1.7}}>
+          💡 ตัวเลขนี้บอกว่า <b>ขนาดไหนเสียหายมากที่สุดเป็นบาท</b> ซึ่งมักแปรตามยอดผลิต —
+          ขนาดที่ผลิตเยอะย่อมเสียหายเยอะตาม ยังไม่ได้แปลว่าขนาดนั้นเปราะกว่า
+          ถ้าต้องการรู้ว่า<b>ขนาดไหนเสี่ยงจริง</b> ต้องหารด้วยจำนวนต้นที่ผลิตของขนาดนั้น
+        </div>
+      </ChartCard>
+
+      {/* ตารางไขว้ หน้าตัด × ความยาว */}
+      {secsForGrid.length>0&&lens.length>0&&
+      <ChartCard span="full" title="ตารางไขว้ หน้าตัด × ความยาว" subtitle="สีเข้ม = มูลค่าเสียหายสูง • ช่องว่าง = ไม่มีรายการ">
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',fontSize:12.5}}>
+            <thead><tr>
+              <th style={{padding:'7px 10px',textAlign:'left',position:'sticky',left:0,background:'#f4f6fa',borderBottom:'2px solid #e2e5ee',fontWeight:700,color:'#42465a'}}>หน้าตัด</th>
+              {lens.map(L=><th key={L} style={{padding:'7px 9px',textAlign:'right',borderBottom:'2px solid #e2e5ee',fontWeight:700,color:'#42465a',whiteSpace:'nowrap'}}>{L.toFixed(2)} ม.</th>)}
+              <th style={{padding:'7px 10px',textAlign:'right',borderBottom:'2px solid #e2e5ee',fontWeight:800,color:'#c0392b'}}>รวม</th>
+            </tr></thead>
+            <tbody>
+              {secsForGrid.map(sec=>{
+                const rowSum=lens.reduce((a,L)=>a+(cell[sec+'|'+L]||0),0);
+                return <tr key={sec}>
+                  <td style={{padding:'7px 10px',fontWeight:700,position:'sticky',left:0,background:'#fff',borderBottom:'1px solid #eef0f5',whiteSpace:'nowrap'}}>{sec}</td>
+                  {lens.map(L=>{
+                    const v=cell[sec+'|'+L]||0;
+                    const a=v?0.12+0.68*(v/maxCell):0;
+                    return <td key={L} style={{padding:'7px 9px',textAlign:'right',borderBottom:'1px solid #eef0f5',
+                      background:v?`rgba(192,57,43,${a.toFixed(3)})`:'transparent',
+                      color:v&&a>0.45?'#fff':'#42465a',fontWeight:v?600:400,whiteSpace:'nowrap'}}>
+                      {v?fmt(v):'–'}</td>;
+                  })}
+                  <td style={{padding:'7px 10px',textAlign:'right',fontWeight:800,color:'#c0392b',borderBottom:'1px solid #eef0f5',whiteSpace:'nowrap'}}>{fmt(rowSum)}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>}
+
+      {/* ท่อนเชื่อม vs ท่อนเดี่ยว */}
+      <ChartCard span="full" title="เทียบชนิดท่อน" subtitle="ท่อนเชื่อม / ท่อนเดี่ยว">
+        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+          {byJoint.map(g=>(
+            <div key={g.key} style={{flex:'1 1 190px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+              <div style={{fontSize:14,fontWeight:700,color:'#1e293b',marginBottom:6}}>{g.key}</div>
+              <div style={{fontSize:24,fontWeight:800,color:'#c0392b',lineHeight:1.15}}>{fmt(g.amount)} <span style={{fontSize:14}}>฿</span></div>
+              <div style={{fontSize:13,color:'#5f6470',marginTop:5}}>
+                {fmt(g.qty)} ต้น · {fmt(g.count)} ครั้ง · {total>0?(g.amount/total*100).toFixed(1):'–'}%
+              </div>
+            </div>
+          ))}
+        </div>
+      </ChartCard>
+    </>;
+  }
+
   function DamageDetailTab({currentUser}){
     const isAdmin=currentUser?.role==='admin';
     const tp={...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
     const dmgSubTabs=[
       {value:'damage',label:'มูลค่าเสียหาย'},{value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},
       {value:'summary',label:'ตารางสรุป'},{value:'cause',label:'แยกสาเหตุ'},
-      {value:'customer',label:'แยกลูกค้า'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
+      {value:'customer',label:'แยกลูกค้า'},{value:'size',label:'วิเคราะห์ขนาดเสา'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
       {value:'detail',label:'ตารางรายการ'}
     ].filter(t=>isAdmin||tp['dmg_'+t.value]!==false);
     const [view,setView]   = useState('damage');
@@ -2277,7 +2509,7 @@ window.__dataReady.then(data => {
                 delta={pctDelta!=null?{dir:pctDelta<=0?-1:1,text:''}:null}/>
             </div>;
           })()
-        : view==='worker' ? null
+        : view==='worker'||view==='size' ? null
         : <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
             <KpiCard label="เสียหายรวม (กรอง)" value={bahtFmt(totalAll)} unit=" ฿"
               sub={`${[...new Set(items.map(r=>r.month))].length} เดือน`} accent={PALETTE.cancel}/>
@@ -2429,6 +2661,7 @@ window.__dataReady.then(data => {
       {view==='customer' && <CustomerView items={items} totalAll={totalAll}/>}
 
       {/* Worker sub-tab nav */}
+      {view==='size' && <PileSizeView items={items}/>}
       {view==='worker' && <div style={{gridColumn:'1 / -1',display:'flex',gap:8,marginBottom:4}}>
         {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'},{v:'driver',l:'วิเคราะห์คนขับรถ'}].map(({v,l})=>(
           <button key={v} onClick={()=>setWorkerTab(v)} style={{padding:'7px 20px',borderRadius:20,border:`1.5px solid ${workerTab===v?'#0f766e':'#e2e8f0'}`,background:workerTab===v?'#0f766e':'#fff',color:workerTab===v?'#fff':'#334155',fontSize:13,fontWeight:workerTab===v?700:400,cursor:'pointer'}}>
@@ -3407,6 +3640,7 @@ window.__dataReady.then(data => {
         </>;
       })()}
 
+      <CementSavingSection canEdit={canEdit}/>
       <SandFMSection canEdit={canEdit}/>
       <StoneGradationSection canEdit={canEdit}/>
     </div>;
@@ -3705,6 +3939,319 @@ window.__dataReady.then(data => {
     });
     const fm=rows.reduce((a,r)=>a+r.cum,0)/100;
     return {total,rows,fm,pan};
+  }
+
+  // ============================================================
+  // ปูนที่ใช้จริงต่อคิว + เงินที่ลดได้เทียบเกณฑ์ปีก่อน
+  // กรอกข้อมูลบนหน้าเว็บโดยตรง (แยกจากกราฟปูนที่ดึงมาจาก Sheet)
+  //   เฉลี่ย  = ยอดซื้อปูน(กก.) ÷ ยอดคิวคำนวณ(m³)
+  //   ส่วนต่าง = เกณฑ์ปีก่อน − เฉลี่ย
+  //   ประหยัด  = ส่วนต่าง × คิว × ราคาปูน(บาท/กก.)
+  // ============================================================
+  function CementSavingSection({canEdit}){
+    const db=DB;
+    const THAI_M=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const [rows,setRows]=useState([]);
+    const [cfg,setCfg]=useState({baseline_kg_m3:380,price_per_kg:0});
+    const [loading,setLoading]=useState(true);
+    const [missing,setMissing]=useState(false);
+    const [showForm,setShowForm]=useState(false);
+    const [editId,setEditId]=useState(null);
+    const [saving,setSaving]=useState(false);
+    const [msg,setMsg]=useState('');
+    const [selYear,setSelYear]=useState(null);
+    const [cfgDraft,setCfgDraft]=useState(null);   // ไม่ null = กำลังแก้ค่าตั้งต้น
+    const now=new Date();
+    const blank={year:now.getFullYear()+543,month:now.getMonth()+1,cement_kg:'',note:''};
+    const [form,setForm]=useState(blank);
+
+    // คิวผลิตจริงจากระบบ (ตาราง production_monthly) — ผู้ใช้ไม่ต้องกรอกเอง
+    const producedFor=(y,m)=>{
+      const g=(D.years||{})[Number(y)];
+      if(!g||!g.months) return null;
+      const row=g.months.find(x=>Number(x.m)===Number(m));
+      const v=row?Number(row.produced):null;
+      return (v!=null&&isFinite(v)&&v>0)?v:null;
+    };
+    // ใช้ค่าจากระบบก่อนเสมอ ถ้าเดือนนั้นระบบยังไม่มีข้อมูลจึงใช้ค่าที่บันทึกไว้
+    const volOf=r=>producedFor(r.year,r.month) ?? (Number(r.volume_m3)||0);
+
+    const load=()=>{
+      Promise.all([
+        db.from('cement_usage').select('*').order('year',{ascending:false}).order('month',{ascending:false}),
+        db.from('cement_config').select('*').eq('id',1).maybeSingle()
+      ]).then(([u,c])=>{
+        if(u.error){setMissing(true);setLoading(false);return;}
+        const list=u.data||[];
+        setRows(list);
+        if(c.data) setCfg({baseline_kg_m3:Number(c.data.baseline_kg_m3)||380,price_per_kg:Number(c.data.price_per_kg)||0});
+        setSelYear(y=>y!=null?y:(list.length?list[0].year:now.getFullYear()+543));
+        setLoading(false);
+      }).catch(()=>{setMissing(true);setLoading(false);});
+    };
+    useEffect(load,[]);
+
+    const years=[...new Set(rows.map(r=>r.year))].sort((a,b)=>b-a);
+    const yr=selYear!=null?selYear:(years[0]||now.getFullYear()+543);
+    const yearRows=rows.filter(r=>r.year===yr).sort((a,b)=>a.month-b.month);
+
+    const calc=r=>{
+      const kg=Number(r.cement_kg)||0, m3=volOf(r);
+      const avg=m3>0?kg/m3:null;
+      const diff=avg!=null?cfg.baseline_kg_m3-avg:null;      // + = ลดลงได้
+      const savedKg=diff!=null?diff*m3:null;
+      const savedBaht=savedKg!=null?savedKg*cfg.price_per_kg:null;
+      return {kg,m3,avg,diff,savedKg,savedBaht};
+    };
+    const sum=yearRows.reduce((a,r)=>{
+      const c=calc(r);
+      a.kg+=c.kg; a.m3+=c.m3;
+      a.savedKg+=c.savedKg||0; a.savedBaht+=c.savedBaht||0;
+      return a;
+    },{kg:0,m3:0,savedKg:0,savedBaht:0});
+    const sumAvg=sum.m3>0?sum.kg/sum.m3:null;
+    const sumDiff=sumAvg!=null?cfg.baseline_kg_m3-sumAvg:null;
+
+    const n0=v=>v==null?'–':Number(v).toLocaleString('th-TH',{maximumFractionDigits:0});
+    const n1=v=>v==null?'–':Number(v).toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1});
+    const n2=v=>v==null?'–':Number(v).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+    const save=()=>{
+      const kg=Number(form.cement_kg);
+      const m3=producedFor(form.year,form.month);
+      if(!kg||kg<=0){setMsg('❌ กรุณาใส่ยอดซื้อปูน (กิโลกรัม)');return;}
+      if(!m3){setMsg('❌ ระบบยังไม่มีคิวผลิตจริงของเดือนนี้ — ต้องมีข้อมูลการผลิตก่อน');return;}
+      setSaving(true);setMsg('');
+      const rec={year:Number(form.year),month:Number(form.month),cement_kg:kg,volume_m3:m3,note:form.note||''};
+      const q=editId? db.from('cement_usage').update(rec).eq('id',editId)
+                    : db.from('cement_usage').insert([rec]);
+      q.then(({error})=>{
+        setSaving(false);
+        if(error){setMsg(error.code==='23505'?'❌ เดือนนี้บันทึกไว้แล้ว — กดแก้ไขที่แถวเดิมแทน':'❌ '+error.message);return;}
+        setShowForm(false);setEditId(null);setForm(blank);setSelYear(Number(form.year));load();
+      });
+    };
+    const openNew =()=>{setForm(blank);setEditId(null);setMsg('');setShowForm(true);};
+    const openEdit=r=>{setForm({year:r.year,month:r.month,cement_kg:r.cement_kg,note:r.note||''});setEditId(r.id);setMsg('');setShowForm(true);};
+    const del=r=>{
+      if(!window.confirm(`ลบข้อมูลเดือน ${THAI_M[r.month]} ${r.year} ?`))return;
+      db.from('cement_usage').delete().eq('id',r.id).then(load);
+    };
+    const saveCfg=()=>{
+      const b=Number(cfgDraft.baseline_kg_m3), p=Number(cfgDraft.price_per_kg);
+      if(!b||b<=0){setMsg('❌ เกณฑ์ปีก่อนต้องมากกว่า 0');return;}
+      db.from('cement_config').update({baseline_kg_m3:b,price_per_kg:p||0,updated_at:new Date().toISOString()}).eq('id',1)
+        .then(({error})=>{
+          if(error){setMsg('❌ '+error.message);return;}
+          setCfg({baseline_kg_m3:b,price_per_kg:p||0});setCfgDraft(null);setMsg('');
+        });
+    };
+
+    const inp={padding:'8px 10px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:15,width:'100%',fontFamily:'inherit',boxSizing:'border-box'};
+    const lbl={fontSize:13,color:'#5f6470',marginBottom:4,fontWeight:600};
+    const btn=(bg,fg)=>({padding:'9px 18px',borderRadius:8,border:'none',background:bg,color:fg,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'});
+    const th={padding:'9px 10px',textAlign:'right',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap',fontSize:13};
+    const td={padding:'8px 10px',textAlign:'right',whiteSpace:'nowrap',fontSize:13.5};
+
+    // ค่าที่คำนวณสดในฟอร์ม — คิวมาจากระบบ
+    const liveKg=Number(form.cement_kg)||0;
+    const liveM3=producedFor(form.year,form.month)||0;
+    const liveAvg=liveM3>0?liveKg/liveM3:null;
+    const liveDiff=liveAvg!=null?cfg.baseline_kg_m3-liveAvg:null;
+    const liveBaht=liveDiff!=null?liveDiff*liveM3*cfg.price_per_kg:null;
+
+    if(missing) return <ChartCard span="wide" title="ปูนที่ใช้จริงต่อคิว">
+      <div style={{padding:'18px 20px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
+        ⚠️ ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-cement-saving.sql</b> ก่อน
+      </div></ChartCard>;
+
+    return <>
+      <ChartCard span="wide"
+        title="ปูนที่ใช้จริงต่อคิว & เงินที่ลดได้"
+        subtitle={`เทียบเกณฑ์ปีก่อน ${n1(cfg.baseline_kg_m3)} กก./m³ • ราคาปูน ${n2(cfg.price_per_kg)} บาท/กก. • คิวผลิตดึงจากระบบอัตโนมัติ`}
+        right={canEdit&&<div style={{display:'flex',gap:8}}>
+          <button style={btn('#f0f2f7','#42465a')} onClick={()=>setCfgDraft({...cfg})}>⚙️ ตั้งค่า</button>
+          <button style={btn('#1a56db','#fff')} onClick={openNew}>+ บันทึกเดือน</button>
+        </div>}>
+
+        {loading? <div style={{padding:24,color:'#888'}}>กำลังโหลด…</div>
+        : rows.length===0? <div style={{padding:24,color:'#888',fontSize:15}}>ยังไม่มีข้อมูล — กด “+ บันทึกเดือน” เพื่อเริ่ม</div>
+        : <>
+          {years.length>1&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16,alignItems:'center'}}>
+            <span style={{fontSize:14,color:'#5f6470',fontWeight:600}}>ปี</span>
+            {years.map(y=>(
+              <button key={y} onClick={()=>setSelYear(y)}
+                style={{padding:'6px 14px',borderRadius:20,fontSize:14,cursor:'pointer',fontFamily:'inherit',
+                  border:`1.5px solid ${yr===y?'#1a56db':'#e2e8f0'}`,background:yr===y?'#1a56db':'#fff',
+                  color:yr===y?'#fff':'#334155',fontWeight:yr===y?700:400}}>{y}</button>
+            ))}
+          </div>}
+
+          {/* KPI รวมทั้งปี */}
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
+            <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>เฉลี่ยใช้ปูนจริง</div>
+              <div style={{fontSize:30,fontWeight:800,color:'#1a56db',lineHeight:1.1}}>{n1(sumAvg)}<span style={{fontSize:15,fontWeight:600,marginLeft:5}}>กก./m³</span></div>
+              <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>เกณฑ์ปีก่อน {n1(cfg.baseline_kg_m3)}
+                {canEdit&&<button onClick={()=>setCfgDraft({...cfg})} style={{marginLeft:7,border:'none',background:'none',color:'#1a56db',cursor:'pointer',fontSize:13,textDecoration:'underline',padding:0,fontFamily:'inherit'}}>แก้เกณฑ์</button>}
+              </div>
+            </div>
+            <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px',
+              background:sumDiff==null?'#fff':(sumDiff>=0?'#f2fbf6':'#fdf2f2')}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ส่วนต่างต่อคิว</div>
+              <div style={{fontSize:30,fontWeight:800,lineHeight:1.1,color:sumDiff==null?'#9aa0ac':(sumDiff>=0?'#059669':'#d13438')}}>
+                {sumDiff!=null&&sumDiff>0?'−':''}{n1(sumDiff!=null?Math.abs(sumDiff):null)}<span style={{fontSize:15,fontWeight:600,marginLeft:5}}>กก./m³</span>
+              </div>
+              <div style={{fontSize:13,marginTop:4,fontWeight:600,color:sumDiff==null?'#9aa0ac':(sumDiff>=0?'#059669':'#d13438')}}>
+                {sumDiff==null?'':sumDiff>=0?'✓ ใช้ปูนลดลง':'✗ ใช้ปูนเกินเกณฑ์'}
+              </div>
+            </div>
+            <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ปูนที่ลดได้รวม</div>
+              <div style={{fontSize:30,fontWeight:800,color:sum.savedKg>=0?'#059669':'#d13438',lineHeight:1.1}}>{n0(sum.savedKg)}<span style={{fontSize:15,fontWeight:600,marginLeft:5}}>กก.</span></div>
+              <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>คิวรวม {n0(sum.m3)} m³</div>
+            </div>
+            <div style={{flex:'1 1 200px',border:'2px solid '+(sum.savedBaht>=0?'#bfe6d2':'#f5c6c6'),borderRadius:12,padding:'14px 18px',
+              background:sum.savedBaht>=0?'#f2fbf6':'#fdf2f2'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>เงินที่ลดได้รวม</div>
+              <div style={{fontSize:30,fontWeight:800,color:sum.savedBaht>=0?'#059669':'#d13438',lineHeight:1.1}}>{n0(sum.savedBaht)}<span style={{fontSize:15,fontWeight:600,marginLeft:5}}>บาท</span></div>
+              {cfg.price_per_kg>0
+                ? <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>@ {n2(cfg.price_per_kg)} บาท/กก.
+                    {canEdit&&<button onClick={()=>setCfgDraft({...cfg})} style={{marginLeft:7,border:'none',background:'none',color:'#1a56db',cursor:'pointer',fontSize:13,textDecoration:'underline',padding:0,fontFamily:'inherit'}}>แก้ราคา</button>}
+                  </div>
+                : canEdit
+                  ? <button onClick={()=>setCfgDraft({...cfg})} style={{marginTop:6,padding:'5px 12px',borderRadius:8,border:'1px solid #fbbf24',background:'#fffbeb',color:'#92400e',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>⚠️ ยังไม่ได้ใส่ราคาปูน — กดใส่เลย</button>
+                  : <div style={{fontSize:13,marginTop:4,color:'#92400e'}}>⚠️ ยังไม่ได้ใส่ราคาปูน</div>}
+            </div>
+          </div>
+
+          {/* กราฟแนวโน้ม */}
+          <LineChart
+            categories={yearRows.map(r=>THAI_M[r.month])}
+            unit="กก./m³" decimals={1} showValues boxedLabels
+            series={[{label:'ใช้จริง',color:'#1a56db',data:yearRows.map(r=>calc(r).avg)}]}
+            targets={[{value:cfg.baseline_kg_m3,color:'#d13438',label:'เกณฑ์ปีก่อน'}]}
+            height={280} padRight={130}/>
+
+          {/* ตาราง */}
+          <div style={{overflowX:'auto',marginTop:16}}>
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead><tr style={{background:'#f4f6fa'}}>
+                <th style={{...th,textAlign:'left'}}>เดือน</th>
+                <th style={th}>ยอดซื้อปูน (กก.)</th><th style={th}>คิวผลิตจริง (m³)</th>
+                <th style={th}>เฉลี่ย (กก./m³)</th><th style={th}>ส่วนต่าง</th>
+                <th style={th}>ปูนที่ลดได้ (กก.)</th><th style={th}>เงินที่ลดได้ (฿)</th>
+                {canEdit&&<th style={{...th,textAlign:'center'}}></th>}
+              </tr></thead>
+              <tbody>
+                {yearRows.map(r=>{
+                  const c=calc(r), good=c.diff!=null&&c.diff>=0;
+                  return <tr key={r.id} style={{borderBottom:'1px solid #eef0f5'}}>
+                    <td style={{...td,textAlign:'left',fontWeight:600}}>{THAI_M[r.month]} {r.year}
+                      {r.note&&<div style={{fontSize:12,color:'#94a3b8',fontWeight:400}}>{r.note}</div>}</td>
+                    <td style={td}>{n0(c.kg)}</td>
+                    <td style={td}>{n0(c.m3)}</td>
+                    <td style={{...td,fontWeight:700,color:'#1a56db'}}>{n1(c.avg)}</td>
+                    <td style={{...td,fontWeight:700,color:good?'#059669':'#d13438'}}>{c.diff!=null?(good?'−':'+')+n1(Math.abs(c.diff)):'–'}</td>
+                    <td style={{...td,color:good?'#059669':'#d13438'}}>{n0(c.savedKg)}</td>
+                    <td style={{...td,fontWeight:700,color:good?'#059669':'#d13438'}}>{n0(c.savedBaht)}</td>
+                    {canEdit&&<td style={{...td,textAlign:'center'}}>
+                      <button onClick={()=>openEdit(r)} style={{fontSize:12,padding:'4px 10px',borderRadius:7,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',marginRight:5,fontFamily:'inherit'}}>แก้ไข</button>
+                      <button onClick={()=>del(r)} style={{fontSize:12,padding:'4px 10px',borderRadius:7,border:'1px solid #fecaca',background:'#fff',color:'#dc2626',cursor:'pointer',fontFamily:'inherit'}}>ลบ</button>
+                    </td>}
+                  </tr>;
+                })}
+                <tr style={{background:'#f4f6fa'}}>
+                  <td style={{...td,textAlign:'left',fontWeight:800}}>รวมทั้งปี {yr}</td>
+                  <td style={{...td,fontWeight:800}}>{n0(sum.kg)}</td>
+                  <td style={{...td,fontWeight:800}}>{n0(sum.m3)}</td>
+                  <td style={{...td,fontWeight:800,color:'#1a56db'}}>{n1(sumAvg)}</td>
+                  <td style={{...td,fontWeight:800,color:sumDiff>=0?'#059669':'#d13438'}}>{sumDiff!=null?(sumDiff>=0?'−':'+')+n1(Math.abs(sumDiff)):'–'}</td>
+                  <td style={{...td,fontWeight:800,color:sum.savedKg>=0?'#059669':'#d13438'}}>{n0(sum.savedKg)}</td>
+                  <td style={{...td,fontWeight:800,color:sum.savedBaht>=0?'#059669':'#d13438'}}>{n0(sum.savedBaht)}</td>
+                  {canEdit&&<td/>}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>}
+      </ChartCard>
+
+      {/* ฟอร์มบันทึกเดือน */}
+      {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(20,22,30,.55)',zIndex:9999,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'32px 16px',overflowY:'auto'}}>
+        <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:520,padding:26,boxShadow:'0 18px 50px rgba(0,0,0,.28)'}}>
+          <h3 style={{margin:'0 0 4px',fontSize:21,fontWeight:800,color:'#22252e'}}>{editId?'แก้ไขข้อมูลปูน':'บันทึกข้อมูลปูนรายเดือน'}</h3>
+          <p style={{margin:'0 0 20px',fontSize:14,color:'#6b7280'}}>ใส่แค่ยอดซื้อปูน — คิวผลิตจริงดึงจากระบบให้อัตโนมัติ</p>
+
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+            <div><div style={lbl}>ปี (พ.ศ.) *</div>
+              <input type="number" style={inp} value={form.year} onChange={e=>setForm({...form,year:e.target.value})}/></div>
+            <div><div style={lbl}>เดือน *</div>
+              <select style={{...inp,background:'#fff'}} value={form.month} onChange={e=>setForm({...form,month:e.target.value})}>
+                {THAI_M.slice(1).map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+              </select></div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+            <div><div style={lbl}>ยอดซื้อปูน (กิโลกรัม) *</div>
+              <input type="number" step="0.01" min="0" style={inp} value={form.cement_kg} onChange={e=>setForm({...form,cement_kg:e.target.value})}/></div>
+            <div><div style={lbl}>คิวผลิตจริง (m³)</div>
+              <div style={{...inp,background:'#f4f6fa',color:liveM3?'#1e293b':'#d13438',fontWeight:700,display:'flex',alignItems:'center'}}>
+                {liveM3?n0(liveM3):'ไม่มีข้อมูลเดือนนี้'}
+              </div>
+              <div style={{fontSize:12.5,color:'#8b91a1',marginTop:4}}>🔗 ดึงจากระบบอัตโนมัติ ไม่ต้องกรอก</div>
+            </div>
+          </div>
+          <div style={{marginBottom:16}}>
+            <div style={lbl}>หมายเหตุ</div>
+            <input style={inp} value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
+          </div>
+
+          <div style={{padding:'14px 18px',borderRadius:12,marginBottom:18,
+            background:liveDiff==null?'#f7f8fb':(liveDiff>=0?'#f2fbf6':'#fdf2f2'),
+            border:'1px solid '+(liveDiff==null?'#e6e8ee':(liveDiff>=0?'#bfe6d2':'#f5c6c6'))}}>
+            <div style={{display:'flex',gap:22,flexWrap:'wrap'}}>
+              <div><div style={{fontSize:13,color:'#5f6470'}}>เฉลี่ยใช้ปูน</div>
+                <div style={{fontSize:26,fontWeight:800,color:'#1a56db',lineHeight:1.15}}>{n1(liveAvg)} <span style={{fontSize:14}}>กก./m³</span></div></div>
+              <div><div style={{fontSize:13,color:'#5f6470'}}>ส่วนต่างจากเกณฑ์ {n1(cfg.baseline_kg_m3)}</div>
+                <div style={{fontSize:26,fontWeight:800,lineHeight:1.15,color:liveDiff==null?'#9aa0ac':(liveDiff>=0?'#059669':'#d13438')}}>
+                  {liveDiff!=null?(liveDiff>=0?'−':'+')+n1(Math.abs(liveDiff)):'–'} <span style={{fontSize:14}}>กก./m³</span></div></div>
+              <div><div style={{fontSize:13,color:'#5f6470'}}>เงินที่ลดได้</div>
+                <div style={{fontSize:26,fontWeight:800,lineHeight:1.15,color:liveBaht==null?'#9aa0ac':(liveBaht>=0?'#059669':'#d13438')}}>
+                  {n0(liveBaht)} <span style={{fontSize:14}}>บาท</span></div></div>
+            </div>
+          </div>
+
+          {msg&&<div style={{marginBottom:14,fontSize:15,fontWeight:600,color:msg[0]==='✅'?'#059669':'#d13438'}}>{msg}</div>}
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button style={btn('#f0f2f7','#42465a')} onClick={()=>{setShowForm(false);setEditId(null);setMsg('');}}>ยกเลิก</button>
+            <button style={btn('#1a56db','#fff')} disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+
+      {/* ตั้งค่าเกณฑ์ + ราคาปูน */}
+      {cfgDraft&&<div style={{position:'fixed',inset:0,background:'rgba(20,22,30,.55)',zIndex:9999,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'32px 16px',overflowY:'auto'}}>
+        <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:440,padding:26,boxShadow:'0 18px 50px rgba(0,0,0,.28)'}}>
+          <h3 style={{margin:'0 0 20px',fontSize:21,fontWeight:800,color:'#22252e'}}>⚙️ ตั้งค่า</h3>
+          <div style={{marginBottom:14}}>
+            <div style={lbl}>เกณฑ์ปีก่อน (กก./m³)</div>
+            <input type="number" step="0.1" min="0" style={inp} value={cfgDraft.baseline_kg_m3}
+              onChange={e=>setCfgDraft({...cfgDraft,baseline_kg_m3:e.target.value})}/>
+            <div style={{fontSize:12.5,color:'#8b91a1',marginTop:4}}>ค่าเฉลี่ยที่ใช้ปีก่อน ใช้เป็นตัวตั้งในการหาส่วนต่าง</div>
+          </div>
+          <div style={{marginBottom:18}}>
+            <div style={lbl}>ราคาปูนล่าสุด (บาท/กก.)</div>
+            <input type="number" step="0.01" min="0" style={inp} value={cfgDraft.price_per_kg}
+              onChange={e=>setCfgDraft({...cfgDraft,price_per_kg:e.target.value})}/>
+          </div>
+          {msg&&<div style={{marginBottom:14,fontSize:15,fontWeight:600,color:'#d13438'}}>{msg}</div>}
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+            <button style={btn('#f0f2f7','#42465a')} onClick={()=>{setCfgDraft(null);setMsg('');}}>ยกเลิก</button>
+            <button style={btn('#1a56db','#fff')} onClick={saveCfg}>บันทึก</button>
+          </div>
+        </div>
+      </div>}
+    </>;
   }
 
   function SandFMSection({canEdit}){
@@ -5612,7 +6159,7 @@ window.__dataReady.then(data => {
   // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
   const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',concrete:'concrete'};
   const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'cementAdd',v:'เหตุผลเพิ่มปูน'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
-  const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
+  const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_size',v:'วิเคราะห์ขนาดเสา'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
 
