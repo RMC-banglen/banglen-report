@@ -2607,11 +2607,11 @@ window.__dataReady.then(data => {
               </tr>
             </thead>
             <tbody>
-              {/* แถวยอดขาย */}
+              {/* แถวยอดขาย — ล็อกติดด้านบน (sticky) ใต้หัวตาราง 2 แถว กันเลื่อนลงแล้วยอดขายหายไป เทียบ % กับแถวอื่นด้านล่างไม่ได้ */}
               <tr style={{background:'#e6f4ea'}}>
-                <td className="ta-l strong" style={{position:'sticky',left:0,background:'#e6f4ea',zIndex:1,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
+                <td className="ta-l strong" style={{position:'sticky',left:0,top:'50px',background:'#e6f4ea',zIndex:2,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
                 {cols.map((c,i)=>{const s=colSales(c);return <React.Fragment key={i}>
-                  <td colSpan={2} style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea'}}>
+                  <td colSpan={2} style={{position:'sticky',top:'50px',textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea',zIndex:1}}>
                     {s?Number(s).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
                   </td>
                 </React.Fragment>;})}
