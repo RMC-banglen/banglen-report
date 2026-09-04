@@ -686,10 +686,12 @@ class App extends React.Component {
         kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
         onNoteChange: v => this.updatePlateGeneralUseEntry(t, idx, 'note', v), onRemove: () => this.removePlateGeneralUseEntry(t, idx),
       }));
-      // "รวมใช้งานอื่น-เสียหาย" โชว์คู่หน่วยแผ่นใหญ่ไว้เฉยๆ แต่ "ส่วนต่างเกิน-หายที่อธิบายไม่ได้" กลับไปรวมกันในหน่วย กก. ตรงๆ แบบเดิม (ยืนยันว่าแบบเดิมถูกแล้ว)
+      // "รวมใช้งานอื่น-เสียหาย" โชว์คู่หน่วยแผ่นใหญ่ไว้เฉยๆ
       const generalUseKg = entries.reduce((s, e) => s + (e.kg || 0), 0);
       const generalUseSheets = generalUseKg / kgPerSheet;
-      const unexplainedKg = sumABKg != null ? sumABKg + generalUseKg : null;
+      // "ส่วนต่างเกิน-หายที่อธิบายไม่ได้" ใช้สูตรดั้งเดิมสุด (A)+(B) แบบไม่กลับเครื่องหมาย (ต่างจากที่โชว์ใน "สรุป (A)+(B)" ที่กลับเครื่องหมายเพื่อให้อ่านง่าย)
+      const rawSumABKg = A != null ? (A + B) * kgPerSheet : null;
+      const unexplainedKg = rawSumABKg != null ? rawSumABKg + generalUseKg : null;
       return { t, rows, openWeightFmt: fmt(openWeightTotal, 1), closeWeightFmt: fmt(closeWeightTotal, 1),
         openSheetsFmt: fmt(openSheets, 2), closeSheetsFmt: fmt(closeSheets, 2), plateCalcBigFmt: fmt(plateCalcBig, 2),
         AFmt: A != null ? fmt(A, 2) : '-', BFmt: fmt(B, 2), sumABSheetsFmt: sumABSheets != null ? fmt(sumABSheets, 2) : '-',
