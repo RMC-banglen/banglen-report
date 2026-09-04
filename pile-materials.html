@@ -319,7 +319,7 @@ const td = (right) => ({ padding: '9px 14px', fontSize: 14, textAlign: right ? '
 class App extends React.Component {
   state = {
     fileName: '', loading: false, error: '', result: null, actual: {},
-    showSettings: false, settingsTab: 'rebar', resultView: 'main',
+    showSettings: false, settingsTab: 'rebar', resultView: 'main', stockSubTab: 'all',
     stock: {}, plateStockDiam: {}, plateGeneralUseEntries: {}, plateGeneralUseOpen: {},
     extraRebarItems: [], alertThresholdPct: 5, alertThresholdByCategory: {},
     mainSearchQuery: '', showAlertList: false, periodLocked: {}, periodSummaries: {},
@@ -409,6 +409,7 @@ class App extends React.Component {
   toggleLock(k) { if (READONLY) return; this.setState(s => ({ locks: { ...s.locks, [k]: !s.locks[k] } })); }
   setSettingsTab(t) { this.setState({ settingsTab: t }); }
   setResultView(v) { this.setState({ resultView: v }); }
+  setStockSubTab(v) { this.setState({ stockSubTab: v }); }
 
   pushUndo(s) { const st = [...(s.undoStack || []), this.snapshotFullState(s)]; return st.length > 20 ? st.slice(st.length - 20) : st; }
   snapshotFullState(s) {
@@ -1115,15 +1116,27 @@ class App extends React.Component {
                   <button onClick={() => window.print()} style={btnGhost()}>พิมพ์ / บันทึกเป็น PDF</button>
                 </div>
 
-                <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />
+                {/* แท็บย่อยแยกตามวัตถุดิบ เฉพาะโหมดนับสต็อก — กันต้องเลื่อนจอยาวๆ ตอนนับของทีละจุด (หน้าหลักยังโชว์รวมทุกอย่างเหมือนเดิม) */}
+                {stockMode && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-no-print="true">
+                    {[['all', 'ทั้งหมด'], ['pc', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['collar', 'Collar'], ['rebar', 'เหล็กเสริม']].map(([v, lbl]) => (
+                      <button key={v} onClick={() => this.setStockSubTab(v)} style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid ' + (s.stockSubTab === v ? '#2f5fd0' : '#d8dde6'), fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: s.stockSubTab === v ? '#2f5fd0' : 'white', color: s.stockSubTab === v ? 'white' : '#333' }}>{lbl}</button>
+                    ))}
+                  </div>
+                )}
+                {(() => { const sub = stockMode ? s.stockSubTab : 'all'; return (
+                <React.Fragment>
+                {(sub === 'all' || sub === 'pc') && <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                {(sub === 'all' || sub === 'stirrup') && <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                {(sub === 'all' || sub === 'plate') && <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />}
                 {/* กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา — โชว์เฉพาะแท็บนับสต็อก (ผู้ใช้แจ้งว่าไม่ต้องการให้โชว์ในหน้าหลัก) */}
-                {stockMode && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
-                <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />
-                <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
-                  extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />
+                {stockMode && (sub === 'all' || sub === 'plate') && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
+                {(sub === 'all' || sub === 'whisker') && <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                {(sub === 'all' || sub === 'collar') && <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                {(sub === 'all' || sub === 'rebar') && <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
+                  extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />}
+                </React.Fragment>
+                ); })()}
 
                 {mp.plateRowsM.map((row, i) => row.plateGeneralUseOpen && (
                   <GeneralUseModalPlate key={'p' + i} row={row} onClose={() => this.togglePlateGeneralUseOpen(row.thickness)} />
