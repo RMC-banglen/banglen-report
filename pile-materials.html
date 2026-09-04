@@ -285,11 +285,12 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top' }}>
+            <tr key={i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <input type="text" value={row.spec} onChange={e => row.onSpecChange(e.target.value)} placeholder="ระบุขนาด/สเปคเหล็ก" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
+                    <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>ไม่อยู่ในสูตร</span>
                     {!READONLY && <button onClick={row.onRemoveExtra} style={btnGhost('#c0392b')}>ลบ</button>}
                   </div>
                 ) : row.label}
@@ -611,12 +612,13 @@ class App extends React.Component {
     if (!r) return null;
     const wireMmMap = this.state.stirrupWireMm || {}, thickMap = this.state.plateThicknessMm || {}, specMap = this.state.whiskerSpecs || {};
     const dl = this._mod ? this._mod.diamLabel : (x => x);
-    const rebarRowsM = markRebarGroups(sortRebarBySpec(r.rebar, x => x.spec)
-      .map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true })));
-    this.state.extraRebarItems.forEach(item => {
+    const baseRebarRowsM = r.rebar.map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true }));
+    const extraRebarRowsM = this.state.extraRebarItems.map(item => {
       const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
-      rebarRowsM.push({ ...row, isExtra: true, spec: item.spec, onSpecChange: v => this.updateExtraRebarSpec(item.id, v), onRemoveExtra: () => this.removeExtraRebarItem(item.id) });
+      return { ...row, isExtra: true, spec: item.spec, onSpecChange: v => this.updateExtraRebarSpec(item.id, v), onRemoveExtra: () => this.removeExtraRebarItem(item.id) };
     });
+    // เรียงรายการเหล็กค้าง/ไม่อยู่ในสูตรปนไปกับแถวคำนวณตามขนาด แทนที่จะโยนไปกองท้ายตารางเหมือนเดิม
+    const rebarRowsM = markRebarGroups(sortRebarBySpec([...baseRebarRowsM, ...extraRebarRowsM], row => row.label));
     const pcBuckets = { 4: 0, 5: 0, 7: 0 };
     r.pc.forEach(x => { pcBuckets[4] += x.pc4Kg; pcBuckets[5] += x.pc5Kg; pcBuckets[7] += x.pc7Kg; });
     const pcRowsM = Object.entries(pcBuckets).filter(([, v]) => v > 0).map(([mm, v]) => this.buildRow('main:pc:' + mm, 'PC.wire' + mm + 'มม.', v, { unit: 'กก.' }));
