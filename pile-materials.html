@@ -598,9 +598,8 @@ class App extends React.Component {
       const generalUseSheets = kgPerBigSheet ? generalUseKg / kgPerBigSheet : 0;
       const actualNum = row.actual === '' || row.actual == null ? null : Number(row.actual);
       const A = actualNum != null ? bigSheets - actualNum : null;
-      // เข้า-ออกสต็อกสำเร็จ = สรุป (A)+(B) เหมือนการ์ดกระทบยอดเพลท (ไม่ใช่แค่ B เฉยๆ) กลับเครื่องหมายให้ของขาดจริงเป็นค่าบวก แล้วค่อยบวกใช้งานอื่น-เสียหายเป็นส่วนต่างจริง
-      const sumAB = A != null ? -(A + stockInOut) : null;
-      const realDiff = sumAB != null ? sumAB + generalUseSheets : null;
+      // เข้า-ออกสต็อกสำเร็จ = (B) สต็อกปลาย−ต้นงวด เฉยๆ (กลับไปใช้ B ตรงๆ ตามที่ยืนยัน) แล้วบวกใช้งานอื่น-เสียหายเป็นส่วนต่างจริง
+      const realDiff = A != null ? A + stockInOut + generalUseSheets : null;
       const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
       const plateEntries = (this.state.plateGeneralUseEntries[t] || []).map((e, idx) => ({
         kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
@@ -611,7 +610,7 @@ class App extends React.Component {
         generalUseFmt: fmt(generalUseSheets, 2), plateGeneralUseOpen: !!this.state.plateGeneralUseOpen[t],
         onTogglePlateGeneralUseOpen: () => this.togglePlateGeneralUseOpen(t), plateGeneralUseEntries: plateEntries,
         onAddPlateGeneralUseEntry: () => this.addPlateGeneralUseEntry(t),
-        stockInOutFmt: sumAB != null ? ((sumAB >= 0 ? '+' : '') + fmt(sumAB, 2)) : '-',
+        stockInOutFmt: (stockInOut >= 0 ? '+' : '') + fmt(stockInOut, 2),
         realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, 2)) : '-',
         pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 2) + '%') : '-',
         rowBg: this.thresholdBg(pctLost, 'main:plate'),
