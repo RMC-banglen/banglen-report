@@ -206,7 +206,16 @@ function ActualCell({ row, stockMode }) {
       </div>
     </div>
   );
-  return <input type="number" value={row.actual} onChange={e => row.onActualChange(e.target.value)} placeholder="0" style={inp(100, true)} disabled={READONLY} />;
+  // โชว์แบบมีลูกน้ำ+ทศนิยมตรงกับคอลัมน์คำนวณ (row.actualFmt) เฉพาะตอนไม่ได้โฟกัส — ตอนพิมพ์ให้เห็นเลขดิบ พิมพ์ง่าย ไม่ต้องกังวลลูกน้ำ
+  const [focused, setFocused] = React.useState(false);
+  const display = focused ? (row.actual ?? '') : (row.actualFmt === '-' ? '' : row.actualFmt);
+  return <input type="text" inputMode="decimal" value={display}
+    onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+    onChange={e => {
+      const raw = e.target.value.replace(/,/g, '');
+      if (raw === '' || /^-?\d*\.?\d*$/.test(raw)) row.onActualChange(raw);
+    }}
+    placeholder="0" style={inp(100, true)} disabled={READONLY} />;
 }
 
 function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, extraRebarButton, allowExtraSpec }) {
@@ -605,7 +614,10 @@ class App extends React.Component {
     });
     const whiskerBuckets = {};
     r.whisker.forEach(x => { const spec = specMap[x.diam] || 'ไม่ระบุ'; if (!whiskerBuckets[spec]) whiskerBuckets[spec] = { count: 0, weight: 0 }; whiskerBuckets[spec].count += x.count; whiskerBuckets[spec].weight += x.weightKg; });
-    const whiskerRowsM = Object.entries(whiskerBuckets).map(([spec, v]) => this.buildRow('main:whisker:' + spec, spec, v.weight, { unit: 'กก.' }));
+    // โชว์ให้ครบทุกสเปคที่ตั้งค่าไว้ (ไม่ใช่แค่สเปคที่มีผลิตงวดนี้) กันขนาดที่ไม่ได้ผลิตแต่มีสต็อกค้างอยู่หายไปจากตาราง
+    const allWhiskerSpecs = [...new Set(Object.values(specMap).filter(Boolean))];
+    Object.keys(whiskerBuckets).forEach(spec => { if (!allWhiskerSpecs.includes(spec)) allWhiskerSpecs.push(spec); });
+    const whiskerRowsM = allWhiskerSpecs.map(spec => this.buildRow('main:whisker:' + spec, spec, (whiskerBuckets[spec] || {}).weight || 0, { unit: 'กก.' }));
     const mok = this._mod ? this._mod.isMok : (() => false);
     const allMokDiams = Object.keys(this.state.plateWeights || {}).filter(mok);
     const collarCountByDiam = Object.fromEntries(r.collar.map(x => [x.diam, x.count]));
