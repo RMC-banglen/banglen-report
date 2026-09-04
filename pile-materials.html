@@ -387,7 +387,7 @@ class App extends React.Component {
   }
   updatePlateStockDiam(diam, field, value) {
     if (READONLY) return;
-    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateStockDiam: { ...s.plateStockDiam, [diam]: { ...s.plateStockDiam[diam], [field]: value === '' ? 0 : Number(value) } } }));
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], plateStockDiam: { ...s.plateStockDiam, [diam]: { ...s.plateStockDiam[diam], [field]: value === '' ? null : Number(value) } } }));
   }
   addPlateGeneralUseEntry(t) {
     if (READONLY) return;
@@ -645,8 +645,9 @@ class App extends React.Component {
     return thicknesses.map(t => {
       const diams = Object.keys(thickMap).filter(d => thickMap[d] === t && (Number(t) !== 9 || mok(d)));
       const rows = diams.map(diam => {
-        const st = this.state.plateStockDiam[diam] || {}; const open = st.open || 0, close = st.close || 0, w = plateWeights[diam] || 0;
-        return { diam, label: dl(diam), open, close, openWeight: open * w, closeWeight: close * w,
+        // เก็บค่าสำหรับโชว์ในช่องกรอกแบบเว้นว่างไว้ (ไม่ยัด 0) ต่างจากค่าที่ใช้คำนวณน้ำหนักซึ่งถือว่าว่าง = 0
+        const st = this.state.plateStockDiam[diam] || {}; const open = st.open ?? 0, close = st.close ?? 0, w = plateWeights[diam] || 0;
+        return { diam, label: dl(diam), open: st.open ?? '', close: st.close ?? '', openWeight: open * w, closeWeight: close * w,
           onOpenChange: v => this.updatePlateStockDiam(diam, 'open', v), onCloseChange: v => this.updatePlateStockDiam(diam, 'close', v) };
       });
       const openWeightTotal = rows.reduce((s, x) => s + x.openWeight, 0), closeWeightTotal = rows.reduce((s, x) => s + x.closeWeight, 0);
