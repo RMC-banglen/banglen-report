@@ -82,6 +82,14 @@ const MAT_DIGITS = {
   pc: 2, pc4: 2, pc5: 2, pc7: 2,
   collar: 0, rebar: 0, rebarExtra: 0,
 };
+const BIG_SHEET_KG_PER_MM = 72.94;   // แผ่นใหญ่ 5x20 ฟุต ≈ 9.29 ตร.ม. × เหล็ก 7,850 กก./ลบ.ม.
+function bigSheetKgFor(mm, table) {
+  const v = (table || {})[mm];
+  if (v != null && v !== '' && Number(v) > 0) return Number(v);
+  const t = Number(mm);
+  return t > 0 ? Math.round(t * BIG_SHEET_KG_PER_MM) : null;
+}
+
 function digitsForKey(key) {
   const cat = String(key || '').split(':')[1];
   return MAT_DIGITS[cat] ?? 1;
@@ -461,7 +469,13 @@ class App extends React.Component {
     const patch = {};
     this.persistKeys.forEach(k => { if (saved[k] !== undefined) patch[k] = saved[k]; });
     if (patch.periodLabel === 'งวดปัจจุบัน') patch.periodLabel = null;
-    this.setState(patch);
+    // ผลลัพธ์ที่บันทึกไว้อาจคำนวณด้วยโค้ดเวอร์ชันเก่า (ยังไม่มีสรุปเสา/เพลทพิเศษ) — คำนวณใหม่จากรายการดิบให้
+    this.setState(patch, () => {
+      const r = this.state.result;
+      const cur = this._mod && this._mod.CALC_VERSION;
+      const stale = r && (!cur || r.calcVersion !== cur);
+      if (stale && this._mod && this.state.rawRows && this.state.rawRows.length) this.recompute();
+    });
   }
   async loadFromSupabase() {
     try {
@@ -615,7 +629,8 @@ class App extends React.Component {
   currentConfig() {
     return { rebarWeights: this.state.rebarWeights, plateWeights: this.state.plateWeights,
       whiskerWeights: this.state.whiskerWeights, whiskerSpecs: this.state.whiskerSpecs,
-      pcWireKgPerM: this.state.pcWireKgPerM, pcWireTable: this.state.pcWireTable, stirrupTable: this.state.stirrupTable };
+      pcWireKgPerM: this.state.pcWireKgPerM, pcWireTable: this.state.pcWireTable, stirrupTable: this.state.stirrupTable,
+      plateThicknessMm: this.state.plateThicknessMm };
   }
   recompute() { if (!this.state.rawRows || !this._mod) return; this.setState({ result: this._mod.calcPileList(this.state.rawRows, this.currentConfig()) }); }
   updateRebarWeight(k, v) { if (READONLY) return; this.setState(s => ({ rebarWeights: { ...s.rebarWeights, [k]: v === '' ? null : Number(v) } }), () => this.recompute()); }
@@ -634,6 +649,14 @@ class App extends React.Component {
     if (r && r.piles) r.piles.forEach(p => set.add(p.diam));
     (r && r.plates ? r.plates : []).forEach(p => set.add(p.diam));
     return [...set];
+  }
+  // ความหนาเพลททั้งหมดที่ต้องตั้งค่า = ที่ตั้งไว้แล้ว + ที่มาตรฐานของแต่ละขนาดเสาใช้ + ที่ระบุพิเศษมาในไฟล์งวดนี้
+  allPlateThicknesses() {
+    const set = new Set(Object.keys(this.state.plateBigSheetKg || {}));
+    Object.values(this.state.plateThicknessMm || {}).forEach(t => { if (t) set.add(String(t)); });
+    const r = this.state.result;
+    (r && r.plates ? r.plates : []).forEach(x => { if (x.plateMm) set.add(String(x.plateMm)); });
+    return [...set].sort((a, b) => Number(b) - Number(a));
   }
   updatePlateBigSheetKg(mm, v) { if (READONLY) return; this.setState(s => ({ plateBigSheetKg: { ...s.plateBigSheetKg, [mm]: v === '' ? null : Number(v) } }), () => this.recompute()); }
   updateStirrupWireMm(diam, v) { if (READONLY) return; this.setState(s => ({ stirrupWireMm: { ...s.stirrupWireMm, [diam]: v } })); }
@@ -808,12 +831,13 @@ class App extends React.Component {
     r.stirrup.forEach(x => { const mm = wireMmMap[x.diam] || 'ไม่ระบุ'; stirrupBuckets[mm] = (stirrupBuckets[mm] || 0) + x.weightKg; });
     const stirrupRowsM = Object.entries(stirrupBuckets).sort((a, b) => a[0].localeCompare(b[0])).map(([mm, v]) => this.buildRow('main:stirrup:' + mm, 'ปลอก' + mm + (mm !== 'ไม่ระบุ' ? ' มม.' : ''), v, { unit: 'กก.' }));
     const plateBuckets = { 6: { count: 0, weight: 0 }, 8: { count: 0, weight: 0 }, 9: { count: 0, weight: 0 } };
-    r.plates.forEach(x => { const t = thickMap[x.diam] || 'ไม่ระบุ'; if (!plateBuckets[t]) plateBuckets[t] = { count: 0, weight: 0 }; plateBuckets[t].count += x.count; plateBuckets[t].weight += x.weightKg; });
+    // เพลทที่ระบุความหนามาในชื่อสินค้า ใช้ความหนานั้น (แยกกองจากมาตรฐานของขนาดเสา)
+    r.plates.forEach(x => { const t = x.plateMm || thickMap[x.diam] || 'ไม่ระบุ'; if (!plateBuckets[t]) plateBuckets[t] = { count: 0, weight: 0 }; plateBuckets[t].count += x.count; plateBuckets[t].weight += x.weightKg; });
     const bigSheetKg = this.state.plateBigSheetKg || {};
     const mokFn = this._mod ? this._mod.isMok : (() => false);
     const plateWeightsM = this.state.plateWeights || {};
     const plateRowsM = Object.entries(plateBuckets).sort((a, b) => Number(b[0]) - Number(a[0])).map(([t, v]) => {
-      const kgPerBigSheet = bigSheetKg[t] || null;
+      const kgPerBigSheet = bigSheetKgFor(t, bigSheetKg);
       const bigSheets = kgPerBigSheet ? v.weight / kgPerBigSheet : 0;
       const label = 'เพลท' + t + (t !== 'ไม่ระบุ' ? ' มม.' : '') + ' (แผ่นใหญ่ 5x20ฟุต)';
       const row = this.buildRow('main:plate:' + t, label, bigSheets, { unit: 'แผ่น' });
@@ -867,7 +891,7 @@ class App extends React.Component {
     const wireMmD = this.state.stirrupWireMm || {};
     const rebarRowsD = markRebarGroups(sortRebarBySpec(r.rebar, x => x.spec)
       .map(x => this.buildRow('detail:rebar:' + x.spec, x.spec, x.weightKg, { piecesFmt: fmt(x.pieces, 0) })));
-    const plateRowsD = r.plates.map(x => this.buildRow('detail:plate:' + x.diam, dl(x.diam) + (plateThicknessD[x.diam] ? ' (เพลท ' + plateThicknessD[x.diam] + ' มม.)' : ''), x.weightKg, { countFmt: fmt(x.count, 0) }));
+    const plateRowsD = r.plates.map(x => { const mm = x.plateMm || plateThicknessD[x.diam]; return this.buildRow('detail:plate:' + x.diam + (x.plateMm ? '|' + x.plateMm : ''), dl(x.diam) + (mm ? ' (เพลท ' + mm + ' มม.' + (x.plateMm ? ' — พิเศษ' : '') + ')' : ''), x.weightKg, { countFmt: fmt(x.count, 0) }); });
     const whiskerRowsD = r.whisker.map(x => this.buildRow('detail:whisker:' + x.diam, dl(x.diam), x.weightKg, { countFmt: fmt(x.count, 0), spec: x.spec || 'ไม่ระบุในไฟล์ต้นฉบับ' }));
     const collarRowsD = r.collar.map(x => ({ ...this.buildRow('detail:collar:' + x.diam, dl(x.diam), x.count), calcFmt: fmt(x.count, 0) }));
     const pcRowsD = [];
@@ -1845,9 +1869,17 @@ function SettingsPanel({ app }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>น้ำหนักเพลทแผ่นใหญ่ 5x20ฟุต (กก./แผ่น)</b>{lockBtn('plate')}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 10, opacity: s.locks.plate ? 0.5 : 1, pointerEvents: s.locks.plate ? 'none' : 'auto' }}>
-              {Object.entries(s.plateBigSheetKg || {}).map(([mm, v]) => (
-                <div key={mm}><div style={{ fontSize: 12, color: '#78839A' }}>{mm} มม.</div><input type="number" step="0.1" value={v ?? ''} onChange={e => app.updatePlateBigSheetKg(mm, e.target.value)} style={{ ...inp(null), width: '100%' }} /></div>
-              ))}
+              {app.allPlateThicknesses().map(mm => {
+                const v = (s.plateBigSheetKg || {})[mm];
+                const auto = v == null || v === '';
+                return (
+                  <div key={mm}>
+                    <div style={{ fontSize: 12, color: '#78839A' }}>{mm} มม.{auto && <span style={{ color: '#2f5fd0' }}> (อัตโนมัติ)</span>}</div>
+                    <input type="number" step="0.1" value={v ?? ''} placeholder={String(bigSheetKgFor(mm, s.plateBigSheetKg) ?? '')}
+                      onChange={e => app.updatePlateBigSheetKg(mm, e.target.value)} style={{ ...inp(null), width: '100%' }} />
+                  </div>
+                );
+              })}
             </div>
             <b>น้ำหนักแผ่นเพลทต่อแผ่น (กก.) ตามขนาดเสา</b>
             <div style={{ opacity: s.locks.plate ? 0.5 : 1, pointerEvents: s.locks.plate ? 'none' : 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
