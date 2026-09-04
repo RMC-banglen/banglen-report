@@ -220,6 +220,8 @@ function ActualCell({ row, stockMode }) {
 
 function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, extraRebarButton, allowExtraSpec }) {
   if (!rows || !rows.length) return null;
+  // คอลัมน์ "เข้า-ออกสต็อก" มีเฉพาะเพลท (สต็อกปลาย−ต้นงวด หน่วยแผ่นใหญ่ เหมือนคอลัมน์คำนวณ) — วัตถุดิบอื่นไม่มีข้อมูลนี้ ซ่อนคอลัมน์ไปเลย
+  const hasStockInOut = rows.some(r => r.stockInOutFmt != null);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
@@ -227,12 +229,13 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden', tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
-            <th style={th(28)}>รายการ</th>
-            <th style={th(15, true)}>คำนวณ ({unitLabel})</th>
-            <th style={th(18, true)}>ใช้จริง ({unitLabel})</th>
-            <th style={th(10, true)}>ส่วนต่าง</th>
-            <th style={th(12, true)}>ใช้งานอื่น-เสียหาย</th>
-            <th style={th(9, true)}>ส่วนต่างจริง</th>
+            <th style={th(24)}>รายการ</th>
+            <th style={th(13, true)}>คำนวณ ({unitLabel})</th>
+            <th style={th(16, true)}>ใช้จริง ({unitLabel})</th>
+            <th style={th(9, true)}>ส่วนต่าง</th>
+            <th style={th(11, true)}>ใช้งานอื่น-เสียหาย</th>
+            {hasStockInOut && <th style={th(11, true)}>เข้า-ออกสต็อกสำเร็จ (แผ่นใหญ่)</th>}
+            <th style={th(8, true)}>ส่วนต่างจริง</th>
             <th style={th(8, true)}>% หาย</th>
           </tr>
         </thead>
@@ -253,6 +256,7 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
               <td style={{ padding: '6px 14px', textAlign: 'right' }}>
                 <button onClick={() => onOpenGeneralUse(row)} style={{ background: '#f4f6f9', border: '1px solid #d8dde6', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, minWidth: 70 }}>{row.generalUseSummaryFmt}</button>
               </td>
+              {hasStockInOut && <td style={td(true)}>{row.stockInOutFmt ?? '-'}</td>}
               <td style={{ ...td(true), fontWeight: 700 }}>{row.realDiffFmt}</td>
               <td style={{ ...td(true), fontWeight: 700, background: row.rowBg, borderRadius: 6 }}>{row.pctLostFmt}</td>
             </tr>
@@ -594,7 +598,9 @@ class App extends React.Component {
       const generalUseSheets = kgPerBigSheet ? generalUseKg / kgPerBigSheet : 0;
       const actualNum = row.actual === '' || row.actual == null ? null : Number(row.actual);
       const A = actualNum != null ? bigSheets - actualNum : null;
-      const realDiff = A != null ? A + generalUseSheets + stockInOut : null;
+      // เข้า-ออกสต็อกสำเร็จ = สรุป (A)+(B) เหมือนการ์ดกระทบยอดเพลท (ไม่ใช่แค่ B เฉยๆ) แล้วค่อยบวกใช้งานอื่น-เสียหายเป็นส่วนต่างจริง
+      const sumAB = A != null ? A + stockInOut : null;
+      const realDiff = sumAB != null ? sumAB + generalUseSheets : null;
       const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
       const plateEntries = (this.state.plateGeneralUseEntries[t] || []).map((e, idx) => ({
         kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
@@ -605,7 +611,7 @@ class App extends React.Component {
         generalUseFmt: fmt(generalUseSheets, 2), plateGeneralUseOpen: !!this.state.plateGeneralUseOpen[t],
         onTogglePlateGeneralUseOpen: () => this.togglePlateGeneralUseOpen(t), plateGeneralUseEntries: plateEntries,
         onAddPlateGeneralUseEntry: () => this.addPlateGeneralUseEntry(t),
-        stockInOutFmt: (stockInOut >= 0 ? '+' : '') + fmt(stockInOut, 2),
+        stockInOutFmt: sumAB != null ? ((sumAB >= 0 ? '+' : '') + fmt(sumAB, 2)) : '-',
         realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, 2)) : '-',
         pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 2) + '%') : '-',
         rowBg: this.thresholdBg(pctLost, 'main:plate'),
@@ -677,13 +683,19 @@ class App extends React.Component {
         kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
         onNoteChange: v => this.updatePlateGeneralUseEntry(t, idx, 'note', v), onRemove: () => this.removePlateGeneralUseEntry(t, idx),
       }));
+      // "ใช้งานอื่น-เสียหาย" คิดเป็นแผ่นใหญ่ด้วย (เดิมมีแค่ กก.) ให้รวมกับ (A)+(B) ซึ่งเป็นหน่วยแผ่นใหญ่อยู่แล้วได้ตรงๆ
       const generalUseKg = entries.reduce((s, e) => s + (e.kg || 0), 0);
-      const unexplainedKg = sumABKg != null ? sumABKg + generalUseKg : null;
+      const generalUseSheets = generalUseKg / kgPerSheet;
+      const unexplainedSheets = sumABSheets != null ? sumABSheets + generalUseSheets : null;
+      const unexplainedKg = unexplainedSheets != null ? unexplainedSheets * kgPerSheet : null;
       return { t, rows, openWeightFmt: fmt(openWeightTotal, 1), closeWeightFmt: fmt(closeWeightTotal, 1),
         openSheetsFmt: fmt(openSheets, 2), closeSheetsFmt: fmt(closeSheets, 2), plateCalcBigFmt: fmt(plateCalcBig, 2),
         AFmt: A != null ? fmt(A, 2) : '-', BFmt: fmt(B, 2), sumABSheetsFmt: sumABSheets != null ? fmt(sumABSheets, 2) : '-',
-        sumABKgFmt: sumABKg != null ? fmt(sumABKg, 1) : '-', generalUseEntries: entries, generalUseKgFmt: fmt(generalUseKg, 1),
-        onAddGeneralUseEntry: () => this.addPlateGeneralUseEntry(t), unexplainedKgFmt: unexplainedKg != null ? fmt(unexplainedKg, 1) : '-' };
+        sumABKgFmt: sumABKg != null ? fmt(sumABKg, 1) : '-', generalUseEntries: entries,
+        generalUseKgFmt: fmt(generalUseKg, 1), generalUseSheetsFmt: fmt(generalUseSheets, 2),
+        onAddGeneralUseEntry: () => this.addPlateGeneralUseEntry(t),
+        unexplainedSheetsFmt: unexplainedSheets != null ? fmt(unexplainedSheets, 2) : '-',
+        unexplainedKgFmt: unexplainedKg != null ? fmt(unexplainedKg, 1) : '-' };
     });
   }
 
@@ -796,7 +808,7 @@ class App extends React.Component {
     sections.forEach(sec => {
       if (!sec.rows || !sec.rows.length) return;
       html += '<table border="1"><tr><td colspan="8"><b>' + esc(sec.title) + '</b></td></tr>';
-      html += '<tr><th>รายการ</th><th>คำนวณ</th><th>ใช้จริง</th><th>ส่วนต่าง</th><th>ใช้งานอื่น-เสียหาย</th><th>เข้า-ออกสต็อก</th><th>ส่วนต่างจริง</th><th>% หาย</th></tr>';
+      html += '<tr><th>รายการ</th><th>คำนวณ</th><th>ใช้จริง</th><th>ส่วนต่าง</th><th>ใช้งานอื่น-เสียหาย</th><th>เข้า-ออกสต็อกสำเร็จ</th><th>ส่วนต่างจริง</th><th>% หาย</th></tr>';
       sec.rows.forEach(row => {
         html += '<tr>' + [row.label, row.calcFmt, row.actual, row.diffFmt, row.generalUseFmt ?? row.generalUseSummaryFmt, row.stockInOutFmt ?? '', row.realDiffFmt, row.pctLostFmt].map(v => '<td>' + esc(v) + '</td>').join('') + '</tr>';
       });
@@ -813,16 +825,16 @@ class App extends React.Component {
         ['น้ำหนักคงเหลือต้นงวด', pr.openWeightFmt + ' กก. (' + pr.openSheetsFmt + ' แผ่นใหญ่)'],
         ['น้ำหนักคงเหลือปลายงวด', pr.closeWeightFmt + ' กก. (' + pr.closeSheetsFmt + ' แผ่นใหญ่)'],
         ['คำนวณตามรายการผลิต', pr.plateCalcBigFmt + ' แผ่นใหญ่'],
-        ['(A) คำนวณ − ยอดใช้จริง', pr.AFmt + ' แผ่น'],
-        ['(B) สต็อกปลาย − ต้นงวด', pr.BFmt + ' แผ่น'],
-        ['สรุป (A) + (B)', pr.sumABSheetsFmt + ' แผ่น = ' + pr.sumABKgFmt + ' กก.'],
+        ['(A) คำนวณ − ยอดใช้จริง', pr.AFmt + ' แผ่นใหญ่'],
+        ['(B) สต็อกปลาย − ต้นงวด', pr.BFmt + ' แผ่นใหญ่'],
+        ['สรุป (A) + (B)', pr.sumABSheetsFmt + ' แผ่นใหญ่ (= ' + pr.sumABKgFmt + ' กก.)'],
       ].forEach(([lbl, val]) => { html += '<tr><td>' + esc(lbl) + '</td><td>' + esc(val) + '</td></tr>'; });
       if (pr.generalUseEntries.length) {
         html += '<tr><td colspan="2"><b>ใช้งานอื่น-เสียหาย</b></td></tr>';
         pr.generalUseEntries.forEach(e => { html += '<tr><td>' + esc(e.note || '') + '</td><td>' + esc(e.kg) + ' กก.</td></tr>'; });
       }
-      html += '<tr><td>รวมใช้งานอื่น-เสียหาย</td><td>' + esc(pr.generalUseKgFmt) + ' กก.</td></tr>';
-      html += '<tr><td><b>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</b></td><td><b>' + esc(pr.unexplainedKgFmt) + ' กก.</b></td></tr>';
+      html += '<tr><td>รวมใช้งานอื่น-เสียหาย</td><td>' + esc(pr.generalUseSheetsFmt) + ' แผ่นใหญ่ (= ' + esc(pr.generalUseKgFmt) + ' กก.)</td></tr>';
+      html += '<tr><td><b>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</b></td><td><b>' + esc(pr.unexplainedSheetsFmt) + ' แผ่นใหญ่ (= ' + esc(pr.unexplainedKgFmt) + ' กก.)</b></td></tr>';
       html += '</table><br/>';
     });
     html += '</body></html>';
@@ -1055,8 +1067,8 @@ class App extends React.Component {
                 <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />
-                {/* กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา — โชว์ทั้งหน้าหลักและนับสต็อก ไม่งั้นดูส่วนต่างจริงต่อขนาดเสาไม่ได้เลยตอนอยู่หน้าหลัก */}
-                {this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
+                {/* กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา — โชว์เฉพาะแท็บนับสต็อก (ผู้ใช้แจ้งว่าไม่ต้องการให้โชว์ในหน้าหลัก) */}
+                {stockMode && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
                 <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
@@ -1117,9 +1129,9 @@ function PlateReconcileCard({ pr }) {
         ['น้ำหนักคงเหลือต้นงวด', pr.openWeightFmt + ' กก. (' + pr.openSheetsFmt + ' แผ่นใหญ่)'],
         ['น้ำหนักคงเหลือปลายงวด', pr.closeWeightFmt + ' กก. (' + pr.closeSheetsFmt + ' แผ่นใหญ่)'],
         ['คำนวณตามรายการผลิต', pr.plateCalcBigFmt + ' แผ่นใหญ่'],
-        ['(A) คำนวณ − ยอดใช้จริง', pr.AFmt + ' แผ่น'],
-        ['(B) สต็อกปลาย − ต้นงวด', pr.BFmt + ' แผ่น'],
-        ['สรุป (A) + (B)', pr.sumABSheetsFmt + ' แผ่น = ' + pr.sumABKgFmt + ' กก.'],
+        ['(A) คำนวณ − ยอดใช้จริง', pr.AFmt + ' แผ่นใหญ่'],
+        ['(B) สต็อกปลาย − ต้นงวด', pr.BFmt + ' แผ่นใหญ่'],
+        ['สรุป (A) + (B)', pr.sumABSheetsFmt + ' แผ่นใหญ่ (= ' + pr.sumABKgFmt + ' กก.)'],
       ].map(([lbl, val], i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}><span style={{ color: '#78839A' }}>{lbl}</span><span style={{ fontWeight: 700 }}>{val}</span></div>)}
       <div style={{ fontSize: 12, fontWeight: 700, color: '#8a6114', textTransform: 'uppercase', marginTop: 6 }}>ใช้งานอื่น-เสียหาย</div>
       {pr.generalUseEntries.map((e, i) => (
@@ -1130,10 +1142,10 @@ function PlateReconcileCard({ pr }) {
         </div>
       ))}
       {!READONLY && <button onClick={pr.onAddGeneralUseEntry} style={{ ...btnDashed(), alignSelf: 'flex-start' }}>+ เพิ่มสาเหตุ</button>}
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid #e0c07a', paddingTop: 8 }}><span>รวมใช้งานอื่น-เสียหาย</span><span style={{ fontWeight: 700 }}>{pr.generalUseKgFmt} กก.</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid #e0c07a', paddingTop: 8 }}><span>รวมใช้งานอื่น-เสียหาย</span><span style={{ fontWeight: 700 }}>{pr.generalUseSheetsFmt} แผ่นใหญ่ (= {pr.generalUseKgFmt} กก.)</span></div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, padding: '12px 14px', background: '#fbeaea', border: '1px solid #e0a3a3' }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</span>
-        <span style={{ fontSize: 17, fontWeight: 800, color: '#c0392b' }}>{pr.unexplainedKgFmt} กก.</span>
+        <span style={{ fontSize: 17, fontWeight: 800, color: '#c0392b' }}>{pr.unexplainedSheetsFmt} แผ่นใหญ่ (= {pr.unexplainedKgFmt} กก.)</span>
       </div>
     </div>
   );
