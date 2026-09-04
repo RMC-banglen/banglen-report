@@ -589,7 +589,9 @@ class App extends React.Component {
       const bigSheets = kgPerBigSheet ? v.weight / kgPerBigSheet : 0;
       const label = 'เพลท' + t + (t !== 'ไม่ระบุ' ? ' มม.' : '') + ' (แผ่นใหญ่ 5x20ฟุต)';
       const row = this.buildRow('main:plate:' + t, label, bigSheets, { unit: 'แผ่น' });
-      const diams = Object.keys(thickMap).filter(d => thickMap[d] === t && (Number(t) !== 9 || mokFn(d)));
+      // t มาจาก Object.entries(plateBuckets) เลยเป็น string เสมอ (แม้ key ตอนสร้าง object จะเป็นเลข) ต้อง Number(t) เทียบกับ thickMap[d] (เก็บเป็นเลข)
+      // ไม่งั้น === จะไม่ตรงกันเลยสักตัว (string '9' !== number 9) ทำให้ diams ว่างเปล่าตลอด เข้า-ออกสต็อกเลยขึ้น 0 ทุกครั้งทั้งที่กรอกข้อมูลไว้แล้ว
+      const diams = Object.keys(thickMap).filter(d => thickMap[d] === Number(t) && (Number(t) !== 9 || mokFn(d)));
       let openW = 0, closeW = 0;
       diams.forEach(d => { const st = this.state.plateStockDiam[d] || {}; const w = plateWeightsM[d] || 0; openW += (st.open || 0) * w; closeW += (st.close || 0) * w; });
       const openSheets = kgPerBigSheet ? openW / kgPerBigSheet : 0, closeSheets = kgPerBigSheet ? closeW / kgPerBigSheet : 0;
@@ -684,18 +686,16 @@ class App extends React.Component {
         kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
         onNoteChange: v => this.updatePlateGeneralUseEntry(t, idx, 'note', v), onRemove: () => this.removePlateGeneralUseEntry(t, idx),
       }));
-      // "ใช้งานอื่น-เสียหาย" คิดเป็นแผ่นใหญ่ด้วย (เดิมมีแค่ กก.) ให้รวมกับ (A)+(B) ซึ่งเป็นหน่วยแผ่นใหญ่อยู่แล้วได้ตรงๆ
+      // "รวมใช้งานอื่น-เสียหาย" โชว์คู่หน่วยแผ่นใหญ่ไว้เฉยๆ แต่ "ส่วนต่างเกิน-หายที่อธิบายไม่ได้" กลับไปรวมกันในหน่วย กก. ตรงๆ แบบเดิม (ยืนยันว่าแบบเดิมถูกแล้ว)
       const generalUseKg = entries.reduce((s, e) => s + (e.kg || 0), 0);
       const generalUseSheets = generalUseKg / kgPerSheet;
-      const unexplainedSheets = sumABSheets != null ? sumABSheets + generalUseSheets : null;
-      const unexplainedKg = unexplainedSheets != null ? unexplainedSheets * kgPerSheet : null;
+      const unexplainedKg = sumABKg != null ? sumABKg + generalUseKg : null;
       return { t, rows, openWeightFmt: fmt(openWeightTotal, 1), closeWeightFmt: fmt(closeWeightTotal, 1),
         openSheetsFmt: fmt(openSheets, 2), closeSheetsFmt: fmt(closeSheets, 2), plateCalcBigFmt: fmt(plateCalcBig, 2),
         AFmt: A != null ? fmt(A, 2) : '-', BFmt: fmt(B, 2), sumABSheetsFmt: sumABSheets != null ? fmt(sumABSheets, 2) : '-',
         sumABKgFmt: sumABKg != null ? fmt(sumABKg, 1) : '-', generalUseEntries: entries,
         generalUseKgFmt: fmt(generalUseKg, 1), generalUseSheetsFmt: fmt(generalUseSheets, 2),
         onAddGeneralUseEntry: () => this.addPlateGeneralUseEntry(t),
-        unexplainedSheetsFmt: unexplainedSheets != null ? fmt(unexplainedSheets, 2) : '-',
         unexplainedKgFmt: unexplainedKg != null ? fmt(unexplainedKg, 1) : '-' };
     });
   }
@@ -835,7 +835,7 @@ class App extends React.Component {
         pr.generalUseEntries.forEach(e => { html += '<tr><td>' + esc(e.note || '') + '</td><td>' + esc(e.kg) + ' กก.</td></tr>'; });
       }
       html += '<tr><td>รวมใช้งานอื่น-เสียหาย</td><td>' + esc(pr.generalUseSheetsFmt) + ' แผ่นใหญ่ (= ' + esc(pr.generalUseKgFmt) + ' กก.)</td></tr>';
-      html += '<tr><td><b>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</b></td><td><b>' + esc(pr.unexplainedSheetsFmt) + ' แผ่นใหญ่ (= ' + esc(pr.unexplainedKgFmt) + ' กก.)</b></td></tr>';
+      html += '<tr><td><b>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</b></td><td><b>' + esc(pr.unexplainedKgFmt) + ' กก.</b></td></tr>';
       html += '</table><br/>';
     });
     html += '</body></html>';
@@ -1146,7 +1146,7 @@ function PlateReconcileCard({ pr }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid #e0c07a', paddingTop: 8 }}><span>รวมใช้งานอื่น-เสียหาย</span><span style={{ fontWeight: 700 }}>{pr.generalUseSheetsFmt} แผ่นใหญ่ (= {pr.generalUseKgFmt} กก.)</span></div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, padding: '12px 14px', background: '#fbeaea', border: '1px solid #e0a3a3' }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</span>
-        <span style={{ fontSize: 17, fontWeight: 800, color: '#c0392b' }}>{pr.unexplainedSheetsFmt} แผ่นใหญ่ (= {pr.unexplainedKgFmt} กก.)</span>
+        <span style={{ fontSize: 17, fontWeight: 800, color: '#c0392b' }}>{pr.unexplainedKgFmt} กก.</span>
       </div>
     </div>
   );
