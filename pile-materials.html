@@ -809,7 +809,7 @@ class App extends React.Component {
     sections.forEach(sec => {
       if (!sec.rows || !sec.rows.length) return;
       html += '<table border="1"><tr><td colspan="8"><b>' + esc(sec.title) + '</b></td></tr>';
-      html += '<tr><th>รายการ</th><th>คำนวณ</th><th>ใช้จริง</th><th>ส่วนต่าง</th><th>ใช้งานอื่น-เสียหาย</th><th>เข้า-ออกสต็อกสำเร็จ</th><th>ส่วนต่างจริง</th><th>% หาย</th></tr>';
+      html += '<tr><th>รายการ</th><th>คำนวณ</th><th>ใช้จริง</th><th>ส่วนต่าง</th><th>ใช้งานอื่น-เสียหาย</th><th>เข้า-ออกสต็อกสำเร็จ (แผ่นใหญ่)</th><th>ส่วนต่างจริง</th><th>% หาย</th></tr>';
       sec.rows.forEach(row => {
         html += '<tr>' + [row.label, row.calcFmt, row.actual, row.diffFmt, row.generalUseFmt ?? row.generalUseSummaryFmt, row.stockInOutFmt ?? '', row.realDiffFmt, row.pctLostFmt].map(v => '<td>' + esc(v) + '</td>').join('') + '</tr>';
       });
