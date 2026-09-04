@@ -802,6 +802,29 @@ class App extends React.Component {
       });
       html += '</table><br/>';
     });
+    // กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา — ไม่มีให้ก่อนหน้านี้ในไฟล์ Excel เลย ทั้งที่ต้องใช้ดูส่วนต่างจริงต่อขนาดเสา
+    this.buildPlateReconcile(r).forEach(pr => {
+      html += '<table border="1"><tr><td colspan="3"><b>กระทบยอดเพลท ' + esc(pr.t) + ' มม. (สต็อกแผ่นสำเร็จรูปต่อขนาดเสา)</b></td></tr>';
+      html += '<tr><th>ขนาดเสา</th><th>แผ่นคงเหลือต้นงวด</th><th>แผ่นคงเหลือปลายงวด</th></tr>';
+      pr.rows.forEach(row => { html += '<tr><td>' + esc(row.label) + '</td><td>' + esc(row.open) + '</td><td>' + esc(row.close) + '</td></tr>'; });
+      html += '</table>';
+      html += '<table border="1">';
+      [
+        ['น้ำหนักคงเหลือต้นงวด', pr.openWeightFmt + ' กก. (' + pr.openSheetsFmt + ' แผ่นใหญ่)'],
+        ['น้ำหนักคงเหลือปลายงวด', pr.closeWeightFmt + ' กก. (' + pr.closeSheetsFmt + ' แผ่นใหญ่)'],
+        ['คำนวณตามรายการผลิต', pr.plateCalcBigFmt + ' แผ่นใหญ่'],
+        ['(A) คำนวณ − ยอดใช้จริง', pr.AFmt + ' แผ่น'],
+        ['(B) สต็อกปลาย − ต้นงวด', pr.BFmt + ' แผ่น'],
+        ['สรุป (A) + (B)', pr.sumABSheetsFmt + ' แผ่น = ' + pr.sumABKgFmt + ' กก.'],
+      ].forEach(([lbl, val]) => { html += '<tr><td>' + esc(lbl) + '</td><td>' + esc(val) + '</td></tr>'; });
+      if (pr.generalUseEntries.length) {
+        html += '<tr><td colspan="2"><b>ใช้งานอื่น-เสียหาย</b></td></tr>';
+        pr.generalUseEntries.forEach(e => { html += '<tr><td>' + esc(e.note || '') + '</td><td>' + esc(e.kg) + ' กก.</td></tr>'; });
+      }
+      html += '<tr><td>รวมใช้งานอื่น-เสียหาย</td><td>' + esc(pr.generalUseKgFmt) + ' กก.</td></tr>';
+      html += '<tr><td><b>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</b></td><td><b>' + esc(pr.unexplainedKgFmt) + ' กก.</b></td></tr>';
+      html += '</table><br/>';
+    });
     html += '</body></html>';
     const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1032,7 +1055,8 @@ class App extends React.Component {
                 <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />
-                {stockMode && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
+                {/* กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา — โชว์ทั้งหน้าหลักและนับสต็อก ไม่งั้นดูส่วนต่างจริงต่อขนาดเสาไม่ได้เลยตอนอยู่หน้าหลัก */}
+                {this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
                 <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />
                 <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
@@ -1084,8 +1108,8 @@ function PlateReconcileCard({ pr }) {
         <tbody>{pr.rows.map((row, i) => (
           <tr key={i} style={{ borderTop: '1px solid #eee' }}>
             <td style={{ padding: '4px 8px' }}>{row.label}</td>
-            <td style={{ padding: '3px 8px', textAlign: 'right' }}><input type="number" value={row.open} onChange={e => row.onOpenChange(e.target.value)} style={inp(80, true)} /></td>
-            <td style={{ padding: '3px 8px', textAlign: 'right' }}><input type="number" value={row.close} onChange={e => row.onCloseChange(e.target.value)} style={inp(80, true)} /></td>
+            <td style={{ padding: '3px 8px', textAlign: 'right' }}><input type="number" value={row.open} onChange={e => row.onOpenChange(e.target.value)} style={inp(80, true)} disabled={READONLY} /></td>
+            <td style={{ padding: '3px 8px', textAlign: 'right' }}><input type="number" value={row.close} onChange={e => row.onCloseChange(e.target.value)} style={inp(80, true)} disabled={READONLY} /></td>
           </tr>
         ))}</tbody>
       </table>
@@ -1100,12 +1124,12 @@ function PlateReconcileCard({ pr }) {
       <div style={{ fontSize: 12, fontWeight: 700, color: '#8a6114', textTransform: 'uppercase', marginTop: 6 }}>ใช้งานอื่น-เสียหาย</div>
       {pr.generalUseEntries.map((e, i) => (
         <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="number" value={e.kg} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(90, true)} />
-          <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="สาเหตุ" style={{ ...inp(null), flex: 1 }} />
-          <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>
+          <input type="number" value={e.kg} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(90, true)} disabled={READONLY} />
+          <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="สาเหตุ" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
         </div>
       ))}
-      <button onClick={pr.onAddGeneralUseEntry} style={{ ...btnDashed(), alignSelf: 'flex-start' }}>+ เพิ่มสาเหตุ</button>
+      {!READONLY && <button onClick={pr.onAddGeneralUseEntry} style={{ ...btnDashed(), alignSelf: 'flex-start' }}>+ เพิ่มสาเหตุ</button>}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid #e0c07a', paddingTop: 8 }}><span>รวมใช้งานอื่น-เสียหาย</span><span style={{ fontWeight: 700 }}>{pr.generalUseKgFmt} กก.</span></div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, padding: '12px 14px', background: '#fbeaea', border: '1px solid #e0a3a3' }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>ส่วนต่างเกิน-หายที่อธิบายไม่ได้</span>
