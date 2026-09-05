@@ -487,8 +487,11 @@ class App extends React.Component {
 
   pushUndo(s) { const st = [...(s.undoStack || []), this.snapshotFullState(s)]; return st.length > 20 ? st.slice(st.length - 20) : st; }
   snapshotFullState(s) {
+    // เดิมลืมเก็บ cutInEntries/extraRebarItems ไว้ในสแนปช็อตย้อนกลับ ทำให้ปุ่ม "ย้อนกลับ" ไม่คืนค่า 2 ส่วนนี้ให้จริง
+    // (เช่น กดลบรายการเหล็กไม่อยู่ในสูตรผิดพลาด แล้วกดย้อนกลับ รายการก็ไม่กลับมา) แก้ให้เก็บครบเหมือนข้อมูลอื่น
     return { stock: s.stock, plateStockDiam: s.plateStockDiam, actual: s.actual, generalUseEntries: s.generalUseEntries,
-      plateGeneralUseEntries: s.plateGeneralUseEntries, periodLabel: s.periodLabel, periods: s.periods, periodHistory: s.periodHistory };
+      plateGeneralUseEntries: s.plateGeneralUseEntries, cutInEntries: s.cutInEntries, extraRebarItems: s.extraRebarItems,
+      periodLabel: s.periodLabel, periods: s.periods, periodHistory: s.periodHistory };
   }
   undoLastAction() {
     if (READONLY) return;
@@ -1043,14 +1046,17 @@ class App extends React.Component {
       const newStock = {}; Object.keys(s.stock).forEach(k => { newStock[k] = { opening: s.stock[k].closing ?? '', received: '', closing: '' }; });
       const newPlateStockDiam = {}; Object.keys(s.plateStockDiam).forEach(d => { const close = s.plateStockDiam[d].close ?? 0; newPlateStockDiam[d] = { open: close, close }; });
       const oldLabel = s.periodLabel || 'งวดที่ยังไม่ตั้งชื่อ';
-      // เก็บ result/rawRows/fileName ไว้ในสแนปช็อตต่องวดด้วย (เดิมลืมเก็บ) ไม่งั้นย้ายไปงวดใหม่ที่ยังไม่เคยอัปโหลดไฟล์
+      // เก็บ result/rawRows/fileName/extraRebarItems ไว้ในสแนปช็อตต่องวดด้วย (เดิมลืมเก็บ) ไม่งั้นย้ายไปงวดใหม่ที่ยังไม่เคยอัปโหลดไฟล์
       // จะยังเห็นตัวเลข "คำนวณ" ของงวดเก่าค้างอยู่ ทั้งที่ควรว่างเปล่าจนกว่าจะอัปโหลดไฟล์รายการเสาของงวดนั้นเอง
+      // extraRebarItems (เหล็กค้าง/ไม่อยู่ในสูตร) เดิมเป็นรายการกลางใช้ร่วมกันทุกงวด ลบ/แก้ที่งวดหนึ่งกระทบงวดอื่นหมดโดยไม่ตั้งใจ
+      // แก้ให้แยกเป็นรายการของแต่ละงวดเหมือนข้อมูลอื่น
       const snapshot = { stock: s.stock, plateStockDiam: s.plateStockDiam, actual: s.actual, generalUseEntries: s.generalUseEntries,
-        plateGeneralUseEntries: s.plateGeneralUseEntries, cutInEntries: s.cutInEntries, result: s.result, rawRows: s.rawRows, fileName: s.fileName };
+        plateGeneralUseEntries: s.plateGeneralUseEntries, cutInEntries: s.cutInEntries, extraRebarItems: s.extraRebarItems,
+        result: s.result, rawRows: s.rawRows, fileName: s.fileName };
       const periodHistory = { ...s.periodHistory, [oldLabel]: snapshot };
       const periods = [...new Set([...(s.periods || []), oldLabel, finalLabel])];
       const periodSummaries = { ...s.periodSummaries, [oldLabel]: this.computePeriodSummary(s) };
-      const emptyNext = { stock: newStock, plateStockDiam: newPlateStockDiam, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, cutInEntries: {}, generalUseOpen: {} };
+      const emptyNext = { stock: newStock, plateStockDiam: newPlateStockDiam, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, cutInEntries: {}, extraRebarItems: [], generalUseOpen: {} };
       return { ...emptyNext, result: null, rawRows: null, fileName: '',
         periodLabel: finalLabel, periodHistory, periods, periodSummaries, periodLocked: { ...s.periodLocked, [oldLabel]: true },
         periodPickerOpen: false, periodPickerPurpose: null, undoStack, redoStack: [] };
@@ -1062,14 +1068,16 @@ class App extends React.Component {
       const undoStack = this.pushUndo(s);
       const oldLabel = s.periodLabel || 'งวดที่ยังไม่ตั้งชื่อ';
       const snapshot = { stock: s.stock, plateStockDiam: s.plateStockDiam, actual: s.actual, generalUseEntries: s.generalUseEntries,
-        plateGeneralUseEntries: s.plateGeneralUseEntries, cutInEntries: s.cutInEntries, result: s.result, rawRows: s.rawRows, fileName: s.fileName };
+        plateGeneralUseEntries: s.plateGeneralUseEntries, cutInEntries: s.cutInEntries, extraRebarItems: s.extraRebarItems,
+        result: s.result, rawRows: s.rawRows, fileName: s.fileName };
       const periodHistory = { ...s.periodHistory, [oldLabel]: snapshot };
       const loaded = periodHistory[newLabel] || { stock: {}, plateStockDiam: {}, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {},
-        cutInEntries: {}, result: null, rawRows: null, fileName: '' };
+        cutInEntries: {}, extraRebarItems: [], result: null, rawRows: null, fileName: '' };
       const periods = [...new Set([...(s.periods || []), oldLabel, newLabel])];
       return { periodHistory, periodLabel: newLabel, periods, stock: loaded.stock, plateStockDiam: loaded.plateStockDiam,
         actual: loaded.actual, generalUseEntries: loaded.generalUseEntries, plateGeneralUseEntries: loaded.plateGeneralUseEntries,
-        cutInEntries: loaded.cutInEntries || {}, result: loaded.result ?? null, rawRows: loaded.rawRows ?? null, fileName: loaded.fileName ?? '',
+        cutInEntries: loaded.cutInEntries || {}, extraRebarItems: loaded.extraRebarItems || [],
+        result: loaded.result ?? null, rawRows: loaded.rawRows ?? null, fileName: loaded.fileName ?? '',
         generalUseOpen: {}, undoStack };
     });
   }
@@ -1113,15 +1121,16 @@ class App extends React.Component {
       const periodSummaries = { ...s.periodSummaries }; delete periodSummaries[label];
       if (!periods.length) {
         return { periods: [], periodHistory: {}, periodSummaries: {}, periodLabel: null, stock: {}, plateStockDiam: {},
-          actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, cutInEntries: {}, generalUseOpen: {}, undoStack: [], redoStack: [],
+          actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, cutInEntries: {}, extraRebarItems: [], generalUseOpen: {}, undoStack: [], redoStack: [],
           periodLocked: {}, result: null, rawRows: null, fileName: '', error: null, resultView: 'main' };
       }
       const nextLabel = periods[0];
       const loaded = periodHistory[nextLabel] || { stock: {}, plateStockDiam: {}, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {},
-        cutInEntries: {}, result: null, rawRows: null, fileName: '' };
+        cutInEntries: {}, extraRebarItems: [], result: null, rawRows: null, fileName: '' };
       return { periods, periodHistory, periodSummaries, periodLabel: nextLabel, stock: loaded.stock, plateStockDiam: loaded.plateStockDiam,
         actual: loaded.actual, generalUseEntries: loaded.generalUseEntries, plateGeneralUseEntries: loaded.plateGeneralUseEntries,
-        cutInEntries: loaded.cutInEntries || {}, result: loaded.result ?? null, rawRows: loaded.rawRows ?? null, fileName: loaded.fileName ?? '',
+        cutInEntries: loaded.cutInEntries || {}, extraRebarItems: loaded.extraRebarItems || [],
+        result: loaded.result ?? null, rawRows: loaded.rawRows ?? null, fileName: loaded.fileName ?? '',
         generalUseOpen: {}, undoStack: [], redoStack: [] };
     });
   }
