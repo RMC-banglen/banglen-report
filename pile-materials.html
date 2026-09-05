@@ -290,12 +290,14 @@ function ExtraSpecInput({ value, onCommit, disabled }) {
   const dirty = draft !== value;
   const commit = () => { if (dirty) onCommit(draft); };
   const cancel = () => setDraft(value);
+  // ก่อนหน้านี้ input หด (minWidth:0) จนตัวหนังสือหายไปเลยเวลาปุ่มยืนยัน/ยกเลิกโผล่มาพร้อมกันในแถวที่แคบ
+  // แก้ให้ input ไม่หดต่ำกว่า 140px แล้วปล่อยให้ปุ่มไหลลงบรรทัดใหม่แทน (flexWrap ที่ตัวห่อข้างนอกช่วยอยู่แล้ว)
   return (
-    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1, minWidth: 0 }}>
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
       <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
         placeholder="ระบุขนาด/สเปคเหล็ก"
-        style={{ ...inp(null), flex: 1, minWidth: 0, borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
+        style={{ ...inp(null), minWidth: 140, flex: '1 1 140px', borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
         disabled={disabled} />
       {dirty && !disabled && <button onClick={commit} style={{ ...btnGhost('#2f5fd0'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✓ ยืนยัน</button>}
       {dirty && !disabled && <button onClick={cancel} style={{ ...btnGhost('#78839A'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✗ ยกเลิก</button>}
@@ -357,7 +359,7 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
             <tr key={row.key || i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
                     <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>ไม่อยู่ในสูตร</span>
                     {!READONLY && <button onClick={row.onRemoveExtra} style={btnGhost('#c0392b')}>ลบ</button>}
