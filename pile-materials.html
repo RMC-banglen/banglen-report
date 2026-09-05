@@ -119,6 +119,14 @@ function fmt(n, digits) {
   if (n == null || !isFinite(n)) return '-';
   return n.toLocaleString('th-TH', { minimumFractionDigits: digits ?? 1, maximumFractionDigits: digits ?? 1 });
 }
+
+// วัดความกว้างตัวหนังสือจริงด้วย canvas (แม่นกว่าคูณจำนวนตัวอักษรเดามั่ว ซึ่งทำให้ช่องกรอกสเปคกว้างเกินจริงไปมาก)
+let __measureCanvasCtx = null;
+function measureTextWidth(text, font) {
+  if (!__measureCanvasCtx) __measureCanvasCtx = document.createElement('canvas').getContext('2d');
+  __measureCanvasCtx.font = font;
+  return __measureCanvasCtx.measureText(text || '').width;
+}
 function parseFmtNum(str) {
   if (str == null || str === '' || str === '-') return null;
   const n = parseFloat(String(str).replace(/[+,%]/g, ''));
@@ -297,9 +305,10 @@ function ExtraSpecInput({ value, onCommit, disabled }) {
   const commit = () => { if (dirty) onCommit(draft); };
   const cancel = () => setDraft(value);
   // ก่อนหน้านี้ input หด (minWidth:0) จนตัวหนังสือหายไปเลยเวลาปุ่มยืนยัน/ยกเลิกโผล่มาพร้อมกันในแถวที่แคบ
-  // แก้ให้ input กว้างพอดีตามความยาวตัวหนังสือจริง (ไม่ใช่ค่าตายตัว) กันข้อความยาวๆ เช่น "DB16x3.25 ม." ถูกตัดจนอ่านไม่เต็ม
-  // แต่ก็ไม่กว้างเกินจำเป็นจนป้าย/ปุ่มข้างๆ ไม่มีที่อยู่ — ปล่อยให้ปุ่มไหลลงบรรทัดใหม่แทนถ้าพื้นที่ไม่พอจริงๆ
-  const inputWidth = Math.max(90, Math.min(220, (draft || '').length * 9 + 28));
+  // แก้ให้ input กว้างพอดีตามความยาวตัวหนังสือจริง — เดิมคูณจำนวนตัวอักษรแบบเดาๆ (9px/ตัว) ทำให้กว้างเกินจริงไปเยอะ
+  // (เช่น "DB16x3.25 ม." จริงกว้างแค่ ~87px แต่สูตรเดาว่า 136px) จนป้าย/ปุ่มข้างๆ ไม่มีที่พอ ต้องตกบรรทัดทั้งที่ไม่จำเป็น
+  // เปลี่ยนมาวัดความกว้างตัวหนังสือจริงด้วย canvas แทน ให้ได้ขนาดพอดีเป๊ะ เผื่อระยะขอบ/เคอร์เซอร์อีกนิดหน่อย
+  const inputWidth = Math.max(70, Math.ceil(measureTextWidth(draft || 'ระบุขนาด/สเปคเหล็ก', '14px "IBM Plex Sans Thai", Sarabun, system-ui, sans-serif')) + 26);
   return (
     <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
       <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
@@ -367,13 +376,13 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
             <tr key={row.key || i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ flex: '0 0 auto' }}>
                       <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
                     </div>
-                    <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
-                      <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>ไม่อยู่ในสูตร</span>
-                      {!READONLY && <button onClick={row.onRemoveExtra} style={{ ...btnGhost('#c0392b'), whiteSpace: 'nowrap' }}>ลบ</button>}
+                    <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                      <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>ไม่อยู่ในสูตร</span>
+                      {!READONLY && <button onClick={row.onRemoveExtra} style={{ ...btnGhost('#c0392b'), padding: '4px 9px', fontSize: 12, whiteSpace: 'nowrap' }}>ลบ</button>}
                     </div>
                   </div>
                 ) : row.label}
