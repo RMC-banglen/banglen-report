@@ -1069,6 +1069,28 @@ class App extends React.Component {
     if (curIdx >= 0 && !isNaN(curYear)) { nextMonth = (curIdx + 1) % 12; nextYear = curIdx === 11 ? curYear + 1 : curYear; }
     this.setState({ periodPickerOpen: true, periodPickerPurpose: 'close', periodPickerMonth: nextMonth, periodPickerYear: nextYear });
   }
+  // เผื่อกรณีสร้างงวดใหม่ด้วยปุ่ม "+ งวดใหม่" ตรงๆ (ไม่ได้ใช้ "ปิดเดือน") เลยไม่ได้ยกยอดนับสต็อกงวดก่อนมาเป็นยกมาให้อัตโนมัติ
+  // ปุ่มนี้ให้ดึงย้อนหลังทีหลังได้ โดยไม่ต้องพิมพ์ตัวเลขเองทุกช่อง
+  pullOpeningFromPreviousPeriod() {
+    if (READONLY) return;
+    const curIdx = THAI_MONTHS.indexOf((this.state.periodLabel || '').split(' ')[0]);
+    const curYear = parseInt((this.state.periodLabel || '').split(' ')[1], 10);
+    if (curIdx < 0 || isNaN(curYear)) { alert('ไม่ทราบเดือน/ปีของงวดปัจจุบัน'); return; }
+    const prevMonth = (curIdx + 11) % 12;
+    const prevYear = curIdx === 0 ? curYear - 1 : curYear;
+    const prevLabel = THAI_MONTHS[prevMonth] + ' ' + prevYear;
+    const prev = this.state.periodHistory[prevLabel];
+    if (!prev) { alert('ไม่พบข้อมูลงวด "' + prevLabel + '" ในระบบ (ต้องเคยบันทึกงวดนั้นไว้ก่อน ถึงจะดึงยอดมาได้)'); return; }
+    if (!confirm('ดึงยอด "นับสต็อก" ของงวด "' + prevLabel + '" มาใส่เป็น "ยกมา" ของงวดนี้ทุกรายการ?\nยอดยกมาที่กรอกไว้อยู่ตอนนี้ (ถ้ามี) จะถูกแทนที่')) return;
+    this.setState(s => {
+      const undoStack = this.pushUndo(s);
+      const newStock = { ...s.stock };
+      Object.keys(prev.stock || {}).forEach(k => { newStock[k] = { ...(newStock[k] || {}), opening: (prev.stock[k] || {}).closing ?? '' }; });
+      const newPlateStockDiam = { ...s.plateStockDiam };
+      Object.keys(prev.plateStockDiam || {}).forEach(d => { const close = (prev.plateStockDiam[d] || {}).close ?? 0; newPlateStockDiam[d] = { ...(newPlateStockDiam[d] || {}), open: close }; });
+      return { stock: newStock, plateStockDiam: newPlateStockDiam, undoStack, redoStack: [] };
+    });
+  }
   deleteCurrentPeriod() {
     if (READONLY) return;
     const label = this.state.periodLabel;
@@ -1203,8 +1225,12 @@ class App extends React.Component {
             {(s.resultView === 'main' || s.resultView === 'stock') && (
               <React.Fragment>
                 {!r && (
-                  <div style={{ padding: 24, textAlign: 'center', color: '#78839A', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10 }}>
-                    ยังไม่มีข้อมูลของงวด "{s.periodLabel}" — อัปโหลดไฟล์รายการเสาที่ด้านบนก่อน
+                  <div style={{ padding: 24, textAlign: 'center', color: '#78839A', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
+                    <div>ยังไม่มีข้อมูลของงวด "{s.periodLabel}" — อัปโหลดไฟล์รายการเสาที่ด้านบนก่อน</div>
+                    {/* ดึงยอดยกมาไว้ล่วงหน้าได้เลยแม้ยังไม่อัปโหลดไฟล์ — ค่าจะรอโผล่ในตารางสต็อกทันทีที่อัปโหลดไฟล์ของงวดนี้แล้ว */}
+                    {stockMode && !READONLY && (
+                      <button onClick={() => this.pullOpeningFromPreviousPeriod()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #b9cdf0', background: '#eef3fc', color: '#244c9b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>⬇ ดึงยอดยกมาจากงวดก่อนหน้า</button>
+                    )}
                   </div>
                 )}
                 {mp && (
@@ -1233,7 +1259,12 @@ class App extends React.Component {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
-                      {stockMode && !READONLY && <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>}
+                      {stockMode && !READONLY && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => this.pullOpeningFromPreviousPeriod()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #b9cdf0', background: '#eef3fc', color: '#244c9b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>⬇ ดึงยอดยกมาจากงวดก่อนหน้า</button>
+                          <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }} data-no-print="true">
