@@ -297,13 +297,15 @@ function ExtraSpecInput({ value, onCommit, disabled }) {
   const commit = () => { if (dirty) onCommit(draft); };
   const cancel = () => setDraft(value);
   // ก่อนหน้านี้ input หด (minWidth:0) จนตัวหนังสือหายไปเลยเวลาปุ่มยืนยัน/ยกเลิกโผล่มาพร้อมกันในแถวที่แคบ
-  // แก้ให้ input ไม่หดต่ำกว่า 100px (ลดจาก 140 ให้พอดีตัวหนังสือ ไม่กินที่จนป้าย/ปุ่มข้างๆ ต้องตกบรรทัด) แล้วปล่อยให้ปุ่มไหลลงบรรทัดใหม่แทนถ้ายังไม่พอจริงๆ
+  // แก้ให้ input กว้างพอดีตามความยาวตัวหนังสือจริง (ไม่ใช่ค่าตายตัว) กันข้อความยาวๆ เช่น "DB16x3.25 ม." ถูกตัดจนอ่านไม่เต็ม
+  // แต่ก็ไม่กว้างเกินจำเป็นจนป้าย/ปุ่มข้างๆ ไม่มีที่อยู่ — ปล่อยให้ปุ่มไหลลงบรรทัดใหม่แทนถ้าพื้นที่ไม่พอจริงๆ
+  const inputWidth = Math.max(90, Math.min(220, (draft || '').length * 9 + 28));
   return (
     <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
       <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
         placeholder="ระบุขนาด/สเปคเหล็ก"
-        style={{ ...inp(null), minWidth: 100, flex: '0 1 100px', borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
+        style={{ ...inp(null), width: inputWidth, minWidth: inputWidth, flex: '0 0 auto', borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
         disabled={disabled} />
       {dirty && !disabled && <button onClick={commit} style={{ ...btnGhost('#2f5fd0'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✓ ยืนยัน</button>}
       {dirty && !disabled && <button onClick={cancel} style={{ ...btnGhost('#78839A'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✗ ยกเลิก</button>}
@@ -366,7 +368,7 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ flex: '0 1 100px', minWidth: 100 }}>
+                    <div style={{ flex: '0 0 auto' }}>
                       <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
                     </div>
                     <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
