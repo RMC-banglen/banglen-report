@@ -1149,20 +1149,45 @@ class App extends React.Component {
           </Modal>
         )}
 
-        {r && (
+        {/* เดิมทั้งบล็อกนี้ผูกกับ {r && (...)} ทำให้พอ result ว่าง (งวดใหม่ที่ยังไม่อัปโหลดไฟล์ หลัง
+            แก้ให้ result แยกตามงวดจริง) ตัวเลือกงวด/ปุ่มจัดการงวดหายไปด้วยทั้งที่ควรใช้งานได้เสมอ
+            แก้ให้ผูกกับ periodLabel แทน ส่วนเนื้อหาที่ต้องใช้ผลไฟล์จริง (r/mp) ค่อยเช็คแยกด้านใน */}
+        {s.periodLabel && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              <div style={kpi()}><div style={kpiLbl()}>แถวข้อมูลที่ใช้ได้</div><div style={kpiVal()}>{r.usedRows} / {r.totalRows}</div></div>
-              <div style={kpi()}><div style={kpiLbl()}>จำนวนเสาเข็มรวม</div><div style={kpiVal()}>{fmt(r.totalPiles, 0)} ต้น</div></div>
-              <div style={kpi()}><div style={kpiLbl()}>รายการที่ข้าม</div><div style={{ ...kpiVal(), color: r.skippedRows.length ? '#b87412' : 'inherit' }}>{r.skippedRows.length}</div></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 10, padding: '12px 18px' }} data-no-print="true">
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#244c9b' }}>📅 กำลังดูข้อมูลงวด:</div>
+              <select value={s.periodLabel || ''} onChange={e => this.switchPeriod(e.target.value)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #2f5fd0', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#244c9b', background: 'white' }}>
+                {(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+              {!READONLY && <button onClick={() => this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add' })} style={btnDashed()}>+ งวดใหม่</button>}
+              {!READONLY && <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>}
+              {!READONLY && s.undoStack.length > 0 && <button onClick={() => this.undoLastAction()} style={{ ...btnGhost('#8a6114'), border: '1px solid #e0c07a', background: '#fdf6e8' }}>↩ ย้อนกลับ ({s.undoStack.length})</button>}
+              {!READONLY && s.redoStack.length > 0 && <button onClick={() => this.redoLastAction()} style={{ ...btnGhost('#244c9b'), border: '1px solid #b9cdf0', background: '#eef3fc' }}>↪ ทำซ้ำ ({s.redoStack.length})</button>}
             </div>
 
-            {(r.warnings.length > 0 || r.skippedRows.length > 0) && (
-              <div style={{ border: '1px solid #e8c98a', background: '#fdf6e8', borderRadius: 10, padding: '16px 20px' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: '#8a6114' }}>ต้องตรวจสอบ ({r.warnings.length + r.skippedRows.length} รายการ)</div>
-                {r.warnings.map((w, i) => <div key={i} style={{ fontSize: 13, color: '#8a6114', padding: '3px 0' }}>• {w}</div>)}
-                {r.skippedRows.map((sr, i) => <div key={'sk' + i} style={{ fontSize: 13, color: '#8a6114', padding: '3px 0' }}>• ข้ามแถว "{sr.code}": {sr.reason}</div>)}
+            {s.periodLocked[s.periodLabel] && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 8, background: '#fdf6e8', border: '1px solid #e0c07a' }} data-no-print="true">
+                <div style={{ fontSize: 13, color: '#8a6114' }}>🔒 งวด "{s.periodLabel}" ปิดแล้ว — ข้อมูลนี้ใช้อ้างอิงเท่านั้น</div>
+                <button onClick={() => this.toggleCurrentPeriodLock()} style={btnGhost('#8a6114')}>ปลดล็อก</button>
               </div>
+            )}
+
+            {r && (
+              <React.Fragment>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <div style={kpi()}><div style={kpiLbl()}>แถวข้อมูลที่ใช้ได้</div><div style={kpiVal()}>{r.usedRows} / {r.totalRows}</div></div>
+                  <div style={kpi()}><div style={kpiLbl()}>จำนวนเสาเข็มรวม</div><div style={kpiVal()}>{fmt(r.totalPiles, 0)} ต้น</div></div>
+                  <div style={kpi()}><div style={kpiLbl()}>รายการที่ข้าม</div><div style={{ ...kpiVal(), color: r.skippedRows.length ? '#b87412' : 'inherit' }}>{r.skippedRows.length}</div></div>
+                </div>
+
+                {(r.warnings.length > 0 || r.skippedRows.length > 0) && (
+                  <div style={{ border: '1px solid #e8c98a', background: '#fdf6e8', borderRadius: 10, padding: '16px 20px' }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: '#8a6114' }}>ต้องตรวจสอบ ({r.warnings.length + r.skippedRows.length} รายการ)</div>
+                    {r.warnings.map((w, i) => <div key={i} style={{ fontSize: 13, color: '#8a6114', padding: '3px 0' }}>• {w}</div>)}
+                    {r.skippedRows.map((sr, i) => <div key={'sk' + i} style={{ fontSize: 13, color: '#8a6114', padding: '3px 0' }}>• ข้ามแถว "{sr.code}": {sr.reason}</div>)}
+                  </div>
+                )}
+              </React.Fragment>
             )}
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-no-print="true">
@@ -1177,87 +1202,78 @@ class App extends React.Component {
 
             {(s.resultView === 'main' || s.resultView === 'stock') && (
               <React.Fragment>
-                {s.resultView === 'main' && (
-                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    <div style={kpi()}><div style={kpiLbl()}>วัตถุดิบปกติ</div><div style={{ ...kpiVal(), color: '#3f7d2b' }}>{status.normal}</div></div>
-                    <div style={{ ...kpi(), cursor: 'pointer', position: 'relative' }} onClick={() => this.toggleAlertList()}>
-                      <div style={kpiLbl()}>เกินเกณฑ์แจ้งเตือน ({s.alertThresholdPct}%)</div>
-                      <div style={{ ...kpiVal(), color: '#c0392b' }}>{status.alert}</div>
-                      {s.showAlertList && (
-                        <Modal onClose={(e) => { e.stopPropagation(); this.toggleAlertList(); }}>
-                          <div style={{ fontSize: 17, fontWeight: 700 }}>รายการที่เกินเกณฑ์ {s.alertThresholdPct}%</div>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 10 }}>
-                            <thead><tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}><th style={{ padding: '6px 4px' }}>ประเภท</th><th style={{ padding: '6px 4px' }}>รายการ</th><th style={{ padding: '6px 4px', textAlign: 'right' }}>%</th></tr></thead>
-                            <tbody>{status.alertRows.map((ar, i) => <tr key={i} style={{ borderTop: '1px solid #f2f2f2' }}><td style={{ padding: '6px 4px', color: '#78839A' }}>{ar.category}</td><td style={{ padding: '6px 4px' }}>{ar.label}</td><td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 700, color: '#c0392b' }}>{ar.pctFmt}</td></tr>)}</tbody>
-                          </table>
-                        </Modal>
-                      )}
-                    </div>
-                    <div style={{ ...kpi(), flex: 1.5, display: 'flex', alignItems: 'center' }}>
-                      <input type="text" value={s.mainSearchQuery} onChange={e => this.setMainSearchQuery(e.target.value)} placeholder="🔍 ค้นหารายการวัตถุดิบ..." style={{ width: '100%', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 14 }} />
-                    </div>
+                {!r && (
+                  <div style={{ padding: 24, textAlign: 'center', color: '#78839A', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10 }}>
+                    ยังไม่มีข้อมูลของงวด "{s.periodLabel}" — อัปโหลดไฟล์รายการเสาที่ด้านบนก่อน
                   </div>
                 )}
+                {mp && (
+                  <React.Fragment>
+                    {s.resultView === 'main' && (
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                        <div style={kpi()}><div style={kpiLbl()}>วัตถุดิบปกติ</div><div style={{ ...kpiVal(), color: '#3f7d2b' }}>{status.normal}</div></div>
+                        <div style={{ ...kpi(), cursor: 'pointer', position: 'relative' }} onClick={() => this.toggleAlertList()}>
+                          <div style={kpiLbl()}>เกินเกณฑ์แจ้งเตือน ({s.alertThresholdPct}%)</div>
+                          <div style={{ ...kpiVal(), color: '#c0392b' }}>{status.alert}</div>
+                          {s.showAlertList && (
+                            <Modal onClose={(e) => { e.stopPropagation(); this.toggleAlertList(); }}>
+                              <div style={{ fontSize: 17, fontWeight: 700 }}>รายการที่เกินเกณฑ์ {s.alertThresholdPct}%</div>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 10 }}>
+                                <thead><tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}><th style={{ padding: '6px 4px' }}>ประเภท</th><th style={{ padding: '6px 4px' }}>รายการ</th><th style={{ padding: '6px 4px', textAlign: 'right' }}>%</th></tr></thead>
+                                <tbody>{status.alertRows.map((ar, i) => <tr key={i} style={{ borderTop: '1px solid #f2f2f2' }}><td style={{ padding: '6px 4px', color: '#78839A' }}>{ar.category}</td><td style={{ padding: '6px 4px' }}>{ar.label}</td><td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 700, color: '#c0392b' }}>{ar.pctFmt}</td></tr>)}</tbody>
+                              </table>
+                            </Modal>
+                          )}
+                        </div>
+                        <div style={{ ...kpi(), flex: 1.5, display: 'flex', alignItems: 'center' }}>
+                          <input type="text" value={s.mainSearchQuery} onChange={e => this.setMainSearchQuery(e.target.value)} placeholder="🔍 ค้นหารายการวัตถุดิบ..." style={{ width: '100%', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 14 }} />
+                        </div>
+                      </div>
+                    )}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 10, padding: '12px 18px' }} data-no-print="true">
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#244c9b' }}>📅 กำลังดูข้อมูลงวด:</div>
-                  <select value={s.periodLabel || ''} onChange={e => this.switchPeriod(e.target.value)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #2f5fd0', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#244c9b', background: 'white' }}>
-                    {(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  {!READONLY && <button onClick={() => this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add' })} style={btnDashed()}>+ งวดใหม่</button>}
-                  {!READONLY && <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>}
-                  {!READONLY && s.undoStack.length > 0 && <button onClick={() => this.undoLastAction()} style={{ ...btnGhost('#8a6114'), border: '1px solid #e0c07a', background: '#fdf6e8' }}>↩ ย้อนกลับ ({s.undoStack.length})</button>}
-                  {!READONLY && s.redoStack.length > 0 && <button onClick={() => this.redoLastAction()} style={{ ...btnGhost('#244c9b'), border: '1px solid #b9cdf0', background: '#eef3fc' }}>↪ ทำซ้ำ ({s.redoStack.length})</button>}
-                </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
+                      {stockMode && !READONLY && <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>}
+                    </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
-                  {stockMode && !READONLY && <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>}
-                </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }} data-no-print="true">
+                      <button onClick={() => this.exportExcel()} style={btnGhost()}>ดาวน์โหลด Excel</button>
+                      <button onClick={() => window.print()} style={btnGhost()}>พิมพ์ / บันทึกเป็น PDF</button>
+                    </div>
 
-                {s.periodLocked[s.periodLabel] && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 8, background: '#fdf6e8', border: '1px solid #e0c07a' }} data-no-print="true">
-                    <div style={{ fontSize: 13, color: '#8a6114' }}>🔒 งวด "{s.periodLabel}" ปิดแล้ว — ข้อมูลนี้ใช้อ้างอิงเท่านั้น</div>
-                    <button onClick={() => this.toggleCurrentPeriodLock()} style={btnGhost('#8a6114')}>ปลดล็อก</button>
-                  </div>
-                )}
+                    {/* แท็บย่อยแยกตามวัตถุดิบ เฉพาะโหมดนับสต็อก — กันต้องเลื่อนจอยาวๆ ตอนนับของทีละจุด (หน้าหลักยังโชว์รวมทุกอย่างเหมือนเดิม) */}
+                    {stockMode && (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-no-print="true">
+                        {[['all', 'ทั้งหมด'], ['pc', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['collar', 'Collar'], ['rebar', 'เหล็กเสริม']].map(([v, lbl]) => (
+                          <button key={v} onClick={() => this.setStockSubTab(v)} style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid ' + (s.stockSubTab === v ? '#2f5fd0' : '#d8dde6'), fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: s.stockSubTab === v ? '#2f5fd0' : 'white', color: s.stockSubTab === v ? 'white' : '#333' }}>{lbl}</button>
+                        ))}
+                      </div>
+                    )}
+                    {(() => { const sub = stockMode ? s.stockSubTab : 'all'; return (
+                    <React.Fragment>
+                    {(sub === 'all' || sub === 'pc') && <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                    {(sub === 'all' || sub === 'stirrup') && <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                    {(sub === 'all' || sub === 'plate') && <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                    {/* กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา — โชว์เฉพาะแท็บนับสต็อก (ผู้ใช้แจ้งว่าไม่ต้องการให้โชว์ในหน้าหลัก) */}
+                    {stockMode && (sub === 'all' || sub === 'plate') && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
+                    {(sub === 'all' || sub === 'whisker') && <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                    {(sub === 'all' || sub === 'collar') && <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />}
+                    {(sub === 'all' || sub === 'rebar') && <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn allowExtraSpec
+                      extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />}
+                    </React.Fragment>
+                    ); })()}
 
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }} data-no-print="true">
-                  <button onClick={() => this.exportExcel()} style={btnGhost()}>ดาวน์โหลด Excel</button>
-                  <button onClick={() => window.print()} style={btnGhost()}>พิมพ์ / บันทึกเป็น PDF</button>
-                </div>
-
-                {/* แท็บย่อยแยกตามวัตถุดิบ เฉพาะโหมดนับสต็อก — กันต้องเลื่อนจอยาวๆ ตอนนับของทีละจุด (หน้าหลักยังโชว์รวมทุกอย่างเหมือนเดิม) */}
-                {stockMode && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-no-print="true">
-                    {[['all', 'ทั้งหมด'], ['pc', 'PC.wire'], ['stirrup', 'ลวดปลอก'], ['plate', 'เพลท'], ['whisker', 'หนวดกุ้ง'], ['collar', 'Collar'], ['rebar', 'เหล็กเสริม']].map(([v, lbl]) => (
-                      <button key={v} onClick={() => this.setStockSubTab(v)} style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid ' + (s.stockSubTab === v ? '#2f5fd0' : '#d8dde6'), fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: s.stockSubTab === v ? '#2f5fd0' : 'white', color: s.stockSubTab === v ? 'white' : '#333' }}>{lbl}</button>
+                    {mp.plateRowsM.map((row, i) => row.plateGeneralUseOpen && (
+                      <GeneralUseModalPlate key={'p' + i} row={row} onClose={() => this.togglePlateGeneralUseOpen(row.thickness)} />
                     ))}
-                  </div>
+                    {[...mp.whiskerRowsM, ...mp.collarRowsM, ...mp.pcRowsM, ...mp.stirrupRowsM, ...mp.rebarRowsM].map((row, i) => row.generalUseOpen && (
+                      <GeneralUseModal key={'g' + i} title={row.label} entries={row.generalUseEntries} onAdd={row.onAddGeneralUseEntry} onClose={row.onToggleGeneralUseOpen} unit="" />
+                    ))}
+                    {mp.rebarRowsM.map((row, i) => row.cutInOpen && (
+                      <CutInModal key={'c' + i} title={row.label} entries={row.cutInEntries} onAdd={row.onAddCutInEntry} onClose={row.onToggleCutInOpen} unit={row.isExtra ? '' : 'เส้น'} />
+                    ))}
+                  </React.Fragment>
                 )}
-                {(() => { const sub = stockMode ? s.stockSubTab : 'all'; return (
-                <React.Fragment>
-                {(sub === 'all' || sub === 'pc') && <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                {(sub === 'all' || sub === 'stirrup') && <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                {(sub === 'all' || sub === 'plate') && <MaterialTable title="แผ่นเพลทเชื่อมต่อเสาเข็ม" rows={mp.plateRowsM} unitLabel="แผ่น" stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                {/* กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา — โชว์เฉพาะแท็บนับสต็อก (ผู้ใช้แจ้งว่าไม่ต้องการให้โชว์ในหน้าหลัก) */}
-                {stockMode && (sub === 'all' || sub === 'plate') && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
-                {(sub === 'all' || sub === 'whisker') && <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                {(sub === 'all' || sub === 'collar') && <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                {(sub === 'all' || sub === 'rebar') && <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn allowExtraSpec
-                  extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />}
-                </React.Fragment>
-                ); })()}
-
-                {mp.plateRowsM.map((row, i) => row.plateGeneralUseOpen && (
-                  <GeneralUseModalPlate key={'p' + i} row={row} onClose={() => this.togglePlateGeneralUseOpen(row.thickness)} />
-                ))}
-                {[...mp.whiskerRowsM, ...mp.collarRowsM, ...mp.pcRowsM, ...mp.stirrupRowsM, ...mp.rebarRowsM].map((row, i) => row.generalUseOpen && (
-                  <GeneralUseModal key={'g' + i} title={row.label} entries={row.generalUseEntries} onAdd={row.onAddGeneralUseEntry} onClose={row.onToggleGeneralUseOpen} unit="" />
-                ))}
-                {mp.rebarRowsM.map((row, i) => row.cutInOpen && (
-                  <CutInModal key={'c' + i} title={row.label} entries={row.cutInEntries} onAdd={row.onAddCutInEntry} onClose={row.onToggleCutInOpen} unit={row.isExtra ? '' : 'เส้น'} />
-                ))}
               </React.Fragment>
             )}
           </div>
