@@ -56,11 +56,17 @@ const SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
 const DB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PILE_STATE_ROW_ID = 'default';
-// สิทธิ์แก้ไข ส่งมาจากหน้าแม่ผ่าน query (?readonly=1) ตามสิทธิ์ผู้ใช้ที่ล็อกอินอยู่ — ถ้าไม่มี query นี้ (เช่นเปิดไฟล์นี้ตรงๆ) ถือว่าแก้ไขได้ตามปกติ
-const READONLY = new URLSearchParams(location.search).get('readonly') === '1';
-// สิทธิ์พิเศษ "แก้ไขสูตร/ค่าคงที่วัตถุดิบ" (?formulaAdmin=1) — ต้องติ๊กเฉพาะบัญชีนั้นในเมนูจัดการผู้ใช้ ไม่ผูกกับสิทธิ์ admin ทั่วไป
-// ปุ่ม "ตั้งค่าคงที่" (เหล็กเสริม/เพลท/หนวดกุ้ง/PC.wire/ลวดปลอก/หน้าตัดเสา/สูตรคอนกรีต) จะซ่อนไว้จนกว่าจะมีสิทธิ์นี้ ส่วนกรอกสต็อกรายวันยังใช้ READONLY เหมือนเดิม
-const CAN_EDIT_FORMULA = !READONLY && new URLSearchParams(location.search).get('formulaAdmin') === '1';
+// เดิมสิทธิ์แก้ไขอ่านจาก query (?readonly=1/?formulaAdmin=1) ที่หน้าแม่ (index.html) ส่งมาให้ตอนฝัง iframe
+// แต่ใครเปิดไฟล์นี้ตรงๆ ก็แก้ query เองได้ทันที ไม่ปลอดภัย — เปลี่ยนมาให้ต้องล็อกอินด้วย PIN เดียวกับ index.html ก่อนเสมอ
+// (ใช้ตาราง worktrack_users ชุดเดียวกัน) แล้วคำนวณสิทธิ์จริงจากผู้ใช้ที่ล็อกอิน ดู bootWithLoggedInUser() ท้ายไฟล์
+// ค่าเริ่มต้นด้านล่างเป็นแค่ placeholder ที่เข้มงวดที่สุด จะถูกคำนวณใหม่เสมอก่อน mount แอปจริง
+let READONLY = true;
+let CAN_EDIT_FORMULA = false;
+function computePileMaterialsPermissions(user) {
+  const canEdit = !!(user && (user.role === 'admin' || (user.role === 'editor' && (user.permissions || {}).pileMaterials)));
+  const formulaAdmin = canEdit && !!(user && (user.permissions || {}).materialFormula);
+  return { canEdit, formulaAdmin };
+}
 let PC = null; // pile-calc module, loaded async below
 function waitForPileCalc() {
   return new Promise(resolve => {
@@ -291,13 +297,13 @@ function ExtraSpecInput({ value, onCommit, disabled }) {
   const commit = () => { if (dirty) onCommit(draft); };
   const cancel = () => setDraft(value);
   // ก่อนหน้านี้ input หด (minWidth:0) จนตัวหนังสือหายไปเลยเวลาปุ่มยืนยัน/ยกเลิกโผล่มาพร้อมกันในแถวที่แคบ
-  // แก้ให้ input ไม่หดต่ำกว่า 140px แล้วปล่อยให้ปุ่มไหลลงบรรทัดใหม่แทน (flexWrap ที่ตัวห่อข้างนอกช่วยอยู่แล้ว)
+  // แก้ให้ input ไม่หดต่ำกว่า 100px (ลดจาก 140 ให้พอดีตัวหนังสือ ไม่กินที่จนป้าย/ปุ่มข้างๆ ต้องตกบรรทัด) แล้วปล่อยให้ปุ่มไหลลงบรรทัดใหม่แทนถ้ายังไม่พอจริงๆ
   return (
     <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
       <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
         placeholder="ระบุขนาด/สเปคเหล็ก"
-        style={{ ...inp(null), minWidth: 140, flex: '1 1 140px', borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
+        style={{ ...inp(null), minWidth: 100, flex: '0 1 100px', borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
         disabled={disabled} />
       {dirty && !disabled && <button onClick={commit} style={{ ...btnGhost('#2f5fd0'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✓ ยืนยัน</button>}
       {dirty && !disabled && <button onClick={cancel} style={{ ...btnGhost('#78839A'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✗ ยกเลิก</button>}
@@ -360,7 +366,7 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ flex: '1 1 140px', minWidth: 140 }}>
+                    <div style={{ flex: '0 1 100px', minWidth: 100 }}>
                       <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
                     </div>
                     <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
@@ -2057,7 +2063,89 @@ const kpi = () => ({ flex: 1, minWidth: 160, border: '1px solid #e3e7ee', border
 const kpiLbl = () => ({ fontSize: 13, color: '#78839A' });
 const kpiVal = () => ({ fontSize: 24, fontWeight: 700 });
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+// หน้าล็อกอินด้วย PIN — ใช้ตาราง worktrack_users ชุดเดียวกับ index.html (sessionStorage key 'wt_user' ก็ใช้ร่วมกัน
+// เพราะเป็น origin เดียวกัน ถ้าเปิดผ่าน iframe ในหน้าที่ล็อกอินอยู่แล้วจะข้ามหน้านี้ไปเลยอัตโนมัติ)
+function PileMaterialsPinLogin({ onLogin }) {
+  const [users, setUsers] = React.useState([]);
+  const [selected, setSelected] = React.useState(null);
+  const [pin, setPin] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    DB.from('worktrack_users').select('*').order('sort_order', { ascending: true, nullsFirst: false }).order('created_at')
+      .then(({ data }) => { setUsers((data || []).filter(u => u.active !== false)); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+  const pressPin = d => {
+    if (error || pin.length >= 4) return;
+    const next = pin + d;
+    setPin(next);
+    if (next.length === 4) {
+      if (next === selected.pin) onLogin(selected);
+      else { setError('PIN ไม่ถูกต้อง'); setTimeout(() => { setPin(''); setError(''); }, 900); }
+    }
+  };
+  React.useEffect(() => {
+    if (!selected) return;
+    const onKey = e => {
+      if (e.key >= '0' && e.key <= '9') pressPin(e.key);
+      else if (e.key === 'Backspace') setPin(p => p.slice(0, -1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, pin, error]);
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#78839A', fontSize: 16, fontFamily: 'inherit' }}>กำลังโหลด...</div>;
+  return (
+    <div style={{ minHeight: '100vh', background: '#f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'inherit' }}>
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#1e293b' }}>สต็อกวัตถุดิบเสาเข็ม</div>
+        <div style={{ fontSize: 13, color: '#78839A', marginTop: 4 }}>ต้องเข้าสู่ระบบก่อนใช้งาน — เลือกผู้ใช้งาน</div>
+      </div>
+      {!selected ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, justifyContent: 'center', maxWidth: 640 }}>
+          {users.map(u => (
+            <div key={u.id} onClick={() => { if (!u.pin) onLogin(u); else { setSelected(u); setPin(''); setError(''); } }}
+              style={{ cursor: 'pointer', textAlign: 'center', padding: '18px 22px', background: '#fff', borderRadius: 16, border: '2px solid #e2e8f0', minWidth: 110, boxShadow: '0 2px 8px rgba(0,0,0,.05)' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{u.name}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{u.position || (u.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน')}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ background: '#fff', borderRadius: 20, padding: '32px 28px', boxShadow: '0 4px 20px rgba(0,0,0,.1)', textAlign: 'center', minWidth: 320 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>{selected.name}</div>
+          <div style={{ fontSize: 13, color: '#78839A', marginBottom: 18 }}>กรอก PIN 4 หลัก</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20 }}>
+            {[0, 1, 2, 3].map(i => <div key={i} style={{ width: 14, height: 14, borderRadius: '50%', background: error ? '#dc2626' : pin.length > i ? '#2f5fd0' : '#e2e8f0', transition: 'background .15s' }} />)}
+          </div>
+          {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 10, fontWeight: 600 }}>{error}</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map((d, i) => (
+              <button key={i} onClick={() => d === '' ? null : d === '⌫' ? setPin(p => p.slice(0, -1)) : pressPin(String(d))}
+                style={{ padding: 18, minWidth: 80, fontSize: 20, fontWeight: 600, border: '1.5px solid #e2e8f0', borderRadius: 10, background: d === '' ? 'transparent' : '#f8fafc', color: '#1e293b', cursor: d === '' ? 'default' : 'pointer', visibility: d === '' ? 'hidden' : 'visible' }}>{d}</button>
+            ))}
+          </div>
+          <button onClick={() => setSelected(null)} style={{ fontSize: 13, color: '#78839A', background: 'none', border: 'none', cursor: 'pointer' }}>← เลือกผู้ใช้อื่น</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const pileMaterialsRoot = ReactDOM.createRoot(document.getElementById('root'));
+function bootPileMaterialsApp(user) {
+  try { sessionStorage.setItem('wt_user', JSON.stringify(user)); } catch (e) {}
+  const perm = computePileMaterialsPermissions(user);
+  READONLY = !perm.canEdit;
+  CAN_EDIT_FORMULA = perm.formulaAdmin;
+  pileMaterialsRoot.render(<App />);
+}
+(function bootPileMaterials() {
+  let user = null;
+  try { user = JSON.parse(sessionStorage.getItem('wt_user') || 'null'); } catch (e) {}
+  if (user && user.id) { bootPileMaterialsApp(user); return; }
+  pileMaterialsRoot.render(<PileMaterialsPinLogin onLogin={bootPileMaterialsApp} />);
+})();
 </script>
 </body>
 </html>
