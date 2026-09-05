@@ -629,7 +629,10 @@ class App extends React.Component {
     const baseRebarRowsM = r.rebar.map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true }));
     const extraRebarRowsM = this.state.extraRebarItems.map(item => {
       const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
-      return { ...row, isExtra: true, spec: item.spec, onSpecChange: v => this.updateExtraRebarSpec(item.id, v), onRemoveExtra: () => this.removeExtraRebarItem(item.id) };
+      // แถวนี้ไม่มีสูตรคำนวณให้เทียบ (คำนวณ = 0 เสมอ) ช่อง ส่วนต่าง/ส่วนต่างจริง/% หาย ที่เทียบกับ 0 เลยไม่มีความหมาย
+      // (ยกตัวอย่าง มีของเข้า-ออกนิดเดียวก็ขึ้น -100% แดงทันที ทั้งที่ไม่ได้ผิดปกติอะไร) ซ่อนคอลัมน์เปรียบเทียบพวกนี้ไปเลยสำหรับแถวไม่อยู่ในสูตร
+      return { ...row, isExtra: true, spec: item.spec, onSpecChange: v => this.updateExtraRebarSpec(item.id, v), onRemoveExtra: () => this.removeExtraRebarItem(item.id),
+        diffFmt: '-', diffColor: 'inherit', realDiffFmt: '-', pctLostFmt: '-', rowBg: 'transparent' };
     });
     // เรียงรายการเหล็กค้าง/ไม่อยู่ในสูตรปนไปกับแถวคำนวณตามขนาด แทนที่จะโยนไปกองท้ายตารางเหมือนเดิม
     const rebarRowsM = markRebarGroups(sortRebarBySpec([...baseRebarRowsM, ...extraRebarRowsM], row => row.label));
