@@ -359,11 +359,13 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
             <tr key={row.key || i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', flex: '1 1 0', textAlign: 'center', boxSizing: 'border-box' }}>ไม่อยู่ในสูตร</span>
-                      {!READONLY && <button onClick={row.onRemoveExtra} style={{ ...btnGhost('#c0392b'), flex: '1 1 0', boxSizing: 'border-box' }}>ลบ</button>}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 140px', minWidth: 140 }}>
+                      <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+                      <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>ไม่อยู่ในสูตร</span>
+                      {!READONLY && <button onClick={row.onRemoveExtra} style={{ ...btnGhost('#c0392b'), whiteSpace: 'nowrap' }}>ลบ</button>}
                     </div>
                   </div>
                 ) : row.label}
@@ -463,8 +465,50 @@ class App extends React.Component {
     this._lastSavedSnapshot = JSON.stringify(this.persistKeys.map(k => out[k]));
     this.setState({ syncStatus: 'saving' });
     DB.from('pile_materials_state').upsert({ id: PILE_STATE_ROW_ID, data: out, updated_at: new Date().toISOString() })
-      .then(({ error }) => { if (error) throw error; this.setState({ syncStatus: 'synced' }); })
+      .then(({ error }) => { if (error) throw error; this.setState({ syncStatus: 'synced' }); this.maybeSaveBackup(out); })
       .catch(e => { console.warn('บันทึกขึ้น Supabase ไม่สำเร็จ', e); this.setState({ syncStatus: 'offline' }); });
+  }
+  // สำรองข้อมูลทั้งก้อนเก็บไว้เป็นแถวแยก (id ขึ้นต้นด้วย "backup-") กันเหตุการณ์แบบที่เคยเจอ
+  // (รายการที่เพิ่มเองของงวดหนึ่งหายไปเพราะบั๊กเดิม แล้วกู้คืนไม่ได้เพราะไม่มีประวัติเก็บไว้เลย)
+  // จำกัดไม่ให้สำรองถี่เกินไประหว่างพิมพ์ข้อมูล เว้นระยะอย่างน้อย BACKUP_MIN_INTERVAL_MS ต่อครั้ง
+  // วิธีกู้คืนกรณีฉุกเฉิน: ไปดึงแถว id="backup-<เวลา>" ที่ต้องการจากตาราง pile_materials_state
+  // แล้ว upsert ค่า data ของแถวนั้นทับกลับไปที่ id="default" (ให้ผู้ดูแลระบบ/ผู้พัฒนาทำผ่าน Supabase หรือขอให้ Claude ช่วยทำให้)
+  maybeSaveBackup(out) {
+    try {
+      const BACKUP_MIN_INTERVAL_MS = 15 * 60 * 1000;
+      const now = Date.now();
+      if (this._lastBackupAt && now - this._lastBackupAt < BACKUP_MIN_INTERVAL_MS) return;
+      this._lastBackupAt = now;
+      const backupId = 'backup-' + new Date().toISOString();
+      DB.from('pile_materials_state').insert({ id: backupId, data: out, updated_at: new Date().toISOString() })
+        .then(({ error }) => { if (error) throw error; this.pruneOldBackups(); })
+        .catch(e => console.warn('สำรองข้อมูลอัตโนมัติไม่สำเร็จ', e));
+    } catch (e) { console.warn('maybeSaveBackup error', e); }
+  }
+  pruneOldBackups() {
+    const KEEP_BACKUPS = 60;
+    DB.from('pile_materials_state').select('id').like('id', 'backup-%').order('id', { ascending: false })
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        const toDelete = data.slice(KEEP_BACKUPS).map(r => r.id);
+        if (toDelete.length) DB.from('pile_materials_state').delete().in('id', toDelete).catch(() => {});
+      }).catch(() => {});
+  }
+  saveBackupNow() {
+    if (READONLY) return;
+    const out = {};
+    this.persistKeys.forEach(k => { out[k] = this.state[k]; });
+    this._lastBackupAt = Date.now();
+    const backupId = 'backup-' + new Date().toISOString();
+    this.setState({ syncStatus: 'saving' });
+    DB.from('pile_materials_state').insert({ id: backupId, data: out, updated_at: new Date().toISOString() })
+      .then(({ error }) => {
+        if (error) throw error;
+        this.pruneOldBackups();
+        this.setState({ syncStatus: 'synced' });
+        alert('สำรองข้อมูล ณ ตอนนี้เรียบร้อยแล้ว');
+      })
+      .catch(e => { console.warn('สำรองข้อมูลไม่สำเร็จ', e); this.setState({ syncStatus: 'offline' }); alert('สำรองข้อมูลไม่สำเร็จ: ' + e.message); });
   }
   componentDidUpdate() {
     if (!this._persistReady) return;
@@ -1210,6 +1254,7 @@ class App extends React.Component {
               {!READONLY && <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>}
               {!READONLY && s.undoStack.length > 0 && <button onClick={() => this.undoLastAction()} style={{ ...btnGhost('#8a6114'), border: '1px solid #e0c07a', background: '#fdf6e8' }}>↩ ย้อนกลับ ({s.undoStack.length})</button>}
               {!READONLY && s.redoStack.length > 0 && <button onClick={() => this.redoLastAction()} style={{ ...btnGhost('#244c9b'), border: '1px solid #b9cdf0', background: '#eef3fc' }}>↪ ทำซ้ำ ({s.redoStack.length})</button>}
+              {!READONLY && <button onClick={() => { if (confirm('สำรองข้อมูลทั้งหมด ณ ตอนนี้ไปเก็บไว้แยกต่างหาก (เผื่อกู้คืนภายหลัง)?')) this.saveBackupNow(); }} title="สำรองข้อมูลทั้งหมดไปเก็บแยกไว้ทันที เผื่อกู้คืนภายหลังหากมีปัญหา" style={{ ...btnGhost('#3a7d5c'), border: '1px solid #a8d5bd', background: '#eef9f2' }}>📦 สำรองข้อมูลเดี๋ยวนี้</button>}
             </div>
 
             {s.periodLocked[s.periodLabel] && (
