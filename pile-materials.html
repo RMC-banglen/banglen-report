@@ -185,6 +185,30 @@ function GeneralUseModal({ title, entries, onAdd, onClose, unit }) {
     </Modal>
   );
 }
+function CutInModal({ title, entries, onAdd, onClose, unit }) {
+  // แยกจาก GeneralUseModal เพราะเป็นของเข้าจริง (ตัดจากความยาวอื่นมาใช้แทน) กรอกเป็นจำนวนบวกตรงๆ ไม่ต้องคิดเครื่องหมาย
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>ตัดรับเข้าจากความยาวอื่น — {title}</div>
+      <div style={{ fontSize: 14, color: '#78839A' }}>สำหรับกรณีตัดเหล็กความยาวอื่นมาใช้แทน (เช่น ตัด 4 ม. มาใช้แทน 2 ม.) ระบุจำนวนที่ได้เป็นบวกตรงๆ ไม่ต้องใส่ติดลบ ระบบจะเอาไปหักลดส่วนต่างจริงให้อัตโนมัติ</div>
+      {entries.map((e, i) => (
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input type="number" min="0" value={e.qty ?? ''} onChange={ev => e.onQtyChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} disabled={READONLY} />
+          <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="ตัดจากความยาวไหน/สาเหตุ" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
+        {!READONLY && <button onClick={onAdd} style={btnDashed()}>+ เพิ่มรายการ</button>}
+        {READONLY && <div />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>รวม: {fmt(entries.reduce((s, e) => s + (Number(e.qty) || 0), 0), 1)} {unit || ''}</div>
+          <button onClick={onClose} style={btnPrimary()}>เสร็จสิ้น</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 function ScrollToTopButton() {
   // หน้านี้ยาวมาก (โดยเฉพาะแท็บนับสต็อกที่มีการ์ดกระทบยอดเพลทหลายใบ) — ปุ่มลอยเลื่อนกลับด้านบนช่วยไม่ต้องลากสกรอลล์เอง
   // ใช้เทคนิคเดียวกับ Modal: หน้านี้ฝังใน iframe แบบยืดความสูงเต็มเนื้อหา (หน้าแม่เลื่อนแทน) position:fixed ปกติเลยใช้ไม่ได้
@@ -275,7 +299,7 @@ function ActualCell({ row, stockMode }) {
     placeholder="0" style={inp(100, true)} disabled={READONLY} />;
 }
 
-function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, extraRebarButton, allowExtraSpec }) {
+function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, onOpenCutIn, extraRebarButton, allowExtraSpec, showCutIn }) {
   if (!rows || !rows.length) return null;
   // คอลัมน์ "เข้า-ออกสต็อก" มีเฉพาะเพลท (สต็อกปลาย−ต้นงวด หน่วยแผ่นใหญ่ เหมือนคอลัมน์คำนวณ) — วัตถุดิบอื่นไม่มีข้อมูลนี้ ซ่อนคอลัมน์ไปเลย
   const hasStockInOut = rows.some(r => r.stockInOutFmt != null);
@@ -286,14 +310,15 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden', tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
-            <th style={th(24)}>รายการ</th>
-            <th style={th(13, true)}>คำนวณ ({unitLabel})</th>
-            <th style={th(16, true)}>ใช้จริง ({unitLabel})</th>
-            <th style={th(9, true)}>ส่วนต่าง</th>
-            <th style={th(11, true)}>ใช้งานอื่น-เสียหาย</th>
-            {hasStockInOut && <th style={th(11, true)}>เข้า-ออกสต็อกสำเร็จ (แผ่นใหญ่)</th>}
+            <th style={th(21)}>รายการ</th>
+            <th style={th(11, true)}>คำนวณ ({unitLabel})</th>
+            <th style={th(14, true)}>ใช้จริง ({unitLabel})</th>
+            <th style={th(8, true)}>ส่วนต่าง</th>
+            <th style={th(10, true)}>ใช้งานอื่น-เสียหาย</th>
+            {showCutIn && <th style={th(10, true)}>ตัดรับเข้าจากความยาวอื่น</th>}
+            {hasStockInOut && <th style={th(10, true)}>เข้า-ออกสต็อกสำเร็จ (แผ่นใหญ่)</th>}
             <th style={th(8, true)}>ส่วนต่างจริง</th>
-            <th style={th(8, true)}>% หาย</th>
+            <th style={th(7, true)}>% หาย</th>
           </tr>
         </thead>
         <tbody>
@@ -314,6 +339,11 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
               <td style={{ padding: '6px 14px', textAlign: 'right' }}>
                 <button onClick={() => onOpenGeneralUse(row)} style={{ background: '#f4f6f9', border: '1px solid #d8dde6', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, minWidth: 70 }}>{row.generalUseSummaryFmt}</button>
               </td>
+              {showCutIn && (
+                <td style={{ padding: '6px 14px', textAlign: 'right' }}>
+                  <button onClick={() => onOpenCutIn(row)} style={{ background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, minWidth: 70, color: '#244c9b' }}>{row.cutInSummaryFmt}</button>
+                </td>
+              )}
               {hasStockInOut && <td style={td(true)}>{row.stockInOutFmt ?? '-'}</td>}
               <td style={{ ...td(true), fontWeight: 700, color: row.realDiffColor || 'inherit' }}>{row.realDiffFmt}</td>
               <td style={{ ...td(true), fontWeight: 700, background: row.rowBg, borderRadius: 6 }}>{row.pctLostFmt}</td>
@@ -336,7 +366,7 @@ class App extends React.Component {
     stock: {}, plateStockDiam: {}, plateGeneralUseEntries: {}, plateGeneralUseOpen: {},
     extraRebarItems: [], alertThresholdPct: 5, alertThresholdByCategory: {},
     mainSearchQuery: '', showAlertList: false, periodLocked: {}, periodSummaries: {},
-    generalUseEntries: {}, generalUseOpen: {}, periodLabel: null, periods: [], periodHistory: {},
+    generalUseEntries: {}, generalUseOpen: {}, cutInEntries: {}, cutInOpen: {}, periodLabel: null, periods: [], periodHistory: {},
     periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
     periodPickerMonth: new Date().getMonth(), periodPickerYear: new Date().getFullYear() + 543,
     undoStack: [], redoStack: [],
@@ -350,7 +380,7 @@ class App extends React.Component {
     syncStatus: 'loading',
   };
 
-  persistKeys = ['result', 'rawRows', 'fileName', 'actual', 'stock', 'plateStockDiam', 'generalUseEntries', 'plateGeneralUseEntries',
+  persistKeys = ['result', 'rawRows', 'fileName', 'actual', 'stock', 'plateStockDiam', 'generalUseEntries', 'plateGeneralUseEntries', 'cutInEntries',
     'periodLabel', 'periods', 'periodHistory', 'periodLocked', 'periodSummaries', 'extraRebarItems', 'alertThresholdPct', 'alertThresholdByCategory',
     'rebarWeights', 'plateWeights', 'whiskerWeights', 'whiskerSpecs', 'pcWireKgPerM', 'pcWireTable', 'stirrupTable', 'stirrupWireMm', 'plateThicknessMm',
     'plateBigSheetKg', 'locks', 'pileAreaM2', 'concreteMix'];
@@ -567,6 +597,27 @@ class App extends React.Component {
       return { undoStack: this.pushUndo(s), redoStack: [], generalUseEntries: { ...s.generalUseEntries, [key]: list } };
     });
   }
+  // "ตัดรับเข้าจากความยาวอื่น" (เฉพาะเหล็กเสริม) — แยกจากใช้งานอื่น-เสียหาย เพราะเป็นของเข้าจริง (บวกตรงๆ)
+  // ไม่ใช่ของหาย/ใช้เกิน กันต้องกรอกติดลบใน "ใช้งานอื่น-เสียหาย" แบบสับสน (ไม่หักสต็อกของความยาวต้นทางให้อัตโนมัติ)
+  addCutInEntry(key) {
+    if (READONLY) return;
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [],
+      cutInEntries: { ...s.cutInEntries, [key]: [...(s.cutInEntries[key] || []), { qty: null, note: '' }] },
+      cutInOpen: { ...s.cutInOpen, [key]: true } }));
+  }
+  removeCutInEntry(key, idx) {
+    if (READONLY) return;
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], cutInEntries: { ...s.cutInEntries, [key]: (s.cutInEntries[key] || []).filter((_, i) => i !== idx) } }));
+  }
+  updateCutInEntry(key, idx, field, value) {
+    if (READONLY) return;
+    this.setState(s => {
+      const list = [...(s.cutInEntries[key] || [])];
+      list[idx] = { ...list[idx], [field]: field === 'qty' ? (value === '' ? null : Number(value)) : value };
+      return { undoStack: this.pushUndo(s), redoStack: [], cutInEntries: { ...s.cutInEntries, [key]: list } };
+    });
+  }
+  toggleCutInOpen(key) { this.setState(s => ({ cutInOpen: { ...s.cutInOpen, [key]: !s.cutInOpen[key] } })); }
 
   diffInfo(calc, actualStr, digits) {
     const d = digits ?? 1;
@@ -593,9 +644,12 @@ class App extends React.Component {
     const stockVals = this.state.stock[key] || {};
     const generalUseEntriesRaw = this.state.generalUseEntries[key] || [];
     const generalUse = generalUseEntriesRaw.reduce((s, e) => s + (e.amount || 0), 0);
+    const cutInEntriesRaw = this.state.cutInEntries[key] || [];
+    const cutInQty = cutInEntriesRaw.reduce((s, e) => s + (e.qty || 0), 0);
     const actualNum = info.actual === '' || info.actual == null ? null : Number(info.actual);
     const A = actualNum != null ? calcVal - actualNum : null;
-    const realDiff = A != null ? A + generalUse : null;
+    // ตัดรับเข้าจากความยาวอื่น (cutInQty) คือของเข้าจริงที่ไม่ได้มาจากสูตร ช่วยลดส่วนต่างจริงที่ดูเหมือนขาด/เกินโดยไม่ทราบสาเหตุ
+    const realDiff = A != null ? A + generalUse - cutInQty : null;
     const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
     return {
       key, label, dg, calcFmt: fmt(calcVal, dg), actual: info.actual,
@@ -615,6 +669,17 @@ class App extends React.Component {
       generalUseOpen: !!this.state.generalUseOpen[key],
       generalUseSummaryFmt: fmt(generalUse, dg),
       onToggleGeneralUseOpen: () => this.toggleGeneralUseOpen(key),
+      cutInQty,
+      cutInEntries: cutInEntriesRaw.map((e, idx) => ({
+        qty: e.qty, note: e.note,
+        onQtyChange: v => this.updateCutInEntry(key, idx, 'qty', v),
+        onNoteChange: v => this.updateCutInEntry(key, idx, 'note', v),
+        onRemove: () => this.removeCutInEntry(key, idx),
+      })),
+      onAddCutInEntry: () => this.addCutInEntry(key),
+      cutInOpen: !!this.state.cutInOpen[key],
+      cutInSummaryFmt: fmt(cutInQty, dg),
+      onToggleCutInOpen: () => this.toggleCutInOpen(key),
       realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, dg)) : '-',
       pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 1) + '%') : '-',
       rowBg: this.thresholdBg(pctLost, key),
@@ -1009,6 +1074,7 @@ class App extends React.Component {
       if (row.key && row.key.startsWith('main:plate:')) this.togglePlateGeneralUseOpen(row.thickness);
       else this.toggleGeneralUseOpen(row.key);
     };
+    const openCutIn = (row) => this.toggleCutInOpen(row.key);
     return (
       <div style={{ fontFamily: "'IBM Plex Sans Thai','Sarabun',sans-serif", color: '#1f2733', maxWidth: 1200, margin: '0 auto', padding: '32px 24px 80px', display: 'flex', flexDirection: 'column', gap: 26 }}>
 
@@ -1150,7 +1216,7 @@ class App extends React.Component {
                 {stockMode && (sub === 'all' || sub === 'plate') && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
                 {(sub === 'all' || sub === 'whisker') && <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
                 {(sub === 'all' || sub === 'collar') && <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                {(sub === 'all' || sub === 'rebar') && <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} allowExtraSpec
+                {(sub === 'all' || sub === 'rebar') && <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn allowExtraSpec
                   extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />}
                 </React.Fragment>
                 ); })()}
@@ -1160,6 +1226,9 @@ class App extends React.Component {
                 ))}
                 {[...mp.whiskerRowsM, ...mp.collarRowsM, ...mp.pcRowsM, ...mp.stirrupRowsM, ...mp.rebarRowsM].map((row, i) => row.generalUseOpen && (
                   <GeneralUseModal key={'g' + i} title={row.label} entries={row.generalUseEntries} onAdd={row.onAddGeneralUseEntry} onClose={row.onToggleGeneralUseOpen} unit="" />
+                ))}
+                {mp.rebarRowsM.map((row, i) => row.cutInOpen && (
+                  <CutInModal key={'c' + i} title={row.label} entries={row.cutInEntries} onAdd={row.onAddCutInEntry} onClose={row.onToggleCutInOpen} unit={row.isExtra ? '' : 'เส้น'} />
                 ))}
               </React.Fragment>
             )}
