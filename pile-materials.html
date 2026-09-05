@@ -119,6 +119,16 @@ function parseFmtNum(str) {
   return isFinite(n) ? n : null;
 }
 const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+// เรียงรายชื่องวด "ชื่อเดือน ปี" ตามลำดับเวลาจริง (ปี → เดือน) แทนลำดับที่สร้างงวดไว้ก่อนหลัง
+// (เช่น สร้างงวดมีนาคมทีหลังสิงหาคม/กันยายน ก็ต้องให้มีนาคมมาก่อนตามปฏิทิน) ป้ายที่แจงเดือน/ปีไม่ได้ (ถ้ามี) จะถูกเรียงไปท้ายสุด
+function sortPeriodLabels(labels) {
+  const key = label => {
+    const [m, y] = String(label || '').split(' ');
+    const mi = THAI_MONTHS.indexOf(m), yr = parseInt(y, 10);
+    return (mi < 0 || isNaN(yr)) ? Infinity : yr * 12 + mi;
+  };
+  return [...labels].sort((a, b) => key(a) - key(b));
+}
 const CATS = [
   { key: 'rebar', label: 'เหล็กเสริม' }, { key: 'plate', label: 'เพลท' }, { key: 'pc', label: 'PC.wire' },
   { key: 'stirrup', label: 'ลวดปลอก' }, { key: 'whisker', label: 'หนวดกุ้ง' }, { key: 'collar', label: 'Collar' },
@@ -279,14 +289,16 @@ function ExtraSpecInput({ value, onCommit, disabled }) {
   React.useEffect(() => { setDraft(value); }, [value]);
   const dirty = draft !== value;
   const commit = () => { if (dirty) onCommit(draft); };
+  const cancel = () => setDraft(value);
   return (
     <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1, minWidth: 0 }}>
       <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); }}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
         placeholder="ระบุขนาด/สเปคเหล็ก"
         style={{ ...inp(null), flex: 1, minWidth: 0, borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
         disabled={disabled} />
       {dirty && !disabled && <button onClick={commit} style={{ ...btnGhost('#2f5fd0'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✓ ยืนยัน</button>}
+      {dirty && !disabled && <button onClick={cancel} style={{ ...btnGhost('#78839A'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✗ ยกเลิก</button>}
     </div>
   );
 }
@@ -1179,7 +1191,7 @@ class App extends React.Component {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 10, padding: '12px 18px' }} data-no-print="true">
               <div style={{ fontSize: 14, fontWeight: 700, color: '#244c9b' }}>📅 กำลังดูข้อมูลงวด:</div>
               <select value={s.periodLabel || ''} onChange={e => this.switchPeriod(e.target.value)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #2f5fd0', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#244c9b', background: 'white' }}>
-                {(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{p}</option>)}
+                {sortPeriodLabels(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
               {!READONLY && <button onClick={() => this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add' })} style={btnDashed()}>+ งวดใหม่</button>}
               {!READONLY && <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>}
