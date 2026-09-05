@@ -359,10 +359,12 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
             <tr key={row.key || i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
-                    <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>ไม่อยู่ในสูตร</span>
-                    {!READONLY && <button onClick={row.onRemoveExtra} style={btnGhost('#c0392b')}>ลบ</button>}
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', width: 84, textAlign: 'center', boxSizing: 'border-box' }}>ไม่อยู่ในสูตร</span>
+                      {!READONLY && <button onClick={row.onRemoveExtra} style={{ ...btnGhost('#c0392b'), width: 84, boxSizing: 'border-box' }}>ลบ</button>}
+                    </div>
                   </div>
                 ) : row.label}
               </td>
