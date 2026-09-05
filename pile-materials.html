@@ -274,13 +274,21 @@ function FormattedNumberInput({ value, onChange, digits, style, disabled }) {
 function ExtraSpecInput({ value, onCommit, disabled }) {
   // ช่องกรอกสเปคเหล็กที่เพิ่มเอง — พิมพ์ในสถานะ local ก่อน ไม่ยิงขึ้นแอปทันทีทุกตัวอักษร
   // เพราะพอสเปคเปลี่ยนแถวจะถูกจัดเรียงใหม่ตามขนาดทันที ทำให้แถวดีดขึ้น/ลงระหว่างพิมพ์ (โฟกัสหลุด)
-  // แก้โดยยืนยันค่าตอน blur (คลิกออกจากช่อง) เท่านั้น ค่อยให้จัดเรียงแถวใหม่
+  // ต้องกด "ยืนยัน" (หรือ Enter) เท่านั้นถึงจะบันทึกจริง — ไม่ commit ตอน blur เฉยๆ กันกรณีเผลอคลิกออกแล้วค่าที่ไม่ตั้งใจพิมพ์ถูกบันทึกไปโดยไม่ได้ตั้งใจ
   const [draft, setDraft] = React.useState(value);
   React.useEffect(() => { setDraft(value); }, [value]);
-  return <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
-    onBlur={() => { if (draft !== value) onCommit(draft); }}
-    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-    placeholder="ระบุขนาด/สเปคเหล็ก" style={{ ...inp(null), flex: 1 }} disabled={disabled} />;
+  const dirty = draft !== value;
+  const commit = () => { if (dirty) onCommit(draft); };
+  return (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1, minWidth: 0 }}>
+      <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); }}
+        placeholder="ระบุขนาด/สเปคเหล็ก"
+        style={{ ...inp(null), flex: 1, minWidth: 0, borderColor: dirty ? '#e0a34a' : undefined, background: dirty ? '#fffaf0' : undefined }}
+        disabled={disabled} />
+      {dirty && !disabled && <button onClick={commit} style={{ ...btnGhost('#2f5fd0'), fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}>✓ ยืนยัน</button>}
+    </div>
+  );
 }
 function ActualCell({ row, stockMode }) {
   if (stockMode) return (
