@@ -271,6 +271,17 @@ function FormattedNumberInput({ value, onChange, digits, style, disabled }) {
     }}
     style={style} disabled={disabled} />;
 }
+function ExtraSpecInput({ value, onCommit, disabled }) {
+  // ช่องกรอกสเปคเหล็กที่เพิ่มเอง — พิมพ์ในสถานะ local ก่อน ไม่ยิงขึ้นแอปทันทีทุกตัวอักษร
+  // เพราะพอสเปคเปลี่ยนแถวจะถูกจัดเรียงใหม่ตามขนาดทันที ทำให้แถวดีดขึ้น/ลงระหว่างพิมพ์ (โฟกัสหลุด)
+  // แก้โดยยืนยันค่าตอน blur (คลิกออกจากช่อง) เท่านั้น ค่อยให้จัดเรียงแถวใหม่
+  const [draft, setDraft] = React.useState(value);
+  React.useEffect(() => { setDraft(value); }, [value]);
+  return <input type="text" value={draft} onChange={e => setDraft(e.target.value)}
+    onBlur={() => { if (draft !== value) onCommit(draft); }}
+    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+    placeholder="ระบุขนาด/สเปคเหล็ก" style={{ ...inp(null), flex: 1 }} disabled={disabled} />;
+}
 function ActualCell({ row, stockMode }) {
   if (stockMode) return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
@@ -323,11 +334,11 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
+            <tr key={row.key || i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input type="text" value={row.spec} onChange={e => row.onSpecChange(e.target.value)} placeholder="ระบุขนาด/สเปคเหล็ก" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
+                    <ExtraSpecInput value={row.spec} onCommit={row.onSpecChange} disabled={READONLY} />
                     <span style={{ fontSize: 11, color: '#8a6114', background: '#fde9a8', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>ไม่อยู่ในสูตร</span>
                     {!READONLY && <button onClick={row.onRemoveExtra} style={btnGhost('#c0392b')}>ลบ</button>}
                   </div>
