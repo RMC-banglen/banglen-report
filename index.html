@@ -5584,6 +5584,16 @@ window.__dataReady.then(data => {
               </div>
             )}
           </div>
+          {/* ปุ่มลัดไปเดือนล่าสุดที่มีข้อมูล — กดทีเดียวได้เลย ไม่ต้องเปิด dropdown เลือกเดือน */}
+          {monthsAvail.length>0 && (()=>{
+            const latestMonth = monthsAvail[monthsAvail.length-1];
+            const isLatest = selMonths.size===1 && selMonths.has(latestMonth);
+            return <button onClick={()=>setSelMonths(new Set([latestMonth]))}
+              style={{padding:'6px 12px',borderRadius:8,border:`1.5px solid ${isLatest?'#2f5fd0':'var(--line-strong)'}`,
+                background:isLatest?'#eef3fc':'#fff',color:isLatest?'#2f5fd0':'var(--ink)',fontSize:13,fontWeight:isLatest?700:400,cursor:'pointer'}}>
+              📌 เดือนล่าสุด ({MONTHS_TH_SHORT[latestMonth-1]})
+            </button>;
+          })()}
         </>}
       </div>
       <div className="table-wrap" style={{overflow:'auto',maxHeight:'70vh'}}>
