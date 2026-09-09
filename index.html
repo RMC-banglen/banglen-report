@@ -2219,7 +2219,9 @@ window.__dataReady.then(data => {
     </>;
   }
 
-  function DamageDetailTab({currentUser}){
+  // initialDrill (ไม่บังคับ) — ใช้ตอนคลิกเข้ามาจากตารางสรุปในหน้าออฟฟิศใหญ่ เพื่อเปิดมาตรงงวด/สาเหตุที่คลิกเลย
+  // ไม่ใส่ initialDrill เลย (เข้าจากเมนูปกติ) พฤติกรรมเดิมทุกอย่างเหมือนเดิมทุกประการ
+  function DamageDetailTab({currentUser,initialDrill}){
     const isAdmin=currentUser?.role==='admin';
     const tp={...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
     const dmgSubTabs=[
@@ -2228,14 +2230,18 @@ window.__dataReady.then(data => {
       {value:'customer',label:'แยกลูกค้า'},{value:'size',label:'วิเคราะห์ขนาดเสา'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
       {value:'detail',label:'ตารางรายการ'}
     ].filter(t=>isAdmin||tp['dmg_'+t.value]!==false);
-    const [view,setView]   = useState('damage');
+    const [view,setView]   = useState(initialDrill?.view||'damage');
     const [workerTab,setWorkerTab] = useState('employee');
     const [filterCode,setFilterCode] = useState('ALL');
     const [filterYear,setFilterYear] = useState(()=>{
+      if(initialDrill && initialDrill.filterYear!=null) return initialDrill.filterYear;
       const ys=[...new Set((D.damageItems||[]).map(r=>r.year))].sort((a,b)=>a-b);
       return ys.length ? ys[ys.length-1] : 'ALL';
     });
-    const [selMonths,setSelMonths] = useState(new Set()); // เดือนที่เลือก (empty = ทุกเดือน)
+    const [selMonths,setSelMonths] = useState(()=> initialDrill?.selMonths ? new Set(initialDrill.selMonths) : new Set()); // เดือนที่เลือก (empty = ทุกเดือน)
+    // ตัวกรอง "สาเหตุ" เฉพาะตอนคลิกเข้ามาจากตารางสรุปหน้าออฟฟิศใหญ่ (ปกติเป็น null = ไม่กรอง เหมือนเดิมทุกที่)
+    const [causeFilterFn,setCauseFilterFn] = useState(()=> initialDrill?.causeFilter || null);
+    const [causeFilterLabel,setCauseFilterLabel] = useState(()=> initialDrill?.label || null);
     const [yoyMode,setYoyMode] = useState(false); // ตารางสรุป: เทียบปีต่อปี (ไม่แสดงคอลัมน์เดือน)
     // วัดความสูงจริงของหัวตาราง 2 แถว (ตารางสรุปความเสียหายรายเดือน) แทนเดาเป็นพิกเซลตายตัว
     // กันแถว "ยอดขายเสาเข็ม" ที่ล็อกติดด้านบน เลื่อนเพี้ยนไม่ตรงกับหัวตารางจริงตอนฟอนต์/ซูมต่างจากที่เดาไว้
@@ -2286,12 +2292,13 @@ window.__dataReady.then(data => {
     const monthsAvail = filterYear==='ALL' ? [] :
       [...new Set(allValid.filter(r=>r.year===Number(filterYear)).map(r=>r.month))].sort((a,b)=>a-b);
 
-    // กรองตาม year + เดือน + code สำหรับ view อื่น
+    // กรองตาม year + เดือน + code สำหรับ view อื่น (+ สาเหตุ ถ้าคลิกเข้ามาจากตารางสรุปหน้าออฟฟิศใหญ่)
     const items = rawItems.filter(r =>
       notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear)) &&
       (selMonths.size===0 || selMonths.has(r.month)) &&
-      (filterCode==='ALL' || r.code_type===filterCode)
+      (filterCode==='ALL' || r.code_type===filterCode) &&
+      (!causeFilterFn || causeFilterFn(r.cause))
     );
 
     // รวมยอดรายเดือน (ใช้ทุก code สำหรับ sales %)
@@ -2406,6 +2413,12 @@ window.__dataReady.then(data => {
           </>}
         </div>
       </div>
+
+      {/* แถบแจ้งว่ากำลังกรองเฉพาะสาเหตุที่คลิกเข้ามาจากตารางสรุปหน้าออฟฟิศใหญ่ — ไม่โผล่ตอนเข้าจากเมนูปกติ */}
+      {causeFilterFn && <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 14px',borderRadius:8,background:'#eef3fc',border:'1px solid #b9cdf0',fontSize:13}}>
+        <span style={{color:'#244c9b'}}>🔍 กำลังกรองเฉพาะ: <strong>{causeFilterLabel}</strong></span>
+        <button onClick={()=>{setCauseFilterFn(null);setCauseFilterLabel(null);}} style={{fontSize:12,padding:'4px 10px',borderRadius:6,border:'1px solid #b9cdf0',background:'#fff',color:'#244c9b',cursor:'pointer'}}>✕ ล้างตัวกรอง</button>
+      </div>}
 
       {/* KPI row */}
       {view==='damage' ? (()=>{
@@ -5379,7 +5392,161 @@ window.__dataReady.then(data => {
     </div>;
   }
 
-  function HeadOfficeMeetingTab(){
+  // ตารางสรุปความเสียหายรายเดือน (เวอร์ชันย่อ สำหรับหน้าออฟฟิศใหญ่) — คัดลอกตรรกะการคำนวณมาจาก
+  // ตารางสรุปในแท็บ "มูลค่า-เปอร์เซ็นต์เสียหาย" (ไม่ได้แก้ของเดิม หน้าเดิมทำงานเหมือนเดิมทุกประการ)
+  // ตัดตัวเลือกเดือน/ปีออกให้กระชับ (แสดงปีล่าสุด+ทุกเดือนที่มีข้อมูลเสมอ) และเพิ่มคลิกตัวเลขเพื่อดูรายละเอียดได้
+  function DamageSummaryTable({onDrillCell,currentUser}){
+    // เคารพสิทธิ์ย่อยของแท็บเสียหายเดิม (dmg_detail) — ถ้าผู้ใช้ไม่มีสิทธิ์เปิด "ตารางรายการ" ก็ไม่ให้คลิกดูรายละเอียดจากที่นี่เช่นกัน
+    const isAdmin = currentUser?.role==='admin';
+    const tp = {...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
+    const canDrill = !!onDrillCell && (isAdmin || tp['dmg_detail']!==false);
+    const rawItemsAll = D.damageItems || [];
+    const sales = D.damageSales || {};
+    const [yoyMode,setYoyMode] = useState(false);
+    const dmgTheadRef=React.useRef(null), dmgRow1Ref=React.useRef(null);
+    const [dmgHeadH,setDmgHeadH]=useState({row1:25,total:50});
+    React.useLayoutEffect(()=>{
+      const measure=()=>{
+        if(dmgRow1Ref.current&&dmgTheadRef.current){
+          const row1=dmgRow1Ref.current.offsetHeight, total=dmgTheadRef.current.offsetHeight;
+          if(row1&&total) setDmgHeadH(h=>(h.row1!==row1||h.total!==total)?{row1,total}:h);
+        }
+      };
+      measure();
+      window.addEventListener('resize',measure);
+      return ()=>window.removeEventListener('resize',measure);
+    });
+
+    const years = [...new Set(rawItemsAll.map(r=>r.year))].sort((a,b)=>a-b);
+    const curYear  = years.length ? years[years.length-1] : null;
+    const prevYear = curYear ? curYear-1 : null;
+
+    const allItemsYear = rawItemsAll.filter(r => !/รับคืนสินค้าใช้ได้/i.test(r.cause||''));
+    const allItemsCur  = allItemsYear.filter(r => !curYear || r.year===curYear);
+    const allItemsPrev = prevYear ? allItemsYear.filter(r=>r.year===prevYear) : [];
+    const showMonths = [...new Set(allItemsCur.map(r=>r.month))].sort((a,b)=>a-b);
+
+    const cols = [];
+    if(yoyMode){
+      years.forEach(y=>cols.push({type:'yearAny', year:y, label:`รวมปี ${y}`}));
+    }else{
+      if(prevYear) cols.push({type:'prevYear', year:prevYear, label:`รวมปี ${prevYear}`});
+      if(curYear)  cols.push({type:'year', year:curYear, label:`รวมปี ${curYear}`});
+      showMonths.forEach(m=>{
+        const key=`${curYear||''}-${m}`;
+        cols.push({type:'month', key, year:curYear, month:m, label:`${MONTHS_TH_SHORT[m-1]}-${String(curYear||'').slice(-2)}`});
+      });
+    }
+
+    const monthKeysCur  = showMonths.map(m=>`${curYear}-${m}`);
+    const monthKeysPrev = prevYear ? [...new Set(allItemsPrev.map(r=>r.month))].sort((a,b)=>a-b).map(m=>`${prevYear}-${m}`) : [];
+
+    const colSales = col => {
+      if(col.type==='yearAny')  return Object.entries(sales).filter(([k])=>k.startsWith(col.year+'-')).reduce((a,[,v])=>a+(v||0),0);
+      if(col.type==='year')     return monthKeysCur.reduce((a,k)=>a+(sales[k]||0),0);
+      if(col.type==='prevYear') return monthKeysPrev.reduce((a,k)=>a+(sales[k]||0),0);
+      return sales[col.key]||0;
+    };
+    const colAmt = (matchFn, col) => {
+      if(col.type==='yearAny')  return allItemsYear.filter(r=>r.year===col.year&&matchFn(r.cause)).reduce((a,r)=>a+(r.amount||0),0);
+      if(col.type==='year')     return allItemsCur.filter(r=>matchFn(r.cause)).reduce((a,r)=>a+(r.amount||0),0);
+      if(col.type==='prevYear') return allItemsPrev.filter(r=>matchFn(r.cause)).reduce((a,r)=>a+(r.amount||0),0);
+      const[y,m]=col.key.split('-').map(Number);
+      return allItemsYear.filter(r=>r.year===y&&r.month===m&&matchFn(r.cause)).reduce((a,r)=>a+(r.amount||0),0);
+    };
+    const groupAmt = (grp, col) => grp.rows.reduce((a,row)=>a+colAmt(row.fn,col),0);
+    const totalAmt = col => DAMAGE_GROUPS.reduce((a,g)=>a+groupAmt(g,col),0);
+
+    const tdNum = (v,sale,bold,bg) => {
+      const pct = sale>0?(v/sale*100).toFixed(2)+'%':'–';
+      return <>
+        <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:bold?700:400,background:bg||'',padding:'3px 6px',whiteSpace:'nowrap'}}>
+          {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
+        </td>
+        <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'11px',color:'var(--muted-text)',background:bg||'',padding:'3px 4px',whiteSpace:'nowrap'}}>
+          {sale>0&&v>0?pct:''}
+        </td>
+      </>;
+    };
+    // เหมือน tdNum แต่คลิกได้ — ใช้กับแถวรายการ (มี row.fn ระบุสาเหตุชัดเจน คลิกแล้วรู้ว่าต้องกรองอะไร)
+    const tdNumClick = (v,sale,bg,onClick) => {
+      const pct = sale>0?(v/sale*100).toFixed(2)+'%':'–';
+      return <>
+        <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',background:bg||'',padding:'3px 6px',whiteSpace:'nowrap',cursor:'pointer'}}>
+          {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
+        </td>
+        <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'11px',color:'var(--muted-text)',background:bg||'',padding:'3px 4px',whiteSpace:'nowrap',cursor:'pointer'}}>
+          {sale>0&&v>0?pct:''}
+        </td>
+      </>;
+    };
+    const drill = (row,col) => {
+      if(!onDrillCell) return;
+      onDrillCell({
+        view: 'detail',
+        label: row.label,
+        causeFilter: row.fn,
+        filterYear: col.type==='prevYear' ? col.year : (col.type==='yearAny' ? col.year : (curYear ?? 'ALL')),
+        selMonths: col.type==='month' ? [col.month] : [],
+      });
+    };
+
+    return <ChartCard title="ตารางสรุปความเสียหายรายเดือน" subtitle={`มูลค่า (บาท) และ % เทียบยอดขาย${canDrill?' — คลิกตัวเลขในแถวรายการเพื่อดูรายละเอียด':''}`} span="full">
+      <div style={{display:'flex',gap:8,marginBottom:12}}>
+        <button onClick={()=>setYoyMode(false)} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${!yoyMode?'#2f5fd0':'#e2e8f0'}`,background:!yoyMode?'#2f5fd0':'#fff',color:!yoyMode?'#fff':'#64748b',fontSize:12,fontWeight:700,cursor:'pointer'}}>รายเดือน</button>
+        <button onClick={()=>setYoyMode(true)} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${yoyMode?'#2f5fd0':'#e2e8f0'}`,background:yoyMode?'#2f5fd0':'#fff',color:yoyMode?'#fff':'#64748b',fontSize:12,fontWeight:700,cursor:'pointer'}}>เทียบปีต่อปี</button>
+      </div>
+      <div className="table-wrap" style={{overflow:'auto',maxHeight:'70vh'}}>
+      <table className="dt" style={{fontSize:'12px',minWidth:'800px',borderCollapse:'collapse'}}>
+        <thead ref={dmgTheadRef}>
+          <tr ref={dmgRow1Ref} style={{background:'#f5f5f5'}}>
+            <th className="ta-l" style={{minWidth:'180px',position:'sticky',left:0,top:0,background:'#f5f5f5',zIndex:3}}>รายการ</th>
+            {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',position:'sticky',top:0,zIndex:2,
+              background:(c.type==='year'||c.type==='yearAny')?'#d9ead3':c.type==='prevYear'?'#fce5cd':'#f5f5f5',
+              color:c.type==='prevYear'?'#b45f06':'inherit',
+              borderLeft:'1px solid #ddd',minWidth:'100px'}}>{c.label}</th>)}
+          </tr>
+          <tr style={{background:'#fafafa',fontSize:'10px',color:'var(--muted-text)'}}>
+            <th style={{position:'sticky',left:0,top:dmgHeadH.row1,background:'#fafafa',zIndex:3}}></th>
+            {cols.map((c,i)=><React.Fragment key={i}><th style={{textAlign:'right',borderLeft:'1px solid #ddd',position:'sticky',top:dmgHeadH.row1,background:'#fafafa',zIndex:2}}>บาท</th><th style={{textAlign:'right',position:'sticky',top:dmgHeadH.row1,background:'#fafafa',zIndex:2}}>%</th></React.Fragment>)}
+          </tr>
+        </thead>
+        <tbody>
+          <tr style={{background:'#e6f4ea'}}>
+            <td className="ta-l strong" style={{position:'sticky',left:0,top:dmgHeadH.total,background:'#e6f4ea',zIndex:2,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
+            {cols.map((c,i)=>{const s=colSales(c);return <React.Fragment key={i}>
+              <td colSpan={2} style={{position:'sticky',top:dmgHeadH.total,textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea',zIndex:1}}>
+                {s?Number(s).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
+              </td>
+            </React.Fragment>;})}
+          </tr>
+
+          {DAMAGE_GROUPS.map(grp=><React.Fragment key={grp.key}>
+            <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:'11px',padding:'3px 8px',position:'sticky',left:0}}>{grp.label}</td></tr>
+            {grp.rows.map((row,ri)=><tr key={ri} style={{background: ri%2===0?'#fff':grp.bg+'55'}}>
+              <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':grp.bg+'55',zIndex:1,padding:'3px 8px 3px 20px'}}>{row.label}</td>
+              {cols.map((c,ci)=>{const v=colAmt(row.fn,c),s=colSales(c);
+                return <React.Fragment key={ci}>{canDrill ? tdNumClick(v,s,ri%2===0?'':grp.bg+'33',()=>drill(row,c)) : tdNum(v,s,false,ri%2===0?'':grp.bg+'33')}</React.Fragment>;})}
+            </tr>)}
+            <tr style={{background:grp.bg,fontWeight:700}}>
+              <td className="ta-l strong" style={{position:'sticky',left:0,background:grp.bg,zIndex:1,padding:'4px 8px',color:grp.hd}}>รวม{grp.label}</td>
+              {cols.map((c,ci)=>{const v=groupAmt(grp,c),s=colSales(c);
+                return <React.Fragment key={ci}>{tdNum(v,s,true,grp.bg)}</React.Fragment>;})}
+            </tr>
+          </React.Fragment>)}
+
+          <tr style={{background:'#fff2cc',borderTop:'2px solid #e6ac00'}}>
+            <td className="ta-l strong" style={{position:'sticky',left:0,background:'#fff2cc',zIndex:1,padding:'5px 8px',fontSize:'13px'}}>รวมทั้งหมด</td>
+            {cols.map((c,ci)=>{const v=totalAmt(c),s=colSales(c);
+              return <React.Fragment key={ci}>{tdNum(v,s,true,'#fff2cc')}</React.Fragment>;})}
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </ChartCard>;
+  }
+
+  function HeadOfficeMeetingTab({onDrillDown,currentUser}){
     const THAI_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const THAI_M_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
     const [pending,setPending]=useState(null);
@@ -5597,6 +5764,9 @@ window.__dataReady.then(data => {
           </table>
         </div>
       </ChartCard>
+      <div style={{marginTop:20}}>
+        <DamageSummaryTable onDrillCell={onDrillDown} currentUser={currentUser}/>
+      </div>
     </div>;
   }
 
@@ -8976,6 +9146,11 @@ window.__dataReady.then(data => {
     };
     const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
     const [year,setYear]=useState(()=>Math.max(...Object.keys(D.years).map(Number)));
+    // ตัวกรองสาเหตุ/งวด ที่ส่งมาจากตารางสรุปในหน้าออฟฟิศใหญ่ตอนคลิกดูรายละเอียด — ล้างทุกครั้งที่เปลี่ยนแท็บผ่านเมนูปกติ (goTab)
+    // กันค้างข้ามการใช้งานครั้งอื่น เช่น ออกไปดูแท็บอื่นแล้วค่อยกดกลับมาแท็บ "มูลค่า-เปอร์เซ็นต์เสียหาย" เอง ต้องได้หน้าเริ่มต้นปกติ
+    const [damageDrill,setDamageDrill]=useState(null);
+    const goTab=t=>{setDamageDrill(null);setTab(t);};
+    const goToDamageDrill=drill=>{setDamageDrill(drill);setTab('damage');};
     const login=user=>{sessionStorage.setItem('wt_user',JSON.stringify(user));setCurrentUser(user);setTab(getFirstTab(user));};
     const logout=()=>{sessionStorage.removeItem('wt_user');setCurrentUser(null);};
     React.useEffect(()=>{
@@ -9011,13 +9186,13 @@ window.__dataReady.then(data => {
           </div>
         </div>
       </header>
-      <TabNav tabs={tabs} tab={tab} setTab={setTab}/>
+      <TabNav tabs={tabs} tab={tab} setTab={goTab}/>
       <main>
-        {tab==='meeting'&&<HeadOfficeMeetingTab/>}
+        {tab==='meeting'&&<HeadOfficeMeetingTab onDrillDown={goToDamageDrill} currentUser={currentUser}/>}
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
         {tab==='overview'&&<OverviewTab year={year}/>}
         {tab==='compare'&&<YearCompareTab/>}
-        {tab==='damage'&&<DamageDetailTab currentUser={currentUser}/>}
+        {tab==='damage'&&<DamageDetailTab currentUser={currentUser} initialDrill={damageDrill}/>}
         {tab==='concrete'&&<ConcreteView year={year} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
         {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
