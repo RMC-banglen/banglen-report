@@ -5468,7 +5468,9 @@ window.__dataReady.then(data => {
       });
     }
 
-    const monthKeysCur  = showMonths.map(m=>`${curYear}-${m}`);
+    // ใช้ monthsAvail (ทุกเดือนของปีนี้) เสมอ ไม่ใช่ showMonths (เดือนที่เลือกโชว์เป็นคอลัมน์) —
+    // ไม่งั้นพอกรองเหลือเดือนเดียว ยอดขาย "รวมปี" จะกลายเป็นยอดขายแค่เดือนนั้นไปด้วย (บั๊กที่เจอ)
+    const monthKeysCur  = monthsAvail.map(m=>`${curYear}-${m}`);
     const monthKeysPrev = prevYear ? [...new Set(allItemsPrev.map(r=>r.month))].sort((a,b)=>a-b).map(m=>`${prevYear}-${m}`) : [];
 
     const colSales = col => {
