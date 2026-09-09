@@ -175,10 +175,24 @@ export function parsePileRow(code, name, qty, config) {
   let plate = null;
   let whisker = null;
   let collar = null;
+  // ความหนาเพลทที่ระบุมาในชื่อสินค้า เช่น "... เพลท 12 มม." — ถือเป็นเพลทพิเศษ แยกจากมาตรฐานของขนาดนั้น
+  const plateMmMatch = name.match(/เพลท\s*(\d+(?:\.\d+)?)\s*(?:มม|mm)\.?/i);
+  const plateThickness = (config && config.plateThicknessMm) || {};
+  const stdMm = Number(plateThickness[diam]) || null;
+  const askedMm = plateMmMatch ? Number(plateMmMatch[1]) : null;
+  // นับเป็นเพลทพิเศษเฉพาะตอนที่ความหนาที่ระบุ ต่างจากมาตรฐานของขนาดเสานั้น
+  const specialMm = (askedMm && (!stdMm || askedMm !== stdMm)) ? askedMm : null;
+
   if (plateCount > 0) {
     const w = plateWeights[diam];
     if (w == null) warnings.push('ไม่ทราบน้ำหนักแผ่นเพลทสำหรับขนาดเสา ' + diam + ' (รหัส ' + code + ')');
-    plate = { diam, count: plateCount, weightKg: w != null ? plateCount * w : 0 };
+    // น้ำหนักเพลทแปรตามความหนาโดยตรง — เทียบสัดส่วนจากความหนามาตรฐาน
+    let unitW = w != null ? w : 0;
+    if (specialMm) {
+      if (stdMm) unitW = unitW * (specialMm / stdMm);
+      else warnings.push('ไม่ทราบความหนาเพลทมาตรฐานของขนาดเสา ' + diam + ' — น้ำหนักเพลท ' + specialMm + ' มม. อาจไม่ตรง (รหัส ' + code + ')');
+    }
+    plate = { diam, count: plateCount, weightKg: unitW * plateCount, plateMm: specialMm };
     const ww = whiskerWeights[diam];
     if (ww == null) warnings.push('ไม่ทราบน้ำหนักเหล็กหนวดกุ้งสำหรับขนาดเสา ' + diam + ' (รหัส ' + code + ')');
     const whiskerSpecs = (config && config.whiskerSpecs) || WHISKER_REBAR_SPEC;
@@ -234,6 +248,9 @@ export function parsePileRow(code, name, qty, config) {
   return { skip: false, code, name, qty, diam, length, totalLength, isWelded, rebars, plate, whisker, collar, pc, stirrup, warnings };
 }
 
+// เพิ่มเลขนี้ทุกครั้งที่แก้สูตร เพื่อให้หน้าเว็บคำนวณผลลัพธ์เก่าใหม่อัตโนมัติ
+export const CALC_VERSION = 2;
+
 export function calcPileList(inputRows, config) {
   const rebarAgg = new Map(), plateAgg = new Map(), whiskerAgg = new Map(), collarAgg = new Map(), pcAgg = new Map(), stirrupAgg = new Map();
   const pileAgg = new Map();   // สรุปจำนวนต้น + ความยาวรวม แยกตาม ขนาดเสา × ความยาว × ท่อนเดียว/ท่อนต่อเชื่อม
@@ -265,9 +282,11 @@ export function calcPileList(inputRows, config) {
       }
     }
     if (res.plate) {
-      const e = plateAgg.get(res.plate.diam) || { diam: res.plate.diam, count: 0, weightKg: 0 };
+      // เพลทความหนาพิเศษแยกกองจากเพลทมาตรฐานของขนาดเดียวกัน
+      const pKey = res.plate.diam + (res.plate.plateMm ? '|' + res.plate.plateMm : '');
+      const e = plateAgg.get(pKey) || { diam: res.plate.diam, plateMm: res.plate.plateMm || null, count: 0, weightKg: 0 };
       e.count += res.plate.count; e.weightKg += res.plate.weightKg;
-      plateAgg.set(res.plate.diam, e);
+      plateAgg.set(pKey, e);
     }
     if (res.whisker) {
       const e = whiskerAgg.get(res.whisker.diam) || { diam: res.whisker.diam, count: 0, weightKg: 0, spec: res.whisker.spec };
@@ -293,6 +312,7 @@ export function calcPileList(inputRows, config) {
 
   const sortByKey = (arr, k) => arr.sort((a, b) => String(a[k]).localeCompare(String(b[k]), 'th'));
   return {
+    calcVersion: CALC_VERSION,
     totalRows: inputRows.length,
     usedRows,
     totalPiles,
