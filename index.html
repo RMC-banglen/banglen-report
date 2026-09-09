@@ -1601,8 +1601,8 @@ window.__dataReady.then(data => {
     </ChartCard>;
   }
 
-  function CauseView({items, totalAll}){
-    const [selCause, setSelCause] = useState(null);
+  function CauseView({items, totalAll, initialSelCause}){
+    const [selCause, setSelCause] = useState(initialSelCause||null);
     const [selCustInCause, setSelCustInCause] = useState(null);
     const [openMonthKey, setOpenMonthKey] = useState(null); // เดือนที่กดขยายดูรายละเอียดในกลุ่มลูกค้า/รหัส
 
@@ -2313,13 +2313,12 @@ window.__dataReady.then(data => {
     const monthsAvail = filterYear==='ALL' ? [] :
       [...new Set(allValid.filter(r=>r.year===Number(filterYear)).map(r=>r.month))].sort((a,b)=>a-b);
 
-    // กรองตาม year + เดือน + code สำหรับ view อื่น (+ สาเหตุ ถ้าคลิกเข้ามาจากตารางสรุปหน้าออฟฟิศใหญ่)
+    // กรองตาม year + เดือน + code สำหรับ view อื่น
     const items = rawItems.filter(r =>
       notReturnOk(r) &&
       (filterYear==='ALL' || r.year===Number(filterYear)) &&
       (selMonths.size===0 || selMonths.has(r.month)) &&
-      (filterCode==='ALL' || r.code_type===filterCode) &&
-      (!causeFilterFn || causeFilterFn(r.cause))
+      (filterCode==='ALL' || r.code_type===filterCode)
     );
 
     // รวมยอดรายเดือน (ใช้ทุก code สำหรับ sales %)
@@ -2435,10 +2434,10 @@ window.__dataReady.then(data => {
         </div>
       </div>
 
-      {/* แถบแจ้งว่ากำลังกรองเฉพาะสาเหตุที่คลิกเข้ามาจากตารางสรุปหน้าออฟฟิศใหญ่ — ไม่โผล่ตอนเข้าจากเมนูปกติ */}
+      {/* แถบแจ้งว่าเข้ามาจากตารางสรุปหน้าออฟฟิศใหญ่ พร้อมเน้นสาเหตุที่คลิกให้อัตโนมัติ — ไม่โผล่ตอนเข้าจากเมนูปกติ */}
       {causeFilterFn && <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 14px',borderRadius:8,background:'#eef3fc',border:'1px solid #b9cdf0',fontSize:13}}>
-        <span style={{color:'#244c9b'}}>🔍 กำลังกรองเฉพาะ: <strong>{causeFilterLabel}</strong></span>
-        <button onClick={()=>{setCauseFilterFn(null);setCauseFilterLabel(null);}} style={{fontSize:12,padding:'4px 10px',borderRadius:6,border:'1px solid #b9cdf0',background:'#fff',color:'#244c9b',cursor:'pointer'}}>✕ ล้างตัวกรอง</button>
+        <span style={{color:'#244c9b'}}>📌 เข้ามาจากตารางสรุป — เน้นสาเหตุ: <strong>{causeFilterLabel}</strong></span>
+        <button onClick={()=>{setCauseFilterFn(null);setCauseFilterLabel(null);}} style={{fontSize:12,padding:'4px 10px',borderRadius:6,border:'1px solid #b9cdf0',background:'#fff',color:'#244c9b',cursor:'pointer'}}>✕ เลิกเน้น</button>
       </div>}
 
       {/* KPI row */}
@@ -2701,8 +2700,17 @@ window.__dataReady.then(data => {
       {/* Damage view — มูลค่าเสียหาย จากมาก→น้อย + ลูกค้า คลิกดูรายละเอียด */}
       {view==='damage' && <DamageRankView items={dmgItems} totalAll={dmgItems.reduce((a,r)=>a+(r.amount||0),0)} selCust={selCust} setSelCust={setSelCust}/>}
 
-      {/* Cause view */}
-      {view==='cause' && <CauseView items={items} totalAll={totalAll}/>}
+      {/* Cause view — ถ้าคลิกเข้ามาจากตารางสรุปหน้าออฟฟิศใหญ่ ให้เลือกสาเหตุที่คลิกไว้ล่วงหน้าอัตโนมัติ
+          (หาสาเหตุจริงที่ตรงกับ regex ของแถวที่คลิก แล้วเลือกตัวที่มูลค่าสูงสุดในงวดนี้) */}
+      {view==='cause' && (()=>{
+        const autoSelCause = causeFilterFn ? (() => {
+          const matches = {};
+          items.forEach(r => { if(causeFilterFn(r.cause)){ const c=r.cause||'ไม่ระบุ'; matches[c]=(matches[c]||0)+(r.amount||0); } });
+          const arr = Object.entries(matches).sort((a,b)=>b[1]-a[1]);
+          return arr.length ? arr[0][0] : null;
+        })() : null;
+        return <CauseView key={autoSelCause||'nofilter'} items={items} totalAll={totalAll} initialSelCause={autoSelCause}/>;
+      })()}
 
       {/* Trend view */}
       {view==='trend' && <CauseTrendView rawItems={rawItems} years={years} filterYear={filterYear}/>}
@@ -5420,7 +5428,7 @@ window.__dataReady.then(data => {
     // เคารพสิทธิ์ย่อยของแท็บเสียหายเดิม (dmg_detail) — ถ้าผู้ใช้ไม่มีสิทธิ์เปิด "ตารางรายการ" ก็ไม่ให้คลิกดูรายละเอียดจากที่นี่เช่นกัน
     const isAdmin = currentUser?.role==='admin';
     const tp = {...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
-    const canDrill = !!onDrillCell && (isAdmin || tp['dmg_detail']!==false);
+    const canDrill = !!onDrillCell && (isAdmin || tp['dmg_cause']!==false);
     const rawItemsAll = D.damageItems || [];
     const sales = D.damageSales || {};
     const [yoyMode,setYoyMode] = useState(false);
@@ -5504,7 +5512,7 @@ window.__dataReady.then(data => {
     const drill = (row,col) => {
       if(!onDrillCell) return;
       onDrillCell({
-        view: 'detail',
+        view: 'cause',
         label: row.label,
         causeFilter: row.fn,
         filterYear: col.type==='prevYear' ? col.year : (col.type==='yearAny' ? col.year : (curYear ?? 'ALL')),
