@@ -2256,6 +2256,283 @@ window.__dataReady.then(data => {
     </>;
   }
 
+  // ── อัตราเสาร้าว ต่อ 1,000 ต้นที่ผลิต (เฉพาะสาเหตุ เสาร้าวในกอง/จากขนส่ง/ปีกแตก)
+  // ตัวหาร = ยอดผลิต (ยอดรับสำเร็จรูป) เพราะเสาทุกต้นที่ผลิตเสร็จต้องผ่านการกองและการขนส่ง
+  // จึงเป็น "ประชากรเสี่ยง" ที่ตรงกับสาเหตุนี้ที่สุด
+  function CrackRateSection({items,year,months,canEdit}){
+    const db=DB;
+    const [rows,setRows]=useState([]);
+    const [missing,setMissing]=useState(false);
+    const [imported,setImported]=useState(null);
+    const [saving,setSaving]=useState(false);
+    const [msg,setMsg]=useState('');
+    const [openSec,setOpenSec]=useState(null);
+    const [base,setBase]=useState('produced');      // produced | sold
+    const fileRef=React.useRef(null);
+    const MIN_BASE=200;                              // ต่ำกว่านี้ถือว่าข้อมูลน้อย ยังสรุปไม่ได้
+
+    const load=()=>{
+      db.from('pile_output').select('*').then(({data,error})=>{
+        if(error){setMissing(true);return;}
+        setMissing(false);setRows(data||[]);
+      }).catch(()=>setMissing(true));
+    };
+    useEffect(load,[]);
+
+    const yr=year!=='ALL'&&year!=null?Number(year):null;
+    const selMonths=[...(months||new Set())].sort((a,b)=>a-b);
+
+    // เสียหายเฉพาะสาเหตุเสาร้าว ตามตัวกรองปี+เดือนของหน้านี้
+    const crackRows=items.filter(r=>/เสาร้าว/.test(r.cause||''))
+                         .map(r=>({...r,p:parsePile(r.product_name)}));
+    const dmg={};let dmgTotal=0,dmgAmount=0,dmgUnparsed=0;
+    crackRows.forEach(r=>{
+      const q=Number(r.qty)||0, amt=Number(r.amount)||0;
+      dmgTotal+=q; dmgAmount+=amt;
+      if(!r.p.ok||r.p.len==null){dmgUnparsed+=q;return;}
+      const k=r.p.sec+'|'+r.p.len.toFixed(2);
+      if(!dmg[k]) dmg[k]={sec:r.p.sec,len:r.p.len,qty:0,amount:0,count:0};
+      dmg[k].qty+=q; dmg[k].amount+=amt; dmg[k].count++;
+    });
+
+    // เลือกชุดตัวหารให้ตรงกับช่วงที่กรองมากที่สุด
+    const inYear=rows.filter(r=>yr==null||Number(r.year)===yr);
+    const monthly=inYear.filter(r=>Number(r.month)>0);
+    const monthsHave=[...new Set(monthly.map(r=>Number(r.month)))];
+    const wanted=selMonths.length?selMonths:null;
+    const missingMonths=wanted?wanted.filter(m=>!monthsHave.includes(m)):[];
+    const useMonthly=wanted?missingMonths.length===0:(monthsHave.length>0&&monthly.length>0&&!inYear.some(r=>Number(r.month)===0));
+    const baseRows=useMonthly
+      ? monthly.filter(r=>!wanted||wanted.includes(Number(r.month)))
+      : inYear.filter(r=>Number(r.month)===0);
+    const baseQty=r=>Number(base==='produced'?r.produced_qty:r.sold_qty)||0;
+    const out={};
+    baseRows.forEach(r=>{
+      const k=r.sec+'|'+Number(r.len).toFixed(2);
+      if(!out[k]) out[k]={sec:r.sec,len:Number(r.len),qty:0};
+      out[k].qty+=baseQty(r);
+    });
+    const baseTotal=Object.values(out).reduce((a,b)=>a+b.qty,0);
+    const rangeText=(baseRows.find(r=>r.range_text)||{}).range_text||'';
+    // ไฟล์ทั้งช่วงแต่ผู้ใช้กรองบางเดือน = ตัวหารกว้างกว่าตัวเศษ ต้องเตือน ไม่ใช่แสดงเฉยๆ
+    const mismatch=!useMonthly&&!!wanted&&baseRows.length>0;
+
+    // รวมเป็นรายหน้าตัด แล้วกางดูรายความยาวได้
+    const bySec={};
+    Object.keys({...dmg,...out}).forEach(k=>{
+      const sec=k.split('|')[0];
+      if(!bySec[sec]) bySec[sec]={sec,dmgQty:0,amount:0,count:0,baseQty:0,lens:[]};
+      const d=dmg[k],o=out[k];
+      const len=Number(k.split('|')[1]);
+      bySec[sec].dmgQty+=d?d.qty:0;
+      bySec[sec].amount+=d?d.amount:0;
+      bySec[sec].count +=d?d.count:0;
+      bySec[sec].baseQty+=o?o.qty:0;
+      bySec[sec].lens.push({len,dmgQty:d?d.qty:0,amount:d?d.amount:0,count:d?d.count:0,baseQty:o?o.qty:0});
+    });
+    const rate=(d,b)=>b>0?d/b*1000:null;                 // ต้นเสีย ต่อ 1,000 ต้น
+    const secList=Object.values(bySec).map(s=>({...s,rate:rate(s.dmgQty,s.baseQty),weak:s.baseQty>0&&s.baseQty<MIN_BASE}))
+      .filter(s=>s.dmgQty>0||s.baseQty>0)
+      .sort((a,b)=>{
+        if(a.weak!==b.weak) return a.weak?1:-1;           // ข้อมูลน้อยไปท้ายตาราง ไม่ให้หลอกตาว่าเสี่ยงสุด
+        return (b.rate??-1)-(a.rate??-1);
+      });
+    const overall=rate(dmgTotal-dmgUnparsed,baseTotal);
+
+    const fmt=n=>Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:0});
+    const f2=n=>n==null?'–':Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const th={padding:'9px 10px',textAlign:'right',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap',fontSize:13};
+    const td={padding:'8px 10px',textAlign:'right',whiteSpace:'nowrap',fontSize:13.5};
+    const baseLabel=base==='produced'?'ผลิต':'ขาย';
+
+    // อ่านไฟล์ Excel: ชีท "ผลิต" และ "ขาย" คนละคอลัมน์ยอด แต่โครงเดียวกัน
+    const readFile=file=>{
+      const reader=new FileReader();
+      reader.onload=evt=>{
+        try{
+          const wb=XLSX.read(evt.target.result,{type:'array'});
+          const norm=v=>String(v??'').replace(/\s/g,'');
+          const map={};let rangeText='',fileYear=null,fromM=null,toM=null,unparsed=0;
+          const grab=(sheetName,field)=>{
+            if(!wb.Sheets[sheetName]) return 0;
+            const grid=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
+            let hIdx=-1;
+            for(let i=0;i<Math.min(grid.length,40);i++){ if(grid[i].some(c=>/^ชื่อสินค้า/.test(norm(c)))){hIdx=i;break;} }
+            if(hIdx<0) return 0;
+            const head=grid[hIdx];
+            const nameC=head.findIndex(c=>/^ชื่อสินค้า/.test(norm(c)));
+            const qtyC =head.findIndex(c=>/^(ยอด|จำนวน)/.test(norm(c)));
+            if(qtyC<0) return 0;
+            let sum=0;
+            for(let i=hIdx+1;i<grid.length;i++){
+              const row=grid[i]; if(!row||!row.length) continue;
+              const q=Number(String(row[qtyC]??'').replace(/,/g,''));
+              if(!Number.isFinite(q)||q<=0) continue;
+              const p=parsePile(row[nameC]);
+              if(!p.ok||p.len==null){unparsed+=q;continue;}
+              const k=p.sec+'|'+p.len.toFixed(2);
+              if(!map[k]) map[k]={sec:p.sec,len:p.len,produced:0,sold:0};
+              map[k][field]+=q; sum+=q;
+            }
+            // ช่วงวันที่อยู่ท้ายรายงาน เช่น "พิมพ์จากวันที่  01/01/2569  ถึง  30/06/2569"
+            grid.slice(-14).forEach(r=>{
+              const t=String(r[0]||'');
+              const d=t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[\s\S]*?(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+              if(d){rangeText=d[1]+'/'+d[2]+'/'+d[3]+' – '+d[4]+'/'+d[5]+'/'+d[6];
+                    fileYear=Number(d[3]); fromM=Number(d[2]); toM=Number(d[5]);}
+            });
+            return sum;
+          };
+          const producedSum=grab(wb.SheetNames.find(n=>/ผลิต/.test(n))||'ผลิต','produced');
+          const soldSum    =grab(wb.SheetNames.find(n=>/ขาย/.test(n))||'ขาย','sold');
+          const list=Object.values(map).sort((a,b)=>a.sec.localeCompare(b.sec)||a.len-b.len);
+          if(!list.length){setMsg('❌ อ่านไฟล์ไม่ได้ — ไม่พบชีท “ผลิต”/“ขาย” หรือหัวตาราง “ชื่อสินค้า”');return;}
+          const month=(fromM&&toM&&fromM===toM)?fromM:0;    // ครอบเดือนเดียว = ไฟล์รายเดือน
+          setImported({list,producedSum,soldSum,unparsed,rangeText,month,
+            year:fileYear||yr||(new Date().getFullYear()+543),fileName:file.name});
+          setMsg('');
+        }catch(err){setMsg('❌ อ่านไฟล์ไม่สำเร็จ: '+(err.message||err));}
+      };
+      reader.readAsArrayBuffer(file);
+    };
+
+    const save=()=>{
+      setSaving(true);setMsg('');
+      const {year:y,month:m}=imported;
+      const recs=imported.list.map(r=>({year:y,month:m,sec:r.sec,len:Number(r.len.toFixed(2)),
+        produced_qty:r.produced,sold_qty:r.sold,range_text:imported.rangeText||'',updated_at:new Date().toISOString()}));
+      // ลบชุดเดิมของ (ปี, เดือน) นั้นก่อน กันขนาดที่หายไปจากรายงานรอบใหม่ค้างเป็นตัวหารเก่า
+      db.from('pile_output').delete().eq('year',y).eq('month',m)
+        .then(()=>db.from('pile_output').insert(recs))
+        .then(({error}={})=>{
+          setSaving(false);
+          if(error){setMsg('❌ '+error.message);return;}
+          setImported(null);setMsg('✅ บันทึกแล้ว '+recs.length+' ขนาด');load();
+        })
+        .catch(e=>{setSaving(false);setMsg('❌ '+(e.message||e));});
+    };
+
+    return <ChartCard span="full" title="อัตราเสาร้าว ต่อ 1,000 ต้น"
+      subtitle={'เฉพาะสาเหตุ เสาร้าวในกอง/จากขนส่ง/ปีกแตก — หารด้วยยอด'+baseLabel+'ของขนาดเดียวกัน'+(rangeText?' • ช่วงรายงาน '+rangeText:'')}
+      right={canEdit&&!missing&&<>
+        <input ref={fileRef} type="file" accept=".xls,.xlsx" style={{display:'none'}}
+          onChange={e=>{const f=e.target.files[0]; if(f) readFile(f); e.target.value='';}}/>
+        <button style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}
+          onClick={()=>fileRef.current&&fileRef.current.click()}>📄 อ่านยอดผลิตจาก Excel</button>
+      </>}>
+
+      {missing
+        ? <div style={{padding:'14px 16px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
+            ⚠️ ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-pile-output.sql</b> ก่อน
+          </div>
+        : <>
+          {msg&&<div style={{marginBottom:10,fontSize:14,color:msg.startsWith('✅')?'#059669':'#c0392b'}}>{msg}</div>}
+
+          {imported&&<div style={{marginBottom:16,padding:'12px 14px',border:'1px solid #99f6e4',background:'#f0fdfa',borderRadius:10}}>
+            <div style={{fontSize:13.5,color:'#134e4a',lineHeight:1.9,marginBottom:10}}>
+              อ่านไฟล์ <b>{imported.fileName}</b>{imported.rangeText&&<> · ช่วง <b>{imported.rangeText}</b></>}<br/>
+              ยอดผลิต <b>{fmt(imported.producedSum)}</b> ต้น · ยอดขาย <b>{fmt(imported.soldSum)}</b> ต้น · {imported.list.length} ขนาด
+              {imported.unparsed>0&&<span style={{color:'#92400e'}}> · อ่านขนาดไม่ได้ {fmt(imported.unparsed)} ต้น (ไม่บันทึก)</span>}<br/>
+              บันทึกเป็นข้อมูลของ <b>{imported.month>0?('เดือน '+imported.month+'/'+imported.year):('ทั้งช่วง ปี '+imported.year)}</b> (ทับชุดเดิมของช่วงนี้)
+            </div>
+            <div style={{display:'flex',gap:10}}>
+              <button disabled={saving} onClick={save} style={{padding:'8px 18px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',fontSize:14.5,fontWeight:600,cursor:saving?'wait':'pointer',fontFamily:'inherit'}}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+              <button onClick={()=>setImported(null)} style={{padding:'8px 16px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#42465a',fontSize:14.5,cursor:'pointer',fontFamily:'inherit'}}>ยกเลิก</button>
+            </div>
+          </div>}
+
+          {baseTotal===0
+            ? <div style={{padding:'16px 18px',fontSize:14,color:'#5f6470',lineHeight:1.9}}>
+                ยังไม่มียอด{baseLabel}สำหรับช่วงที่เลือก — กด <b>📄 อ่านยอดผลิตจาก Excel</b> แล้วเลือกไฟล์รายงาน (มีชีท “ผลิต” และ “ขาย”)
+                {missingMonths.length>0&&<div style={{marginTop:6,color:'#92400e'}}>เดือนที่ยังไม่มีไฟล์: {missingMonths.join(', ')}</div>}
+              </div>
+            : <>
+              <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:16,alignItems:'center'}}>
+                {[['เสาร้าวรวม',fmt(dmgTotal)+' ต้น','#c0392b'],
+                  ['ยอด'+baseLabel+'รวม',fmt(baseTotal)+' ต้น','#0f766e'],
+                  ['อัตรารวม',f2(overall)+' ต่อ 1,000 ต้น','#1a56db'],
+                  ['มูลค่าเสียหาย',fmt(dmgAmount)+' ฿','#7c3aed']].map(([l,v,c])=>(
+                  <div key={l} style={{flex:'1 1 170px',border:'1px solid #e6e8ee',borderRadius:12,padding:'13px 17px'}}>
+                    <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>{l}</div>
+                    <div style={{fontSize:24,fontWeight:800,color:c,lineHeight:1.2}}>{v}</div>
+                  </div>
+                ))}
+                <div style={{display:'flex',gap:6}}>
+                  {[['produced','เทียบยอดผลิต'],['sold','เทียบยอดขาย']].map(([v,l])=>(
+                    <button key={v} onClick={()=>setBase(v)} style={{padding:'5px 13px',borderRadius:20,fontSize:13,cursor:'pointer',fontFamily:'inherit',
+                      border:`1.5px solid ${base===v?'#0f766e':'#e2e8f0'}`,background:base===v?'#0f766e':'#fff',color:base===v?'#fff':'#334155',fontWeight:base===v?700:400}}>{l}</button>
+                  ))}
+                </div>
+              </div>
+
+              {mismatch&&<div style={{marginBottom:12,fontSize:13,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'9px 13px',lineHeight:1.7}}>
+                ⚠️ เลือกดูเฉพาะบางเดือน แต่ยอด{baseLabel}ที่มีเป็นของทั้งช่วง ({rangeText||'ทั้งปี'}) — อัตราที่เห็นจึง<b>ต่ำกว่าความจริง</b>
+                {missingMonths.length>0&&<> · ยังไม่มีไฟล์รายเดือนของเดือน {missingMonths.join(', ')}</>}
+              </div>}
+
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{background:'#f4f6fa'}}>
+                    <th style={{...th,textAlign:'left'}}>หน้าตัด</th>
+                    <th style={th}>ร้าว (ต้น)</th>
+                    <th style={th}>ครั้ง</th>
+                    <th style={{...th,color:'#0f766e'}}>ยอด{baseLabel} (ต้น)</th>
+                    <th style={{...th,color:'#1a56db'}}>ต่อ 1,000 ต้น</th>
+                    <th style={th}>มูลค่า (฿)</th>
+                  </tr></thead>
+                  <tbody>
+                    {secList.map(s=>{
+                      const open=openSec===s.sec;
+                      const lens=[...s.lens].sort((a,b)=>{
+                        const ra=rate(a.dmgQty,a.baseQty),rb=rate(b.dmgQty,b.baseQty);
+                        return (rb??-1)-(ra??-1);
+                      });
+                      return <React.Fragment key={s.sec}>
+                        <tr onClick={()=>setOpenSec(open?null:s.sec)}
+                          style={{borderBottom:'1px solid #eef0f5',cursor:'pointer',background:open?'#eef3fc':'transparent'}}>
+                          <td style={{...td,textAlign:'left',fontWeight:700}}>
+                            {open?'▲':'▼'} {s.sec}
+                            {s.weak&&<span style={{marginLeft:7,fontSize:11.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:5,padding:'1px 6px'}}>ข้อมูลน้อย</span>}
+                          </td>
+                          <td style={{...td,color:'#c0392b',fontWeight:700}}>{s.dmgQty?fmt(s.dmgQty):'–'}</td>
+                          <td style={td}>{s.count||'–'}</td>
+                          <td style={{...td,color:'#0f766e'}}>{s.baseQty?fmt(s.baseQty):'–'}</td>
+                          <td style={{...td,color:'#1a56db',fontWeight:800,fontSize:14.5}}>{f2(s.rate)}</td>
+                          <td style={td}>{s.amount?fmt(s.amount):'–'}</td>
+                        </tr>
+                        {open&&lens.map(L=>(
+                          <tr key={s.sec+L.len} style={{borderBottom:'1px solid #f4f6fa',background:'#fafbfd'}}>
+                            <td style={{...td,textAlign:'left',paddingLeft:34,color:'#5f6470'}}>
+                              ยาว {L.len.toFixed(2)} ม.
+                              {L.baseQty>0&&L.baseQty<MIN_BASE&&<span style={{marginLeft:6,fontSize:11,color:'#92400e'}}>(น้อย)</span>}
+                            </td>
+                            <td style={{...td,color:'#5f6470'}}>{L.dmgQty?fmt(L.dmgQty):'–'}</td>
+                            <td style={{...td,color:'#5f6470'}}>{L.count||'–'}</td>
+                            <td style={{...td,color:'#5f6470'}}>{L.baseQty?fmt(L.baseQty):'–'}</td>
+                            <td style={{...td,color:'#1a56db',fontWeight:600}}>{f2(rate(L.dmgQty,L.baseQty))}</td>
+                            <td style={{...td,color:'#5f6470'}}>{L.amount?fmt(L.amount):'–'}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {dmgUnparsed>0&&<div style={{marginTop:12,fontSize:13,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'9px 13px'}}>
+                ⚠️ มีเสาร้าว {fmt(dmgUnparsed)} ต้นที่อ่านขนาดจากชื่อสินค้าไม่ได้ — นับรวมใน “เสาร้าวรวม” แต่ไม่ได้แยกลงหน้าตัด
+              </div>}
+
+              <div style={{marginTop:12,fontSize:13,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'10px 14px',lineHeight:1.8}}>
+                💡 <b>ต่อ 1,000 ต้น</b> = ร้าวกี่ต้น ต่อของที่{baseLabel} 1,000 ต้นของขนาดนั้น — ตัวเลขนี้เทียบข้ามขนาดได้ตรงๆ ต่างจาก % หรือมูลค่าที่แปรตามยอดผลิต ·
+                ขนาดที่ยอด{baseLabel}น้อยกว่า {MIN_BASE} ต้น ติดป้าย <b>ข้อมูลน้อย</b> และถูกดันไปท้ายตาราง เพราะร้าวเพิ่มต้นเดียวอัตราเด้งเท่าตัว ยังสรุปไม่ได้
+              </div>
+            </>}
+        </>}
+    </ChartCard>;
+  }
+
+
   function DamageDetailTab({currentUser}){
     const isAdmin=currentUser?.role==='admin';
     const tp={...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
@@ -2714,7 +2991,7 @@ window.__dataReady.then(data => {
       {view==='customer' && <CustomerView items={items} totalAll={totalAll}/>}
 
       {/* Worker sub-tab nav */}
-      {view==='size' && <PileSizeView items={items}/>}
+      {view==='size' && <><PileSizeView items={items}/><CrackRateSection items={items} year={filterYear} months={selMonths} canEdit={currentUser?.role==='admin'||currentUser?.role==='editor'}/></>}
       {view==='worker' && <div style={{gridColumn:'1 / -1',display:'flex',gap:8,marginBottom:4}}>
         {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'},{v:'driver',l:'วิเคราะห์คนขับรถ'}].map(({v,l})=>(
           <button key={v} onClick={()=>setWorkerTab(v)} style={{padding:'7px 20px',borderRadius:20,border:`1.5px solid ${workerTab===v?'#0f766e':'#e2e8f0'}`,background:workerTab===v?'#0f766e':'#fff',color:workerTab===v?'#fff':'#334155',fontSize:13,fontWeight:workerTab===v?700:400,cursor:'pointer'}}>
