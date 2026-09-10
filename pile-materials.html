@@ -151,9 +151,10 @@ function sortPeriodLabels(labels) {
   };
   return [...labels].sort((a, b) => key(a) - key(b));
 }
+// เรียงตามลำดับเดียวกับตารางในหน้าหลัก: PC.wire → ลวดปลอก → เพลท → หนวดกุ้ง → Collar → เหล็กเสริม
 const CATS = [
-  { key: 'rebar', label: 'เหล็กเสริม', unit: 'เส้น' }, { key: 'plate', label: 'เพลท', unit: 'แผ่นใหญ่' }, { key: 'pc', label: 'PC.wire', unit: 'กก.' },
-  { key: 'stirrup', label: 'ลวดปลอก', unit: 'กก.' }, { key: 'whisker', label: 'หนวดกุ้ง', unit: 'กก.' }, { key: 'collar', label: 'Collar', unit: 'ชุด' },
+  { key: 'pc', label: 'PC.wire', unit: 'กก.' }, { key: 'stirrup', label: 'ลวดปลอก', unit: 'กก.' }, { key: 'plate', label: 'เพลท', unit: 'แผ่นใหญ่' },
+  { key: 'whisker', label: 'หนวดกุ้ง', unit: 'กก.' }, { key: 'collar', label: 'Collar', unit: 'ชุด' }, { key: 'rebar', label: 'เหล็กเสริม', unit: 'เส้น' },
 ];
 
 /* ---------- small UI ---------- */
