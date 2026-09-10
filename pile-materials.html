@@ -152,8 +152,8 @@ function sortPeriodLabels(labels) {
   return [...labels].sort((a, b) => key(a) - key(b));
 }
 const CATS = [
-  { key: 'rebar', label: 'เหล็กเสริม' }, { key: 'plate', label: 'เพลท' }, { key: 'pc', label: 'PC.wire' },
-  { key: 'stirrup', label: 'ลวดปลอก' }, { key: 'whisker', label: 'หนวดกุ้ง' }, { key: 'collar', label: 'Collar' },
+  { key: 'rebar', label: 'เหล็กเสริม', unit: 'เส้น' }, { key: 'plate', label: 'เพลท', unit: 'แผ่นใหญ่' }, { key: 'pc', label: 'PC.wire', unit: 'กก.' },
+  { key: 'stirrup', label: 'ลวดปลอก', unit: 'กก.' }, { key: 'whisker', label: 'หนวดกุ้ง', unit: 'กก.' }, { key: 'collar', label: 'Collar', unit: 'ชุด' },
 ];
 
 /* ---------- small UI ---------- */
@@ -993,7 +993,7 @@ class App extends React.Component {
         if (rd != null) { totalRealDiff += rd; hasDiff = true; }
       });
       const pct = hasDiff && totalCalc ? (totalRealDiff / totalCalc) * 100 : null;
-      return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct };
+      return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct, hasDiff };
     }));
   }
   // แถวเทียบคิวผลิต/ความยาว ข้ามงวด
@@ -1008,11 +1008,26 @@ class App extends React.Component {
       return e ? e.piles : null;
     };
     const defs = [
-      { label: 'จำนวนเสาเข็ม (ต้น)', pick: t => t && fmt(t.qty, 0) },
-      { label: 'ความยาวรวม (ม.)', pick: t => t && fmt(t.length, 2) },
-      { label: 'คิวผลิต (m³)', pick: t => t ? (t.volume == null ? 'ยังไม่ตั้งหน้าตัด' : fmt(t.volume, 2)) : null },
+      { label: 'จำนวนเสาเข็ม (ต้น)', dg: 0, val: t => (t ? t.qty : null) },
+      { label: 'ความยาวรวม (ม.)', dg: 2, val: t => (t ? t.length : null) },
+      { label: 'คิวผลิต (m³)', dg: 2, val: t => (t ? t.volume : null), note: t => (t && t.volume == null ? 'ยังไม่ตั้งหน้าตัด' : null) },
     ];
-    return { cols, rows: defs.map(d => ({ label: d.label, cells: cols.map(pl => ({ period: pl, text: d.pick(totalsFor(pl)) || '-' })) })) };
+    return {
+      cols,
+      rows: defs.map(d => {
+        const vals = [];
+        const cells = cols.map(pl => {
+          const t = totalsFor(pl);
+          const v = d.val(t);
+          const note = d.note ? d.note(t) : null;
+          if (v != null && isFinite(v)) vals.push(v);
+          return { period: pl, text: v != null && isFinite(v) ? fmt(v, d.dg) : (note || '-') };
+        });
+        // ค่าเฉลี่ยต่องวด — คิดเฉพาะงวดที่มีตัวเลข
+        const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+        return { label: d.label, cells, avgFmt: avg != null ? fmt(avg, d.dg) : '-' };
+      }),
+    };
   }
   filterMainPage(mp) {
     if (!mp) return mp;
@@ -1039,15 +1054,27 @@ class App extends React.Component {
     const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
     const currentSummary = this.computePeriodSummary(s);
     const periodCols = [...closedLabels, s.periodLabel];
-    return CATS.map(m => ({
-      label: m.label,
-      cells: periodCols.map(pl => {
+    return CATS.map(m => {
+      const dg = digitsForKey('x:' + m.key);
+      const vals = [];
+      const cells = periodCols.map(pl => {
         const summary = pl === s.periodLabel ? currentSummary : s.periodSummaries[pl];
         const item = summary && summary.find(x => x.key === m.key);
-        const pct = item ? item.pct : null;
-        return { period: pl, pctFmt: pct != null && isFinite(pct) ? ((pct > 0 ? '+' : '') + fmt(pct, 1) + '%') : '-' };
-      }),
-    }));
+        // สรุปงวดเก่าอาจยังไม่มี hasDiff — ใช้ pct เป็นตัวบอกแทนว่ามีการกรอกใช้จริงหรือยัง
+        const has = item ? (item.hasDiff !== undefined ? item.hasDiff : item.pct != null) : false;
+        const d = has && item && isFinite(item.totalRealDiff) ? item.totalRealDiff : null;
+        if (d != null) vals.push(d);
+        return { period: pl, pctFmt: d != null ? ((d > 0 ? '+' : '') + fmt(d, dg)) : '-' };
+      });
+      // ค่าเฉลี่ย — คิดเฉพาะงวดที่กรอกใช้จริงแล้วเท่านั้น
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      return {
+        label: m.label + ' (' + (m.unit || '') + ')',
+        cells,
+        avgFmt: avg != null ? ((avg > 0 ? '+' : '') + fmt(avg, dg)) : '-',
+        avgCount: vals.length,
+      };
+    });
   }
 
   exportExcel() {
@@ -1786,15 +1813,16 @@ function TrendView({ app }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
-        <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}><th style={{ padding: '10px 14px', fontSize: 13 }}>วัตถุดิบ</th>{periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}</tr></thead>
+        <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}><th style={{ padding: '10px 14px', fontSize: 13 }}>วัตถุดิบ</th>{periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}<th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>เฉลี่ย</th></tr></thead>
         <tbody>{rows.map((row, i) => (
           <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
             <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 600 }}>{row.label}</td>
             {row.cells.map((c, j) => <td key={j} style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right' }}>{c.pctFmt}</td>)}
+            <td style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right', fontWeight: 700, background: '#f7faff', color: '#2f5fd0' }}>{row.avgFmt}</td>
           </tr>
         ))}</tbody>
       </table>
-      <div style={{ fontSize: 12, color: '#78839A' }}>% ผิดพลาด = ส่วนต่างจริง ÷ ยอดคำนวณ ต่อวัตถุดิบ ในแต่ละงวด (คอลัมน์ขวาสุดคืองวดปัจจุบัน)</div>
+      <div style={{ fontSize: 12, color: '#78839A' }}>ส่วนต่างจริง = ยอดคำนวณ − ใช้จริง + ใช้งานอื่น-เสียหาย รวมทุกรายการของวัตถุดิบนั้นในแต่ละงวด · <b>+ = ของหาย</b> / <b>− = ของเกิน</b> · <b>เฉลี่ย</b> คิดเฉพาะงวดที่กรอกใช้จริงแล้ว (“-” คือยังไม่ได้กรอก)</div>
 
       {(() => {
         const pt = app.buildPileTrendRows();
@@ -1806,15 +1834,17 @@ function TrendView({ app }) {
               <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
                 <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
                 {pt.cols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}
+                <th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>เฉลี่ย</th>
               </tr></thead>
               <tbody>{pt.rows.map((row, i) => (
                 <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
                   <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 600 }}>{row.label}</td>
                   {row.cells.map((c, j) => <td key={j} style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right' }}>{c.text}</td>)}
+                  <td style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right', fontWeight: 700, background: '#f7faff', color: '#2f5fd0' }}>{row.avgFmt}</td>
                 </tr>
               ))}</tbody>
             </table>
-            <div style={{ fontSize: 12, color: '#78839A' }}>ตัวเลขของแต่ละงวดมาจากไฟล์รายการเสาที่อัปโหลดในงวดนั้น</div>
+            <div style={{ fontSize: 12, color: '#78839A' }}>ตัวเลขของแต่ละงวดมาจากไฟล์รายการเสาที่อัปโหลดในงวดนั้น · <b>เฉลี่ย</b> = เฉลี่ยต่องวดจากงวดที่มีข้อมูล</div>
           </div>
         );
       })()}
