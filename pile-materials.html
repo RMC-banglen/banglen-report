@@ -993,7 +993,9 @@ class App extends React.Component {
         if (rd != null) { totalRealDiff += rd; hasDiff = true; }
       });
       const pct = hasDiff && totalCalc ? (totalRealDiff / totalCalc) * 100 : null;
-      return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct, hasDiff };
+      // เก็บรายตัวไว้ด้วย เพื่อให้ตารางแนวโน้มแยกดูทีละรายการย้อนหลังได้
+      const items = rows.map(row => ({ label: row.label, calc: parseFmtNum(row.calcFmt) || 0, realDiff: parseFmtNum(row.realDiffFmt) }));
+      return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct, hasDiff, items };
     }));
   }
   // แถวเทียบคิวผลิต/ความยาว ข้ามงวด
@@ -1048,6 +1050,41 @@ class App extends React.Component {
       if (Math.abs(pct) >= this.getThresholdFor(cat.key)) { alert++; alertRows.push({ category: cat.label, label: row.label, pctFmt: row.pctLostFmt ?? row.pctFmt }); }
     }));
     return { normal: total - alert, alert, total, alertRows };
+  }
+  // แนวโน้มแบบแยกทีละรายการ (ไม่รวมยอดทั้งหมวด) — ใช้ items ที่เก็บไว้ในสรุปแต่ละงวด
+  buildTrendItemRows() {
+    const s = this.state;
+    const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
+    const currentSummary = this.computePeriodSummary(s);
+    const periodCols = [...closedLabels, s.periodLabel];
+    const summaryFor = pl => (pl === s.periodLabel ? currentSummary : s.periodSummaries[pl]);
+    return CATS.map(m => {
+      const dg = digitsForKey('x:' + m.key);
+      // รวมชื่อรายการจากทุกงวด (งวดเก่าที่บันทึกก่อนมีฟีเจอร์นี้จะไม่มี items → ข้ามไป)
+      const order = [];
+      const seen = new Set();
+      periodCols.forEach(pl => {
+        const sum = summaryFor(pl);
+        const cat = sum && sum.find ? sum.find(x => x.key === m.key) : null;
+        (cat && cat.items ? cat.items : []).forEach(it => {
+          if (!seen.has(it.label)) { seen.add(it.label); order.push(it.label); }
+        });
+      });
+      const items = order.map(label => {
+        const vals = [];
+        const cells = periodCols.map(pl => {
+          const sum = summaryFor(pl);
+          const cat = sum && sum.find ? sum.find(x => x.key === m.key) : null;
+          const it = cat && cat.items ? cat.items.find(x => x.label === label) : null;
+          const d = it && it.realDiff != null && isFinite(it.realDiff) ? it.realDiff : null;
+          if (d != null) vals.push(d);
+          return { period: pl, text: d != null ? ((d > 0 ? '+' : '') + fmt(d, dg)) : '-' };
+        });
+        const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+        return { label, cells, avgFmt: avg != null ? ((avg > 0 ? '+' : '') + fmt(avg, dg)) : '-' };
+      });
+      return { key: m.key, label: m.label, unit: m.unit || '', items };
+    }).filter(g => g.items.length);
   }
   buildTrendRows() {
     const s = this.state;
@@ -1823,6 +1860,36 @@ function TrendView({ app }) {
         ))}</tbody>
       </table>
       <div style={{ fontSize: 12, color: '#78839A' }}>ส่วนต่างจริง = ยอดคำนวณ − ใช้จริง + ใช้งานอื่น-เสียหาย รวมทุกรายการของวัตถุดิบนั้นในแต่ละงวด · <b>+ = ของหาย</b> / <b>− = ของเกิน</b> · <b>เฉลี่ย</b> คิดเฉพาะงวดที่กรอกใช้จริงแล้ว (“-” คือยังไม่ได้กรอก)</div>
+
+      {(() => {
+        const groups = app.buildTrendItemRows();
+        if (!groups.length) return null;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>แยกรายตัว — ส่วนต่างจริงของแต่ละรายการ</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
+              <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
+                {periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}
+                <th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>เฉลี่ย</th>
+              </tr></thead>
+              <tbody>{groups.map(g => [
+                <tr key={'h-' + g.key} style={{ background: '#eef3fc' }}>
+                  <td colSpan={periodCols.length + 2} style={{ padding: '7px 14px', fontSize: 13, fontWeight: 700, color: '#2f5fd0' }}>{g.label}{g.unit ? ' (' + g.unit + ')' : ''}</td>
+                </tr>,
+                ...g.items.map((row, i) => (
+                  <tr key={g.key + '-' + i} style={{ borderTop: '1px solid #eef0f4' }}>
+                    <td style={{ padding: '9px 14px 9px 26px', fontSize: 14 }}>{row.label}</td>
+                    {row.cells.map((c, j) => <td key={j} style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right' }}>{c.text}</td>)}
+                    <td style={{ padding: '9px 14px', fontSize: 14, textAlign: 'right', fontWeight: 700, background: '#f7faff', color: '#2f5fd0' }}>{row.avgFmt}</td>
+                  </tr>
+                )),
+              ])}</tbody>
+            </table>
+            <div style={{ fontSize: 12, color: '#78839A' }}>ส่วนต่างจริงของแต่ละรายการ · <b>+ = ของหาย</b> / <b>− = ของเกิน</b> · งวดที่ปิดไว้ก่อนเพิ่มฟีเจอร์นี้จะยังไม่มีข้อมูลรายตัว</div>
+          </div>
+        );
+      })()}
 
       {(() => {
         const pt = app.buildPileTrendRows();
