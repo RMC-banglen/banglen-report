@@ -1005,7 +1005,7 @@ class App extends React.Component {
     const cols = [...closedLabels, s.periodLabel];
     const totalsFor = pl => {
       if (pl === s.periodLabel) return this.computePileTotals(s);
-      const sum = s.periodSummaries[pl];
+      const sum = this.summaryForClosedPeriod(pl);
       const e = sum && sum.find ? sum.find(x => x.key === '__piles') : null;
       return e ? e.piles : null;
     };
@@ -1051,13 +1051,38 @@ class App extends React.Component {
     }));
     return { normal: total - alert, alert, total, alertRows };
   }
+  // สรุปของงวดที่ปิดไปแล้ว — คำนวณใหม่จากสแนปช็อตของงวดนั้น (periodHistory) แทนการใช้ยอดรวมที่บันทึกไว้
+  // เพราะงวดที่ปิดก่อนมีฟีเจอร์ "แยกรายตัว" จะเก็บแค่ยอดรวมของหมวด ไม่มีรายการย่อย
+  // สแนปช็อตเก็บข้อมูลดิบครบอยู่แล้ว (สต็อก/ใช้จริง/ใช้งานอื่น/ตัดรับเข้า/ไฟล์รายการเสา) จึงย้อนคำนวณได้ตรงกับตอนปิดงวด
+  summaryForClosedPeriod(pl) {
+    const s = this.state;
+    const stored = (s.periodSummaries || {})[pl];
+    const snap = (s.periodHistory || {})[pl];
+    if (!snap || !snap.result) return stored;   // ไม่มีไฟล์รายการเสาของงวดนั้น ย้อนคำนวณไม่ได้
+    this._closedSummaryCache = this._closedSummaryCache || {};
+    const cached = this._closedSummaryCache[pl];
+    if (cached && cached.snap === snap) return cached.summary;
+    const realState = this.state;
+    let out = stored;
+    try {
+      // สลับ state ชั่วคราวเพราะ buildRow/buildMainPage อ่านค่าจาก this.state โดยตรง
+      this.state = { ...realState, stock: snap.stock || {}, plateStockDiam: snap.plateStockDiam || {},
+        actual: snap.actual || {}, generalUseEntries: snap.generalUseEntries || {},
+        plateGeneralUseEntries: snap.plateGeneralUseEntries || {}, cutInEntries: snap.cutInEntries || {},
+        extraRebarItems: snap.extraRebarItems || [], result: snap.result, rawRows: snap.rawRows,
+        mainSearchQuery: '' };
+      out = this.computePeriodSummary(this.state) || stored;
+    } catch (e) { out = stored; } finally { this.state = realState; }
+    this._closedSummaryCache[pl] = { snap, summary: out };
+    return out;
+  }
   // แนวโน้มแบบแยกทีละรายการ (ไม่รวมยอดทั้งหมวด) — ใช้ items ที่เก็บไว้ในสรุปแต่ละงวด
   buildTrendItemRows() {
     const s = this.state;
     const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
     const currentSummary = this.computePeriodSummary(s);
     const periodCols = [...closedLabels, s.periodLabel];
-    const summaryFor = pl => (pl === s.periodLabel ? currentSummary : s.periodSummaries[pl]);
+    const summaryFor = pl => (pl === s.periodLabel ? currentSummary : this.summaryForClosedPeriod(pl));
     return CATS.map(m => {
       const dg = digitsForKey('x:' + m.key);
       // รวมชื่อรายการจากทุกงวด (งวดเก่าที่บันทึกก่อนมีฟีเจอร์นี้จะไม่มี items → ข้ามไป)
@@ -1095,7 +1120,7 @@ class App extends React.Component {
       const dg = digitsForKey('x:' + m.key);
       const vals = [];
       const cells = periodCols.map(pl => {
-        const summary = pl === s.periodLabel ? currentSummary : s.periodSummaries[pl];
+        const summary = pl === s.periodLabel ? currentSummary : this.summaryForClosedPeriod(pl);
         const item = summary && summary.find(x => x.key === m.key);
         // สรุปงวดเก่าอาจยังไม่มี hasDiff — ใช้ pct เป็นตัวบอกแทนว่ามีการกรอกใช้จริงหรือยัง
         const has = item ? (item.hasDiff !== undefined ? item.hasDiff : item.pct != null) : false;
@@ -1886,7 +1911,7 @@ function TrendView({ app }) {
                 )),
               ])}</tbody>
             </table>
-            <div style={{ fontSize: 12, color: '#78839A' }}>ส่วนต่างจริงของแต่ละรายการ · <b>+ = ของหาย</b> / <b>− = ของเกิน</b> · งวดที่ปิดไว้ก่อนเพิ่มฟีเจอร์นี้จะยังไม่มีข้อมูลรายตัว</div>
+            <div style={{ fontSize: 12, color: '#78839A' }}>ส่วนต่างจริงของแต่ละรายการ · <b>+ = ของหาย</b> / <b>− = ของเกิน</b> · งวดที่ปิดไปแล้วจะย้อนคำนวณจากข้อมูลที่บันทึกไว้ของงวดนั้นให้อัตโนมัติ (ถ้างวดนั้นมีไฟล์รายการเสา)</div>
           </div>
         );
       })()}
