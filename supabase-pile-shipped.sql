@@ -1,19 +1,21 @@
 -- ============================================================
--- ยอดส่งเสาเข็มรวมรายเดือน (ไม่แยกขนาด)
+-- ยอดส่ง/ยอดขายเสาเข็ม แยกตามหน้าตัด+ความยาว (นำเข้าจากไฟล์ Excel รายงานยอดขาย)
 -- ใช้เป็นตัวหารหา "% เสียหายต่อยอดส่ง" ในแท็บวิเคราะห์ขนาดเสา
--- กรอกเองจากหน้าเว็บ (แท็บ มูลค่า-เปอร์เซ็นต์เสียหาย → วิเคราะห์ขนาดเสา)
+-- ไฟล์ต้นทาง: รายงานยอดขาย/ผลิต ชีท "ขาย" คอลัมน์ รหัสสินค้า | ชื่อสินค้า | ยอดขาย
 -- ============================================================
 
 create table if not exists pile_shipped (
   id          bigserial primary key,
-  year        int not null,            -- ปี พ.ศ. เช่น 2569
-  month       int not null,            -- 1-12
-  qty         numeric not null,        -- ยอดส่งรวมทั้งเดือน (ต้น)
+  year        int not null,            -- ปี พ.ศ. ของรายงาน เช่น 2569
+  sec         text not null,           -- หน้าตัด เช่น I-0.26
+  len         numeric not null,        -- ความยาว (เมตร)
+  qty         numeric not null,        -- จำนวนต้นที่ส่ง/ขาย
+  range_text  text default '',         -- ช่วงวันที่ของรายงาน เช่น 01/01/2569 - 09/09/2569
   updated_at  timestamptz default now(),
-  unique (year, month)
+  unique (year, sec, len)
 );
 
-create index if not exists pile_shipped_ym_idx on pile_shipped (year desc, month desc);
+create index if not exists pile_shipped_year_idx on pile_shipped (year desc);
 
 alter table pile_shipped enable row level security;
 

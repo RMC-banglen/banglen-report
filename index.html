@@ -2075,6 +2075,58 @@ window.__dataReady.then(data => {
     // เดือนที่จะกรอก — ตั้งต้นตามตัวกรองที่เลือกอยู่ ถ้าเลือกหลายเดือนใช้เดือนล่าสุดที่เลือก
     const filtMonths=[...(months||new Set())].sort((a,b)=>a-b);
     const shipYear=year!=='ALL'&&year!=null?Number(year):nowD.getFullYear()+543;
+    const fileRef=React.useRef(null);
+    const [imported,setImported]=useState(null);   // ผลอ่านไฟล์ Excel ก่อนยืนยันใส่ลงตาราง
+
+    // อ่านไฟล์ Excel รายงานยอดขาย (ชีท "ขาย": รหัสสินค้า | ชื่อสินค้า | ยอดขาย)
+    // แยกหน้าตัด+ความยาวจากชื่อสินค้าด้วยตัวอ่านเดียวกับข้อมูลเสียหาย ตัวเลขถึงจะจับคู่กันได้ตรง
+    const readShipFile=file=>{
+      const reader=new FileReader();
+      reader.onload=evt=>{
+        try{
+          const wb=XLSX.read(evt.target.result,{type:'array'});
+          const sheetName=wb.SheetNames.find(n=>/ขาย|ส่ง/.test(n))||wb.SheetNames[0];
+          const grid=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
+          if(!grid.length){setShipMsg('❌ ไฟล์ว่าง');return;}
+          const norm=v=>String(v??'').replace(/\s/g,'');
+          // หัวตาราง = แถวที่มี "ชื่อสินค้า" คอลัมน์ยอด = คอลัมน์ที่ขึ้นต้นด้วย ยอด (ยอดขาย/ยอดรับสำเร็จรูป/ยอดยกไป)
+          let hIdx=-1;
+          for(let i=0;i<Math.min(grid.length,40);i++){ if(grid[i].some(c=>/^ชื่อสินค้า/.test(norm(c)))){hIdx=i;break;} }
+          if(hIdx<0){setShipMsg('❌ หาหัวตาราง “ชื่อสินค้า” ในไฟล์ไม่เจอ');return;}
+          const head=grid[hIdx];
+          const nameC=head.findIndex(c=>/^ชื่อสินค้า/.test(norm(c)));
+          const qtyC =head.findIndex(c=>/^(ยอด|จำนวน)/.test(norm(c)));
+          if(qtyC<0){setShipMsg('❌ หาคอลัมน์ยอด (ยอดขาย/จำนวน) ไม่เจอ');return;}
+          const qtyLabel=String(head[qtyC]||'ยอด').trim();
+          const m={}; let rowsUsed=0, grand=0, skipped=0, skippedQty=0;
+          for(let i=hIdx+1;i<grid.length;i++){
+            const row=grid[i]; if(!row||!row.length) continue;
+            const q=Number(String(row[qtyC]??'').replace(/,/g,''));
+            if(!Number.isFinite(q)||q<=0) continue;        // ข้ามแถวว่าง/ท้ายรายงาน
+            const p=parsePile(row[nameC]);
+            grand+=q; rowsUsed++;
+            if(!p.ok||p.len==null){skipped++;skippedQty+=q;continue;}
+            const k=p.sec+'|'+p.len.toFixed(2);
+            if(!m[k]) m[k]={sec:p.sec,len:p.len,qty:0};
+            m[k].qty+=q;
+          }
+          if(!rowsUsed){setShipMsg('❌ ไม่พบแถวที่มียอดเป็นตัวเลข');return;}
+          // ช่วงวันที่อยู่ท้ายรายงาน เช่น "พิมพ์จากวันที่  01/01/2569  ถึง  09/09/2569"
+          let rangeText='', fileYear=null;
+          grid.slice(-12).forEach(r=>{
+            const t=String(r[0]||'');
+            const d=t.match(/(\d{1,2}\/\d{1,2}\/(\d{4}))[\s\S]*?(\d{1,2}\/\d{1,2}\/\d{4})/);
+            if(d){rangeText=d[1]+' – '+d[3]; fileYear=Number(d[2]);}
+          });
+          const list=Object.values(m).sort((a,b)=>a.sec.localeCompare(b.sec)||a.len-b.len);
+          setImported({list,grand,rowsUsed,skipped,skippedQty,rangeText,qtyLabel,sheetName,
+            year:fileYear||shipYear,fileName:file.name,
+            matched:list.reduce((a,b)=>a+b.qty,0)});
+          setShipMsg('');
+        }catch(err){setShipMsg('❌ อ่านไฟล์ไม่สำเร็จ: '+(err.message||err));}
+      };
+      reader.readAsArrayBuffer(file);
+    };
     const loadShip=()=>{
       db.from('pile_shipped').select('*').then(({data,error})=>{
         if(error){setShipMissing(true);return;}
@@ -2082,11 +2134,15 @@ window.__dataReady.then(data => {
       }).catch(()=>setShipMissing(true));
     };
     useEffect(loadShip,[]);
-    // ยอดส่งเฉพาะช่วงเดียวกับที่กรองข้อมูลเสียหายอยู่ ถึงจะเทียบกันได้ตรง
-    const shipScoped=shipRows.filter(r=>
-      (year==='ALL'||year==null||Number(r.year)===Number(year)) &&
-      (!months||months.size===0||months.has(Number(r.month))));
+    // ยอดส่งเป็นยอดทั้งปีจากรายงาน (ไม่มีแยกเดือน) จึงเทียบได้ตรงเมื่อดูทั้งปี
+    const shipScoped=shipRows.filter(r=>year==='ALL'||year==null||Number(r.year)===Number(year));
     const totalShipped=shipScoped.length?shipScoped.reduce((a,b)=>a+(Number(b.qty)||0),0):null;
+    const shipRangeText=(shipScoped.find(r=>r.range_text)||{}).range_text||'';
+    const partialMonths=!!(months&&months.size>0);   // เลือกบางเดือน → ตัวหารยังเป็นยอดทั้งปี ต้องบอกผู้ใช้
+    const shipQty=(sec,len)=>{
+      const m=shipScoped.filter(r=>r.sec===sec&&(len==null||Number(r.len).toFixed(2)===Number(len).toFixed(2)));
+      return m.length?m.reduce((a,b)=>a+(Number(b.qty)||0),0):null;
+    };
 
     const allRows=items.filter(r=>cause==='__all__'||r.cause===cause)
                     .map(r=>({...r,p:parsePile(r.product_name)}));
@@ -2098,13 +2154,6 @@ window.__dataReady.then(data => {
     const total=rows.reduce((a,b)=>a+(Number(b.amount)||0),0);
     const totalCount=rows.length;
     const totalOf=g=>metric==='qty'?totalQty:totalCount;
-    // เดือนสำหรับกรอกยอดส่ง — ทุกเดือนที่มีข้อมูลเสียหายในปีนั้น + เดือนที่เคยกรอกยอดส่งไว้
-    const shipMonths=[...new Set([
-      ...items.filter(r=>Number(r.year)===shipYear).map(r=>Number(r.month)),
-      ...shipRows.filter(r=>Number(r.year)===shipYear).map(r=>Number(r.month)),
-    ])].filter(Boolean).sort((a,b)=>a-b);
-    const dmgQtyOfMonth=m=>items.filter(r=>Number(r.year)===shipYear&&Number(r.month)===m)
-      .reduce((a,b)=>a+(Number(b.qty)||0),0);
 
     const group=keyFn=>{
       const g={};
@@ -2200,7 +2249,7 @@ window.__dataReady.then(data => {
               <th style={{...th,textAlign:'left'}}>หน้าตัด</th>
               <th style={th}>จำนวนต้น</th><th style={th}>จำนวนครั้ง</th>
               <th style={th}>มูลค่า (฿)</th><th style={th}>% ของต้นที่เสียหาย</th>
-              <th style={{...th,color:'#0f766e'}}>% ของยอดส่ง</th>
+              <th style={{...th,color:'#0f766e'}}>ต้นที่ส่ง</th><th style={{...th,color:'#0f766e'}}>% เสียหาย/ยอดส่ง</th>
             </tr></thead>
             <tbody>
               {bySec.map(g=>{
@@ -2218,7 +2267,10 @@ window.__dataReady.then(data => {
                     <td style={td}>{fmt(g.count)}</td>
                     <td style={td}>{fmt(g.amount)}</td>
                     <td style={td}>{totalQty>0?(g.qty/totalQty*100).toFixed(1)+'%':'–'}</td>
-                    <td style={{...td,color:'#0f766e',fontWeight:700}}>{totalShipped>0?(g.qty/totalShipped*100).toFixed(2)+'%':'–'}</td>
+                    {(()=>{const sq=shipQty(g.key,null);return <>
+                      <td style={{...td,color:'#0f766e'}}>{sq!=null?fmt(sq):'–'}</td>
+                      <td style={{...td,color:'#0f766e',fontWeight:700}}>{sq>0?(g.qty/sq*100).toFixed(2)+'%':'–'}</td>
+                    </>;})()}
                   </tr>
                   {open&&byLen.map(L=>(
                     <tr key={g.key+L.key} style={{borderBottom:'1px solid #f4f6fa',background:'#fafbfd'}}>
@@ -2227,7 +2279,10 @@ window.__dataReady.then(data => {
                       <td style={{...td,color:'#5f6470'}}>{fmt(L.count)}</td>
                       <td style={{...td,color:'#5f6470'}}>{fmt(L.amount)}</td>
                       <td style={{...td,color:'#5f6470'}}>{totalQty>0?(L.qty/totalQty*100).toFixed(1)+'%':'–'}</td>
-                      <td style={{...td,color:'#0f766e'}}>{totalShipped>0?(L.qty/totalShipped*100).toFixed(2)+'%':'–'}</td>
+                      {(()=>{const sq=L.len!=null?shipQty(g.key,L.len):null;return <>
+                        <td style={{...td,color:'#0f766e'}}>{sq!=null?fmt(sq):'–'}</td>
+                        <td style={{...td,color:'#0f766e'}}>{sq>0?(L.qty/sq*100).toFixed(2)+'%':'–'}</td>
+                      </>;})()}
                     </tr>
                   ))}
                 </React.Fragment>;
@@ -2243,79 +2298,76 @@ window.__dataReady.then(data => {
         <div style={{marginTop:12,fontSize:13,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'10px 14px',lineHeight:1.7}}>
           💡 % ที่เห็นคือ <b>สัดส่วนของต้นที่เสียหาย</b> ซึ่งมักแปรตามยอดผลิต —
           ขนาดที่ผลิตเยอะย่อมเสียหายเยอะตาม ยังไม่ได้แปลว่าขนาดนั้นเปราะกว่า
-          ถ้าต้องการรู้ว่า<b>เสียหายมากน้อยแค่ไหนเทียบของที่ส่งจริง</b> ให้ดูคอลัมน์ <b style={{color:'#0f766e'}}>% ของยอดส่ง</b> ซึ่งหารด้วยยอดส่งรวมของช่วงที่เลือก
+          ถ้าต้องการรู้ว่า<b>ขนาดไหนเสี่ยงจริง</b> ให้ดูคอลัมน์ <b style={{color:'#0f766e'}}>% เสียหาย/ยอดส่ง</b> ซึ่งหารด้วยจำนวนต้นที่ส่งจริงของขนาดนั้น
         </div>
       </ChartCard>
 
-      {/* กรอกยอดส่งรวมรายเดือน */}
-      <ChartCard span="full" title="ยอดส่งทั้งหมด (กรอกเอง)"
-        subtitle={`กรอกยอดส่งรวมเป็นเดือนๆ ปี ${shipYear} — ใช้เป็นตัวหารของ % ของยอดส่ง`}
-        right={canEdit&&!shipMissing&&<button style={{padding:'9px 18px',borderRadius:8,border:'none',background:shipOpen?'#f0f2f7':'#0f766e',color:shipOpen?'#42465a':'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}
-          onClick={()=>{
-            if(shipOpen){setShipOpen(false);return;}
-            const d={};
-            shipRows.filter(r=>Number(r.year)===shipYear).forEach(r=>{d[r.month]=String(r.qty);});
-            setDraft(d);setShipMsg('');setShipOpen(true);
-          }}>{shipOpen?'ปิด':'✎ กรอกยอดส่ง'}</button>}>
+      {/* นำเข้ายอดส่งจากไฟล์ Excel รายงานยอดขาย */}
+      <ChartCard span="full" title="ยอดส่งทั้งหมด (จากไฟล์ Excel)"
+        subtitle={shipRangeText?('ปี '+shipYear+' • ช่วงรายงาน '+shipRangeText):('ปี '+shipYear+' — อัปโหลดรายงานยอดขายเพื่อใช้เป็นตัวหารของ % เสียหาย/ยอดส่ง')}
+        right={canEdit&&!shipMissing&&<>
+          <input ref={fileRef} type="file" accept=".xls,.xlsx" style={{display:'none'}}
+            onChange={e=>{const f=e.target.files[0]; if(f) readShipFile(f); e.target.value='';}}/>
+          <button style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}
+            onClick={()=>fileRef.current&&fileRef.current.click()}>📄 อ่านจากไฟล์ Excel</button>
+        </>}>
         {shipMissing
           ? <div style={{padding:'14px 16px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
               ⚠️ ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-pile-shipped.sql</b> ก่อน
             </div>
           : <>
-            <div style={{overflowX:'auto'}}>
-              <table style={{borderCollapse:'collapse',fontSize:13.5}}>
-                <thead><tr style={{background:'#f4f6fa'}}>
-                  <th style={{...th,textAlign:'left'}}>เดือน</th>
-                  <th style={th}>เสียหาย (ต้น)</th>
-                  <th style={{...th,color:'#0f766e'}}>ส่งทั้งหมด (ต้น)</th>
-                  <th style={th}>% เสียหาย</th>
-                </tr></thead>
-                <tbody>
-                  {shipMonths.map(m=>{
-                    const saved=shipRows.find(r=>Number(r.year)===shipYear&&Number(r.month)===m);
-                    const sq=shipOpen?(draft[m]===''||draft[m]==null?null:Number(draft[m])):(saved?Number(saved.qty):null);
-                    const dq=dmgQtyOfMonth(m);
-                    return <tr key={m} style={{borderBottom:'1px solid #eef0f5'}}>
-                      <td style={{...td,textAlign:'left',fontWeight:700}}>{THAI_MON[m]} {shipYear}</td>
-                      <td style={{...td,color:'#c0392b'}}>{dq?fmt(dq):'–'}</td>
-                      <td style={{...td,padding:shipOpen?'5px 10px':td.padding,color:'#0f766e',fontWeight:700}}>
-                        {shipOpen
-                          ? <input type="number" value={draft[m]??''} placeholder="0"
-                              onChange={e=>setDraft(d=>({...d,[m]:e.target.value}))}
-                              style={{padding:'6px 9px',border:'1px solid #d6d8e0',borderRadius:7,fontSize:14,width:120,textAlign:'right',fontFamily:'inherit'}}/>
-                          : (sq!=null?fmt(sq):'–')}
-                      </td>
-                      <td style={td}>{sq>0?(dq/sq*100).toFixed(2)+'%':'–'}</td>
-                    </tr>;
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {shipOpen&&<div style={{display:'flex',gap:10,alignItems:'center',marginTop:14,flexWrap:'wrap'}}>
-              <button disabled={shipSaving} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',fontSize:15,fontWeight:600,cursor:shipSaving?'wait':'pointer',fontFamily:'inherit'}}
-                onClick={()=>{
-                  const recs=[],delMonths=[];
-                  shipMonths.forEach(m=>{
-                    const v=draft[m];
-                    const n=v===''||v==null?null:Number(v);
-                    if(n!=null&&isFinite(n)&&n>0) recs.push({year:shipYear,month:m,qty:n,updated_at:new Date().toISOString()});
-                    else delMonths.push(m);
-                  });
-                  setShipSaving(true);setShipMsg('');
-                  // เดือนที่เว้นว่าง/ใส่ 0 = ลบทิ้ง ไม่ให้ค้างเป็นตัวหารเก่า
-                  Promise.all(delMonths.map(m=>db.from('pile_shipped').delete().eq('year',shipYear).eq('month',m)))
-                    .then(()=>recs.length?db.from('pile_shipped').upsert(recs,{onConflict:'year,month'}):{error:null})
-                    .then(({error}={})=>{
-                      setShipSaving(false);
-                      if(error){setShipMsg('❌ '+error.message);return;}
-                      setShipMsg('✅ บันทึกแล้ว');setShipOpen(false);loadShip();
-                    })
-                    .catch(e=>{setShipSaving(false);setShipMsg('❌ '+(e.message||e));});
-                }}>{shipSaving?'กำลังบันทึก…':'บันทึกยอดส่ง'}</button>
-              {shipMsg&&<span style={{fontSize:14,color:shipMsg.startsWith('✅')?'#059669':'#c0392b'}}>{shipMsg}</span>}
-              <span style={{fontSize:12.5,color:'#8b91a1'}}>เว้นว่างหรือใส่ 0 = เดือนนั้นไม่คิด %</span>
+            {shipMsg&&<div style={{marginBottom:10,fontSize:14,color:shipMsg.startsWith('✅')?'#059669':'#c0392b'}}>{shipMsg}</div>}
+            {!imported&&<div style={{fontSize:13.5,color:'#5f6470',lineHeight:1.9}}>
+              {totalShipped!=null
+                ? <>ปี {shipYear} มียอดส่งบันทึกไว้ <b style={{color:'#0f766e'}}>{fmt(totalShipped)} ต้น</b> จาก {shipScoped.length} ขนาด — ใช้คำนวณคอลัมน์ <b>% เสียหาย/ยอดส่ง</b> ในตารางด้านบนแล้ว</>
+                : <>ยังไม่มียอดส่งของปี {shipYear} — กด <b>📄 อ่านจากไฟล์ Excel</b> แล้วเลือกไฟล์รายงานยอดขาย (ชีท “ขาย” คอลัมน์ ชื่อสินค้า + ยอดขาย)</>}
+              {partialMonths&&totalShipped!=null&&<div style={{marginTop:6,color:'#92400e'}}>⚠️ ตอนนี้กรองเฉพาะบางเดือน แต่ยอดส่งเป็นยอดทั้งปี — % เสียหาย/ยอดส่ง จึงต่ำกว่าความจริง ถ้าจะเทียบให้ตรงให้เลือก “ทุกเดือน”</div>}
             </div>}
-            {!shipOpen&&shipMsg&&<div style={{marginTop:10,fontSize:14,color:'#059669'}}>{shipMsg}</div>}
+            {imported&&<div>
+              <div style={{fontSize:13.5,color:'#5f6470',lineHeight:1.9,marginBottom:10}}>
+                อ่านไฟล์ <b>{imported.fileName}</b> · ชีท <b>{imported.sheetName}</b> · คอลัมน์ <b>{imported.qtyLabel}</b>
+                {imported.rangeText&&<> · ช่วง <b>{imported.rangeText}</b></>}<br/>
+                พบ <b>{fmt(imported.rowsUsed)}</b> แถว รวม <b>{fmt(imported.grand)}</b> ต้น →
+                จับคู่ขนาดได้ <b style={{color:'#0f766e'}}>{fmt(imported.matched)}</b> ต้น ({imported.list.length} ขนาด)
+                {imported.skipped>0&&<span style={{color:'#92400e'}}> · อ่านขนาดไม่ได้ {imported.skipped} แถว ({fmt(imported.skippedQty)} ต้น) จะไม่ถูกบันทึก</span>}
+                <br/>จะบันทึกเป็นยอดส่งของปี <b>{imported.year}</b> (ทับข้อมูลเดิมของปีนี้ทั้งหมด)
+              </div>
+              <div style={{maxHeight:260,overflow:'auto',border:'1px solid #eef0f5',borderRadius:8}}>
+                <table style={{borderCollapse:'collapse',fontSize:13,width:'100%'}}>
+                  <thead><tr style={{background:'#f4f6fa'}}>
+                    <th style={{...th,textAlign:'left',position:'sticky',top:0,background:'#f4f6fa'}}>หน้าตัด</th>
+                    <th style={{...th,textAlign:'left',position:'sticky',top:0,background:'#f4f6fa'}}>ความยาว</th>
+                    <th style={{...th,position:'sticky',top:0,background:'#f4f6fa'}}>ต้นที่ส่ง</th>
+                  </tr></thead>
+                  <tbody>{imported.list.map(r=>(
+                    <tr key={r.sec+r.len} style={{borderBottom:'1px solid #f4f6fa'}}>
+                      <td style={{...td,textAlign:'left',fontWeight:700}}>{r.sec}</td>
+                      <td style={{...td,textAlign:'left',color:'#5f6470'}}>{r.len.toFixed(2)} ม.</td>
+                      <td style={{...td,color:'#0f766e',fontWeight:700}}>{fmt(r.qty)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              <div style={{display:'flex',gap:10,alignItems:'center',marginTop:14,flexWrap:'wrap'}}>
+                <button disabled={shipSaving} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',fontSize:15,fontWeight:600,cursor:shipSaving?'wait':'pointer',fontFamily:'inherit'}}
+                  onClick={()=>{
+                    setShipSaving(true);setShipMsg('');
+                    const y=imported.year;
+                    const recs=imported.list.map(r=>({year:y,sec:r.sec,len:Number(r.len.toFixed(2)),qty:r.qty,range_text:imported.rangeText||'',updated_at:new Date().toISOString()}));
+                    // ลบของปีนั้นก่อนแล้วใส่ใหม่ทั้งชุด กันขนาดที่หายไปจากรายงานรอบใหม่ค้างเป็นตัวหารเก่า
+                    db.from('pile_shipped').delete().eq('year',y)
+                      .then(()=>db.from('pile_shipped').insert(recs))
+                      .then(({error}={})=>{
+                        setShipSaving(false);
+                        if(error){setShipMsg('❌ '+error.message);return;}
+                        setImported(null);setShipMsg('✅ บันทึกยอดส่งปี '+y+' แล้ว ('+recs.length+' ขนาด)');loadShip();
+                      })
+                      .catch(e=>{setShipSaving(false);setShipMsg('❌ '+(e.message||e));});
+                  }}>{shipSaving?'กำลังบันทึก…':'บันทึกยอดส่ง'}</button>
+                <button style={{padding:'9px 18px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#42465a',fontSize:15,cursor:'pointer',fontFamily:'inherit'}}
+                  onClick={()=>setImported(null)}>ยกเลิก</button>
+              </div>
+            </div>}
           </>}
       </ChartCard>
 
