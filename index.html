@@ -2054,13 +2054,39 @@ window.__dataReady.then(data => {
     return {sec:m[1]+'-'+m[2],len:parseFloat(m[3]),joint,ok:true};
   }
 
-  function PileSizeView({items}){
+  function PileSizeView({items,year,months,canEdit}){
     const CAUSE_CRACK='เสาร้าวในกอง/จากขนส่ง/ปีกแตก';
     const causes=[...new Set(items.map(r=>r.cause).filter(Boolean))].sort();
     const defCause=causes.find(c=>/เสาร้าว/.test(c))||'__all__';
     const [cause,setCause]=useState(defCause);
     const [metric,setMetric]=useState('qty');   // qty | count — เทียบเป็นจำนวนต้นเป็นหลัก ไม่ใช้มูลค่า
     const [openSec,setOpenSec]=useState(null);
+
+    // ── ยอดส่งทั้งหมด (กรอกเองรายเดือน แยกหน้าตัด+ความยาว) ใช้เป็นตัวหารหา % เสียหายต่อยอดส่ง
+    const db=DB;
+    const THAI_MON=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const [shipRows,setShipRows]=useState([]);
+    const [shipMissing,setShipMissing]=useState(false);
+    const [shipOpen,setShipOpen]=useState(false);
+    const [shipSaving,setShipSaving]=useState(false);
+    const [shipMsg,setShipMsg]=useState('');
+    const [draft,setDraft]=useState({});
+    const nowD=new Date();
+    // เดือนที่จะกรอก — ตั้งต้นตามตัวกรองที่เลือกอยู่ ถ้าเลือกหลายเดือนใช้เดือนล่าสุดที่เลือก
+    const filtMonths=[...(months||new Set())].sort((a,b)=>a-b);
+    const shipYear=year!=='ALL'&&year!=null?Number(year):nowD.getFullYear()+543;
+    const loadShip=()=>{
+      db.from('pile_shipped').select('*').then(({data,error})=>{
+        if(error){setShipMissing(true);return;}
+        setShipMissing(false);setShipRows(data||[]);
+      }).catch(()=>setShipMissing(true));
+    };
+    useEffect(loadShip,[]);
+    // ยอดส่งเฉพาะช่วงเดียวกับที่กรองข้อมูลเสียหายอยู่ ถึงจะเทียบกันได้ตรง
+    const shipScoped=shipRows.filter(r=>
+      (year==='ALL'||year==null||Number(r.year)===Number(year)) &&
+      (!months||months.size===0||months.has(Number(r.month))));
+    const totalShipped=shipScoped.length?shipScoped.reduce((a,b)=>a+(Number(b.qty)||0),0):null;
 
     const allRows=items.filter(r=>cause==='__all__'||r.cause===cause)
                     .map(r=>({...r,p:parsePile(r.product_name)}));
@@ -2069,8 +2095,16 @@ window.__dataReady.then(data => {
     const unparsedQty=allRows.filter(r=>!r.p.ok).reduce((a,b)=>a+(Number(b.qty)||0),0);
     const rows=allRows.filter(r=>r.p.ok);
     const totalQty=rows.reduce((a,b)=>a+(Number(b.qty)||0),0);
+    const total=rows.reduce((a,b)=>a+(Number(b.amount)||0),0);
     const totalCount=rows.length;
     const totalOf=g=>metric==='qty'?totalQty:totalCount;
+    // เดือนสำหรับกรอกยอดส่ง — ทุกเดือนที่มีข้อมูลเสียหายในปีนั้น + เดือนที่เคยกรอกยอดส่งไว้
+    const shipMonths=[...new Set([
+      ...items.filter(r=>Number(r.year)===shipYear).map(r=>Number(r.month)),
+      ...shipRows.filter(r=>Number(r.year)===shipYear).map(r=>Number(r.month)),
+    ])].filter(Boolean).sort((a,b)=>a-b);
+    const dmgQtyOfMonth=m=>items.filter(r=>Number(r.year)===shipYear&&Number(r.month)===m)
+      .reduce((a,b)=>a+(Number(b.qty)||0),0);
 
     const group=keyFn=>{
       const g={};
@@ -2132,9 +2166,10 @@ window.__dataReady.then(data => {
         {/* KPI */}
         <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
           {[['จำนวนต้นรวม',fmt(totalQty)+' ต้น','#c0392b'],
+            ['มูลค่าเสียหายรวม',fmt(total)+' ฿','#c0392b'],
             ['จำนวนครั้ง',fmt(totalCount)+' รายการ','#7c3aed'],
-            ['ขนาดที่เสียมากสุด',bySec.length?bySec[0].key:'–','#1a56db'],
-            ['เฉลี่ยต่อครั้ง',(totalCount?(totalQty/totalCount).toFixed(1):'–')+' ต้น','#059669']].map(([l,v,c])=>(
+            ['ต้นที่ส่งรวม',totalShipped!=null?fmt(totalShipped)+' ต้น':'ยังไม่กรอก','#0f766e'],
+            ['% เสียหาย/ยอดส่ง',totalShipped>0?(totalQty/totalShipped*100).toFixed(2)+'%':'–','#0f766e']].map(([l,v,c])=>(
             <div key={l} style={{flex:'1 1 170px',border:'1px solid #e6e8ee',borderRadius:12,padding:'13px 17px'}}>
               <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>{l}</div>
               <div style={{fontSize:26,fontWeight:800,color:c,lineHeight:1.15}}>{v}</div>
@@ -2164,7 +2199,8 @@ window.__dataReady.then(data => {
             <thead><tr style={{background:'#f4f6fa'}}>
               <th style={{...th,textAlign:'left'}}>หน้าตัด</th>
               <th style={th}>จำนวนต้น</th><th style={th}>จำนวนครั้ง</th>
-              <th style={th}>เฉลี่ยต้น/ครั้ง</th><th style={th}>% ของต้นที่เสียหาย</th>
+              <th style={th}>มูลค่า (฿)</th><th style={th}>% ของต้นที่เสียหาย</th>
+              <th style={{...th,color:'#0f766e'}}>% ของยอดส่ง</th>
             </tr></thead>
             <tbody>
               {bySec.map(g=>{
@@ -2180,16 +2216,18 @@ window.__dataReady.then(data => {
                     <td style={{...td,textAlign:'left',fontWeight:700}}>{open?'▲':'▼'} {g.key}</td>
                     <td style={{...td,fontWeight:700,color:'#c0392b'}}>{fmt(g.qty)}</td>
                     <td style={td}>{fmt(g.count)}</td>
-                    <td style={td}>{g.count?(g.qty/g.count).toFixed(1):'–'}</td>
+                    <td style={td}>{fmt(g.amount)}</td>
                     <td style={td}>{totalQty>0?(g.qty/totalQty*100).toFixed(1)+'%':'–'}</td>
+                    <td style={{...td,color:'#0f766e',fontWeight:700}}>{totalShipped>0?(g.qty/totalShipped*100).toFixed(2)+'%':'–'}</td>
                   </tr>
                   {open&&byLen.map(L=>(
                     <tr key={g.key+L.key} style={{borderBottom:'1px solid #f4f6fa',background:'#fafbfd'}}>
                       <td style={{...td,textAlign:'left',paddingLeft:34,color:'#5f6470'}}>ยาว {L.key}</td>
                       <td style={{...td,color:'#5f6470'}}>{fmt(L.qty)}</td>
                       <td style={{...td,color:'#5f6470'}}>{fmt(L.count)}</td>
-                      <td style={{...td,color:'#5f6470'}}>{L.count?(L.qty/L.count).toFixed(1):'–'}</td>
+                      <td style={{...td,color:'#5f6470'}}>{fmt(L.amount)}</td>
                       <td style={{...td,color:'#5f6470'}}>{totalQty>0?(L.qty/totalQty*100).toFixed(1)+'%':'–'}</td>
+                      <td style={{...td,color:'#0f766e'}}>{totalShipped>0?(L.qty/totalShipped*100).toFixed(2)+'%':'–'}</td>
                     </tr>
                   ))}
                 </React.Fragment>;
@@ -2205,8 +2243,80 @@ window.__dataReady.then(data => {
         <div style={{marginTop:12,fontSize:13,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'10px 14px',lineHeight:1.7}}>
           💡 % ที่เห็นคือ <b>สัดส่วนของต้นที่เสียหาย</b> ซึ่งมักแปรตามยอดผลิต —
           ขนาดที่ผลิตเยอะย่อมเสียหายเยอะตาม ยังไม่ได้แปลว่าขนาดนั้นเปราะกว่า
-          ถ้าต้องการรู้ว่า<b>ขนาดไหนเสี่ยงจริง</b> ต้องหารด้วยจำนวนต้นที่ส่ง/ผลิตของขนาดนั้น
+          ถ้าต้องการรู้ว่า<b>เสียหายมากน้อยแค่ไหนเทียบของที่ส่งจริง</b> ให้ดูคอลัมน์ <b style={{color:'#0f766e'}}>% ของยอดส่ง</b> ซึ่งหารด้วยยอดส่งรวมของช่วงที่เลือก
         </div>
+      </ChartCard>
+
+      {/* กรอกยอดส่งรวมรายเดือน */}
+      <ChartCard span="full" title="ยอดส่งทั้งหมด (กรอกเอง)"
+        subtitle={`กรอกยอดส่งรวมเป็นเดือนๆ ปี ${shipYear} — ใช้เป็นตัวหารของ % ของยอดส่ง`}
+        right={canEdit&&!shipMissing&&<button style={{padding:'9px 18px',borderRadius:8,border:'none',background:shipOpen?'#f0f2f7':'#0f766e',color:shipOpen?'#42465a':'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}
+          onClick={()=>{
+            if(shipOpen){setShipOpen(false);return;}
+            const d={};
+            shipRows.filter(r=>Number(r.year)===shipYear).forEach(r=>{d[r.month]=String(r.qty);});
+            setDraft(d);setShipMsg('');setShipOpen(true);
+          }}>{shipOpen?'ปิด':'✎ กรอกยอดส่ง'}</button>}>
+        {shipMissing
+          ? <div style={{padding:'14px 16px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
+              ⚠️ ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-pile-shipped.sql</b> ก่อน
+            </div>
+          : <>
+            <div style={{overflowX:'auto'}}>
+              <table style={{borderCollapse:'collapse',fontSize:13.5}}>
+                <thead><tr style={{background:'#f4f6fa'}}>
+                  <th style={{...th,textAlign:'left'}}>เดือน</th>
+                  <th style={th}>เสียหาย (ต้น)</th>
+                  <th style={{...th,color:'#0f766e'}}>ส่งทั้งหมด (ต้น)</th>
+                  <th style={th}>% เสียหาย</th>
+                </tr></thead>
+                <tbody>
+                  {shipMonths.map(m=>{
+                    const saved=shipRows.find(r=>Number(r.year)===shipYear&&Number(r.month)===m);
+                    const sq=shipOpen?(draft[m]===''||draft[m]==null?null:Number(draft[m])):(saved?Number(saved.qty):null);
+                    const dq=dmgQtyOfMonth(m);
+                    return <tr key={m} style={{borderBottom:'1px solid #eef0f5'}}>
+                      <td style={{...td,textAlign:'left',fontWeight:700}}>{THAI_MON[m]} {shipYear}</td>
+                      <td style={{...td,color:'#c0392b'}}>{dq?fmt(dq):'–'}</td>
+                      <td style={{...td,padding:shipOpen?'5px 10px':td.padding,color:'#0f766e',fontWeight:700}}>
+                        {shipOpen
+                          ? <input type="number" value={draft[m]??''} placeholder="0"
+                              onChange={e=>setDraft(d=>({...d,[m]:e.target.value}))}
+                              style={{padding:'6px 9px',border:'1px solid #d6d8e0',borderRadius:7,fontSize:14,width:120,textAlign:'right',fontFamily:'inherit'}}/>
+                          : (sq!=null?fmt(sq):'–')}
+                      </td>
+                      <td style={td}>{sq>0?(dq/sq*100).toFixed(2)+'%':'–'}</td>
+                    </tr>;
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {shipOpen&&<div style={{display:'flex',gap:10,alignItems:'center',marginTop:14,flexWrap:'wrap'}}>
+              <button disabled={shipSaving} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',fontSize:15,fontWeight:600,cursor:shipSaving?'wait':'pointer',fontFamily:'inherit'}}
+                onClick={()=>{
+                  const recs=[],delMonths=[];
+                  shipMonths.forEach(m=>{
+                    const v=draft[m];
+                    const n=v===''||v==null?null:Number(v);
+                    if(n!=null&&isFinite(n)&&n>0) recs.push({year:shipYear,month:m,qty:n,updated_at:new Date().toISOString()});
+                    else delMonths.push(m);
+                  });
+                  setShipSaving(true);setShipMsg('');
+                  // เดือนที่เว้นว่าง/ใส่ 0 = ลบทิ้ง ไม่ให้ค้างเป็นตัวหารเก่า
+                  Promise.all(delMonths.map(m=>db.from('pile_shipped').delete().eq('year',shipYear).eq('month',m)))
+                    .then(()=>recs.length?db.from('pile_shipped').upsert(recs,{onConflict:'year,month'}):{error:null})
+                    .then(({error}={})=>{
+                      setShipSaving(false);
+                      if(error){setShipMsg('❌ '+error.message);return;}
+                      setShipMsg('✅ บันทึกแล้ว');setShipOpen(false);loadShip();
+                    })
+                    .catch(e=>{setShipSaving(false);setShipMsg('❌ '+(e.message||e));});
+                }}>{shipSaving?'กำลังบันทึก…':'บันทึกยอดส่ง'}</button>
+              {shipMsg&&<span style={{fontSize:14,color:shipMsg.startsWith('✅')?'#059669':'#c0392b'}}>{shipMsg}</span>}
+              <span style={{fontSize:12.5,color:'#8b91a1'}}>เว้นว่างหรือใส่ 0 = เดือนนั้นไม่คิด %</span>
+            </div>}
+            {!shipOpen&&shipMsg&&<div style={{marginTop:10,fontSize:14,color:'#059669'}}>{shipMsg}</div>}
+          </>}
       </ChartCard>
 
       {/* ตารางไขว้ หน้าตัด × ความยาว */}
@@ -2715,7 +2825,8 @@ window.__dataReady.then(data => {
       {view==='customer' && <CustomerView items={items} totalAll={totalAll}/>}
 
       {/* Worker sub-tab nav */}
-      {view==='size' && <PileSizeView items={items}/>}
+      {view==='size' && <PileSizeView items={items} year={filterYear} months={selMonths}
+        canEdit={currentUser?.role==='admin'||currentUser?.role==='editor'}/>}
       {view==='worker' && <div style={{gridColumn:'1 / -1',display:'flex',gap:8,marginBottom:4}}>
         {[{v:'employee',l:'วิเคราะห์พนักงาน'},{v:'contractor',l:'วิเคราะห์ผู้รับเหมา'},{v:'driver',l:'วิเคราะห์คนขับรถ'}].map(({v,l})=>(
           <button key={v} onClick={()=>setWorkerTab(v)} style={{padding:'7px 20px',borderRadius:20,border:`1.5px solid ${workerTab===v?'#0f766e':'#e2e8f0'}`,background:workerTab===v?'#0f766e':'#fff',color:workerTab===v?'#fff':'#334155',fontSize:13,fontWeight:workerTab===v?700:400,cursor:'pointer'}}>
