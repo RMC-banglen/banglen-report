@@ -2059,14 +2059,18 @@ window.__dataReady.then(data => {
     const causes=[...new Set(items.map(r=>r.cause).filter(Boolean))].sort();
     const defCause=causes.find(c=>/เสาร้าว/.test(c))||'__all__';
     const [cause,setCause]=useState(defCause);
-    const [metric,setMetric]=useState('amount');   // amount | qty | count
+    const [metric,setMetric]=useState('qty');   // qty | count — เทียบเป็นจำนวนต้นเป็นหลัก ไม่ใช้มูลค่า
     const [openSec,setOpenSec]=useState(null);
 
-    const rows=items.filter(r=>cause==='__all__'||r.cause===cause)
+    const allRows=items.filter(r=>cause==='__all__'||r.cause===cause)
                     .map(r=>({...r,p:parsePile(r.product_name)}));
-    const total=rows.reduce((a,b)=>a+(Number(b.amount)||0),0);
+    // ตัดรายการที่อ่านขนาดจากชื่อสินค้าไม่ได้ออก — ไม่รู้หน้าตัด เอามาเทียบสัดส่วนไม่ได้ (ยังนับจำนวนไว้เตือนด้านล่าง)
+    const unparsed=allRows.filter(r=>!r.p.ok).length;
+    const unparsedQty=allRows.filter(r=>!r.p.ok).reduce((a,b)=>a+(Number(b.qty)||0),0);
+    const rows=allRows.filter(r=>r.p.ok);
     const totalQty=rows.reduce((a,b)=>a+(Number(b.qty)||0),0);
-    const unparsed=rows.filter(r=>!r.p.ok).length;
+    const totalCount=rows.length;
+    const totalOf=g=>metric==='qty'?totalQty:totalCount;
 
     const group=keyFn=>{
       const g={};
@@ -2080,9 +2084,9 @@ window.__dataReady.then(data => {
       });
       return Object.values(g);
     };
-    const val=g=>metric==='amount'?g.amount:metric==='qty'?g.qty:g.count;
+    const val=g=>metric==='qty'?g.qty:g.count;
     const bySec=group(p=>p.sec).sort((a,b)=>val(b)-val(a));
-    const byJoint=group(p=>p.joint).sort((a,b)=>b.amount-a.amount);
+    const byJoint=group(p=>p.joint).sort((a,b)=>b.qty-a.qty);
     const maxVal=Math.max(1,...bySec.map(val));
 
     // ตารางไขว้ หน้าตัด × ความยาว
@@ -2091,7 +2095,7 @@ window.__dataReady.then(data => {
     const cell={};
     rows.forEach(r=>{ if(r.p.len==null) return;
       const k=r.p.sec+'|'+r.p.len;
-      cell[k]=(cell[k]||0)+(Number(r.amount)||0);
+      cell[k]=(cell[k]||0)+(Number(r.qty)||0);
     });
     const maxCell=Math.max(1,...Object.values(cell));
 
@@ -2120,7 +2124,6 @@ window.__dataReady.then(data => {
           </select>
           <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600,marginLeft:6}}>เรียงตาม</span>
           <div style={{display:'flex',gap:6}}>
-            {seg('amount','มูลค่า',metric,setMetric)}
             {seg('qty','จำนวนต้น',metric,setMetric)}
             {seg('count','จำนวนครั้ง',metric,setMetric)}
           </div>
@@ -2128,10 +2131,10 @@ window.__dataReady.then(data => {
 
         {/* KPI */}
         <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
-          {[['มูลค่าเสียหายรวม',fmt(total)+' ฿','#c0392b'],
-            ['จำนวนต้น',fmt(totalQty)+' ต้น','#1a56db'],
-            ['จำนวนครั้ง',fmt(rows.length)+' รายการ','#7c3aed'],
-            ['เฉลี่ยต่อต้น',(totalQty?fmt(total/totalQty):'–')+' ฿','#059669']].map(([l,v,c])=>(
+          {[['จำนวนต้นรวม',fmt(totalQty)+' ต้น','#c0392b'],
+            ['จำนวนครั้ง',fmt(totalCount)+' รายการ','#7c3aed'],
+            ['ขนาดที่เสียมากสุด',bySec.length?bySec[0].key:'–','#1a56db'],
+            ['เฉลี่ยต่อครั้ง',(totalCount?(totalQty/totalCount).toFixed(1):'–')+' ต้น','#059669']].map(([l,v,c])=>(
             <div key={l} style={{flex:'1 1 170px',border:'1px solid #e6e8ee',borderRadius:12,padding:'13px 17px'}}>
               <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>{l}</div>
               <div style={{fontSize:26,fontWeight:800,color:c,lineHeight:1.15}}>{v}</div>
@@ -2142,8 +2145,8 @@ window.__dataReady.then(data => {
         {/* กราฟแท่งแยกตามหน้าตัด */}
         <div style={{marginBottom:20}}>
           {bySec.map((g,i)=>{
-            const v=val(g), pct=total>0?g.amount/total*100:0;
-            const unit=metric==='amount'?' ฿':metric==='qty'?' ต้น':' ครั้ง';
+            const v=val(g), tot=totalOf(), pct=tot>0?v/tot*100:0;
+            const unit=metric==='qty'?' ต้น':' ครั้ง';
             return <div key={g.key} style={{display:'flex',alignItems:'center',gap:12,marginBottom:7}}>
               <div style={{width:96,fontSize:13.5,fontWeight:700,color:'#1e293b',textAlign:'right'}}>{i+1}. {g.key}</div>
               <div style={{flex:1,background:'#eef0f5',borderRadius:6,height:20,overflow:'hidden'}}>
@@ -2161,7 +2164,7 @@ window.__dataReady.then(data => {
             <thead><tr style={{background:'#f4f6fa'}}>
               <th style={{...th,textAlign:'left'}}>หน้าตัด</th>
               <th style={th}>จำนวนต้น</th><th style={th}>จำนวนครั้ง</th>
-              <th style={th}>มูลค่า (฿)</th><th style={th}>บาท/ต้น</th><th style={th}>% ของสาเหตุนี้</th>
+              <th style={th}>เฉลี่ยต้น/ครั้ง</th><th style={th}>% ของต้นที่เสียหาย</th>
             </tr></thead>
             <tbody>
               {bySec.map(g=>{
@@ -2170,25 +2173,23 @@ window.__dataReady.then(data => {
                   g.rows.forEach(r=>{const k=r.p.len==null?'ไม่ระบุ':r.p.len.toFixed(2)+' ม.';
                     if(!m[k])m[k]={key:k,len:r.p.len,amount:0,qty:0,count:0};
                     m[k].amount+=Number(r.amount)||0;m[k].qty+=Number(r.qty)||0;m[k].count++;});
-                  return Object.values(m).sort((a,b)=>b.amount-a.amount);})();
+                  return Object.values(m).sort((a,b)=>b.qty-a.qty);})();
                 return <React.Fragment key={g.key}>
                   <tr onClick={()=>setOpenSec(open?null:g.key)}
                     style={{borderBottom:'1px solid #eef0f5',cursor:'pointer',background:open?'#eef3fc':'transparent'}}>
                     <td style={{...td,textAlign:'left',fontWeight:700}}>{open?'▲':'▼'} {g.key}</td>
-                    <td style={td}>{fmt(g.qty)}</td>
+                    <td style={{...td,fontWeight:700,color:'#c0392b'}}>{fmt(g.qty)}</td>
                     <td style={td}>{fmt(g.count)}</td>
-                    <td style={{...td,fontWeight:700,color:'#c0392b'}}>{fmt(g.amount)}</td>
-                    <td style={td}>{g.qty?fmt(g.amount/g.qty):'–'}</td>
-                    <td style={td}>{total>0?(g.amount/total*100).toFixed(1)+'%':'–'}</td>
+                    <td style={td}>{g.count?(g.qty/g.count).toFixed(1):'–'}</td>
+                    <td style={td}>{totalQty>0?(g.qty/totalQty*100).toFixed(1)+'%':'–'}</td>
                   </tr>
                   {open&&byLen.map(L=>(
                     <tr key={g.key+L.key} style={{borderBottom:'1px solid #f4f6fa',background:'#fafbfd'}}>
                       <td style={{...td,textAlign:'left',paddingLeft:34,color:'#5f6470'}}>ยาว {L.key}</td>
                       <td style={{...td,color:'#5f6470'}}>{fmt(L.qty)}</td>
                       <td style={{...td,color:'#5f6470'}}>{fmt(L.count)}</td>
-                      <td style={{...td,color:'#5f6470'}}>{fmt(L.amount)}</td>
-                      <td style={{...td,color:'#5f6470'}}>{L.qty?fmt(L.amount/L.qty):'–'}</td>
-                      <td style={{...td,color:'#5f6470'}}>{total>0?(L.amount/total*100).toFixed(1)+'%':'–'}</td>
+                      <td style={{...td,color:'#5f6470'}}>{L.count?(L.qty/L.count).toFixed(1):'–'}</td>
+                      <td style={{...td,color:'#5f6470'}}>{totalQty>0?(L.qty/totalQty*100).toFixed(1)+'%':'–'}</td>
                     </tr>
                   ))}
                 </React.Fragment>;
@@ -2198,19 +2199,19 @@ window.__dataReady.then(data => {
         </div>
 
         {unparsed>0&&<div style={{marginTop:12,fontSize:13,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'9px 13px'}}>
-          ⚠️ มี {unparsed} รายการที่อ่านขนาดจากชื่อสินค้าไม่ได้ — รวมไว้ในกลุ่ม “ไม่ระบุขนาด” ตรวจการพิมพ์ชื่อในชีทได้
+          ⚠️ ตัดออก {unparsed} รายการ ({fmt(unparsedQty)} ต้น) ที่อ่านขนาดจากชื่อสินค้าไม่ได้ — ไม่ถูกนับในตารางและ % ด้านบน ตรวจการพิมพ์ชื่อในชีทได้
         </div>}
 
         <div style={{marginTop:12,fontSize:13,color:'#1e40af',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'10px 14px',lineHeight:1.7}}>
-          💡 ตัวเลขนี้บอกว่า <b>ขนาดไหนเสียหายมากที่สุดเป็นบาท</b> ซึ่งมักแปรตามยอดผลิต —
+          💡 % ที่เห็นคือ <b>สัดส่วนของต้นที่เสียหาย</b> ซึ่งมักแปรตามยอดผลิต —
           ขนาดที่ผลิตเยอะย่อมเสียหายเยอะตาม ยังไม่ได้แปลว่าขนาดนั้นเปราะกว่า
-          ถ้าต้องการรู้ว่า<b>ขนาดไหนเสี่ยงจริง</b> ต้องหารด้วยจำนวนต้นที่ผลิตของขนาดนั้น
+          ถ้าต้องการรู้ว่า<b>ขนาดไหนเสี่ยงจริง</b> ต้องหารด้วยจำนวนต้นที่ส่ง/ผลิตของขนาดนั้น
         </div>
       </ChartCard>
 
       {/* ตารางไขว้ หน้าตัด × ความยาว */}
       {secsForGrid.length>0&&lens.length>0&&
-      <ChartCard span="full" title="ตารางไขว้ หน้าตัด × ความยาว" subtitle="สีเข้ม = มูลค่าเสียหายสูง • ช่องว่าง = ไม่มีรายการ">
+      <ChartCard span="full" title="ตารางไขว้ หน้าตัด × ความยาว" subtitle="จำนวนต้นที่เสียหาย • สีเข้ม = เสียหายเยอะ • ช่องว่าง = ไม่มีรายการ">
         <div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',fontSize:12.5}}>
             <thead><tr>
@@ -2245,9 +2246,9 @@ window.__dataReady.then(data => {
           {byJoint.map(g=>(
             <div key={g.key} style={{flex:'1 1 190px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
               <div style={{fontSize:14,fontWeight:700,color:'#1e293b',marginBottom:6}}>{g.key}</div>
-              <div style={{fontSize:24,fontWeight:800,color:'#c0392b',lineHeight:1.15}}>{fmt(g.amount)} <span style={{fontSize:14}}>฿</span></div>
+              <div style={{fontSize:24,fontWeight:800,color:'#c0392b',lineHeight:1.15}}>{fmt(g.qty)} <span style={{fontSize:14}}>ต้น</span></div>
               <div style={{fontSize:13,color:'#5f6470',marginTop:5}}>
-                {fmt(g.qty)} ต้น · {fmt(g.count)} ครั้ง · {total>0?(g.amount/total*100).toFixed(1):'–'}%
+                {fmt(g.count)} ครั้ง · {totalQty>0?(g.qty/totalQty*100).toFixed(1):'–'}% ของต้นที่เสียหาย
               </div>
             </div>
           ))}
