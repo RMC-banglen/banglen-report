@@ -2256,9 +2256,10 @@ window.__dataReady.then(data => {
     </>;
   }
 
-  // ── อัตราเสาร้าว ต่อ 1,000 ต้นที่ผลิต (เฉพาะสาเหตุ เสาร้าวในกอง/จากขนส่ง/ปีกแตก)
-  // ตัวหาร = ยอดผลิต (ยอดรับสำเร็จรูป) เพราะเสาทุกต้นที่ผลิตเสร็จต้องผ่านการกองและการขนส่ง
-  // จึงเป็น "ประชากรเสี่ยง" ที่ตรงกับสาเหตุนี้ที่สุด
+  // ── อัตราเสาร้าว ต่อ 1,000 ต้น (เฉพาะสาเหตุ เสาร้าวในกอง/จากขนส่ง/ปีกแตก)
+  // ตัวหาร = ยอดส่ง (จากชีต "ผลิต" ในไฟล์ Excel ที่นำเข้า — จริงๆ เป็นยอดที่ส่งมอบแล้ว ไม่ใช่ยอดผลิต
+  // ตั้งชื่อฟิลด์/สถานะภายในว่า produced ตามชื่อชีตเดิม แต่ label ที่แสดงผลใช้คำว่า "ส่ง" ให้ตรงความหมายจริง)
+  // เพราะเสาทุกต้นที่ส่งมอบแล้วต้องผ่านการกองและการขนส่งมาก่อน จึงเป็น "ประชากรเสี่ยง" ที่ตรงกับสาเหตุนี้ที่สุด
   function CrackRateSection({items,year,months,canEdit}){
     const db=DB;
     const [rows,setRows]=useState([]);
@@ -2343,7 +2344,7 @@ window.__dataReady.then(data => {
     const f2=n=>n==null?'–':Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
     const th={padding:'9px 10px',textAlign:'right',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap',fontSize:13};
     const td={padding:'8px 10px',textAlign:'right',whiteSpace:'nowrap',fontSize:13.5};
-    const baseLabel=base==='produced'?'ผลิต':'ขาย';
+    const baseLabel=base==='produced'?'ส่ง':'ขาย'; // ชีต "ผลิต" ในไฟล์ Excel จริงๆ เก็บยอดที่ส่งมอบแล้ว ไม่ใช่ยอดผลิต จึงเรียก "ยอดส่ง" ให้ตรงความหมาย
 
     // อ่านไฟล์ Excel: ชีท "ผลิต" และ "ขาย" คนละคอลัมน์ยอด แต่โครงเดียวกัน
     const readFile=file=>{
@@ -2431,7 +2432,7 @@ window.__dataReady.then(data => {
           {imported&&<div style={{marginBottom:16,padding:'12px 14px',border:'1px solid #99f6e4',background:'#f0fdfa',borderRadius:10}}>
             <div style={{fontSize:13.5,color:'#134e4a',lineHeight:1.9,marginBottom:10}}>
               อ่านไฟล์ <b>{imported.fileName}</b>{imported.rangeText&&<> · ช่วง <b>{imported.rangeText}</b></>}<br/>
-              ยอดผลิต <b>{fmt(imported.producedSum)}</b> ต้น · ยอดขาย <b>{fmt(imported.soldSum)}</b> ต้น · {imported.list.length} ขนาด
+              ยอดส่ง <b>{fmt(imported.producedSum)}</b> ต้น · ยอดขาย <b>{fmt(imported.soldSum)}</b> ต้น · {imported.list.length} ขนาด
               {imported.unparsed>0&&<span style={{color:'#92400e'}}> · อ่านขนาดไม่ได้ {fmt(imported.unparsed)} ต้น (ไม่บันทึก)</span>}<br/>
               บันทึกเป็นข้อมูลของ <b>{imported.month>0?('เดือน '+imported.month+'/'+imported.year):('ทั้งช่วง ปี '+imported.year)}</b> (ทับชุดเดิมของช่วงนี้)
             </div>
@@ -2458,7 +2459,7 @@ window.__dataReady.then(data => {
                   </div>
                 ))}
                 <div style={{display:'flex',gap:6}}>
-                  {[['produced','เทียบยอดผลิต'],['sold','เทียบยอดขาย']].map(([v,l])=>(
+                  {[['produced','เทียบยอดส่ง'],['sold','เทียบยอดขาย']].map(([v,l])=>(
                     <button key={v} onClick={()=>setBase(v)} style={{padding:'5px 13px',borderRadius:20,fontSize:13,cursor:'pointer',fontFamily:'inherit',
                       border:`1.5px solid ${base===v?'#0f766e':'#e2e8f0'}`,background:base===v?'#0f766e':'#fff',color:base===v?'#fff':'#334155',fontWeight:base===v?700:400}}>{l}</button>
                   ))}
