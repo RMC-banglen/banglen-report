@@ -5033,8 +5033,23 @@ window.__dataReady.then(data => {
       setSaving(false);
     }
 
+    // แปลง public URL กลับเป็น path ในบักเก็ต เช่น .../public/quality-images/reports/12/xxx.jpg → reports/12/xxx.jpg
+    function storagePathOf(url){
+      const m=String(url||'').split('/quality-images/');
+      return m.length>1?decodeURIComponent(m[1]):null;
+    }
+    // ลบไฟล์จริงในที่เก็บด้วย ไม่งั้นลบรายงานแล้วไฟล์ยังค้างกินพื้นที่ไปเรื่อยๆ
+    async function removeStorageFiles(urls){
+      const paths=(urls||[]).map(storagePathOf).filter(Boolean);
+      if(!paths.length) return;
+      const {error}=await db.storage.from('quality-images').remove(paths);
+      if(error) console.warn('ลบไฟล์รูปไม่สำเร็จ',error);
+    }
+
     async function handleDelete(id){
       if(!confirm('ลบรายงานนี้?'))return;
+      const {data:imgs}=await db.from('quality_report_images').select('image_url').eq('report_id',id);
+      await removeStorageFiles((imgs||[]).map(r=>r.image_url));
       await db.from('quality_report_images').delete().eq('report_id',id);
       await db.from('quality_reports').delete().eq('id',id);
       fetchAll();
@@ -5042,6 +5057,7 @@ window.__dataReady.then(data => {
 
     async function deleteImage(reportId,url){
       if(!confirm('ลบรูปนี้?'))return;
+      await removeStorageFiles([url]);
       await db.from('quality_report_images').delete().eq('image_url',url);
       setImgMap(m=>({...m,[reportId]:(m[reportId]||[]).filter(u=>u!==url)}));
     }
