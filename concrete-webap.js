@@ -196,6 +196,7 @@ function onOpen() {
     .addToUi();
 
   ui.createMenu('🚨 แจ้งเตือนผลลูกปูน')
+    .addItem('หาไอดีกลุ่ม Telegram', 'findChatIds')
     .addItem('ทดสอบส่ง Telegram', 'testTelegramAlert')
     .addItem('ตรวจย้อนหลังทั้งชีท', 'checkAllConcreteResults')
     .addToUi();
@@ -444,6 +445,34 @@ function fmtThaiDate(v) {
   var d = new Date(v);
   if (isNaN(d.getTime())) return String(v);
   return Utilities.formatDate(d, 'Asia/Bangkok', 'dd/MM/') + (d.getFullYear() + 543);
+}
+
+// หาไอดีกลุ่มอัตโนมัติ — ไม่ต้องไปเปิด URL getUpdates เอง
+// ต้องมีคนพิมพ์ข้อความอะไรก็ได้ในกลุ่มก่อน Telegram ถึงจะคืนกลุ่มนั้นมาให้
+function findChatIds() {
+  var ui = SpreadsheetApp.getUi();
+  var token = PropertiesService.getScriptProperties().getProperty('TELEGRAM_TOKEN');
+  if (!token) { ui.alert('ยังไม่ได้ตั้ง TELEGRAM_TOKEN ใน Script properties'); return; }
+
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getUpdates',
+                              { muteHttpExceptions: true });
+  var data = JSON.parse(res.getContentText());
+  if (!data.ok) { ui.alert('เรียก Telegram ไม่สำเร็จ: ' + (data.description || '')); return; }
+
+  var seen = {}, lines = [];
+  (data.result || []).forEach(function (u) {
+    var c = (u.message || u.channel_post || u.my_chat_member || {}).chat;
+    if (!c || seen[c.id]) return;
+    seen[c.id] = true;
+    lines.push((c.title || c.username || c.first_name || '(ไม่มีชื่อ)') + '\n   ไอดี: ' + c.id + '  [' + c.type + ']');
+  });
+
+  if (!lines.length) {
+    ui.alert('ยังไม่เจอกลุ่มไหนเลย\n\n1) เพิ่มบอทเข้ากลุ่ม QC ก่อน\n2) พิมพ์ข้อความอะไรก็ได้ในกลุ่ม 1 ครั้ง\n3) กดเมนูนี้ใหม่\n\n(Telegram เก็บข้อความย้อนหลังแค่ 24 ชม.)');
+    return;
+  }
+  ui.alert('กลุ่ม/แชทที่บอทเห็น\n\n' + lines.join('\n\n')
+         + '\n\nเอาไอดีของกลุ่ม QC ไปใส่ใน Script properties ช่อง TELEGRAM_CHAT');
 }
 
 // กดจากเมนูเพื่อทดสอบว่าบอทส่งเข้ากลุ่มได้จริง
