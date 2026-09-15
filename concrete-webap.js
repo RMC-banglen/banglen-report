@@ -46,6 +46,16 @@ function doPost(e) {
       data.avg_ksc
     ]]);
 
+    // ผลไม่ผ่านเกณฑ์ → แจ้งเตือน Telegram ทันทีที่บันทึก
+    notifyIfBelowTarget({
+      sampleDate: data.sample_date,
+      testDate:   data.test_date,
+      age:        data.age_days,
+      formula:    data.formula_name,
+      ksc:        data.avg_ksc,
+      row:        newRow
+    });
+
     return respond(true, 'บันทึกสำเร็จ');
 
   } catch (err) {
@@ -183,6 +193,11 @@ function onOpen() {
   ui.createMenu('Sync Dashboard')
     .addItem('Sync ทันที', 'syncConcrete')
     .addItem('ดู Log', 'viewLog')
+    .addToUi();
+
+  ui.createMenu('🚨 แจ้งเตือนผลลูกปูน')
+    .addItem('ทดสอบส่ง Telegram', 'testTelegramAlert')
+    .addItem('ตรวจย้อนหลังทั้งชีท', 'checkAllConcreteResults')
     .addToUi();
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -331,6 +346,133 @@ function onEdit(e) {
   if (isNaN(d.getTime())) return;
   var ym = Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM');
   sh.getRange(row, 12).setValue(ym);
+}
+
+// กรอกผลในชีทเองก็ให้แจ้งเตือนเหมือนกัน — ยิงตอนแก้คอลัมน์ "เฉลี่ย KSC"
+// แยกจาก onEdit ด้านบนเพราะอันนั้นดักเฉพาะคอลัมน์ A (วันที่เก็บตัวอย่าง)
+function onEditConcreteResult(e) {
+  if (!e || !e.range) return;
+  var sh = e.range.getSheet();
+  if (sh.getName() !== SHEET_NAME) return;
+  var row = e.range.getRow();
+  if (row <= 1) return;
+
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (x) { return String(x).trim(); });
+  var ci = {}; headers.forEach(function (n, i) { ci[n] = i + 1; });
+  var cKsc = ci['เฉลี่ย KSC'];
+  if (!cKsc) return;
+  // แก้ค่า kN ก็ทำให้ KSC เปลี่ยนตามสูตร จึงตรวจเมื่อแก้คอลัมน์ไหนก็ได้ในแถวนั้น
+  var vals = sh.getRange(row, 1, 1, sh.getLastColumn()).getValues()[0];
+  var get = function (name, fallback) { return ci[name] ? vals[ci[name] - 1] : fallback; };
+  notifyIfBelowTarget({
+    sampleDate: vals[0],
+    testDate:   vals[1],
+    age:        get('อายุ(วัน)', get('อายุ (วัน)', null)),
+    formula:    get('ชื่อสูตร', null),
+    ksc:        Number(vals[cKsc - 1]),
+    row:        row
+  });
+}
+
+// ============================================================
+// แจ้งเตือน Telegram เมื่อผลลูกปูนไม่ผ่านเกณฑ์
+// ตั้งค่าครั้งเดียว: Project Settings > Script properties
+//   TELEGRAM_TOKEN = โทเคนบอท     TELEGRAM_CHAT  = ไอดีแชท/กลุ่ม
+// (เก็บใน Script properties ไม่ใส่ในโค้ด เพราะไฟล์นี้ขึ้น GitHub แบบสาธารณะ)
+// ============================================================
+
+// เกณฑ์กำลังอัด (ksc) ตามอายุ — ต้องตรงกับที่หน้าแดชบอร์ดใช้ (TARGET_NORMAL / TARGET_NP280)
+var TARGET_NORMAL = { 1: 340, 3: 400, 5: 420, 7: 450 };
+var TARGET_NP280  = { 1: 340, 7: 420 };
+var ALERT_FLAG_COL = 13;   // คอลัมน์ M — กันส่งซ้ำแถวเดิม
+
+function targetFor(formula, age) {
+  var a = Number(age);
+  if (!a) return null;
+  var isNP280 = String(formula || '').toUpperCase().indexOf('280') >= 0;
+  var spec = isNP280 ? TARGET_NP280 : TARGET_NORMAL;
+  return spec[a] != null ? spec[a] : null;   // อายุที่ไม่มีเกณฑ์ = ไม่ต้องตัดสิน
+}
+
+function notifyIfBelowTarget(r) {
+  try {
+    var ksc = Number(r.ksc);
+    if (!isFinite(ksc) || ksc <= 0) return;
+    var target = targetFor(r.formula, r.age);
+    if (target == null) return;
+    if (ksc >= target) return;                       // ผ่านเกณฑ์ ไม่ต้องแจ้ง
+
+    // กันส่งซ้ำ: ถ้าแถวนี้เคยแจ้งแล้วด้วยค่าเดิม ไม่ส่งอีก
+    var stamp = String(r.formula) + '|' + r.age + '|' + ksc;
+    if (r.row) {
+      var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+      var cell = sh.getRange(r.row, ALERT_FLAG_COL);
+      if (String(cell.getValue()) === stamp) return;
+      cell.setValue(stamp);
+    }
+
+    var diff = Math.round((target - ksc) * 10) / 10;
+    var pct  = Math.round(diff / target * 1000) / 10;
+    var msg = '🚨 <b>ผลลูกปูนไม่ผ่านเกณฑ์</b>\n\n'
+            + '<b>สูตร:</b> ' + (r.formula || '-') + '\n'
+            + '<b>อายุ:</b> ' + r.age + ' วัน\n'
+            + '<b>ผลที่ได้:</b> ' + ksc + ' ksc\n'
+            + '<b>เกณฑ์:</b> ' + target + ' ksc\n'
+            + '<b>ต่ำกว่าเกณฑ์:</b> ' + diff + ' ksc (' + pct + '%)\n\n'
+            + 'เก็บตัวอย่าง ' + fmtThaiDate(r.sampleDate) + ' · ทดสอบ ' + fmtThaiDate(r.testDate);
+    sendTelegram(msg);
+  } catch (err) {
+    Logger.log('notifyIfBelowTarget error: ' + err.message);
+  }
+}
+
+function sendTelegram(text) {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty('TELEGRAM_TOKEN');
+  var chat  = props.getProperty('TELEGRAM_CHAT');
+  if (!token || !chat) { Logger.log('ยังไม่ได้ตั้ง TELEGRAM_TOKEN / TELEGRAM_CHAT'); return; }
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ chat_id: chat, text: text, parse_mode: 'HTML' }),
+    muteHttpExceptions: true
+  });
+}
+
+function fmtThaiDate(v) {
+  if (!v) return '-';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return Utilities.formatDate(d, 'Asia/Bangkok', 'dd/MM/') + (d.getFullYear() + 543);
+}
+
+// กดจากเมนูเพื่อทดสอบว่าบอทส่งเข้ากลุ่มได้จริง
+function testTelegramAlert() {
+  sendTelegram('✅ ทดสอบการแจ้งเตือนผลลูกปูน — ถ้าเห็นข้อความนี้แปลว่าตั้งค่าถูกแล้ว');
+  SpreadsheetApp.getUi().alert('ส่งข้อความทดสอบไป Telegram แล้ว — ลองเช็คในกลุ่ม');
+}
+
+// ตรวจย้อนหลังทั้งชีท แล้วแจ้งเฉพาะแถวที่ยังไม่เคยแจ้ง (ใช้ตอนเริ่มใช้งานครั้งแรก)
+function checkAllConcreteResults() {
+  var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  var rows = sh.getDataRange().getValues();
+  var headers = rows[0].map(function (x) { return String(x).trim(); });
+  var ci = {}; headers.forEach(function (n, i) { ci[n] = i; });
+  var iAge  = ci['อายุ(วัน)'] !== undefined ? ci['อายุ(วัน)'] : ci['อายุ (วัน)'];
+  var iForm = ci['ชื่อสูตร'];
+  var iKsc  = ci['เฉลี่ย KSC'];
+  var fail = 0;
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0]) continue;
+    var target = targetFor(r[iForm], r[iAge]);
+    if (target == null) continue;
+    if (Number(r[iKsc]) >= target) continue;
+    fail++;
+    notifyIfBelowTarget({ sampleDate: r[0], testDate: r[1], age: r[iAge],
+                          formula: r[iForm], ksc: Number(r[iKsc]), row: i + 1 });
+  }
+  SpreadsheetApp.getUi().alert('ตรวจย้อนหลังเสร็จ — พบผลไม่ผ่านเกณฑ์ ' + fail + ' แถว (แจ้งเฉพาะแถวที่ยังไม่เคยแจ้ง)');
 }
 
 function viewLog() {
