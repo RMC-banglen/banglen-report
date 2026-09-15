@@ -377,10 +377,12 @@ function onEditConcreteResult(e) {
 
 // ============================================================
 // แจ้งเตือน Telegram เมื่อผลลูกปูนไม่ผ่านเกณฑ์
-// ตั้งค่าครั้งเดียว: Project Settings > Script properties
-//   TELEGRAM_TOKEN = โทเคนบอท     TELEGRAM_CHAT  = ไอดีแชท/กลุ่ม
-// (เก็บใน Script properties ไม่ใส่ในโค้ด เพราะไฟล์นี้ขึ้น GitHub แบบสาธารณะ)
+//
+// ★ ใส่ค่า 2 บรรทัดนี้ในสคริปต์ของคุณ (ก๊อปมาจากสคริปต์แจ้งเตือนรอบสอบเทียบได้เลย)
+//   ในไฟล์บน GitHub เว้นว่างไว้ เพราะเป็น repo สาธารณะ โทเคนจะหลุด
 // ============================================================
+var TELEGRAM_TOKEN = '';   // เช่น '8852411771:AAG...'
+var TELEGRAM_CHAT  = '';   // ไอดีกลุ่ม QC เช่น '-1001234567890'
 
 // เกณฑ์กำลังอัด (ksc) ตามอายุ — ต้องตรงกับที่หน้าแดชบอร์ดใช้ (TARGET_NORMAL / TARGET_NP280)
 var TARGET_NORMAL = { 1: 340, 3: 400, 5: 420, 7: 450 };
@@ -427,11 +429,16 @@ function notifyIfBelowTarget(r) {
   }
 }
 
+function tgToken() {
+  return TELEGRAM_TOKEN || PropertiesService.getScriptProperties().getProperty('TELEGRAM_TOKEN') || '';
+}
+function tgChat() {
+  return TELEGRAM_CHAT || PropertiesService.getScriptProperties().getProperty('TELEGRAM_CHAT') || '';
+}
+
 function sendTelegram(text) {
-  var props = PropertiesService.getScriptProperties();
-  var token = props.getProperty('TELEGRAM_TOKEN');
-  var chat  = props.getProperty('TELEGRAM_CHAT');
-  if (!token || !chat) { Logger.log('ยังไม่ได้ตั้ง TELEGRAM_TOKEN / TELEGRAM_CHAT'); return; }
+  var token = tgToken(), chat = tgChat();
+  if (!token || !chat) { Logger.log('ยังไม่ได้ใส่ TELEGRAM_TOKEN / TELEGRAM_CHAT ที่หัวไฟล์'); return; }
   UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'post',
     contentType: 'application/json',
@@ -451,8 +458,8 @@ function fmtThaiDate(v) {
 // ต้องมีคนพิมพ์ข้อความอะไรก็ได้ในกลุ่มก่อน Telegram ถึงจะคืนกลุ่มนั้นมาให้
 function findChatIds() {
   var ui = SpreadsheetApp.getUi();
-  var token = PropertiesService.getScriptProperties().getProperty('TELEGRAM_TOKEN');
-  if (!token) { ui.alert('ยังไม่ได้ตั้ง TELEGRAM_TOKEN ใน Script properties'); return; }
+  var token = tgToken();
+  if (!token) { ui.alert('ยังไม่ได้ใส่ TELEGRAM_TOKEN ที่หัวไฟล์'); return; }
 
   var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getUpdates',
                               { muteHttpExceptions: true });
@@ -472,7 +479,7 @@ function findChatIds() {
     return;
   }
   ui.alert('กลุ่ม/แชทที่บอทเห็น\n\n' + lines.join('\n\n')
-         + '\n\nเอาไอดีของกลุ่ม QC ไปใส่ใน Script properties ช่อง TELEGRAM_CHAT');
+         + '\n\nเอาไอดีของกลุ่ม QC ไปใส่ที่หัวไฟล์ ช่อง TELEGRAM_CHAT');
 }
 
 // กดจากเมนูเพื่อทดสอบว่าบอทส่งเข้ากลุ่มได้จริง
