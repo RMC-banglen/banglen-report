@@ -829,7 +829,7 @@ window.__dataReady.then(data => {
   }
 
   // ── รายงานการผลิต–เวลาเทเสร็จ (รายวัน) กรอกในตารางได้เลยทีละช่อง
-  function PourDailySection({year,canEdit}){
+  function PourDailySection({year,canEdit,avgQueuePerDay,avgQueueDays,avgQueueMonthNum}){
     const db=DB;
     const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const [rows,setRows]=useState([]);
@@ -981,7 +981,12 @@ window.__dataReady.then(data => {
         {[['วันที่บันทึก',monthRows.length+' วัน','#1a56db'],
           ['เวลาเทเสร็จเฉลี่ย',hhmm(avgTime),'#7c3aed'],
           ['แพผลิตรวม',fmtN(sumOf('raft_produced'))+' แพ','#0f766e'],
-          ['แพค้างเท/ยกเลิก',fmtN(sumCancel)+' แพ','#d97706']].map(([l,v,c])=>(
+          ['แพค้างเท/ยกเลิก',fmtN(sumCancel)+' แพ','#d97706'],
+          // เทียบกับ "เฉลี่ยคิว/วัน (เดือนล่าสุด)" ได้ก็ต่อเมื่อจำนวนวันที่กำลังดูอยู่ในตารางนี้ ตรงกับ
+          // จำนวนวันผลิตที่ใช้คิดค่าเฉลี่ยนั้นเป๊ะ (กันเทียบมั่ว เช่น กด "ทุกวัน" ทั้งเดือนแต่ค่าเฉลี่ยคิดจากไม่กี่วัน)
+          ...(avgQueueDays!=null&&mon===avgQueueMonthNum&&shownDays.length===avgQueueDays
+            ?[['เฉลี่ยคิว/วัน (เดือนล่าสุด)',fmtN(avgQueuePerDay)+' m³','#7b61c4']]:[])
+          ].map(([l,v,c])=>(
           <div key={l} style={{flex:'1 1 140px',border:'1px solid #e6e8ee',borderRadius:12,padding:'11px 15px'}}>
             <div style={{fontSize:12.5,color:'#5f6470',marginBottom:3}}>{l}</div>
             <div style={{fontSize:21,fontWeight:800,color:c,lineHeight:1.2}}>{v}</div>
@@ -1074,6 +1079,8 @@ window.__dataReady.then(data => {
       const paired=D.causeLabels.map((l,i)=>({label:l,value:totals[i],color:CAUSE_COLORS[i]})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);
       causeItems=paired; causeSegments=paired;
     }
+    const lm=yd.months[yd.months.length-1];
+    const apd=lm.days>0?lm.produced/lm.days:0;
     return <div className="grid">
       <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))'}}>
         <KpiCard label="คิวผลิตจริงรวม" value={fmt(totalProduced)} unit=" m³" sub={`เฉลี่ย ${fmt(totalProduced/yd.months[yd.months.length-1].m)} m³/เดือน`} accent={PALETTE.produced}/>
@@ -1081,17 +1088,16 @@ window.__dataReady.then(data => {
         <KpiCard label="ผลิต − ขนส่ง (สุทธิ)" value={(net>=0?'+':'')+fmt(net)} unit=" m³" sub={net>=0?'ผลิตมากกว่าขนส่ง':'ขนส่งมากกว่าผลิต'} accent={net>=0?PALETTE.produced:PALETTE.cancel}/>
         <KpiCard label="สต็อคคงเหลือล่าสุด" value={fmt(latestStock)} unit=" m³" sub={`ณ เดือน${cats[cats.length-1]}`} accent={PALETTE.stock}/>
         <KpiCard label="% ผลิตได้จริงเฉลี่ย" value={fmt(avgPct,1)} unit="%" sub={`ค่าเฉลี่ย ${cats[0]}–${cats[cats.length-1]} ${String(year).slice(-2)}`} accent={avgPct>=90?'#5a8f3c':PALETTE.cancel}/>
-        {(()=>{
-          const lm=yd.months[yd.months.length-1];
-          const apd=lm.days>0?lm.produced/lm.days:0;
-          return <KpiCard label="เฉลี่ยคิว/วัน (เดือนล่าสุด)" value={fmt(apd,1)} unit=" m³" sub={`${cats[cats.length-1]} ${year} • ${lm.days} วันผลิต`} accent='#7b61c4'/>;
-        })()}
+        <KpiCard label="เฉลี่ยคิว/วัน (เดือนล่าสุด)" value={fmt(apd,1)} unit=" m³" sub={`${cats[cats.length-1]} ${year} • ${lm.days} วันผลิต`} accent='#7b61c4'/>
       </div>
       <LatestCompareCard month={yd.months[yd.months.length-1]} label={cats[cats.length-1]} year={year}/>
       <ChartCard title="เทียบคิวผลิตจริงกับคิวขนส่งรายเดือน" subtitle="หน่วย: ลูกบาศก์เมตร (m³)" right={<Legend items={[{label:'คิวผลิตจริง',color:PALETTE.produced},{label:'คิวขนส่ง',color:PALETTE.transport}]}/>} span="wide">
         <GroupedBarChart categories={cats} unit="m³" series={[{key:'p',label:'คิวผลิตจริง',color:PALETTE.produced,data:produced},{key:'t',label:'คิวขนส่ง',color:PALETTE.transport,data:transport}]} height={320}/>
       </ChartCard>
-      <PourDailySection year={year} canEdit={canEdit}/>
+      {/* ส่งเฉลี่ยคิว/วัน(เดือนล่าสุด)+จำนวนวันผลิตที่ใช้คิดเฉลี่ยลงไปด้วย เพื่อเทียบกับตารางเทเสร็จรายวัน
+          — เทียบได้ก็ต่อเมื่อ "จำนวนวันที่กำลังดูอยู่" ในตารางเทเสร็จ ตรงกับจำนวนวันผลิตนี้เป๊ะ (กันเทียบมั่ว เช่น
+          ดู "ทุกวัน" ทั้งเดือนแต่จำนวนวันผลิตจริงมีแค่บางวัน) */}
+      <PourDailySection year={year} canEdit={canEdit} avgQueuePerDay={apd} avgQueueDays={lm.days} avgQueueMonthNum={lm.m}/>
       <StockStatusCard current={latestStock} prev={stock.length>1?stock[stock.length-2]:null} label={cats[cats.length-1]} year={year} stockDiff={stockDiff[stockDiff.length-1]} stockDiffMonths={null}/>
       <ChartCard title="สต็อคคิวคงเหลือรายเดือน" subtitle="ปริมาณคงเหลือปลายเดือน (m³)">
         <LineChart categories={cats} unit="m³" area showValues series={[{label:'สต็อคคงเหลือ',color:PALETTE.stock,data:stock}]} height={260}/>
