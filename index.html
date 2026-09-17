@@ -874,6 +874,20 @@ window.__dataReady.then(data => {
       const m=String(t||'').match(/^(\d{1,2})[:.](\d{2})/);
       return m?Number(m[1])+Number(m[2])/60:null;
     };
+    // พิมพ์ "1658" แล้วเติม : ให้เอง — 3 หลักคิดเป็น ช:นน (930 = 09:30), 4 หลักเป็น ชช:นน
+    // จัดรูปตอนออกจากช่อง ไม่ใช่ระหว่างพิมพ์ จะได้ไม่เด้งเป็น "93:0" ให้สับสนกลางคัน
+    const normTime=v=>{
+      const s=String(v||'').trim();
+      if(!s) return '';
+      const d=s.replace(/\D/g,'');
+      let hh,mm;
+      if(d.length<=2){ hh=d; mm='00'; }
+      else if(d.length===3){ hh=d.slice(0,1); mm=d.slice(1); }
+      else { hh=d.slice(0,2); mm=d.slice(2,4); }
+      const H=Number(hh),Mi=Number(mm);
+      if(!isFinite(H)||!isFinite(Mi)||H>23||Mi>59) return s;   // เลขเพี้ยน คืนค่าที่พิมพ์ไว้ ไม่ลบทิ้ง
+      return pad(H)+':'+pad(Mi);
+    };
     const hhmm=h=>h==null?'–':pad(Math.floor(h))+':'+pad(Math.round((h-Math.floor(h))*60));
 
     const monthRows=allDays.map(d=>byDate[key(d)]).filter(Boolean);
@@ -979,8 +993,10 @@ window.__dataReady.then(data => {
                   </td>
                 ))}
                 <td style={{padding:'4px 6px',textAlign:'center'}}>
-                  <input type="text" placeholder="16:59" value={val(k,'finish_time')} disabled={!canEdit}
+                  <input type="text" inputMode="numeric" placeholder="1659" value={val(k,'finish_time')} disabled={!canEdit}
                     onChange={e=>setVal(k,'finish_time',e.target.value)}
+                    onBlur={e=>setVal(k,'finish_time',normTime(e.target.value))}
+                    onKeyDown={e=>{if(e.key==='Enter'){setVal(k,'finish_time',normTime(e.target.value));e.target.blur();}}}
                     style={{...inp,width:70,textAlign:'center',color:late?'#c0392b':'inherit',fontWeight:late?700:400}}/>
                 </td>
                 <td style={{padding:'4px 6px'}}>
@@ -1004,6 +1020,7 @@ window.__dataReady.then(data => {
       <div style={{marginTop:10,fontSize:12.5,color:'#78839A',lineHeight:1.8}}>
         ปกติแสดงเฉพาะวันที่มีข้อมูลและวันนี้ · กด <b>แสดงทุกวัน</b> เพื่อกรอกย้อนหลัง ·
         ช่องที่แก้แล้วยังไม่บันทึกจะเป็น<span style={{background:'#fffbeb',padding:'1px 5px',borderRadius:4}}>พื้นเหลือง</span> ·
+        ช่องเวลาพิมพ์ตัวเลขติดกันได้เลย เช่น <b>1658</b> → กด Enter หรือคลิกออกจะกลายเป็น <b>16:58</b> เอง ·
         เวลาเทเสร็จตั้งแต่ 17:00 ขึ้นไปจะขึ้นเป็น<b style={{color:'#c0392b'}}>สีแดง</b>
       </div>
     </ChartCard>;
@@ -1048,6 +1065,7 @@ window.__dataReady.then(data => {
       <ChartCard title="เทียบคิวผลิตจริงกับคิวขนส่งรายเดือน" subtitle="หน่วย: ลูกบาศก์เมตร (m³)" right={<Legend items={[{label:'คิวผลิตจริง',color:PALETTE.produced},{label:'คิวขนส่ง',color:PALETTE.transport}]}/>} span="wide">
         <GroupedBarChart categories={cats} unit="m³" series={[{key:'p',label:'คิวผลิตจริง',color:PALETTE.produced,data:produced},{key:'t',label:'คิวขนส่ง',color:PALETTE.transport,data:transport}]} height={320}/>
       </ChartCard>
+      <PourDailySection year={year} canEdit={canEdit}/>
       <StockStatusCard current={latestStock} prev={stock.length>1?stock[stock.length-2]:null} label={cats[cats.length-1]} year={year} stockDiff={stockDiff[stockDiff.length-1]} stockDiffMonths={null}/>
       <ChartCard title="สต็อคคิวคงเหลือรายเดือน" subtitle="ปริมาณคงเหลือปลายเดือน (m³)">
         <LineChart categories={cats} unit="m³" area showValues series={[{label:'สต็อคคงเหลือ',color:PALETTE.stock,data:stock}]} height={260}/>
@@ -1122,8 +1140,6 @@ window.__dataReady.then(data => {
           </tr></tfoot>
         </table></div>
       </ChartCard>
-
-      <PourDailySection year={year} canEdit={canEdit}/>
     </div>;
   }
 
