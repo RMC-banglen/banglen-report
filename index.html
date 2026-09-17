@@ -2782,7 +2782,7 @@ window.__dataReady.then(data => {
     const [elongSpec,setElongSpec]=useState([]);   // ค่าระยะยืดมาตรฐานต่อแพ/ขนาดลวด
     const [elongMissing,setElongMissing]=useState(false);
     const [rafts,setRafts]=useState([]);
-    const [eForm,setEForm]=useState({raft_num:'',mm4:'',mm5:'',tol_pct:'5'});
+    const [eForm,setEForm]=useState({});   // ค่า ±% ที่กำลังพิมพ์ในแต่ละแถว
     const [items,setItems]=useState([]);
     const [missing,setMissing]=useState(false);
     const [loading,setLoading]=useState(true);
@@ -3075,7 +3075,7 @@ window.__dataReady.then(data => {
         </ChartCard>
 
         <ChartCard span="wide" title="ค่าระยะยืดของลวด (Elongation total)"
-          subtitle="ตั้งค่ามาตรฐานต่อแพ — QC กรอกค่าที่วัดได้ ระบบตัดสินผ่าน/ไม่ผ่านให้เอง">
+          subtitle="กรอกไล่ลงมาได้เลย — พิมพ์แล้วคลิกออกจากช่อง = บันทึกทันที">
           {elongMissing
             ? <div style={{padding:'14px 16px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
                 ⚠️ ยังไม่ได้สร้างตาราง — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-qc-elongation.sql</b> ก่อน
@@ -3084,121 +3084,91 @@ window.__dataReady.then(data => {
               const WIRES=[4,5];
               const byRaft={};
               elongSpec.forEach(e=>{(byRaft[e.raft_num]=byRaft[e.raft_num]||{})[e.wire_mm]=e;});
-              const doneRafts=Object.keys(byRaft).map(Number).sort((a,b)=>a-b);
-              const freeRafts=rafts.filter(r=>!byRaft[r.raft_num]);
-              const saveCell=(row,patch)=>db.from('qc_elongation_spec').update({...patch,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);
+              const tolOf=n=>{
+                if(eForm['tol_'+n]!=null) return eForm['tol_'+n];
+                const any=byRaft[n]&&(byRaft[n][4]||byRaft[n][5]);
+                return any?String(any.tol_pct):'5';
+              };
+              // พิมพ์ค่า → ไม่มีแถวก็เพิ่มให้ · มีแถวแล้วก็แก้ · ลบค่าออก = ลบแถวนั้น
+              const setVal=(n,w,raw)=>{
+                const row=byRaft[n]&&byRaft[n][w];
+                const v=Number(raw);
+                if(raw===''||raw==null||!(v>0)){
+                  if(row) db.from('qc_elongation_spec').delete().eq('id',row.id).then(load);
+                  return;
+                }
+                if(row){
+                  if(Number(row.target_mm)!==v) db.from('qc_elongation_spec').update({target_mm:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);
+                }else{
+                  db.from('qc_elongation_spec').insert([{raft_num:n,wire_mm:w,target_mm:v,tol_pct:Number(tolOf(n))||5}]).then(load);
+                }
+              };
+              const setTol=(n,raw)=>{
+                const v=Number(raw);
+                setEForm(f=>({...f,['tol_'+n]:raw}));
+                if(!(v>0)) return;
+                WIRES.forEach(w=>{const row=byRaft[n]&&byRaft[n][w];
+                  if(row&&Number(row.tol_pct)!==v) db.from('qc_elongation_spec').update({tol_pct:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);});
+              };
+              const cellInp={width:96,padding:'7px 9px',borderRadius:8,fontSize:14.5,textAlign:'right',fontFamily:'inherit'};
               return <>
                 <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse'}}>
                     <thead><tr style={{background:'#f4f6fa'}}>
                       <th style={{...th,textAlign:'left'}}>แพ</th>
                       {WIRES.map(w=><th key={w} style={th}>ลวด {w} มม. (มม.)</th>)}
-                      <th style={th}>ยอมรับ ±%</th><th style={th}>ช่วงที่ผ่าน</th>
-                      {canEdit&&<th style={th}></th>}
+                      <th style={th}>ยอมรับ ±%</th><th style={{...th,textAlign:'left'}}>ช่วงที่ผ่าน</th>
                     </tr></thead>
                     <tbody>
-                      {doneRafts.map(n=>{
-                        const r=rafts.find(x=>Number(x.raft_num)===n);
-                        const rows=byRaft[n];
-                        const any=rows[4]||rows[5];
-                        return <tr key={n} style={{borderBottom:'1px solid #eef0f5'}}>
-                          <td style={{...td,textAlign:'left',fontWeight:700}}>
-                            แพ {n}<span style={{fontWeight:400,color:'#5f6470'}}> · {(r&&((r.pile_type||'')+(r.section||'')))||'–'}</span>
+                      {rafts.map(r=>{
+                        const n=Number(r.raft_num);
+                        const rows=byRaft[n]||{};
+                        const has=!!(rows[4]||rows[5]);
+                        return <tr key={n} style={{borderBottom:'1px solid #eef0f5',background:has?'#f7fdfb':'transparent'}}>
+                          <td style={{...td,textAlign:'left',fontWeight:700,whiteSpace:'nowrap'}}>
+                            แพ {n}<span style={{fontWeight:400,color:'#5f6470'}}> · {(r.pile_type||'')+(r.section||'')||'–'}</span>
                           </td>
                           {WIRES.map(w=>{
                             const row=rows[w];
-                            return <td key={w} style={{...td,padding:'5px 8px'}}>
-                              {row
-                                ? (canEdit
-                                    ? <input type="number" step="any" defaultValue={row.target_mm}
-                                        onBlur={ev=>{const v=Number(ev.target.value); if(v>0&&v!==Number(row.target_mm)) saveCell(row,{target_mm:v});}}
-                                        style={{width:92,padding:'6px 8px',border:'1.5px solid #d6d8e0',borderRadius:7,
-                                          fontSize:14,textAlign:'right',fontWeight:700,color:'#0f766e',fontFamily:'inherit'}}/>
-                                    : <span style={{fontWeight:700,color:'#0f766e'}}>{row.target_mm}</span>)
-                                : (canEdit
-                                    ? <input type="number" step="any" placeholder="เพิ่ม"
-                                        onBlur={ev=>{const v=Number(ev.target.value); if(!(v>0))return;
-                                          db.from('qc_elongation_spec').insert([{raft_num:n,wire_mm:w,target_mm:v,tol_pct:Number(any&&any.tol_pct)||5}]).then(load);}}
-                                        style={{width:92,padding:'6px 8px',border:'1.5px dashed #cbd5e1',borderRadius:7,
-                                          fontSize:14,textAlign:'right',fontFamily:'inherit'}}/>
-                                    : <span style={{color:'#cbd5e1'}}>–</span>)}
+                            return <td key={w} style={{...td,padding:'4px 8px'}}>
+                              {canEdit
+                                ? <input type="number" step="any" placeholder="–"
+                                    key={row?('v'+row.id+'-'+row.target_mm):('e'+n+'-'+w)}
+                                    defaultValue={row?row.target_mm:''}
+                                    onBlur={ev=>setVal(n,w,ev.target.value)}
+                                    style={{...cellInp,
+                                      border:row?'1.5px solid #0f766e':'1.5px dashed #cbd5e1',
+                                      color:row?'#0f766e':'#334155',fontWeight:row?700:400}}/>
+                                : <span style={{fontWeight:700,color:row?'#0f766e':'#cbd5e1'}}>{row?row.target_mm:'–'}</span>}
                             </td>;
                           })}
-                          <td style={{...td,padding:'5px 8px'}}>
+                          <td style={{...td,padding:'4px 8px'}}>
                             {canEdit
-                              ? <input type="number" step="any" defaultValue={any?any.tol_pct:5}
-                                  onBlur={ev=>{const v=Number(ev.target.value); if(!(v>0))return;
-                                    WIRES.forEach(w=>{if(rows[w]&&Number(rows[w].tol_pct)!==v) saveCell(rows[w],{tol_pct:v});});}}
-                                  style={{width:70,padding:'6px 8px',border:'1.5px solid #d6d8e0',borderRadius:7,
-                                    fontSize:14,textAlign:'right',fontFamily:'inherit'}}/>
-                              : <span>±{any?any.tol_pct:5}%</span>}
+                              ? <input type="number" step="any" value={tolOf(n)}
+                                  onChange={ev=>setEForm(f=>({...f,['tol_'+n]:ev.target.value}))}
+                                  onBlur={ev=>setTol(n,ev.target.value)}
+                                  style={{...cellInp,width:70,border:'1.5px solid #d6d8e0'}}/>
+                              : <span>±{tolOf(n)}%</span>}
                           </td>
-                          <td style={{...td,color:'#5f6470',fontSize:12.5,whiteSpace:'normal'}}>
+                          <td style={{...td,textAlign:'left',color:'#5f6470',fontSize:12.5,whiteSpace:'normal'}}>
                             {WIRES.filter(w=>rows[w]).map(w=>{
                               const e=rows[w];
                               return w+' มม.: '+(e.target_mm*(1-e.tol_pct/100)).toFixed(1)+'–'+(e.target_mm*(1+e.tol_pct/100)).toFixed(1);
-                            }).join(' · ')||'–'}
+                            }).join(' · ')||<span style={{color:'#cbd5e1'}}>ยังไม่ได้ตั้ง</span>}
                           </td>
-                          {canEdit&&<td style={{...td,textAlign:'center'}}>
-                            <button onClick={()=>{
-                              if(!window.confirm('ลบค่าระยะยืดของแพ '+n+' ทั้งหมด?'))return;
-                              db.from('qc_elongation_spec').delete().eq('raft_num',n).then(load);
-                            }} style={{border:'none',background:'none',cursor:'pointer',color:'#c0392b',fontSize:15}}>✕</button>
-                          </td>}
                         </tr>;
                       })}
-                      {!doneRafts.length&&<tr><td colSpan={canEdit?6:5} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>
-                        ยังไม่ได้ตั้งค่าระยะยืด — เพิ่มด้านล่าง
-                      </td></tr>}
                     </tbody>
                   </table>
                 </div>
-
-                {canEdit&&(freeRafts.length
-                  ? <div style={{marginTop:14,padding:'12px 14px',background:'#f8fafc',borderRadius:10,border:'1px solid #e6e8ee'}}>
-                      <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
-                        <div><div style={{fontSize:12.5,color:'#5f6470',marginBottom:4}}>เพิ่มแพ</div>
-                          <select value={eForm.raft_num} onChange={ev=>setEForm(f=>({...f,raft_num:ev.target.value}))}
-                            style={{padding:'7px 10px',borderRadius:8,border:'1.5px solid #d6d8e0',fontSize:13.5,fontFamily:'inherit',background:'#fff'}}>
-                            <option value="">— เลือกแพ —</option>
-                            {freeRafts.map(r=><option key={r.raft_num} value={r.raft_num}>แพ {r.raft_num} · {(r.pile_type||'')+(r.section||'')}</option>)}
-                          </select></div>
-                        {eForm.raft_num&&<>
-                          {WIRES.map(w=>(
-                            <div key={w}><div style={{fontSize:12.5,color:'#5f6470',marginBottom:4}}>ลวด {w} มม. (มม.)</div>
-                              <input type="number" step="any" value={eForm['mm'+w]||''} placeholder="ไม่ใช้เว้นว่าง"
-                                onChange={ev=>setEForm(f=>({...f,['mm'+w]:ev.target.value}))}
-                                style={{padding:'7px 10px',borderRadius:8,border:'1.5px solid #d6d8e0',fontSize:13.5,width:130,fontFamily:'inherit'}}/></div>
-                          ))}
-                          <div><div style={{fontSize:12.5,color:'#5f6470',marginBottom:4}}>ยอมรับ ±%</div>
-                            <input type="number" step="any" value={eForm.tol_pct}
-                              onChange={ev=>setEForm(f=>({...f,tol_pct:ev.target.value}))}
-                              style={{padding:'7px 10px',borderRadius:8,border:'1.5px solid #d6d8e0',fontSize:13.5,width:80,fontFamily:'inherit'}}/></div>
-                          <button onClick={()=>{
-                            const rn=Number(eForm.raft_num), tp=Number(eForm.tol_pct)||5;
-                            const rows=WIRES.map(w=>({w,v:Number(eForm['mm'+w])})).filter(x=>x.v>0)
-                              .map(x=>({raft_num:rn,wire_mm:x.w,target_mm:x.v,tol_pct:tp}));
-                            if(!rows.length){alert('ใส่ระยะยืดอย่างน้อย 1 ขนาด');return;}
-                            db.from('qc_elongation_spec').insert(rows).then(({error})=>{
-                              if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
-                              setEForm({raft_num:'',mm4:'',mm5:'',tol_pct:'5'}); load();
-                            });
-                          }} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',
-                            fontSize:14.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>บันทึกค่า</button>
-                        </>}
-                      </div>
-                      {!eForm.raft_num&&<div style={{fontSize:12.5,color:'#78839A',marginTop:8}}>เลือกแพก่อน แล้วจะมีช่องให้ใส่ทั้ง 4 มม. และ 5 มม.</div>}
-                    </div>
-                  : <div style={{marginTop:12,fontSize:13.5,color:'#0f766e',background:'#ecfdf5',border:'1px solid #a7e3d4',
-                      borderRadius:9,padding:'10px 14px'}}>✅ ตั้งค่าครบทุกแพแล้ว — แก้ตัวเลขได้ที่ตารางด้านบน</div>)}
-
                 <div style={{marginTop:10,fontSize:12.5,color:'#78839A',lineHeight:1.8}}>
-                  แพที่ตั้งค่าแล้วจะหายจากรายการ "เพิ่มแพ" · แก้ตัวเลขในตารางได้เลย (พิมพ์แล้วคลิกออกจากช่อง = บันทึกทันที) ·
-                  ช่องเส้นประ = ขนาดลวดที่ยังไม่ได้ตั้ง ใส่เพิ่มได้
+                  กรอกไล่ลงมาทีละแพได้เลย · แพไหนไม่ใช้ลวดขนาดนั้นก็เว้นว่าง ·
+                  ลบค่าออกจากช่อง = ยกเลิกการตั้งค่าของขนาดนั้น · แถวพื้นเขียวอ่อน = ตั้งค่าแล้ว
                 </div>
               </>;
             })()}
         </ChartCard>
+
 
 
         <ChartCard span="wide" title="หัวข้อที่ใช้ตรวจ" subtitle="แก้ข้อความ/เกณฑ์ หรือปิดหัวข้อที่ไม่ใช้ได้">
