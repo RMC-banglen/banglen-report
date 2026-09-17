@@ -139,6 +139,7 @@ function App(){
   const [inspectors,setInspectors]=useState(null);
   const [checklist,setChecklist]=useState(null);
   const [rafts,setRafts]=useState([]);   // แพผลิตจากระบบติดตามงาน
+  const [elong,setElong]=useState([]);   // ค่ามาตรฐานระยะยืดของลวด ต่อแพ/ขนาดลวด
   const [err,setErr]=useState('');
   const [formType,setFormType]=useState(null);
   const [material,setMaterial]=useState(null);   // ใช้เฉพาะฟอร์มตรวจวัตถุดิบ
@@ -149,9 +150,10 @@ function App(){
       DB.from('qc_inspectors').select('*').eq('active',true).order('sort_order'),
       DB.from('qc_checklist').select('*').eq('active',true).order('form_type').order('sort_order'),
       DB.from('worktrack_raft_info').select('raft_num,pile_type,section').order('raft_num'),
-    ]).then(([a,b,r])=>{
+      DB.from('qc_elongation_spec').select('*').order('raft_num').order('wire_mm'),
+    ]).then(([a,b,r,e])=>{
       if(a.error||b.error){setErr('ยังไม่ได้สร้างตารางในฐานข้อมูล — ให้แอดมินรันไฟล์ supabase-qc.sql ก่อน');return;}
-      setInspectors(a.data||[]); setChecklist(b.data||[]); setRafts((r&&r.data)||[]);
+      setInspectors(a.data||[]); setChecklist(b.data||[]); setRafts((r&&r.data)||[]); setElong((e&&e.data)||[]);
     }).catch(()=>setErr('เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจอินเทอร์เน็ต'));
   },[]);
 
@@ -168,7 +170,7 @@ function App(){
     return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
-  return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} presetRaft={presetRaft}
+  return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} elong={elong} presetRaft={presetRaft}
                     onBack={()=>{setPresetRaft(null);formType==='mat'?setMaterial(null):setFormType(null);}}/>;
 }
 
@@ -375,12 +377,12 @@ function PickMaterial({me,mats,onPick,onBack}){
   </>;
 }
 
-function CheckForm({me,formType,material,checklist,rafts,presetRaft,onBack}){
+function CheckForm({me,formType,material,checklist,rafts,elong,presetRaft,onBack}){
   const F=FORMS[formType];
   const isPre=formType==='pre';
   const isMat=formType==='mat';
   const [head,setHead]=useState(()=>({
-    check_date: todayISO(), bed_no:'', lot_no:'', pile_spec:'', qty:'', supplier:'',
+    check_date: todayISO(), bed_no:'', lot_no:'', pile_spec:'', qty:'', supplier:'', wire_mm:'', elong_mm:'',
   }));
   const [vals,setVals]=useState({});        // itemId -> {yn, num, note}
   const [files,setFiles]=useState([]);      // {id, file, url}
@@ -431,12 +433,19 @@ function CheckForm({me,formType,material,checklist,rafts,presetRaft,onBack}){
     }
     setSaving(true);
     try{
-      const result=failed.length?'fail':'pass';
+      // ระยะยืดของลวดเป็นหัวข้อพิเศษ (ไม่ได้อยู่ในเช็คลิสต์) ต้องรวมผลก่อนตัดสินทั้งใบ
+      const elongSpec=isPre?(elong||[]).find(e=>String(e.raft_num)===String(head.bed_no)&&String(e.wire_mm)===String(head.wire_mm)):null;
+      const elongVal=(isPre&&head.elong_mm!==''&&head.elong_mm!=null)?Number(head.elong_mm):null;
+      const elongOk=(elongVal!=null&&elongSpec)
+        ? (elongVal>=elongSpec.target_mm*(1-elongSpec.tol_pct/100)&&elongVal<=elongSpec.target_mm*(1+elongSpec.tol_pct/100))
+        : null;
+      const allFailed=failed.concat(elongOk===false?[{label:'ระยะยืดของลวด (Elongation total)'}]:[]);
+      const result=allFailed.length?'fail':'pass';
       const {data,error}=await DB.from('qc_checks').insert({
         form_type:formType, inspector_code:me.code, check_date:head.check_date,
         bed_no:head.bed_no||'', lot_no:head.lot_no||'', pile_spec:head.pile_spec||'',
         material:material||'', supplier:head.supplier||'',
-        qty:Number(head.qty)||0, result, fail_count:failed.length, note:''
+        qty:Number(head.qty)||0, result, fail_count:allFailed.length, note:''
       }).select().single();
       if(error) throw error;
       const checkId=data.id;
@@ -449,6 +458,12 @@ function CheckForm({me,formType,material,checklist,rafts,presetRaft,onBack}){
                 value_num:it.kind==='num'&&v.num!==''&&v.num!=null?Number(v.num):null,
                 unit:it.unit||'', ok:ok, note:v.note||''};
       });
+      // ระยะยืดของลวด เก็บเป็นหัวข้อหนึ่งในใบตรวจ จะได้โผล่ในรายงานเหมือนหัวข้ออื่น
+      if(elongVal!=null){
+        rows.push({check_id:checkId,item_id:null,label:'ระยะยืดของลวด (Elongation total)',section:'ลวดอัดแรง/เหล็กเสริม',
+          kind:'num',value_yn:null,value_num:elongVal,unit:'มม.',ok:elongOk,
+          note:elongSpec?('ลวด '+elongSpec.wire_mm+' มม. · เกณฑ์ '+elongSpec.target_mm+' มม. ±'+elongSpec.tol_pct+'%'):'ไม่ได้ตั้งค่ามาตรฐาน'});
+      }
       if(rows.length) await DB.from('qc_check_items').insert(rows);
 
       for(const f of files){
@@ -463,7 +478,7 @@ function CheckForm({me,formType,material,checklist,rafts,presetRaft,onBack}){
       }
 
       try{localStorage.setItem(memKey,JSON.stringify({pile_spec:head.pile_spec,bed_no:head.bed_no,supplier:head.supplier}));}catch(e){}
-      setDone({result,failed:failed.map(f=>f.label),id:checkId});
+      setDone({result,failed:allFailed.map(f=>f.label),id:checkId});
     }catch(e){
       alert('บันทึกไม่สำเร็จ: '+(e.message||e));
     }finally{ setSaving(false); }
@@ -522,6 +537,50 @@ function CheckForm({me,formType,material,checklist,rafts,presetRaft,onBack}){
           </>}
         </>}
       </div>
+
+      {isPre&&(()=>{
+        // ระยะยืดของลวด — ค่ามาตรฐานตั้งไว้ต่อแพ/ขนาดลวด QC กรอกแค่ค่าที่วัดได้
+        const specs=(elong||[]).filter(e=>String(e.raft_num)===String(head.bed_no));
+        if(!head.bed_no) return null;
+        const cur=specs.find(e=>String(e.wire_mm)===String(head.wire_mm))||null;
+        const lo=cur?cur.target_mm*(1-cur.tol_pct/100):null;
+        const hi=cur?cur.target_mm*(1+cur.tol_pct/100):null;
+        const v=head.elong_mm;
+        const ok=(v===''||v==null||!cur)?null:(Number(v)>=lo&&Number(v)<=hi);
+        const diff=(v===''||v==null||!cur)?null:(Number(v)-cur.target_mm);
+        return <>
+          <div className="sec">ระยะยืดของลวด (Elongation total)</div>
+          <div className={'item '+(ok===false?'bad':ok===true?'ok':'')}>
+            {!specs.length
+              ? <div className="spec" style={{margin:0,lineHeight:1.9}}>
+                  ⚠️ แพ {head.bed_no} ยังไม่ได้ตั้งค่าระยะยืด — ให้แอดมินตั้งที่ แท็บงาน QC → ลิงก์ &amp; หัวข้อตรวจ
+                </div>
+              : <>
+                <div className="lbl">ขนาดลวดที่ใช้</div>
+                <div className="seg" style={{marginBottom:10}}>
+                  {specs.map(e=>(
+                    <button key={e.wire_mm} className={String(head.wire_mm)===String(e.wire_mm)?'on-pass':''}
+                      onClick={()=>setHead(h=>({...h,wire_mm:String(e.wire_mm)}))}>{e.wire_mm} มม.</button>
+                  ))}
+                </div>
+                {cur&&<>
+                  <div className="spec" style={{marginBottom:8}}>
+                    ค่ามาตรฐาน <b>{cur.target_mm} มม.</b> · ยอมรับ ±{cur.tol_pct}% ({lo.toFixed(1)}–{hi.toFixed(1)} มม.)
+                  </div>
+                  <div className="numrow">
+                    <input type="number" step="any" inputMode="decimal" placeholder="ค่าที่วัดได้"
+                      value={v??''} onChange={e=>setHead(h=>({...h,elong_mm:e.target.value}))}/>
+                    <span className="unit">มม.</span>
+                    {ok!=null&&<span className={'verdict '+(ok?'v-ok':'v-bad')}>{ok?'ผ่าน':'ไม่ผ่าน'}</span>}
+                  </div>
+                  {diff!=null&&<div className="spec" style={{marginTop:6,marginBottom:0}}>
+                    ต่างจากมาตรฐาน {diff>0?'+':''}{diff.toFixed(1)} มม. ({(diff/cur.target_mm*100).toFixed(1)}%)
+                  </div>}
+                </>}
+              </>}
+          </div>
+        </>;
+      })()}
 
       <button onClick={passAll} className="ghost" style={{marginTop:12,color:'var(--ok)',borderColor:'#a7e3d4'}}>
         ✓ ติ๊กผ่านทั้งหมด แล้วแก้เฉพาะข้อที่มีปัญหา

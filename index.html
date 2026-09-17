@@ -2779,6 +2779,10 @@ window.__dataReady.then(data => {
     const [checklist,setChecklist]=useState([]);
     const [plan,setPlan]=useState([]);            // ใบงานผลิตรายวัน
     const [preChecks,setPreChecks]=useState([]);  // ใบตรวจก่อนผลิต ไว้จับคู่กับใบงาน
+    const [elongSpec,setElongSpec]=useState([]);   // ค่าระยะยืดมาตรฐานต่อแพ/ขนาดลวด
+    const [elongMissing,setElongMissing]=useState(false);
+    const [rafts,setRafts]=useState([]);
+    const [eForm,setEForm]=useState({raft_num:'',wire_mm:'',target_mm:'',tol_pct:'5'});
     const [items,setItems]=useState([]);
     const [missing,setMissing]=useState(false);
     const [loading,setLoading]=useState(true);
@@ -2796,10 +2800,14 @@ window.__dataReady.then(data => {
         db.from('qc_checklist').select('*').order('form_type').order('section').order('sort_order'),
         db.from('qc_production_day').select('*').order('d',{ascending:false}).limit(600),
         db.from('qc_checks').select('check_date,bed_no').eq('form_type','pre').limit(2000),
-      ]).then(([a,b,c,p,pc])=>{
+        db.from('qc_elongation_spec').select('*').order('raft_num').order('wire_mm'),
+        db.from('worktrack_raft_info').select('raft_num,pile_type,section').order('raft_num'),
+      ]).then(([a,b,c,p,pc,el,rf])=>{
         if(a.error||b.error){setMissing(true);setLoading(false);return;}
         setInspectors(a.data||[]);setChecks(b.data||[]);setChecklist(c.data||[]);
         setPlan((p&&p.data)||[]);setPreChecks((pc&&pc.data)||[]);
+        if(el&&el.error){setElongMissing(true);}else{setElongMissing(false);setElongSpec((el&&el.data)||[]);}
+        setRafts((rf&&rf.data)||[]);
         setMissing(false);setLoading(false);
       }).catch(()=>{setMissing(true);setLoading(false);});
     };
@@ -3064,6 +3072,79 @@ window.__dataReady.then(data => {
                   fontWeight:700,textDecoration:'none'}}>เปิด</a>
             </div>;
           })}
+        </ChartCard>
+
+        <ChartCard span="wide" title="ค่าระยะยืดของลวด (Elongation total)"
+          subtitle="ตั้งค่ามาตรฐานต่อแพ ต่อขนาดลวด — QC กรอกค่าที่วัดได้ ระบบตัดสินผ่าน/ไม่ผ่านให้เอง">
+          {elongMissing
+            ? <div style={{padding:'14px 16px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
+                ⚠️ ยังไม่ได้สร้างตาราง — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-qc-elongation.sql</b> ก่อน
+              </div>
+            : <>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{background:'#f4f6fa'}}>
+                    <th style={{...th,textAlign:'left'}}>แพ</th><th style={{...th,textAlign:'left'}}>ขนาดลวด</th>
+                    <th style={th}>ระยะยืดมาตรฐาน (มม.)</th><th style={th}>ยอมรับ ±%</th>
+                    <th style={th}>ช่วงที่ผ่าน</th>{canEdit&&<th style={th}></th>}
+                  </tr></thead>
+                  <tbody>
+                    {elongSpec.map(e=>{
+                      const lo=e.target_mm*(1-e.tol_pct/100), hi=e.target_mm*(1+e.tol_pct/100);
+                      return <tr key={e.id} style={{borderBottom:'1px solid #eef0f5'}}>
+                        <td style={{...td,textAlign:'left',fontWeight:700}}>แพ {e.raft_num}</td>
+                        <td style={{...td,textAlign:'left'}}>{e.wire_mm} มม.</td>
+                        <td style={{...td,fontWeight:700,color:'#0f766e'}}>{e.target_mm}</td>
+                        <td style={td}>±{e.tol_pct}%</td>
+                        <td style={{...td,color:'#5f6470'}}>{lo.toFixed(1)} – {hi.toFixed(1)}</td>
+                        {canEdit&&<td style={{...td,textAlign:'center'}}>
+                          <button onClick={()=>{
+                            if(!window.confirm('ลบค่าระยะยืดของแพ '+e.raft_num+' ลวด '+e.wire_mm+' มม. ?'))return;
+                            db.from('qc_elongation_spec').delete().eq('id',e.id).then(load);
+                          }} style={{border:'none',background:'none',cursor:'pointer',color:'#c0392b',fontSize:15}}>✕</button>
+                        </td>}
+                      </tr>;
+                    })}
+                    {!elongSpec.length&&<tr><td colSpan={canEdit?6:5} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>
+                      ยังไม่ได้ตั้งค่าระยะยืด — เพิ่มด้านล่าง
+                    </td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              {canEdit&&<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end',marginTop:14,
+                padding:'12px 14px',background:'#f8fafc',borderRadius:10,border:'1px solid #e6e8ee'}}>
+                <div><div style={{fontSize:12.5,color:'#5f6470',marginBottom:4}}>แพ</div>
+                  <select value={eForm.raft_num} onChange={ev=>setEForm(f=>({...f,raft_num:ev.target.value}))}
+                    style={{padding:'7px 10px',borderRadius:8,border:'1.5px solid #d6d8e0',fontSize:13.5,fontFamily:'inherit',background:'#fff'}}>
+                    <option value="">— เลือก —</option>
+                    {rafts.map(r=><option key={r.raft_num} value={r.raft_num}>แพ {r.raft_num} · {(r.pile_type||'')+(r.section||'')}</option>)}
+                  </select></div>
+                <div><div style={{fontSize:12.5,color:'#5f6470',marginBottom:4}}>ขนาดลวด (มม.)</div>
+                  <input type="number" step="any" value={eForm.wire_mm} placeholder="4 / 5"
+                    onChange={ev=>setEForm(f=>({...f,wire_mm:ev.target.value}))}
+                    style={{padding:'7px 10px',borderRadius:8,border:'1.5px solid #d6d8e0',fontSize:13.5,width:90,fontFamily:'inherit'}}/></div>
+                <div><div style={{fontSize:12.5,color:'#5f6470',marginBottom:4}}>ระยะยืดมาตรฐาน (มม.)</div>
+                  <input type="number" step="any" value={eForm.target_mm}
+                    onChange={ev=>setEForm(f=>({...f,target_mm:ev.target.value}))}
+                    style={{padding:'7px 10px',borderRadius:8,border:'1.5px solid #d6d8e0',fontSize:13.5,width:130,fontFamily:'inherit'}}/></div>
+                <div><div style={{fontSize:12.5,color:'#5f6470',marginBottom:4}}>ยอมรับ ±%</div>
+                  <input type="number" step="any" value={eForm.tol_pct}
+                    onChange={ev=>setEForm(f=>({...f,tol_pct:ev.target.value}))}
+                    style={{padding:'7px 10px',borderRadius:8,border:'1.5px solid #d6d8e0',fontSize:13.5,width:90,fontFamily:'inherit'}}/></div>
+                <button onClick={()=>{
+                  const rn=Number(eForm.raft_num), wm=Number(eForm.wire_mm), tm=Number(eForm.target_mm), tp=Number(eForm.tol_pct);
+                  if(!rn||!wm||!tm){alert('กรอก แพ / ขนาดลวด / ระยะยืดมาตรฐาน ให้ครบ');return;}
+                  db.from('qc_elongation_spec').upsert([{raft_num:rn,wire_mm:wm,target_mm:tm,tol_pct:isFinite(tp)&&tp>0?tp:5,updated_at:new Date().toISOString()}],{onConflict:'raft_num,wire_mm'})
+                    .then(({error})=>{ if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
+                      setEForm({raft_num:'',wire_mm:'',target_mm:'',tol_pct:'5'}); load(); });
+                }} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#0f766e',color:'#fff',
+                  fontSize:14.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>บันทึกค่า</button>
+              </div>}
+              <div style={{marginTop:10,fontSize:12.5,color:'#78839A',lineHeight:1.8}}>
+                แพเดียวกันใส่ได้หลายขนาดลวด · ใส่แพ+ขนาดเดิมซ้ำ = แก้ค่าเดิม ·
+                QC จะเห็นค่ามาตรฐานและช่วงที่ผ่านในหน้ากรอก ไม่ต้องจำเอง
+              </div>
+            </>}
         </ChartCard>
 
         <ChartCard span="wide" title="หัวข้อที่ใช้ตรวจ" subtitle="แก้ข้อความ/เกณฑ์ หรือปิดหัวข้อที่ไม่ใช้ได้">
