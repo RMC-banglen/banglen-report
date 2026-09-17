@@ -2771,7 +2771,7 @@ window.__dataReady.then(data => {
   // ============================================================
   function QCTab({currentUser}){
     const db=DB;
-    const canEdit=currentUser?.role==='admin'||currentUser?.role==='editor';
+    const canEdit=currentUser?.role==='admin'||(currentUser?.role==='editor'&&(currentUser?.permissions||{}).qc!==false);
     const QC_FORMS={pre:'ตรวจก่อนผลิต (มอก.396-2549)',post:'ตรวจหลังผลิต (มอก.396-2549)',mat:'ตรวจสอบวัตถุดิบ'};
     const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const [inspectors,setInspectors]=useState([]);
@@ -7377,10 +7377,10 @@ window.__dataReady.then(data => {
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขนส่ง','ฝ่ายจัดซื้อ','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
   // เรียงลำดับ + ใช้คำเดียวกับ TAB_PERM_LIST ด้านล่าง (หน้าที่เข้าดูได้) ให้ตรงกัน จะได้เทียบคู่กันง่ายตอนตั้งสิทธิ์
-  const PERM_LIST=[{k:'quality',v:'รายงานปัญหา'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
+  const PERM_LIST=[{k:'quality',v:'รายงานปัญหา'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'qc',v:'งาน QC'},{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
   const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',concrete:'concrete'};
-  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'calibration',v:'รอบงานประจำ'},{k:'cementAdd',v:'เหตุผลเพิ่มปูน'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'qc',v:'งาน QC'},{k:'calibration',v:'รอบงานประจำ'},{k:'cementAdd',v:'เหตุผลเพิ่มปูน'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_size',v:'วิเคราะห์ขนาดเสา'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
@@ -10177,7 +10177,7 @@ window.__dataReady.then(data => {
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const getFirstTab=(user)=>{
       const tp={...DEFAULT_TAB_PERMS,...(user?.tab_perms||{})};
-      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','calibration','cementAdd','repair','transport','plateusage','accident','pileMaterials'];
+      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','qc','calibration','cementAdd','repair','transport','plateusage','accident','pileMaterials'];
       return user?.role==='admin'?'meeting':(ordered.find(k=>tp[k]!==false)||'meeting');
     };
     const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
