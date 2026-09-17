@@ -2772,7 +2772,7 @@ window.__dataReady.then(data => {
   function QCTab({currentUser}){
     const db=DB;
     const canEdit=currentUser?.role==='admin'||currentUser?.role==='editor';
-    const QC_FORMS={pre:'ตรวจก่อนผลิต (มอก.396-2549)',post:'ตรวจหลังผลิต (มอก.396-2549)'};
+    const QC_FORMS={pre:'ตรวจก่อนผลิต (มอก.396-2549)',post:'ตรวจหลังผลิต (มอก.396-2549)',mat:'ตรวจสอบวัตถุดิบ'};
     const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const [inspectors,setInspectors]=useState([]);
     const [checks,setChecks]=useState([]);
@@ -2957,18 +2957,18 @@ window.__dataReady.then(data => {
           <table style={{width:'100%',borderCollapse:'collapse'}}>
             <thead><tr style={{background:'#f4f6fa'}}>
               <th style={{...th,textAlign:'left'}}>วันที่</th><th style={{...th,textAlign:'left'}}>ฟอร์ม</th>
-              <th style={{...th,textAlign:'left'}}>ผู้ตรวจ</th><th style={{...th,textAlign:'left'}}>แพ/ล็อต</th>
-              <th style={{...th,textAlign:'left'}}>ขนาดเสา</th><th style={th}>ต้น</th>
+              <th style={{...th,textAlign:'left'}}>ผู้ตรวจ</th><th style={{...th,textAlign:'left'}}>แพ/ล็อต/ใบส่งของ</th>
+              <th style={{...th,textAlign:'left'}}>ขนาดเสา / วัตถุดิบ</th><th style={th}>ต้น</th>
               <th style={{...th,textAlign:'center'}}>ผล</th>
             </tr></thead>
             <tbody>{rows.slice(0,300).map(r=>(
               <tr key={r.id} onClick={()=>openDetail(r)} style={{borderBottom:'1px solid #eef0f5',cursor:'pointer',
                 background:r.result==='fail'?'#fdecea55':'transparent'}}>
                 <td style={{...td,textAlign:'left'}}>{fmtD(r.check_date)}</td>
-                <td style={{...td,textAlign:'left'}}>{r.form_type==='pre'?'ก่อนผลิต':'หลังผลิต'}</td>
+                <td style={{...td,textAlign:'left'}}>{r.form_type==='pre'?'ก่อนผลิต':r.form_type==='mat'?'วัตถุดิบ':'หลังผลิต'}</td>
                 <td style={{...td,textAlign:'left',fontWeight:600}}>{nameOf(r.inspector_code)}</td>
                 <td style={{...td,textAlign:'left'}}>{r.bed_no||r.lot_no||'–'}</td>
-                <td style={{...td,textAlign:'left'}}>{r.pile_spec||'–'}</td>
+                <td style={{...td,textAlign:'left'}}>{r.form_type==='mat'?(r.material||'–'):(r.pile_spec||'–')}</td>
                 <td style={td}>{r.qty?n0(r.qty):'–'}</td>
                 <td style={{...td,textAlign:'center'}}>
                   <span style={{padding:'3px 11px',borderRadius:20,fontSize:12.5,fontWeight:700,
@@ -3051,7 +3051,7 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:14}}>
             <div>
               <div style={{fontSize:19,fontWeight:800}}>
-                ใบตรวจ #{openCheck.id} · {openCheck.form_type==='pre'?'ก่อนผลิต':'หลังผลิต'}
+                ใบตรวจ #{openCheck.id} · {openCheck.form_type==='pre'?'ก่อนผลิต':openCheck.form_type==='mat'?('วัตถุดิบ — '+(openCheck.material||'')):'หลังผลิต'}
               </div>
               <div style={{fontSize:13.5,color:'#5f6470',marginTop:4,lineHeight:1.8}}>
                 {fmtD(openCheck.check_date)} · ผู้ตรวจ {nameOf(openCheck.inspector_code)}

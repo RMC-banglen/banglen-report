@@ -84,6 +84,7 @@ const {useState,useEffect,useRef} = React;
 const FORMS = {
   pre:  {label:'ตรวจก่อนผลิต', full:'ระบบตรวจสอบก่อนผลิตเสาเข็มคอนกรีตอัดแรง ตาม มอก.396-2549', icon:'🧰'},
   post: {label:'ตรวจหลังผลิต', full:'ระบบตรวจสอบหลังผลิตเสาเข็ม ตาม มอก.396-2549', icon:'📏'},
+  mat:  {label:'ตรวจสอบวัตถุดิบ', full:'ตรวจรับวัตถุดิบเข้าโรงงาน — ปูน ลวด เหล็ก น้ำยา', icon:'📦'},
 };
 const todayISO = () => {
   const d=new Date();
@@ -130,6 +131,7 @@ function App(){
   const [checklist,setChecklist]=useState(null);
   const [err,setErr]=useState('');
   const [formType,setFormType]=useState(null);
+  const [material,setMaterial]=useState(null);   // ใช้เฉพาะฟอร์มตรวจวัตถุดิบ
 
   useEffect(()=>{
     Promise.all([
@@ -146,9 +148,14 @@ function App(){
 
   const me=inspectors.find(x=>x.code===code);
   if(!me) return <PickUser inspectors={inspectors}/>;
-  if(!formType) return <PickForm me={me} onPick={setFormType}/>;
-  return <CheckForm me={me} formType={formType} checklist={checklist.filter(c=>c.form_type===formType)}
-                    onBack={()=>setFormType(null)}/>;
+  if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
+  if(formType==='mat'&&!material){
+    const mats=[...new Set(checklist.filter(c=>c.form_type==='mat').map(c=>c.section))];
+    return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
+  }
+  const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
+  return <CheckForm me={me} formType={formType} material={material} checklist={list}
+                    onBack={()=>formType==='mat'?setMaterial(null):setFormType(null)}/>;
 }
 
 // เปิดลิงก์ผิด/ไม่มี ?u= → ให้เลือกชื่อ แล้วจำไว้ในเครื่อง
@@ -191,11 +198,33 @@ function PickForm({me,onPick}){
   </>;
 }
 
-function CheckForm({me,formType,checklist,onBack}){
+function PickMaterial({me,mats,onPick,onBack}){
+  return <>
+    <div className="topbar">
+      <button onClick={onBack} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',
+        borderRadius:10,padding:'7px 11px',fontSize:16,cursor:'pointer'}}>←</button>
+      <div><div className="who">ตรวจสอบวัตถุดิบ</div><div className="sub">{me.name} · เลือกวัตถุดิบที่รับเข้า</div></div>
+    </div>
+    <div className="wrap">
+      {mats.map(m=>(
+        <button key={m} onClick={()=>onPick(m)} className="card"
+          style={{width:'100%',textAlign:'left',cursor:'pointer',fontSize:16.5,fontWeight:700,color:'var(--brand)'}}>
+          📦 {m}
+        </button>
+      ))}
+      {!mats.length&&<div className="card" style={{marginTop:16,color:'#92400e',background:'#fffbeb',borderColor:'#fde68a',lineHeight:1.9}}>
+        ⚠️ ยังไม่มีหัวข้อตรวจวัตถุดิบ — ให้แอดมินรันไฟล์ supabase-qc-materials.sql ก่อน
+      </div>}
+    </div>
+  </>;
+}
+
+function CheckForm({me,formType,material,checklist,onBack}){
   const F=FORMS[formType];
   const isPre=formType==='pre';
+  const isMat=formType==='mat';
   const [head,setHead]=useState(()=>({
-    check_date: todayISO(), bed_no:'', lot_no:'', pile_spec:'', qty:'',
+    check_date: todayISO(), bed_no:'', lot_no:'', pile_spec:'', qty:'', supplier:'',
   }));
   const [vals,setVals]=useState({});        // itemId -> {yn, num, note}
   const [files,setFiles]=useState([]);      // {id, file, url}
@@ -204,11 +233,11 @@ function CheckForm({me,formType,checklist,onBack}){
   const fileRef=useRef(null);
 
   // จำค่าหัวเรื่องล่าสุดของคนนี้ไว้ กรอกครั้งต่อไปไม่ต้องพิมพ์ซ้ำ
-  const memKey='qc_last_'+me.code+'_'+formType;
+  const memKey='qc_last_'+me.code+'_'+formType+(material?'_'+material:'');
   useEffect(()=>{
     try{
       const m=JSON.parse(localStorage.getItem(memKey)||'null');
-      if(m) setHead(h=>({...h,pile_spec:m.pile_spec||'',bed_no:m.bed_no||'',lot_no:m.lot_no||''}));
+      if(m) setHead(h=>({...h,pile_spec:m.pile_spec||'',bed_no:m.bed_no||'',supplier:m.supplier||''}));
     }catch(e){}
   },[memKey]);
 
@@ -244,6 +273,7 @@ function CheckForm({me,formType,checklist,onBack}){
       const {data,error}=await DB.from('qc_checks').insert({
         form_type:formType, inspector_code:me.code, check_date:head.check_date,
         bed_no:head.bed_no||'', lot_no:head.lot_no||'', pile_spec:head.pile_spec||'',
+        material:material||'', supplier:head.supplier||'',
         qty:Number(head.qty)||0, result, fail_count:failed.length, note:''
       }).select().single();
       if(error) throw error;
@@ -270,7 +300,7 @@ function CheckForm({me,formType,checklist,onBack}){
         await DB.from('qc_check_images').insert({check_id:checkId,image_url:publicUrl});
       }
 
-      try{localStorage.setItem(memKey,JSON.stringify({pile_spec:head.pile_spec,bed_no:head.bed_no,lot_no:head.lot_no}));}catch(e){}
+      try{localStorage.setItem(memKey,JSON.stringify({pile_spec:head.pile_spec,bed_no:head.bed_no,supplier:head.supplier}));}catch(e){}
       setDone({result,failed:failed.map(f=>f.label),id:checkId});
     }catch(e){
       alert('บันทึกไม่สำเร็จ: '+(e.message||e));
@@ -290,7 +320,7 @@ function CheckForm({me,formType,checklist,onBack}){
     <div className="topbar">
       <button onClick={onBack} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',
         borderRadius:10,padding:'7px 11px',fontSize:16,cursor:'pointer'}}>←</button>
-      <div><div className="who">{F.label}</div><div className="sub">{me.name} · {thaiDate(head.check_date)}</div></div>
+      <div><div className="who">{material||F.label}</div><div className="sub">{me.name} · {thaiDate(head.check_date)}</div></div>
     </div>
 
     <div className="wrap">
@@ -299,15 +329,22 @@ function CheckForm({me,formType,checklist,onBack}){
           <label>วันที่ตรวจ</label>
           <input type="date" value={head.check_date} onChange={e=>setHead(h=>({...h,check_date:e.target.value}))}/>
         </div>
-        {isPre
-          ? <div className="field"><label>แพ/เบด ที่ตรวจ</label>
-              <input value={head.bed_no} placeholder="เช่น แพ 6" onChange={e=>setHead(h=>({...h,bed_no:e.target.value}))}/></div>
-          : <div className="field"><label>ล็อต/เลขที่ผลิต</label>
-              <input value={head.lot_no} placeholder="เช่น L-0915" onChange={e=>setHead(h=>({...h,lot_no:e.target.value}))}/></div>}
-        <div className="field"><label>ขนาดเสา</label>
-          <input value={head.pile_spec} placeholder="เช่น I-0.26 x 12.00 ม." onChange={e=>setHead(h=>({...h,pile_spec:e.target.value}))}/></div>
-        <div className="field"><label>จำนวนที่ตรวจ (ต้น)</label>
-          <input type="number" inputMode="numeric" value={head.qty} onChange={e=>setHead(h=>({...h,qty:e.target.value}))}/></div>
+        {isMat ? <>
+          <div className="field"><label>ผู้ขาย / ผู้ส่ง</label>
+            <input value={head.supplier} placeholder="ชื่อร้าน/บริษัท" onChange={e=>setHead(h=>({...h,supplier:e.target.value}))}/></div>
+          <div className="field"><label>เลขที่ใบส่งของ</label>
+            <input value={head.lot_no} placeholder="เช่น DO-1234" onChange={e=>setHead(h=>({...h,lot_no:e.target.value}))}/></div>
+        </> : <>
+          {isPre
+            ? <div className="field"><label>แพ/เบด ที่ตรวจ</label>
+                <input value={head.bed_no} placeholder="เช่น แพ 6" onChange={e=>setHead(h=>({...h,bed_no:e.target.value}))}/></div>
+            : <div className="field"><label>ล็อต/เลขที่ผลิต</label>
+                <input value={head.lot_no} placeholder="เช่น L-0915" onChange={e=>setHead(h=>({...h,lot_no:e.target.value}))}/></div>}
+          <div className="field"><label>ขนาดเสา</label>
+            <input value={head.pile_spec} placeholder="เช่น I-0.26 x 12.00 ม." onChange={e=>setHead(h=>({...h,pile_spec:e.target.value}))}/></div>
+          <div className="field"><label>จำนวนที่ตรวจ (ต้น)</label>
+            <input type="number" inputMode="numeric" value={head.qty} onChange={e=>setHead(h=>({...h,qty:e.target.value}))}/></div>
+        </>}
       </div>
 
       <button onClick={passAll} className="ghost" style={{marginTop:12,color:'var(--ok)',borderColor:'#a7e3d4'}}>
