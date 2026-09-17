@@ -828,7 +828,189 @@ window.__dataReady.then(data => {
     </section>;
   }
 
-  function OverviewTab({year}){
+  // ── รายงานการผลิต–เวลาเทเสร็จ (รายวัน) กรอกในตารางได้เลยทีละช่อง
+  function PourDailySection({year,canEdit}){
+    const db=DB;
+    const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const [rows,setRows]=useState([]);
+    const [missing,setMissing]=useState(false);
+    const [draft,setDraft]=useState({});        // เฉพาะช่องที่แก้ ยังไม่บันทึก
+    const [saving,setSaving]=useState(false);
+    const [msg,setMsg]=useState('');
+    const [showAll,setShowAll]=useState(false); // false = โชว์เฉพาะวันที่มีข้อมูล + วันนี้
+    const nowD=new Date();
+    const ce=Number(year)-543;                  // ปี พ.ศ. → ค.ศ. (เก็บใน DB เป็น ค.ศ.)
+    const [mon,setMon]=useState(()=>nowD.getMonth()+1);
+
+    const load=()=>{
+      db.from('pour_daily').select('*').order('d').then(({data,error})=>{
+        if(error){setMissing(true);return;}
+        setMissing(false);setRows(data||[]);
+      }).catch(()=>setMissing(true));
+    };
+    useEffect(load,[]);
+
+    const pad=n=>String(n).padStart(2,'0');
+    const daysInMonth=new Date(ce,mon,0).getDate();
+    const key=d=>ce+'-'+pad(mon)+'-'+pad(d);
+    const byDate={}; rows.forEach(r=>{byDate[String(r.d).slice(0,10)]=r;});
+
+    // แถวที่จะแสดง — ปกติโชว์เฉพาะวันที่มีข้อมูลแล้ว + วันนี้ (กรอกง่าย ไม่ต้องเลื่อนผ่าน 31 แถว)
+    const todayKey=nowD.getFullYear()+'-'+pad(nowD.getMonth()+1)+'-'+pad(nowD.getDate());
+    const allDays=Array.from({length:daysInMonth},(_,i)=>i+1);
+    const shownDays=showAll?allDays:allDays.filter(d=>byDate[key(d)]||key(d)===todayKey||draft[key(d)]);
+
+    const val=(k,f)=>{
+      if(draft[k]&&draft[k][f]!==undefined) return draft[k][f];
+      const r=byDate[k];
+      if(!r) return '';
+      return r[f]==null?'':String(r[f]);
+    };
+    const setVal=(k,f,v)=>setDraft(d=>({...d,[k]:{...(d[k]||{}),[f]:v}}));
+    const dirty=Object.keys(draft).length>0;
+
+    // เวลา "16:59" → 16.98 ไว้หาค่าเฉลี่ย/วาดกราฟ
+    const toHours=t=>{
+      const m=String(t||'').match(/^(\d{1,2})[:.](\d{2})/);
+      return m?Number(m[1])+Number(m[2])/60:null;
+    };
+    const hhmm=h=>h==null?'–':pad(Math.floor(h))+':'+pad(Math.round((h-Math.floor(h))*60));
+
+    const monthRows=allDays.map(d=>byDate[key(d)]).filter(Boolean);
+    const times=monthRows.map(r=>toHours(r.finish_time)).filter(v=>v!=null);
+    const avgTime=times.length?times.reduce((a,b)=>a+b,0)/times.length:null;
+    const lateCount=times.filter(v=>v>=17).length;
+    const sumOf=f=>monthRows.reduce((a,r)=>a+(Number(r[f])||0),0);
+
+    const save=()=>{
+      const recs=Object.keys(draft).map(k=>{
+        const cur=byDate[k]||{};
+        const g=f=>{const v=draft[k][f]!==undefined?draft[k][f]:cur[f];return v;};
+        const num=f=>{const v=g(f);const n=Number(v);return v===''||v==null||!isFinite(n)?0:n;};
+        return {d:k,raft_order:num('raft_order'),raft_produced:num('raft_produced'),
+                raft_cancel:num('raft_cancel'),volume_m3:num('volume_m3'),
+                finish_time:String(g('finish_time')||''),note:String(g('note')||''),
+                updated_at:new Date().toISOString()};
+      });
+      if(!recs.length) return;
+      setSaving(true);setMsg('');
+      db.from('pour_daily').upsert(recs,{onConflict:'d'}).then(({error})=>{
+        setSaving(false);
+        if(error){setMsg('❌ '+error.message);return;}
+        setDraft({});setMsg('✅ บันทึกแล้ว '+recs.length+' วัน');load();
+        setTimeout(()=>setMsg(''),4000);
+      }).catch(e=>{setSaving(false);setMsg('❌ '+(e.message||e));});
+    };
+
+    const del=k=>{
+      if(!window.confirm('ลบข้อมูลวันที่ '+k+' ?'))return;
+      db.from('pour_daily').delete().eq('d',k).then(()=>{
+        setDraft(d=>{const n={...d};delete n[k];return n;});
+        load();
+      });
+    };
+
+    const fmtN=(n,dg)=>n==null?'–':Number(n).toLocaleString('th-TH',{minimumFractionDigits:dg||0,maximumFractionDigits:dg||0});
+    const th={padding:'8px 8px',textAlign:'center',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap',fontSize:12.5};
+    const inp={padding:'5px 7px',border:'1px solid #d6d8e0',borderRadius:6,fontSize:13.5,fontFamily:'inherit',textAlign:'right',width:62,boxSizing:'border-box'};
+
+    if(missing) return <ChartCard span="full" title="รายงานการผลิต–เวลาเทเสร็จ (แพ)">
+      <div style={{padding:'14px 16px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
+        ⚠️ ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-pour-daily.sql</b> ก่อน
+      </div></ChartCard>;
+
+    return <ChartCard span="full" title="รายงานการผลิต–เวลาเทเสร็จ (แพ)"
+      subtitle={'กรอกรายวัน — คลิกในช่องแล้วพิมพ์ได้เลย · '+M_TH[mon-1]+' '+year}
+      right={<div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+        <select value={mon} onChange={e=>{setMon(Number(e.target.value));setDraft({});}}
+          style={{padding:'7px 11px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,background:'#fff',fontFamily:'inherit'}}>
+          {M_TH.map((n,i)=><option key={i+1} value={i+1}>{n}</option>)}
+        </select>
+        <button onClick={()=>setShowAll(v=>!v)}
+          style={{padding:'7px 14px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#42465a',fontSize:13.5,cursor:'pointer',fontFamily:'inherit'}}>
+          {showAll?'ย่อ':'แสดงทุกวัน'}
+        </button>
+        {canEdit&&<button onClick={save} disabled={!dirty||saving}
+          style={{padding:'8px 18px',borderRadius:8,border:'none',fontSize:14.5,fontWeight:600,fontFamily:'inherit',
+            background:dirty?'#1a56db':'#e8eaf0',color:dirty?'#fff':'#98a0b0',cursor:dirty&&!saving?'pointer':'default'}}>
+          {saving?'กำลังบันทึก…':dirty?('บันทึก ('+Object.keys(draft).length+' วัน)'):'บันทึก'}
+        </button>}
+      </div>}>
+
+      {msg&&<div style={{marginBottom:10,fontSize:14,color:msg.startsWith('✅')?'#059669':'#c0392b'}}>{msg}</div>}
+
+      <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:14}}>
+        {[['วันที่บันทึก',monthRows.length+' วัน','#1a56db'],
+          ['เวลาเทเสร็จเฉลี่ย',hhmm(avgTime),'#7c3aed'],
+          ['เสร็จหลัง 17:00',lateCount+' วัน','#c0392b'],
+          ['แพผลิตรวม',fmtN(sumOf('raft_produced'),1)+' แพ','#0f766e'],
+          ['แพค้างเท/ยกเลิก',fmtN(sumOf('raft_cancel'),0)+' แพ','#d97706'],
+          ['คิวผลิตรวม',fmtN(sumOf('volume_m3'),0)+' m³','#059669']].map(([l,v,c])=>(
+          <div key={l} style={{flex:'1 1 140px',border:'1px solid #e6e8ee',borderRadius:12,padding:'11px 15px'}}>
+            <div style={{fontSize:12.5,color:'#5f6470',marginBottom:3}}>{l}</div>
+            <div style={{fontSize:21,fontWeight:800,color:c,lineHeight:1.2}}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr style={{background:'#f4f6fa'}}>
+            <th style={{...th,textAlign:'left'}}>วันที่</th>
+            <th style={th}>แพสั่งผลิต</th><th style={th}>แพผลิต</th><th style={th}>ยกเลิก/ค้างเท</th>
+            <th style={th}>คิวผลิต</th><th style={th}>เวลาเทเสร็จ</th>
+            <th style={{...th,textAlign:'left',minWidth:260}}>รายงานการผลิตที่ไม่เป็นไปตามกำหนด</th>
+            {canEdit&&<th style={th}></th>}
+          </tr></thead>
+          <tbody>
+            {shownDays.map(d=>{
+              const k=key(d);
+              const isToday=k===todayKey, edited=!!draft[k], has=!!byDate[k];
+              const late=toHours(val(k,'finish_time'))>=17;
+              return <tr key={k} style={{borderBottom:'1px solid #eef0f5',
+                background:edited?'#fffbeb':isToday?'#f0f9ff':'transparent'}}>
+                <td style={{padding:'6px 8px',fontSize:13.5,fontWeight:700,whiteSpace:'nowrap'}}>
+                  {d}/{mon}/{year}{isToday&&<span style={{marginLeft:6,fontSize:11,color:'#1a56db'}}>วันนี้</span>}
+                </td>
+                {[['raft_order',62],['raft_produced',62],['raft_cancel',62],['volume_m3',76]].map(([f,w])=>(
+                  <td key={f} style={{padding:'4px 6px',textAlign:'center'}}>
+                    <input type="number" step="any" value={val(k,f)} disabled={!canEdit}
+                      onChange={e=>setVal(k,f,e.target.value)} style={{...inp,width:w}}/>
+                  </td>
+                ))}
+                <td style={{padding:'4px 6px',textAlign:'center'}}>
+                  <input type="text" placeholder="16:59" value={val(k,'finish_time')} disabled={!canEdit}
+                    onChange={e=>setVal(k,'finish_time',e.target.value)}
+                    style={{...inp,width:70,textAlign:'center',color:late?'#c0392b':'inherit',fontWeight:late?700:400}}/>
+                </td>
+                <td style={{padding:'4px 6px'}}>
+                  <input type="text" value={val(k,'note')} disabled={!canEdit}
+                    onChange={e=>setVal(k,'note',e.target.value)}
+                    style={{...inp,width:'100%',textAlign:'left'}}/>
+                </td>
+                {canEdit&&<td style={{padding:'4px 6px',textAlign:'center'}}>
+                  {has&&<button onClick={()=>del(k)} title="ลบวันนี้"
+                    style={{border:'none',background:'none',cursor:'pointer',color:'#c0392b',fontSize:15}}>✕</button>}
+                </td>}
+              </tr>;
+            })}
+            {!shownDays.length&&<tr><td colSpan={canEdit?8:7} style={{padding:18,textAlign:'center',color:'#94a3b8',fontSize:14}}>
+              ยังไม่มีข้อมูลเดือนนี้ — กด “แสดงทุกวัน” เพื่อเริ่มกรอก
+            </td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{marginTop:10,fontSize:12.5,color:'#78839A',lineHeight:1.8}}>
+        ปกติแสดงเฉพาะวันที่มีข้อมูลและวันนี้ · กด <b>แสดงทุกวัน</b> เพื่อกรอกย้อนหลัง ·
+        ช่องที่แก้แล้วยังไม่บันทึกจะเป็น<span style={{background:'#fffbeb',padding:'1px 5px',borderRadius:4}}>พื้นเหลือง</span> ·
+        เวลาเทเสร็จตั้งแต่ 17:00 ขึ้นไปจะขึ้นเป็น<b style={{color:'#c0392b'}}>สีแดง</b>
+      </div>
+    </ChartCard>;
+  }
+
+
+  function OverviewTab({year,canEdit}){
     const yd=yearData(year),cats=monthsPresent(year).map(m=>M[m-1]);
     const produced=yd.months.map(mo=>mo.produced),transport=yd.months.map(mo=>mo.transport);
     const stock=yd.months.map(mo=>mo.stock),pctInfo=yd.months.map(mo=>computePct(mo)),pct=pctInfo.map(p=>p.pct);
@@ -940,6 +1122,8 @@ window.__dataReady.then(data => {
           </tr></tfoot>
         </table></div>
       </ChartCard>
+
+      <PourDailySection year={year} canEdit={canEdit}/>
     </div>;
   }
 
@@ -9598,7 +9782,7 @@ window.__dataReady.then(data => {
       <main>
         {tab==='meeting'&&<HeadOfficeMeetingTab currentUser={currentUser}/>}
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
-        {tab==='overview'&&<OverviewTab year={year}/>}
+        {tab==='overview'&&<OverviewTab year={year} canEdit={currentUser.role==='admin'||currentUser.role==='editor'}/>}
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='damage'&&<DamageDetailTab currentUser={currentUser}/>}
         {tab==='concrete'&&<ConcreteView year={year} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
