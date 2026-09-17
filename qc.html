@@ -86,6 +86,7 @@ const FORMS = {
   pre:  {label:'ตรวจก่อนผลิต', full:'ระบบตรวจสอบก่อนผลิตเสาเข็มคอนกรีตอัดแรง ตาม มอก.396-2549', icon:'🧰'},
   post: {label:'ตรวจหลังผลิต', full:'ระบบตรวจสอบหลังผลิตเสาเข็ม ตาม มอก.396-2549', icon:'📏'},
   mat:  {label:'ตรวจสอบวัตถุดิบ', full:'ตรวจรับวัตถุดิบเข้าโรงงาน — ปูน ลวด เหล็ก น้ำยา', icon:'📦'},
+  plan: {label:'ใบงานผลิตวันนี้', full:'ลงแพที่ผลิตวันนี้ และดูว่าแพไหนยังไม่ได้ตรวจ', icon:'📋'},
 };
 const todayISO = () => {
   const d=new Date();
@@ -141,6 +142,7 @@ function App(){
   const [err,setErr]=useState('');
   const [formType,setFormType]=useState(null);
   const [material,setMaterial]=useState(null);   // ใช้เฉพาะฟอร์มตรวจวัตถุดิบ
+  const [presetRaft,setPresetRaft]=useState(null); // แพที่กดมาจากใบงานผลิต
 
   useEffect(()=>{
     Promise.all([
@@ -159,13 +161,15 @@ function App(){
   const me=inspectors.find(x=>x.code===code);
   if(!me) return <PickUser inspectors={inspectors}/>;
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
+  if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
+                                  onInspect={n=>{setPresetRaft(String(n));setFormType('pre');}}/>;
   if(formType==='mat'&&!material){
     const mats=[...new Set(checklist.filter(c=>c.form_type==='mat').map(c=>c.section))].sort((x,y)=>x.localeCompare(y,'th'));
     return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
-  return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts}
-                    onBack={()=>formType==='mat'?setMaterial(null):setFormType(null)}/>;
+  return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} presetRaft={presetRaft}
+                    onBack={()=>{setPresetRaft(null);formType==='mat'?setMaterial(null):setFormType(null);}}/>;
 }
 
 // เปิดลิงก์ผิด/ไม่มี ?u= → ให้เลือกชื่อ แล้วจำไว้ในเครื่อง
@@ -208,6 +212,148 @@ function PickForm({me,onPick}){
   </>;
 }
 
+// ใบงานผลิตรายวัน + สถานะการตรวจ — หน้าเดียวจบ ลงใบงานแล้วเห็นเลยว่าเหลือแพไหน
+function PlanView({me,rafts,onBack,onInspect}){
+  const [day,setDay]=useState(todayISO());
+  const [plan,setPlan]=useState(null);        // เลขแพที่ลงใบงานไว้ของวันนั้น
+  const [checked,setChecked]=useState([]);    // เลขแพที่ตรวจก่อนผลิตแล้วของวันนั้น
+  const [editing,setEditing]=useState(false);
+  const [sel,setSel]=useState([]);
+  const [saving,setSaving]=useState(false);
+  const [msg,setMsg]=useState('');
+  const [missing,setMissing]=useState(false);
+
+  const load=(d)=>{
+    Promise.all([
+      DB.from('qc_production_day').select('raft_num,pile_spec').eq('d',d).order('raft_num'),
+      DB.from('qc_checks').select('bed_no').eq('form_type','pre').eq('check_date',d),
+    ]).then(([p,c])=>{
+      if(p.error){setMissing(true);return;}
+      setMissing(false);
+      setPlan(p.data||[]);
+      setChecked([...new Set((c.data||[]).map(x=>String(x.bed_no)).filter(Boolean))]);
+    }).catch(()=>setMissing(true));
+  };
+  useEffect(()=>{setPlan(null);load(day);},[day]);
+
+  const isDone=n=>checked.includes(String(n));
+  const openEdit=()=>{setSel((plan||[]).map(p=>p.raft_num));setEditing(true);setMsg('');};
+
+  const copyPrev=async()=>{
+    const d=new Date(day+'T00:00:00'); d.setDate(d.getDate()-1);
+    const prev=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const {data}=await DB.from('qc_production_day').select('raft_num').eq('d',prev);
+    if(!data||!data.length){setMsg('เมื่อวานไม่มีใบงาน');return;}
+    setSel(data.map(r=>r.raft_num));setMsg('ดึงจากเมื่อวานแล้ว '+data.length+' แพ — กดบันทึกเพื่อยืนยัน');
+  };
+
+  const save=async()=>{
+    setSaving(true);setMsg('');
+    try{
+      await DB.from('qc_production_day').delete().eq('d',day);
+      if(sel.length){
+        const rows=sel.map(n=>{
+          const r=rafts.find(x=>Number(x.raft_num)===Number(n));
+          return {d:day,raft_num:Number(n),pile_spec:raftLabel(r),created_by:me.code};
+        });
+        const {error}=await DB.from('qc_production_day').insert(rows);
+        if(error) throw error;
+      }
+      setEditing(false);setMsg('✅ บันทึกใบงานแล้ว');load(day);
+      setTimeout(()=>setMsg(''),3500);
+    }catch(e){setMsg('❌ '+(e.message||e));}
+    finally{setSaving(false);}
+  };
+
+  const done=(plan||[]).filter(p=>isDone(p.raft_num)).length;
+  const total=(plan||[]).length;
+
+  return <>
+    <div className="topbar">
+      <button onClick={onBack} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',
+        borderRadius:10,padding:'7px 11px',fontSize:16,cursor:'pointer'}}>←</button>
+      <div><div className="who">ใบงานผลิต</div><div className="sub">{me.name} · {thaiDate(day)}</div></div>
+    </div>
+
+    <div className="wrap">
+      {missing&&<div className="card" style={{marginTop:14,color:'#92400e',background:'#fffbeb',borderColor:'#fde68a',lineHeight:1.9}}>
+        ⚠️ ยังไม่ได้สร้างตารางใบงานผลิต — ให้แอดมินรันไฟล์ supabase-qc-plan.sql ก่อน
+      </div>}
+
+      <div className="card">
+        <div className="field" style={{marginBottom:0}}>
+          <label>วันที่</label>
+          <input type="date" value={day} onChange={e=>setDay(e.target.value)}/>
+        </div>
+      </div>
+
+      {msg&&<div style={{margin:'10px 2px',fontSize:14,color:msg.startsWith('❌')?'var(--bad)':'var(--ok)'}}>{msg}</div>}
+
+      {!missing&&(plan===null
+        ? <div className="card" style={{color:'#78839a'}}>กำลังโหลด…</div>
+        : editing
+          ? <>
+            <div className="sec">เลือกแพที่ผลิตวันนี้</div>
+            <div className="card">
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                {rafts.map(r=>{
+                  const on=sel.includes(r.raft_num);
+                  return <button key={r.raft_num} onClick={()=>setSel(s=>on?s.filter(x=>x!==r.raft_num):[...s,r.raft_num])}
+                    style={{padding:'12px 8px',borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
+                      border:`2px solid ${on?'var(--ok)':'var(--line-strong)'}`,background:on?'var(--okbg)':'#fff'}}>
+                    <div style={{fontSize:15,fontWeight:800,color:on?'var(--ok)':'var(--ink)'}}>
+                      {on?'✓ ':''}แพ {r.raft_num}
+                    </div>
+                    <div style={{fontSize:12.5,color:'var(--muted)'}}>{raftLabel(r)||'ยังไม่ระบุ'}</div>
+                  </button>;
+                })}
+              </div>
+              <button className="ghost" style={{marginTop:12}} onClick={copyPrev}>📄 เหมือนเมื่อวาน</button>
+            </div>
+            <div style={{display:'flex',gap:10,marginTop:12}}>
+              <button className="bigbtn" style={{flex:1}} disabled={saving} onClick={save}>
+                {saving?'กำลังบันทึก…':'บันทึกใบงาน ('+sel.length+' แพ)'}
+              </button>
+              <button className="ghost" style={{width:110}} onClick={()=>setEditing(false)}>ยกเลิก</button>
+            </div>
+          </>
+          : <>
+            <div className="card" style={{marginTop:12,textAlign:'center',
+              background:total&&done===total?'var(--okbg)':'#fff',
+              borderColor:total&&done===total?'#a7e3d4':'var(--line)'}}>
+              <div style={{fontSize:13,color:'var(--muted)'}}>ตรวจก่อนผลิตแล้ว</div>
+              <div className="big" style={{color:total&&done===total?'var(--ok)':'var(--bad)'}}>{done}/{total} แพ</div>
+            </div>
+
+            {total===0
+              ? <div className="card" style={{color:'#78839a',lineHeight:1.9}}>
+                  ยังไม่ได้ลงใบงานของวันนี้ — กดปุ่มด้านล่างเพื่อเลือกแพที่ผลิต
+                </div>
+              : (plan||[]).map(p=>{
+                  const ok=isDone(p.raft_num);
+                  return <button key={p.raft_num} onClick={()=>!ok&&onInspect(p.raft_num)}
+                    style={{width:'100%',textAlign:'left',marginBottom:8,padding:'14px 15px',borderRadius:12,
+                      cursor:ok?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:12,
+                      border:`1.5px solid ${ok?'#a7e3d4':'#f3b8b0'}`,background:ok?'var(--okbg)':'var(--badbg)'}}>
+                    <span style={{fontSize:20}}>{ok?'🟢':'🔴'}</span>
+                    <span style={{flex:1}}>
+                      <span style={{display:'block',fontSize:16,fontWeight:800,color:ok?'var(--ok)':'var(--bad)'}}>แพ {p.raft_num}</span>
+                      <span style={{display:'block',fontSize:13,color:'var(--muted)'}}>{p.pile_spec||'ยังไม่ระบุขนาด'}</span>
+                    </span>
+                    <span style={{fontSize:13,fontWeight:700,color:ok?'var(--ok)':'var(--bad)'}}>
+                      {ok?'ตรวจแล้ว':'ตรวจเลย →'}
+                    </span>
+                  </button>;
+                })}
+
+            <button className="ghost" style={{marginTop:6}} onClick={openEdit}>
+              ✎ {total?'แก้ไขใบงาน':'ลงใบงานผลิตวันนี้'}
+            </button>
+          </>)}
+    </div>
+  </>;
+}
+
 function PickMaterial({me,mats,onPick,onBack}){
   return <>
     <div className="topbar">
@@ -229,7 +375,7 @@ function PickMaterial({me,mats,onPick,onBack}){
   </>;
 }
 
-function CheckForm({me,formType,material,checklist,rafts,onBack}){
+function CheckForm({me,formType,material,checklist,rafts,presetRaft,onBack}){
   const F=FORMS[formType];
   const isPre=formType==='pre';
   const isMat=formType==='mat';
@@ -244,6 +390,12 @@ function CheckForm({me,formType,material,checklist,rafts,onBack}){
 
   // จำค่าหัวเรื่องล่าสุดของคนนี้ไว้ กรอกครั้งต่อไปไม่ต้องพิมพ์ซ้ำ
   const memKey='qc_last_'+me.code+'_'+formType+(material?'_'+material:'');
+  // กดมาจากใบงานผลิต → เลือกแพให้เลย ไม่ต้องหาซ้ำ
+  useEffect(()=>{
+    if(!presetRaft) return;
+    const r=(rafts||[]).find(x=>String(x.raft_num)===String(presetRaft));
+    setHead(h=>({...h,bed_no:String(presetRaft),pile_spec:raftLabel(r)}));
+  },[presetRaft]);
   useEffect(()=>{
     try{
       const m=JSON.parse(localStorage.getItem(memKey)||'null');
