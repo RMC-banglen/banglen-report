@@ -2790,16 +2790,30 @@ window.__dataReady.then(data => {
     const load=()=>{
       Promise.all([
         db.from('qc_inspectors').select('*').order('sort_order'),
-        db.from('qc_checks').select('*').order('check_date',{ascending:false}).order('id',{ascending:false}).limit(2000),
+        db.from('qc_checks').select('*').order('check_date',{ascending:false}).order('id',{ascending:false}).limit(600),
         db.from('qc_checklist').select('*').order('form_type').order('sort_order'),
-        db.from('qc_check_items').select('check_id,label,section,kind,value_yn,value_num,unit,ok,note').limit(20000),
-      ]).then(([a,b,c,d])=>{
+      ]).then(([a,b,c])=>{
         if(a.error||b.error){setMissing(true);setLoading(false);return;}
-        setInspectors(a.data||[]);setChecks(b.data||[]);setChecklist(c.data||[]);setItems(d.data||[]);
+        setInspectors(a.data||[]);setChecks(b.data||[]);setChecklist(c.data||[]);
         setMissing(false);setLoading(false);
       }).catch(()=>{setMissing(true);setLoading(false);});
     };
     useEffect(load,[]);
+
+    // ผลรายหัวข้อ: ดึงเฉพาะใบที่อยู่ในตัวกรองปัจจุบัน (ไม่ใช่ทั้งฐาน) เพื่อไม่ให้ payload โตตามอายุการใช้งาน
+    const [itemKey,setItemKey]=useState('');
+    useEffect(()=>{
+      if(sub!=='overview'||!rowIds.length){return;}
+      const key=rowIds.join(',');
+      if(key===itemKey) return;
+      setItemKey(key);
+      // แบ่งขอทีละ 150 ใบ กัน URL ยาวเกินที่เซิร์ฟเวอร์รับได้ แล้วรวมผลกลับมา
+      const chunks=[];
+      for(let x=0;x<rowIds.length;x+=150) chunks.push(rowIds.slice(x,x+150));
+      Promise.all(chunks.map(c=>db.from('qc_check_items').select('check_id,label,ok').in('check_id',c)))
+        .then(res=>setItems(res.flatMap(r=>r.data||[])))
+        .catch(()=>setItems([]));
+    });
 
     const nameOf=code=>(inspectors.find(i=>i.code===code)||{}).name||code;
     const ym=r=>String(r.check_date||'').slice(0,7);
@@ -2811,8 +2825,8 @@ window.__dataReady.then(data => {
       (fForm==='all'||r.form_type===fForm) &&
       (fWho==='all'||r.inspector_code===fWho) &&
       (!activeYM||ym(r)===activeYM));
-    const ids=new Set(rows.map(r=>r.id));
-    const rowItems=items.filter(x=>ids.has(x.check_id));
+    const rowIds=rows.map(r=>r.id);
+    const rowItems=items.filter(x=>rowIds.includes(x.check_id));
 
     const nPass=rows.filter(r=>r.result==='pass').length;
     const nFail=rows.length-nPass;
