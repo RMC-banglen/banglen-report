@@ -199,6 +199,7 @@ function onOpen() {
     .addItem('หาไอดีกลุ่ม Telegram', 'findChatIds')
     .addItem('ทดสอบส่ง Telegram', 'testTelegramAlert')
     .addItem('ตรวจย้อนหลังทั้งชีท', 'checkAllConcreteResults')
+    .addItem('ทดสอบเตือน QC แพค้างตรวจ', 'qcTestAlertNow')
     .addToUi();
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -613,4 +614,71 @@ function syncConcrete() {
   } catch(e) {
     Logger.log(logMsg);
   }
+}
+
+// ============================================================
+// แจ้งเตือน QC — แพที่ลงใบงานผลิตไว้แต่ยังไม่ได้ตรวจก่อนผลิต
+// ตั้ง Trigger 2 ตัว:
+//   qcAlertEvening  → Day timer 17:00-18:00  (เตือนของวันนี้)
+//   qcAlertMorning  → Day timer 08:00-09:00  (เตือนของเมื่อวานที่ยังค้าง)
+// ============================================================
+
+function qcAlertEvening() { qcCheckPending(0, 'เย็นนี้'); }
+function qcAlertMorning() { qcCheckPending(-1, 'เมื่อวาน'); }
+
+function qcCheckPending(dayOffset, whenLabel) {
+  try {
+    var d = new Date();
+    d.setDate(d.getDate() + (dayOffset || 0));
+    var ymd = Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd');
+
+    var planned = qcGet('qc_production_day?select=raft_num,pile_spec&d=eq.' + ymd);
+    if (!planned || !planned.length) return;            // วันนั้นไม่มีใบงาน ไม่ต้องเตือน
+
+    var checks = qcGet('qc_checks?select=bed_no&form_type=eq.pre&check_date=eq.' + ymd) || [];
+    var done = {};
+    checks.forEach(function (c) { if (c.bed_no) done[String(c.bed_no)] = true; });
+
+    var pending = planned.filter(function (p) { return !done[String(p.raft_num)]; });
+    if (!pending.length) {
+      // ครบแล้ว — เตือนเฉพาะรอบเย็นให้รู้ว่าเรียบร้อย
+      if ((dayOffset || 0) === 0) {
+        sendTelegram('✅ <b>QC ตรวจก่อนผลิตครบแล้ว</b>\n' + qcThaiDate(ymd) +
+                     ' · ครบทั้ง ' + planned.length + ' แพ');
+      }
+      return;
+    }
+
+    var lines = pending.map(function (p) {
+      return '• แพ ' + p.raft_num + (p.pile_spec ? ' — ' + p.pile_spec : '');
+    }).join('\n');
+
+    sendTelegram('🚨 <b>ยังไม่ได้ตรวจก่อนผลิต ' + pending.length + ' แพ</b>\n' +
+                 'ใบงานผลิต ' + qcThaiDate(ymd) + ' (' + whenLabel + ')\n\n' + lines +
+                 '\n\nตรวจแล้ว ' + (planned.length - pending.length) + '/' + planned.length + ' แพ');
+  } catch (err) {
+    Logger.log('qcCheckPending error: ' + err.message);
+  }
+}
+
+// อ่านข้อมูลจาก Supabase (อ่านอย่างเดียว)
+function qcGet(path) {
+  var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    method: 'get',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY },
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() !== 200) { Logger.log('qcGet ' + res.getResponseCode() + ': ' + res.getContentText()); return null; }
+  return JSON.parse(res.getContentText());
+}
+
+function qcThaiDate(ymd) {
+  var p = String(ymd).split('-');
+  return Number(p[2]) + '/' + Number(p[1]) + '/' + (Number(p[0]) + 543);
+}
+
+// กดจากเมนูเพื่อลองดูผลทันที ไม่ต้องรอ trigger
+function qcTestAlertNow() {
+  qcCheckPending(0, 'ทดสอบ');
+  SpreadsheetApp.getUi().alert('ส่งผลตรวจสอบของวันนี้ไป Telegram แล้ว (ถ้าวันนี้ไม่มีใบงานผลิต จะไม่ส่งอะไร)');
 }
