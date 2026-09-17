@@ -837,7 +837,8 @@ window.__dataReady.then(data => {
     const [draft,setDraft]=useState({});        // เฉพาะช่องที่แก้ ยังไม่บันทึก
     const [saving,setSaving]=useState(false);
     const [msg,setMsg]=useState('');
-    const [showAll,setShowAll]=useState(false); // false = โชว์เฉพาะวันที่มีข้อมูล + วันนี้
+    // auto = เฉพาะวันที่มีข้อมูล + วันนี้ | h1 = วันที่ 1–15 | h2 = 16–สิ้นเดือน | all = ทุกวัน
+    const [view,setView]=useState('auto');
     const nowD=new Date();
     const ce=Number(year)-543;                  // ปี พ.ศ. → ค.ศ. (เก็บใน DB เป็น ค.ศ.)
     const [mon,setMon]=useState(()=>nowD.getMonth()+1);
@@ -858,7 +859,11 @@ window.__dataReady.then(data => {
     // แถวที่จะแสดง — ปกติโชว์เฉพาะวันที่มีข้อมูลแล้ว + วันนี้ (กรอกง่าย ไม่ต้องเลื่อนผ่าน 31 แถว)
     const todayKey=nowD.getFullYear()+'-'+pad(nowD.getMonth()+1)+'-'+pad(nowD.getDate());
     const allDays=Array.from({length:daysInMonth},(_,i)=>i+1);
-    const shownDays=showAll?allDays:allDays.filter(d=>byDate[key(d)]||key(d)===todayKey||draft[key(d)]);
+    const shownDays=
+        view==='all' ? allDays
+      : view==='h1'  ? allDays.filter(d=>d<=15)
+      : view==='h2'  ? allDays.filter(d=>d>15)
+      : allDays.filter(d=>byDate[key(d)]||key(d)===todayKey||draft[key(d)]);
 
     const val=(k,f)=>{
       if(draft[k]&&draft[k][f]!==undefined) return draft[k][f];
@@ -924,7 +929,8 @@ window.__dataReady.then(data => {
       });
     };
 
-    const fmtN=(n,dg)=>n==null?'–':Number(n).toLocaleString('th-TH',{minimumFractionDigits:dg||0,maximumFractionDigits:dg||0});
+    // แสดงทศนิยมเฉพาะตอนมีเศษจริง (แพครึ่งใบมีได้ 7.5 แพ) จะได้ไม่ปัด 0.5 เป็น 1
+    const fmtN=(n,dg)=>n==null?'–':Number(n).toLocaleString('th-TH',{maximumFractionDigits:dg==null?1:dg});
     const th={padding:'8px 8px',textAlign:'center',fontWeight:700,color:'#42465a',borderBottom:'2px solid #e2e5ee',whiteSpace:'nowrap',fontSize:12.5};
     const inp={padding:'5px 7px',border:'1px solid #d6d8e0',borderRadius:6,fontSize:13.5,fontFamily:'inherit',textAlign:'right',width:62,boxSizing:'border-box'};
 
@@ -940,10 +946,14 @@ window.__dataReady.then(data => {
           style={{padding:'7px 11px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,background:'#fff',fontFamily:'inherit'}}>
           {M_TH.map((n,i)=><option key={i+1} value={i+1}>{n}</option>)}
         </select>
-        <button onClick={()=>setShowAll(v=>!v)}
-          style={{padding:'7px 14px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#42465a',fontSize:13.5,cursor:'pointer',fontFamily:'inherit'}}>
-          {showAll?'ย่อ':'แสดงทุกวัน'}
-        </button>
+        <div style={{display:'flex',gap:5}}>
+          {[['auto','ย่อ'],['h1','1–15'],['h2','16–สิ้นเดือน'],['all','ทุกวัน']].map(([v,l])=>(
+            <button key={v} onClick={()=>setView(v)}
+              style={{padding:'7px 12px',borderRadius:20,fontSize:13,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',
+                border:`1.5px solid ${view===v?'#1a56db':'#e2e8f0'}`,background:view===v?'#1a56db':'#fff',
+                color:view===v?'#fff':'#334155',fontWeight:view===v?700:400}}>{l}</button>
+          ))}
+        </div>
         {canEdit&&<button onClick={save} disabled={!dirty||saving}
           style={{padding:'8px 18px',borderRadius:8,border:'none',fontSize:14.5,fontWeight:600,fontFamily:'inherit',
             background:dirty?'#1a56db':'#e8eaf0',color:dirty?'#fff':'#98a0b0',cursor:dirty&&!saving?'pointer':'default'}}>
@@ -957,8 +967,8 @@ window.__dataReady.then(data => {
         {[['วันที่บันทึก',monthRows.length+' วัน','#1a56db'],
           ['เวลาเทเสร็จเฉลี่ย',hhmm(avgTime),'#7c3aed'],
           ['เสร็จหลัง 17:00',lateCount+' วัน','#c0392b'],
-          ['แพผลิตรวม',fmtN(sumOf('raft_produced'),1)+' แพ','#0f766e'],
-          ['แพค้างเท/ยกเลิก',fmtN(sumOf('raft_cancel'),0)+' แพ','#d97706']].map(([l,v,c])=>(
+          ['แพผลิตรวม',fmtN(sumOf('raft_produced'))+' แพ','#0f766e'],
+          ['แพค้างเท/ยกเลิก',fmtN(sumOf('raft_cancel'))+' แพ','#d97706']].map(([l,v,c])=>(
           <div key={l} style={{flex:'1 1 140px',border:'1px solid #e6e8ee',borderRadius:12,padding:'11px 15px'}}>
             <div style={{fontSize:12.5,color:'#5f6470',marginBottom:3}}>{l}</div>
             <div style={{fontSize:21,fontWeight:800,color:c,lineHeight:1.2}}>{v}</div>
@@ -1010,14 +1020,14 @@ window.__dataReady.then(data => {
               </tr>;
             })}
             {!shownDays.length&&<tr><td colSpan={canEdit?7:6} style={{padding:18,textAlign:'center',color:'#94a3b8',fontSize:14}}>
-              ยังไม่มีข้อมูลเดือนนี้ — กด “แสดงทุกวัน” เพื่อเริ่มกรอก
+              ยังไม่มีข้อมูลเดือนนี้ — กด “1–15” หรือ “ทุกวัน” เพื่อเริ่มกรอก
             </td></tr>}
           </tbody>
         </table>
       </div>
 
       <div style={{marginTop:10,fontSize:12.5,color:'#78839A',lineHeight:1.8}}>
-        ปกติแสดงเฉพาะวันที่มีข้อมูลและวันนี้ · กด <b>แสดงทุกวัน</b> เพื่อกรอกย้อนหลัง ·
+        <b>ย่อ</b> = เฉพาะวันที่มีข้อมูลและวันนี้ · <b>1–15</b> / <b>16–สิ้นเดือน</b> = กรอกทีละครึ่งเดือน · <b>ทุกวัน</b> = ทั้งเดือน ·
         ช่องที่แก้แล้วยังไม่บันทึกจะเป็น<span style={{background:'#fffbeb',padding:'1px 5px',borderRadius:4}}>พื้นเหลือง</span> ·
         ช่องเวลาพิมพ์ตัวเลขติดกันได้เลย เช่น <b>1658</b> → กด Enter หรือคลิกออกจะกลายเป็น <b>16:58</b> เอง ·
         เวลาเทเสร็จตั้งแต่ 17:00 ขึ้นไปจะขึ้นเป็น<b style={{color:'#c0392b'}}>สีแดง</b>
