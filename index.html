@@ -6009,13 +6009,18 @@ window.__dataReady.then(data => {
     const groupAmt = (grp, col) => grp.rows.reduce((a,row)=>a+colAmt(row.fn,col),0);
     const totalAmt = col => DAMAGE_GROUPS.reduce((a,g)=>a+groupAmt(g,col),0);
 
+    // คอลัมน์น้อย (เช่นเลือกเดือนล่าสุดเดือนเดียว) เหลือพื้นที่ว่างเยอะ → ขยายตัวเลขให้อ่านง่ายขึ้น
+    const nCols=cols.length;
+    const SZ = nCols<=3 ? {num:18,pct:14,label:15,head:14,sub:12,grp:13,pad:'8px 12px',padSm:'8px 10px',row:'7px 10px'}
+             : nCols<=6 ? {num:15,pct:12,label:13.5,head:13,sub:11,grp:12,pad:'5px 9px',padSm:'5px 7px',row:'5px 9px'}
+             :            {num:12,pct:11,label:12,head:12,sub:10,grp:11,pad:'3px 6px',padSm:'3px 4px',row:'3px 8px'};
     const tdNum = (v,sale,bold,bg) => {
       const pct = sale>0?(v/sale*100).toFixed(2)+'%':'–';
       return <>
-        <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:bold?700:400,background:bg||'',padding:'3px 6px',whiteSpace:'nowrap'}}>
+        <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:SZ.num,fontWeight:bold?700:400,background:bg||'',padding:SZ.pad,whiteSpace:'nowrap'}}>
           {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
         </td>
-        <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'11px',color:'var(--muted-text)',background:bg||'',padding:'3px 4px',whiteSpace:'nowrap'}}>
+        <td style={{textAlign:'right',fontFamily:'var(--num)',fontSize:SZ.pct,color:'var(--muted-text)',background:bg||'',padding:SZ.padSm,whiteSpace:'nowrap'}}>
           {sale>0&&v>0?pct:''}
         </td>
       </>;
@@ -6024,10 +6029,10 @@ window.__dataReady.then(data => {
     const tdNumClick = (v,sale,bg,onClick) => {
       const pct = sale>0?(v/sale*100).toFixed(2)+'%':'–';
       return <>
-        <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',background:bg||'',padding:'3px 6px',whiteSpace:'nowrap',cursor:'pointer'}}>
+        <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:SZ.num,background:bg||'',padding:SZ.pad,whiteSpace:'nowrap',cursor:'pointer'}}>
           {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
         </td>
-        <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:'11px',color:'var(--muted-text)',background:bg||'',padding:'3px 4px',whiteSpace:'nowrap',cursor:'pointer'}}>
+        <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:SZ.pct,color:'var(--muted-text)',background:bg||'',padding:SZ.padSm,whiteSpace:'nowrap',cursor:'pointer'}}>
           {sale>0&&v>0?pct:''}
         </td>
       </>;
@@ -6117,16 +6122,16 @@ window.__dataReady.then(data => {
         </>}
       </div>
       <div className="table-wrap" style={{overflow:'auto',maxHeight:'70vh'}}>
-      <table className="dt" style={{fontSize:'12px',minWidth:'800px',borderCollapse:'collapse'}}>
+      <table className="dt" style={{fontSize:SZ.label,minWidth:nCols<=3?'auto':'800px',width:nCols<=3?'100%':'auto',borderCollapse:'collapse'}}>
         <thead ref={dmgTheadRef}>
           <tr ref={dmgRow1Ref} style={{background:'#f5f5f5'}}>
             <th className="ta-l" style={{minWidth:'180px',position:'sticky',left:0,top:0,background:'#f5f5f5',zIndex:3}}>รายการ</th>
             {cols.map((c,i)=><th key={i} colSpan={2} style={{textAlign:'center',position:'sticky',top:0,zIndex:2,
               background:(c.type==='year'||c.type==='yearAny')?'#d9ead3':c.type==='prevYear'?'#fce5cd':'#f5f5f5',
               color:c.type==='prevYear'?'#b45f06':'inherit',
-              borderLeft:'1px solid #ddd',minWidth:'100px'}}>{c.label}</th>)}
+              borderLeft:'1px solid #ddd',minWidth:'100px',fontSize:SZ.head,padding:SZ.row}}>{c.label}</th>)}
           </tr>
-          <tr style={{background:'#fafafa',fontSize:'10px',color:'var(--muted-text)'}}>
+          <tr style={{background:'#fafafa',fontSize:SZ.sub,color:'var(--muted-text)'}}>
             <th style={{position:'sticky',left:0,top:dmgHeadH.row1,background:'#fafafa',zIndex:3}}></th>
             {cols.map((c,i)=><React.Fragment key={i}><th style={{textAlign:'right',borderLeft:'1px solid #ddd',position:'sticky',top:dmgHeadH.row1,background:'#fafafa',zIndex:2}}>บาท</th><th style={{textAlign:'right',position:'sticky',top:dmgHeadH.row1,background:'#fafafa',zIndex:2}}>%</th></React.Fragment>)}
           </tr>
@@ -6135,16 +6140,16 @@ window.__dataReady.then(data => {
           <tr style={{background:'#e6f4ea'}}>
             <td className="ta-l strong" style={{position:'sticky',left:0,top:dmgHeadH.total,background:'#e6f4ea',zIndex:2,padding:'4px 8px'}}>ยอดขายเสาเข็ม</td>
             {cols.map((c,i)=>{const s=colSales(c);return <React.Fragment key={i}>
-              <td colSpan={2} style={{position:'sticky',top:dmgHeadH.total,textAlign:'right',fontFamily:'var(--num)',fontSize:'12px',fontWeight:700,borderLeft:'1px solid #ddd',padding:'3px 6px',background:'#e6f4ea',zIndex:1}}>
+              <td colSpan={2} style={{position:'sticky',top:dmgHeadH.total,textAlign:'right',fontFamily:'var(--num)',fontSize:SZ.num,fontWeight:700,borderLeft:'1px solid #ddd',padding:SZ.pad,background:'#e6f4ea',zIndex:1}}>
                 {s?Number(s).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
               </td>
             </React.Fragment>;})}
           </tr>
 
           {DAMAGE_GROUPS.map(grp=><React.Fragment key={grp.key}>
-            <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:'11px',padding:'3px 8px',position:'sticky',left:0}}>{grp.label}</td></tr>
+            <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:SZ.grp,padding:SZ.row,position:'sticky',left:0}}>{grp.label}</td></tr>
             {grp.rows.map((row,ri)=><tr key={ri} style={{background: ri%2===0?'#fff':grp.bg+'55'}}>
-              <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':grp.bg+'55',zIndex:1,padding:'3px 8px 3px 20px'}}>{row.label}</td>
+              <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':grp.bg+'55',zIndex:1,padding:SZ.row,paddingLeft:nCols<=3?28:20,fontSize:SZ.label}}>{row.label}</td>
               {cols.map((c,ci)=>{const v=colAmt(row.fn,c),s=colSales(c);
                 return <React.Fragment key={ci}>{canDrill ? tdNumClick(v,s,ri%2===0?'':grp.bg+'33',()=>drill(row,c)) : tdNum(v,s,false,ri%2===0?'':grp.bg+'33')}</React.Fragment>;})}
             </tr>)}
