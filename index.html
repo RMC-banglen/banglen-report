@@ -2786,6 +2786,7 @@ window.__dataReady.then(data => {
     });
     const [selMonths,setSelMonths] = useState(new Set()); // เดือนที่เลือก (empty = ทุกเดือน)
     const [yoyMode,setYoyMode] = useState(false); // ตารางสรุป: เทียบปีต่อปี (ไม่แสดงคอลัมน์เดือน)
+    const [dmgModalCtx,setDmgModalCtx] = useState(null); // ตารางสรุป: {row,col} ตอนคลิกตัวเลขในแถวรายการ เปิดดูรายละเอียด
     // วัดความสูงจริงของหัวตาราง 2 แถว (ตารางสรุปความเสียหายรายเดือน) แทนเดาเป็นพิกเซลตายตัว
     // กันแถว "ยอดขายเสาเข็ม" ที่ล็อกติดด้านบน เลื่อนเพี้ยนไม่ตรงกับหัวตารางจริงตอนฟอนต์/ซูมต่างจากที่เดาไว้
     const dmgTheadRef=React.useRef(null), dmgRow1Ref=React.useRef(null);
@@ -3154,8 +3155,25 @@ window.__dataReady.then(data => {
             </td>
           </>;
         };
+        // เหมือน tdNum แต่คลิกได้ — ใช้กับแถวรายการ (มี row.fn ระบุสาเหตุชัดเจน คลิกแล้วเปิดดูรายละเอียดได้)
+        const tdNumClick = (v,sale,bg,onClick) => {
+          const pct = sale>0?(v/sale*100).toFixed(2)+'%':'–';
+          return <>
+            <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:SZ.num,background:bg||'',padding:SZ.pad,whiteSpace:'nowrap',cursor:'pointer'}}>
+              {v?Number(v).toLocaleString('th-TH',{maximumFractionDigits:0}):'–'}
+            </td>
+            <td onClick={onClick} title="คลิกเพื่อดูรายละเอียด" style={{textAlign:'right',fontFamily:'var(--num)',fontSize:SZ.pct,color:'var(--muted-text)',background:bg||'',padding:SZ.padSm,whiteSpace:'nowrap',cursor:'pointer'}}>
+              {sale>0&&v>0?pct:''}
+            </td>
+          </>;
+        };
+        const canDrillSummary = isAdmin||tp['dmg_cause']!==false;
+        const drillSummary = (row,col) => {
+          if(!canDrillSummary || colAmt(row.fn,col)<=0) return;
+          setDmgModalCtx({row,col});
+        };
 
-        return <ChartCard title="ตารางสรุปความเสียหายรายเดือน" subtitle="มูลค่า (บาท) และ % เทียบยอดขาย" span="full">
+        return <ChartCard title="ตารางสรุปความเสียหายรายเดือน" subtitle={`มูลค่า (บาท) และ % เทียบยอดขาย${canDrillSummary?' — คลิกตัวเลขในแถวรายการเพื่อดูรายละเอียด':''}`} span="full">
           <div style={{display:'flex',gap:8,marginBottom:12}}>
             <button onClick={()=>setYoyMode(false)} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${!yoyMode?'#2f5fd0':'#e2e8f0'}`,background:!yoyMode?'#2f5fd0':'#fff',color:!yoyMode?'#fff':'#64748b',fontSize:12,fontWeight:700,cursor:'pointer'}}>รายเดือน</button>
             <button onClick={()=>setYoyMode(true)} style={{padding:'6px 14px',borderRadius:8,border:`1.5px solid ${yoyMode?'#2f5fd0':'#e2e8f0'}`,background:yoyMode?'#2f5fd0':'#fff',color:yoyMode?'#fff':'#64748b',fontSize:12,fontWeight:700,cursor:'pointer'}}>เทียบปีต่อปี</button>
@@ -3205,7 +3223,7 @@ window.__dataReady.then(data => {
                 {grp.rows.map((row,ri)=><tr key={ri} style={{background: ri%2===0?'#fff':grp.bg+'55'}}>
                   <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':grp.bg+'55',zIndex:1,padding:SZ.row,paddingLeft:nCols<=3?28:20,fontSize:SZ.label}}>{row.label}</td>
                   {cols.map((c,ci)=>{const v=colAmt(row.fn,c),s=colSales(c);
-                    return <React.Fragment key={ci}>{tdNum(v,s,false,ri%2===0?'':grp.bg+'33')}</React.Fragment>;})}
+                    return <React.Fragment key={ci}>{canDrillSummary ? tdNumClick(v,s,ri%2===0?'':grp.bg+'33',()=>drillSummary(row,c)) : tdNum(v,s,false,ri%2===0?'':grp.bg+'33')}</React.Fragment>;})}
                 </tr>)}
                 {/* แถวรวมกลุ่ม */}
                 <tr style={{background:grp.bg,fontWeight:700}}>
@@ -3226,6 +3244,23 @@ window.__dataReady.then(data => {
           </table>
           </div>
         </ChartCard>;
+      })()}
+
+      {/* หน้าต่างป็อปอัพดูรายละเอียด ตอนคลิกตัวเลขในตารางสรุปด้านบน (เหมือนหน้าออฟฟิศใหญ่) */}
+      {dmgModalCtx && (()=>{
+        const {row,col} = dmgModalCtx;
+        const y = col.type==='month' ? (filterYear==='ALL'?null:Number(filterYear)) : col.year;
+        const m = col.type==='month' ? col.month : null;
+        const modalItems = rawItems.filter(r =>
+          !/รับคืนสินค้าใช้ได้/i.test(r.cause||'') &&
+          (y==null || r.year===y) &&
+          (m==null || r.month===m)
+        );
+        const matches = {};
+        modalItems.forEach(r => { if(row.fn(r.cause)){ const c=r.cause||'ไม่ระบุ'; matches[c]=(matches[c]||0)+(r.amount||0); } });
+        const arr = Object.entries(matches).sort((a,b)=>b[1]-a[1]);
+        const causeLabel = arr.length?arr[0][0]:row.label;
+        return <DamageCauseModal items={modalItems} causeLabel={causeLabel} onClose={()=>setDmgModalCtx(null)}/>;
       })()}
 
       {/* Damage view — มูลค่าเสียหาย จากมาก→น้อย + ลูกค้า คลิกดูรายละเอียด */}
