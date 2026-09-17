@@ -221,6 +221,7 @@ function PlanView({me,rafts,onBack,onInspect}){
   const [checked,setChecked]=useState([]);    // เลขแพที่ตรวจก่อนผลิตแล้วของวันนั้น
   const [editing,setEditing]=useState(false);
   const [sel,setSel]=useState([]);
+  const [spec,setSpec]=useState({});   // ขนาดที่แก้เอง เฉพาะแพที่แก้ได้
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState('');
   const [missing,setMissing]=useState(false);
@@ -239,7 +240,22 @@ function PlanView({me,rafts,onBack,onInspect}){
   useEffect(()=>{setPlan(null);load(day);},[day]);
 
   const isDone=n=>checked.includes(String(n));
-  const openEdit=()=>{setSel((plan||[]).map(p=>p.raft_num));setEditing(true);setMsg('');};
+  const openEdit=()=>{
+    const sp={};
+    (plan||[]).forEach(p=>{sp[p.raft_num]=p.pile_spec||raftLabel(rafts.find(r=>Number(r.raft_num)===Number(p.raft_num)));});
+    setSel((plan||[]).map(p=>p.raft_num)); setSpec(sp); setEditing(true); setMsg('');
+  };
+  // แพ S เปลี่ยนได้เฉพาะขนาด S · แพที่ 4 เปลี่ยนได้ทุกแบบ · แพอื่นล็อกตามระบบแพผลิต
+  const FREE_RAFT=4;
+  const S_SIZES=['S18','S22','S26','S30','S35','S40'];
+  const ALL_SIZES=['I18','I22','I26','I30','I35','I40'].concat(S_SIZES).concat(['เลนเดี่ยว']);
+  const sizeOptsFor=n=>{
+    const r=rafts.find(x=>Number(x.raft_num)===Number(n));
+    const cur=raftLabel(r);
+    const base=Number(n)===FREE_RAFT?ALL_SIZES:(String((r&&r.pile_type)||'').toUpperCase()==='S'?S_SIZES:null);
+    if(!base) return null;                       // null = แก้ไม่ได้
+    return [...new Set([cur,...base].filter(Boolean))];
+  };
 
   const copyPrev=async()=>{
     const d=new Date(day+'T00:00:00'); d.setDate(d.getDate()-1);
@@ -256,7 +272,7 @@ function PlanView({me,rafts,onBack,onInspect}){
       if(sel.length){
         const rows=sel.map(n=>{
           const r=rafts.find(x=>Number(x.raft_num)===Number(n));
-          return {d:day,raft_num:Number(n),pile_spec:raftLabel(r),created_by:me.code};
+          return {d:day,raft_num:Number(n),pile_spec:(spec[n]||raftLabel(r)||'').trim(),created_by:me.code};
         });
         const {error}=await DB.from('qc_production_day').insert(rows);
         if(error) throw error;
@@ -300,7 +316,10 @@ function PlanView({me,rafts,onBack,onInspect}){
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 {rafts.map(r=>{
                   const on=sel.includes(r.raft_num);
-                  return <button key={r.raft_num} onClick={()=>setSel(s=>on?s.filter(x=>x!==r.raft_num):[...s,r.raft_num])}
+                  return <button key={r.raft_num} onClick={()=>{
+                      setSel(s=>on?s.filter(x=>x!==r.raft_num):[...s,r.raft_num]);
+                      if(!on) setSpec(sp=>({...sp,[r.raft_num]:sp[r.raft_num]||raftLabel(r)}));
+                    }}
                     style={{padding:'12px 8px',borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
                       border:`2px solid ${on?'var(--ok)':'var(--line-strong)'}`,background:on?'var(--okbg)':'#fff'}}>
                     <div style={{fontSize:15,fontWeight:800,color:on?'var(--ok)':'var(--ink)'}}>
@@ -312,6 +331,27 @@ function PlanView({me,rafts,onBack,onInspect}){
               </div>
               <button className="ghost" style={{marginTop:12}} onClick={copyPrev}>📄 เหมือนเมื่อวาน</button>
             </div>
+
+            {(()=>{
+              // โชว์เฉพาะแพที่แก้ขนาดได้ (แพ S และแพที่ 4) และต้องถูกเลือกไว้ด้วย
+              const editable=sel.slice().sort((x,y)=>x-y).filter(n=>sizeOptsFor(n));
+              if(!editable.length) return null;
+              return <>
+                <div className="sec">แก้ขนาดเสา</div>
+                <div className="card">
+                  <div className="spec" style={{marginTop:0}}>แพ S และแพที่ {FREE_RAFT} เปลี่ยนขนาดได้ · แพอื่นล็อกตามระบบแพผลิต</div>
+                  {editable.map(n=>(
+                    <div key={n} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:'1px solid var(--line)'}}>
+                      <div style={{width:60,fontWeight:800,fontSize:15}}>แพ {n}</div>
+                      <select value={spec[n]||''} onChange={e=>setSpec(sp=>({...sp,[n]:e.target.value}))}
+                        style={{flex:1,padding:'10px 11px',border:'1.5px solid var(--line-strong)',borderRadius:9,fontSize:15,background:'#fff'}}>
+                        {sizeOptsFor(n).map(o=><option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </>;
+            })()}
             <div style={{display:'flex',gap:10,marginTop:12}}>
               <button className="bigbtn" style={{flex:1}} disabled={saving} onClick={save}>
                 {saving?'กำลังบันทึก…':'บันทึกใบงาน ('+sel.length+' แพ)'}
