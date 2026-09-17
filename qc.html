@@ -45,7 +45,8 @@
   .note{width:100%;margin-top:8px;padding:9px 11px;border:1.5px solid var(--line-strong);border-radius:10px;font-size:14.5px}
   .field{margin-bottom:10px}
   .field label{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px}
-  .field input,.field select{width:100%;padding:11px 12px;border:1.5px solid var(--line-strong);border-radius:10px}
+  .field input,.field select{width:100%;max-width:100%;min-width:0;padding:11px 12px;border:1.5px solid var(--line-strong);border-radius:10px}
+  .field input[type=date]{-webkit-appearance:none;appearance:none;text-align:left}
   .bigbtn{width:100%;padding:16px;border:none;border-radius:14px;background:var(--brand);color:#fff;
           font-size:17px;font-weight:800;cursor:pointer}
   .bigbtn[disabled]{background:#cbd5e1;color:#8b94a5}
@@ -91,6 +92,8 @@ const todayISO = () => {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 };
 // ชื่อไทยขึ้นต้นด้วยสระหน้า (เ แ โ ใ ไ) เช่น ไผ่/เอิร์ธ ต้องข้ามไปเอาพยัญชนะ ไม่งั้นวงกลมจะขึ้น ไ เฉยๆ
+// แพผลิตเก็บชนิด (I/S) กับหน้าตัดแยกกัน เช่น I + 26รง. → I26รง.
+const raftLabel = r => r ? ((r.pile_type||'')+(r.section||'')).trim() : '';
 const thaiInitial = name => {
   const t=String(name||'').trim();
   return (t.length>1 && /[เแโใไ]/.test(t[0])) ? t[1] : t.slice(0,1);
@@ -134,6 +137,7 @@ function App(){
 
   const [inspectors,setInspectors]=useState(null);
   const [checklist,setChecklist]=useState(null);
+  const [rafts,setRafts]=useState([]);   // แพผลิตจากระบบติดตามงาน
   const [err,setErr]=useState('');
   const [formType,setFormType]=useState(null);
   const [material,setMaterial]=useState(null);   // ใช้เฉพาะฟอร์มตรวจวัตถุดิบ
@@ -142,9 +146,10 @@ function App(){
     Promise.all([
       DB.from('qc_inspectors').select('*').eq('active',true).order('sort_order'),
       DB.from('qc_checklist').select('*').eq('active',true).order('form_type').order('sort_order'),
-    ]).then(([a,b])=>{
+      DB.from('worktrack_raft_info').select('raft_num,pile_type,section').order('raft_num'),
+    ]).then(([a,b,r])=>{
       if(a.error||b.error){setErr('ยังไม่ได้สร้างตารางในฐานข้อมูล — ให้แอดมินรันไฟล์ supabase-qc.sql ก่อน');return;}
-      setInspectors(a.data||[]); setChecklist(b.data||[]);
+      setInspectors(a.data||[]); setChecklist(b.data||[]); setRafts((r&&r.data)||[]);
     }).catch(()=>setErr('เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจอินเทอร์เน็ต'));
   },[]);
 
@@ -159,7 +164,7 @@ function App(){
     return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
-  return <CheckForm me={me} formType={formType} material={material} checklist={list}
+  return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts}
                     onBack={()=>formType==='mat'?setMaterial(null):setFormType(null)}/>;
 }
 
@@ -224,7 +229,7 @@ function PickMaterial({me,mats,onPick,onBack}){
   </>;
 }
 
-function CheckForm({me,formType,material,checklist,onBack}){
+function CheckForm({me,formType,material,checklist,rafts,onBack}){
   const F=FORMS[formType];
   const isPre=formType==='pre';
   const isMat=formType==='mat';
@@ -340,15 +345,29 @@ function CheckForm({me,formType,material,checklist,onBack}){
           <div className="field"><label>เลขที่ใบส่งของ</label>
             <input value={head.lot_no} placeholder="เช่น DO-1234" onChange={e=>setHead(h=>({...h,lot_no:e.target.value}))}/></div>
         </> : <>
-          {isPre
-            ? <div className="field"><label>แพ/เบด ที่ตรวจ</label>
-                <input value={head.bed_no} placeholder="เช่น แพ 6" onChange={e=>setHead(h=>({...h,bed_no:e.target.value}))}/></div>
-            : <div className="field"><label>ล็อต/เลขที่ผลิต</label>
-                <input value={head.lot_no} placeholder="เช่น L-0915" onChange={e=>setHead(h=>({...h,lot_no:e.target.value}))}/></div>}
-          <div className="field"><label>ขนาดเสา</label>
-            <input value={head.pile_spec} placeholder="เช่น I-0.26 x 12.00 ม." onChange={e=>setHead(h=>({...h,pile_spec:e.target.value}))}/></div>
-          <div className="field"><label>จำนวนที่ตรวจ (ต้น)</label>
-            <input type="number" inputMode="numeric" value={head.qty} onChange={e=>setHead(h=>({...h,qty:e.target.value}))}/></div>
+          {isPre ? <>
+            {/* เลือกแพจากระบบแพผลิต — ขนาดเสาเติมให้เองตามแพที่เลือก ไม่ต้องพิมพ์ */}
+            <div className="field"><label>แพที่ตรวจ</label>
+              <select value={head.bed_no} onChange={e=>{
+                const n=e.target.value;
+                const r=rafts.find(x=>String(x.raft_num)===n);
+                setHead(h=>({...h,bed_no:n,pile_spec:r?raftLabel(r):''}));
+              }}>
+                <option value="">— เลือกแพ —</option>
+                {rafts.map(r=><option key={r.raft_num} value={r.raft_num}>แพที่ {r.raft_num} · {raftLabel(r)||'ยังไม่ระบุ'}</option>)}
+              </select>
+            </div>
+            {head.bed_no&&<div className="field"><label>ขนาดเสา (จากแพผลิต)</label>
+              <div style={{padding:'11px 12px',border:'1.5px solid var(--line)',borderRadius:10,
+                background:'#f8fafc',fontWeight:700,color:'var(--brand)'}}>{head.pile_spec||'ยังไม่ระบุขนาดในระบบแพผลิต'}</div></div>}
+          </> : <>
+            <div className="field"><label>ล็อต/เลขที่ผลิต</label>
+              <input value={head.lot_no} placeholder="เช่น L-0915" onChange={e=>setHead(h=>({...h,lot_no:e.target.value}))}/></div>
+            <div className="field"><label>ขนาดเสา</label>
+              <input value={head.pile_spec} placeholder="เช่น I-0.26 x 12.00 ม." onChange={e=>setHead(h=>({...h,pile_spec:e.target.value}))}/></div>
+            <div className="field"><label>จำนวนที่ตรวจ (ต้น)</label>
+              <input type="number" inputMode="numeric" value={head.qty} onChange={e=>setHead(h=>({...h,qty:e.target.value}))}/></div>
+          </>}
         </>}
       </div>
 
