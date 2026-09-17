@@ -902,7 +902,7 @@ window.__dataReady.then(data => {
         const g=f=>{const v=draft[k][f]!==undefined?draft[k][f]:cur[f];return v;};
         const num=f=>{const v=g(f);const n=Number(v);return v===''||v==null||!isFinite(n)?0:n;};
         return {d:k,raft_order:num('raft_order'),raft_produced:num('raft_produced'),
-                raft_cancel:num('raft_cancel'),volume_m3:num('volume_m3'),
+                raft_cancel:num('raft_cancel'),
                 finish_time:String(g('finish_time')||''),note:String(g('note')||''),
                 updated_at:new Date().toISOString()};
       });
@@ -958,8 +958,7 @@ window.__dataReady.then(data => {
           ['เวลาเทเสร็จเฉลี่ย',hhmm(avgTime),'#7c3aed'],
           ['เสร็จหลัง 17:00',lateCount+' วัน','#c0392b'],
           ['แพผลิตรวม',fmtN(sumOf('raft_produced'),1)+' แพ','#0f766e'],
-          ['แพค้างเท/ยกเลิก',fmtN(sumOf('raft_cancel'),0)+' แพ','#d97706'],
-          ['คิวผลิตรวม',fmtN(sumOf('volume_m3'),0)+' m³','#059669']].map(([l,v,c])=>(
+          ['แพค้างเท/ยกเลิก',fmtN(sumOf('raft_cancel'),0)+' แพ','#d97706']].map(([l,v,c])=>(
           <div key={l} style={{flex:'1 1 140px',border:'1px solid #e6e8ee',borderRadius:12,padding:'11px 15px'}}>
             <div style={{fontSize:12.5,color:'#5f6470',marginBottom:3}}>{l}</div>
             <div style={{fontSize:21,fontWeight:800,color:c,lineHeight:1.2}}>{v}</div>
@@ -972,7 +971,7 @@ window.__dataReady.then(data => {
           <thead><tr style={{background:'#f4f6fa'}}>
             <th style={{...th,textAlign:'left'}}>วันที่</th>
             <th style={th}>แพสั่งผลิต</th><th style={th}>แพผลิต</th><th style={th}>ยกเลิก/ค้างเท</th>
-            <th style={th}>คิวผลิต</th><th style={th}>เวลาเทเสร็จ</th>
+            <th style={th}>เวลาเทเสร็จ</th>
             <th style={{...th,textAlign:'left',minWidth:260}}>รายงานการผลิตที่ไม่เป็นไปตามกำหนด</th>
             {canEdit&&<th style={th}></th>}
           </tr></thead>
@@ -986,7 +985,7 @@ window.__dataReady.then(data => {
                 <td style={{padding:'6px 8px',fontSize:13.5,fontWeight:700,whiteSpace:'nowrap'}}>
                   {d}/{mon}/{year}{isToday&&<span style={{marginLeft:6,fontSize:11,color:'#1a56db'}}>วันนี้</span>}
                 </td>
-                {[['raft_order',62],['raft_produced',62],['raft_cancel',62],['volume_m3',76]].map(([f,w])=>(
+                {[['raft_order',62],['raft_produced',62],['raft_cancel',62]].map(([f,w])=>(
                   <td key={f} style={{padding:'4px 6px',textAlign:'center'}}>
                     <input type="number" step="any" value={val(k,f)} disabled={!canEdit}
                       onChange={e=>setVal(k,f,e.target.value)} style={{...inp,width:w}}/>
@@ -1010,7 +1009,7 @@ window.__dataReady.then(data => {
                 </td>}
               </tr>;
             })}
-            {!shownDays.length&&<tr><td colSpan={canEdit?8:7} style={{padding:18,textAlign:'center',color:'#94a3b8',fontSize:14}}>
+            {!shownDays.length&&<tr><td colSpan={canEdit?7:6} style={{padding:18,textAlign:'center',color:'#94a3b8',fontSize:14}}>
               ยังไม่มีข้อมูลเดือนนี้ — กด “แสดงทุกวัน” เพื่อเริ่มกรอก
             </td></tr>}
           </tbody>

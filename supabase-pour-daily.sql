@@ -9,7 +9,6 @@ create table if not exists pour_daily (
   raft_order     numeric default 0,         -- รวมแพสั่งผลิต (แพ)
   raft_produced  numeric default 0,         -- รวมแพผลิต (แพ)
   raft_cancel    numeric default 0,         -- รวมแพ ยกเลิก/ค้างเท (แพ)
-  volume_m3      numeric default 0,         -- คิวผลิต (m³)
   finish_time    text default '',           -- เวลาเทเสร็จ เช่น 16:59
   note           text default '',           -- รายงานการผลิตที่ไม่เป็นไปตามกำหนด
   updated_at     timestamptz default now()
