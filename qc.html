@@ -316,42 +316,34 @@ function PlanView({me,rafts,onBack,onInspect}){
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 {rafts.map(r=>{
                   const on=sel.includes(r.raft_num);
-                  return <button key={r.raft_num} onClick={()=>{
+                  const opts=sizeOptsFor(r.raft_num);       // null = แพนี้แก้ขนาดไม่ได้
+                  const cur=spec[r.raft_num]||raftLabel(r);
+                  return <div key={r.raft_num} onClick={()=>{
                       setSel(s=>on?s.filter(x=>x!==r.raft_num):[...s,r.raft_num]);
                       if(!on) setSpec(sp=>({...sp,[r.raft_num]:sp[r.raft_num]||raftLabel(r)}));
                     }}
-                    style={{padding:'12px 8px',borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
+                    style={{padding:'12px 8px',borderRadius:12,cursor:'pointer',textAlign:'left',
                       border:`2px solid ${on?'var(--ok)':'var(--line-strong)'}`,background:on?'var(--okbg)':'#fff'}}>
                     <div style={{fontSize:15,fontWeight:800,color:on?'var(--ok)':'var(--ink)'}}>
                       {on?'✓ ':''}แพ {r.raft_num}
                     </div>
-                    <div style={{fontSize:12.5,color:'var(--muted)'}}>{raftLabel(r)||'ยังไม่ระบุ'}</div>
-                  </button>;
+                    {on&&opts
+                      ? <select value={cur} onClick={e=>e.stopPropagation()}
+                          onChange={e=>{e.stopPropagation();setSpec(sp=>({...sp,[r.raft_num]:e.target.value}));}}
+                          style={{marginTop:5,width:'100%',padding:'5px 6px',fontSize:13,fontWeight:700,
+                            fontFamily:'inherit',color:'var(--ok)',background:'#fff',
+                            border:'1.5px solid var(--ok)',borderRadius:7}}>
+                          {opts.map(o=><option key={o} value={o}>{o}</option>)}
+                        </select>
+                      : <div style={{fontSize:12.5,color:'var(--muted)',marginTop:2}}>
+                          {cur||'ยังไม่ระบุ'}{opts?' ✎':''}
+                        </div>}
+                  </div>;
                 })}
               </div>
               <button className="ghost" style={{marginTop:12}} onClick={copyPrev}>📄 เหมือนเมื่อวาน</button>
             </div>
 
-            {(()=>{
-              // โชว์เฉพาะแพที่แก้ขนาดได้ (แพ S และแพที่ 4) และต้องถูกเลือกไว้ด้วย
-              const editable=sel.slice().sort((x,y)=>x-y).filter(n=>sizeOptsFor(n));
-              if(!editable.length) return null;
-              return <>
-                <div className="sec">แก้ขนาดเสา</div>
-                <div className="card">
-                  <div className="spec" style={{marginTop:0}}>แพ S และแพที่ {FREE_RAFT} เปลี่ยนขนาดได้ · แพอื่นล็อกตามระบบแพผลิต</div>
-                  {editable.map(n=>(
-                    <div key={n} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:'1px solid var(--line)'}}>
-                      <div style={{width:60,fontWeight:800,fontSize:15}}>แพ {n}</div>
-                      <select value={spec[n]||''} onChange={e=>setSpec(sp=>({...sp,[n]:e.target.value}))}
-                        style={{flex:1,padding:'10px 11px',border:'1.5px solid var(--line-strong)',borderRadius:9,fontSize:15,background:'#fff'}}>
-                        {sizeOptsFor(n).map(o=><option key={o} value={o}>{o}</option>)}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </>;
-            })()}
             <div style={{display:'flex',gap:10,marginTop:12}}>
               <button className="bigbtn" style={{flex:1}} disabled={saving} onClick={save}>
                 {saving?'กำลังบันทึก…':'บันทึกใบงาน ('+sel.length+' แพ)'}
