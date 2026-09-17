@@ -421,6 +421,14 @@ function CheckForm({me,formType,material,checklist,rafts,elong,presetRaft,onBack
   const [saving,setSaving]=useState(false);
   const [done,setDone]=useState(null);
   const fileRef=useRef(null);
+  // แพที่เลือกตรวจได้ = เฉพาะแพในใบงานผลิตของวันนั้น
+  const [dayPlan,setDayPlan]=useState(null);
+  useEffect(()=>{
+    if(formType!=='pre'){setDayPlan([]);return;}
+    setDayPlan(null);
+    DB.from('qc_production_day').select('raft_num,pile_spec').eq('d',head.check_date).order('raft_num')
+      .then(({data,error})=>setDayPlan(error?[]:(data||[])));
+  },[head.check_date,formType]);
 
   // จำค่าหัวเรื่องล่าสุดของคนนี้ไว้ กรอกครั้งต่อไปไม่ต้องพิมพ์ซ้ำ
   const memKey='qc_last_'+me.code+'_'+formType+(material?'_'+material:'');
@@ -547,14 +555,21 @@ function CheckForm({me,formType,material,checklist,rafts,elong,presetRaft,onBack
           {isPre ? <>
             {/* เลือกแพจากระบบแพผลิต — ขนาดเสาเติมให้เองตามแพที่เลือก ไม่ต้องพิมพ์ */}
             <div className="field"><label>แพที่ตรวจ</label>
-              <select value={head.bed_no} onChange={e=>{
+              <select value={head.bed_no} disabled={!dayPlan||!dayPlan.length} onChange={e=>{
                 const n=e.target.value;
+                const p=(dayPlan||[]).find(x=>String(x.raft_num)===n);
                 const r=rafts.find(x=>String(x.raft_num)===n);
-                setHead(h=>({...h,bed_no:n,pile_spec:r?raftLabel(r):''}));
+                setHead(h=>({...h,bed_no:n,pile_spec:(p&&p.pile_spec)||(r?raftLabel(r):'')}));
               }}>
                 <option value="">— เลือกแพ —</option>
-                {rafts.map(r=><option key={r.raft_num} value={r.raft_num}>แพที่ {r.raft_num} · {raftLabel(r)||'ยังไม่ระบุ'}</option>)}
+                {(dayPlan||[]).map(p=>(
+                  <option key={p.raft_num} value={p.raft_num}>แพที่ {p.raft_num} · {p.pile_spec||'ยังไม่ระบุ'}</option>
+                ))}
               </select>
+              {dayPlan&&!dayPlan.length&&<div className="spec" style={{marginTop:6,marginBottom:0,color:'#92400e'}}>
+                ⚠️ วันนี้ยังไม่มีใบงานผลิต — กลับไปลงใบงานที่เมนู “📋 ใบงานผลิตวันนี้” ก่อน
+              </div>}
+              {dayPlan===null&&<div className="spec" style={{marginTop:6,marginBottom:0}}>กำลังโหลดใบงาน…</div>}
             </div>
             {head.bed_no&&<div className="field"><label>ขนาดเสา (จากแพผลิต)</label>
               <div style={{padding:'11px 12px',border:'1.5px solid var(--line)',borderRadius:10,
