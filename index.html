@@ -2791,7 +2791,7 @@ window.__dataReady.then(data => {
       Promise.all([
         db.from('qc_inspectors').select('*').order('sort_order'),
         db.from('qc_checks').select('*').order('check_date',{ascending:false}).order('id',{ascending:false}).limit(600),
-        db.from('qc_checklist').select('*').order('form_type').order('sort_order'),
+        db.from('qc_checklist').select('*').order('form_type').order('section').order('sort_order'),
       ]).then(([a,b,c])=>{
         if(a.error||b.error){setMissing(true);setLoading(false);return;}
         setInspectors(a.data||[]);setChecks(b.data||[]);setChecklist(c.data||[]);
@@ -3013,8 +3013,10 @@ window.__dataReady.then(data => {
                   <th style={{...th,textAlign:'left'}}>ชนิด</th><th style={{...th,textAlign:'left'}}>เกณฑ์</th>
                   {canEdit&&<th style={{...th,textAlign:'center'}}>ใช้งาน</th>}
                 </tr></thead>
-                <tbody>{checklist.filter(c=>c.form_type===ft).map(c=>(
-                  <tr key={c.id} style={{borderBottom:'1px solid #eef0f5',opacity:c.active?1:.45}}>
+                <tbody>{checklist.filter(c=>c.form_type===ft).map((c,ci,arr)=>(
+                  <React.Fragment key={c.id}>
+                  {(ci===0||arr[ci-1].section!==c.section)&&<tr><td colSpan={canEdit?5:4} style={{padding:'7px 10px',background:'#eef3fc',color:'#0f766e',fontWeight:800,fontSize:13}}>{c.section}</td></tr>}
+                  <tr style={{borderBottom:'1px solid #eef0f5',opacity:c.active?1:.45}}>
                     <td style={{...td,textAlign:'left',color:'#5f6470'}}>{c.section}</td>
                     <td style={{...td,textAlign:'left',fontWeight:600,whiteSpace:'normal'}}>{c.label}</td>
                     <td style={{...td,textAlign:'left'}}>{c.kind==='num'?('กรอกค่า ('+(c.unit||'')+')'):'ผ่าน/ไม่ผ่าน'}</td>
@@ -3031,6 +3033,7 @@ window.__dataReady.then(data => {
                         color:c.active?'#0f766e':'#94a3b8',fontWeight:700}}>{c.active?'ใช้อยู่':'ปิดไว้'}</button>
                     </td>}
                   </tr>
+                  </React.Fragment>
                 ))}</tbody>
               </table>
             </div>

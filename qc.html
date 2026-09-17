@@ -150,7 +150,7 @@ function App(){
   if(!me) return <PickUser inspectors={inspectors}/>;
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
   if(formType==='mat'&&!material){
-    const mats=[...new Set(checklist.filter(c=>c.form_type==='mat').map(c=>c.section))];
+    const mats=[...new Set(checklist.filter(c=>c.form_type==='mat').map(c=>c.section))].sort((x,y)=>x.localeCompare(y,'th'));
     return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
