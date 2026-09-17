@@ -82,7 +82,7 @@ const DB = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const {useState,useEffect,useRef} = React;
 
 const FORMS = {
-  pre:  {label:'ตรวจก่อนผลิต', full:'ระบบตรวจสอบก่อนผลิตเสาเข็มคอนกรีตอัดแรง', icon:'🧰'},
+  pre:  {label:'ตรวจก่อนผลิต', full:'ระบบตรวจสอบก่อนผลิตเสาเข็มคอนกรีตอัดแรง ตาม มอก.396-2549', icon:'🧰'},
   post: {label:'ตรวจหลังผลิต', full:'ระบบตรวจสอบหลังผลิตเสาเข็ม ตาม มอก.396-2549', icon:'📏'},
 };
 const todayISO = () => {

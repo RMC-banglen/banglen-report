@@ -2772,7 +2772,7 @@ window.__dataReady.then(data => {
   function QCTab({currentUser}){
     const db=DB;
     const canEdit=currentUser?.role==='admin'||currentUser?.role==='editor';
-    const QC_FORMS={pre:'ตรวจก่อนผลิต',post:'ตรวจหลังผลิต (มอก.396-2549)'};
+    const QC_FORMS={pre:'ตรวจก่อนผลิต (มอก.396-2549)',post:'ตรวจหลังผลิต (มอก.396-2549)'};
     const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const [inspectors,setInspectors]=useState([]);
     const [checks,setChecks]=useState([]);
