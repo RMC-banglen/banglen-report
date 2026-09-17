@@ -221,8 +221,6 @@ function PlanView({me,rafts,onBack,onInspect}){
   const [checked,setChecked]=useState([]);    // เลขแพที่ตรวจก่อนผลิตแล้วของวันนั้น
   const [editing,setEditing]=useState(false);
   const [sel,setSel]=useState([]);
-  const [spec,setSpec]=useState({});   // ขนาดเสาที่แก้เองของแต่ละแพ {raft_num: 'S30มอก.'}
-  const [custom,setCustom]=useState({}); // แพที่เลือก 'พิมพ์เอง'
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState('');
   const [missing,setMissing]=useState(false);
@@ -241,17 +239,7 @@ function PlanView({me,rafts,onBack,onInspect}){
   useEffect(()=>{setPlan(null);load(day);},[day]);
 
   const isDone=n=>checked.includes(String(n));
-  const openEdit=()=>{
-    const sp={};
-    (plan||[]).forEach(p=>{sp[p.raft_num]=p.pile_spec||raftLabel(rafts.find(r=>Number(r.raft_num)===Number(p.raft_num)));});
-    setSel((plan||[]).map(p=>p.raft_num)); setSpec(sp); setCustom({}); setEditing(true); setMsg('');
-  };
-  // ตัวเลือกขนาดเสา — เอาของที่ใช้จริงในระบบมารวมกับรายการมาตรฐาน แก้เป็นอะไรก็ได้
-  const SIZE_OPTS=(()=>{
-    const std=['I18','I22','I26','I30','I35','I40','S18','S22','S26','S30','S35','S40','เลนเดี่ยว'];
-    const used=(rafts||[]).map(raftLabel).filter(Boolean);
-    return [...new Set([...used,...std])].sort((a,b)=>a.localeCompare(b,'th'));
-  })();
+  const openEdit=()=>{setSel((plan||[]).map(p=>p.raft_num));setEditing(true);setMsg('');};
 
   const copyPrev=async()=>{
     const d=new Date(day+'T00:00:00'); d.setDate(d.getDate()-1);
@@ -268,7 +256,7 @@ function PlanView({me,rafts,onBack,onInspect}){
       if(sel.length){
         const rows=sel.map(n=>{
           const r=rafts.find(x=>Number(x.raft_num)===Number(n));
-          return {d:day,raft_num:Number(n),pile_spec:(spec[n]||raftLabel(r)||'').trim(),created_by:me.code};
+          return {d:day,raft_num:Number(n),pile_spec:raftLabel(r),created_by:me.code};
         });
         const {error}=await DB.from('qc_production_day').insert(rows);
         if(error) throw error;
@@ -312,10 +300,7 @@ function PlanView({me,rafts,onBack,onInspect}){
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 {rafts.map(r=>{
                   const on=sel.includes(r.raft_num);
-                  return <button key={r.raft_num} onClick={()=>{
-                      setSel(s=>on?s.filter(x=>x!==r.raft_num):[...s,r.raft_num]);
-                      if(!on) setSpec(sp=>({...sp,[r.raft_num]:sp[r.raft_num]||raftLabel(r)}));
-                    }}
+                  return <button key={r.raft_num} onClick={()=>setSel(s=>on?s.filter(x=>x!==r.raft_num):[...s,r.raft_num])}
                     style={{padding:'12px 8px',borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
                       border:`2px solid ${on?'var(--ok)':'var(--line-strong)'}`,background:on?'var(--okbg)':'#fff'}}>
                     <div style={{fontSize:15,fontWeight:800,color:on?'var(--ok)':'var(--ink)'}}>
@@ -327,35 +312,6 @@ function PlanView({me,rafts,onBack,onInspect}){
               </div>
               <button className="ghost" style={{marginTop:12}} onClick={copyPrev}>📄 เหมือนเมื่อวาน</button>
             </div>
-
-            {sel.length>0&&<>
-              <div className="sec">ขนาดเสาของแต่ละแพ</div>
-              <div className="card">
-                <div className="spec" style={{marginTop:0}}>ตั้งมาจากระบบแพผลิตให้แล้ว — แก้ได้ถ้าวันนี้เปลี่ยนขนาด</div>
-                {sel.slice().sort((x,y)=>x-y).map(n=>(
-                  <div key={n} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 0',borderTop:'1px solid var(--line)'}}>
-                    <div style={{width:62,fontWeight:800,fontSize:15}}>แพ {n}</div>
-                    <div style={{flex:1}}>
-                      {custom[n]
-                        ? <input value={spec[n]||''} placeholder="พิมพ์ขนาดเสา"
-                            onChange={e=>setSpec(sp=>({...sp,[n]:e.target.value}))}
-                            style={{width:'100%',padding:'9px 11px',border:'1.5px solid var(--line-strong)',borderRadius:9,fontSize:15}}/>
-                        : <select value={SIZE_OPTS.includes(spec[n])?spec[n]:'__other__'}
-                            onChange={e=>{
-                              if(e.target.value==='__other__'){setCustom(c=>({...c,[n]:true}));return;}
-                              setSpec(sp=>({...sp,[n]:e.target.value}));
-                            }}
-                            style={{width:'100%',padding:'9px 11px',border:'1.5px solid var(--line-strong)',borderRadius:9,fontSize:15,background:'#fff'}}>
-                            {SIZE_OPTS.map(o=><option key={o} value={o}>{o}</option>)}
-                            <option value="__other__">พิมพ์เอง…</option>
-                          </select>}
-                    </div>
-                    {custom[n]&&<button onClick={()=>setCustom(c=>{const k={...c};delete k[n];return k;})}
-                      style={{border:'none',background:'#f1f5f9',borderRadius:8,padding:'8px 10px',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>เลือกจากรายการ</button>}
-                  </div>
-                ))}
-              </div>
-            </>}
             <div style={{display:'flex',gap:10,marginTop:12}}>
               <button className="bigbtn" style={{flex:1}} disabled={saving} onClick={save}>
                 {saving?'กำลังบันทึก…':'บันทึกใบงาน ('+sel.length+' แพ)'}
