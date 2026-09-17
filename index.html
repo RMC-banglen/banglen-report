@@ -1014,8 +1014,8 @@ window.__dataReady.then(data => {
                       onChange={e=>setVal(k,f,e.target.value)} style={{...inp,width:w}}/>
                   </td>
                 ))}
-                {/* ยกเลิก/ค้างเท = แพสั่งผลิต - แพผลิต คำนวณให้อัตโนมัติ ไม่ต้องพิมพ์เอง */}
-                <td style={{padding:'4px 6px',textAlign:'center',fontSize:13.5,fontWeight:700,color:'#c0392b'}}>
+                {/* ยกเลิก/ค้างเท = แพสั่งผลิต - แพผลิต คำนวณให้อัตโนมัติ ไม่ต้องพิมพ์เอง — เป็น 0 ไม่ต้องขึ้นแดง */}
+                <td style={{padding:'4px 6px',textAlign:'center',fontSize:13.5,fontWeight:cancel?700:400,color:cancel?'#c0392b':'inherit'}}>
                   {has||edited?fmtN(cancel):'–'}
                 </td>
                 <td style={{padding:'4px 6px',textAlign:'center'}}>
