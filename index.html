@@ -856,6 +856,12 @@ window.__dataReady.then(data => {
     const key=d=>ce+'-'+pad(mon)+'-'+pad(d);
     const byDate={}; rows.forEach(r=>{byDate[String(r.d).slice(0,10)]=r;});
 
+    // เดือนล่าสุดที่มีข้อมูลของปีนี้ — ไม่มีข้อมูลเลยก็ใช้เดือนตามนาฬิกา
+    const monthsWithData=[...new Set(rows.filter(r=>String(r.d).slice(0,4)===String(ce))
+      .map(r=>Number(String(r.d).slice(5,7))))].sort((a,b)=>a-b);
+    const latestMon=monthsWithData.length?monthsWithData[monthsWithData.length-1]:nowD.getMonth()+1;
+    const atLatest=mon===latestMon;
+
     // แถวที่จะแสดง — ปกติโชว์เฉพาะวันที่มีข้อมูลแล้ว + วันนี้ (กรอกง่าย ไม่ต้องเลื่อนผ่าน 31 แถว)
     const todayKey=nowD.getFullYear()+'-'+pad(nowD.getMonth()+1)+'-'+pad(nowD.getDate());
     const allDays=Array.from({length:daysInMonth},(_,i)=>i+1);
@@ -946,6 +952,12 @@ window.__dataReady.then(data => {
           style={{padding:'7px 11px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,background:'#fff',fontFamily:'inherit'}}>
           {M_TH.map((n,i)=><option key={i+1} value={i+1}>{n}</option>)}
         </select>
+        <button onClick={()=>{setMon(latestMon);setDraft({});}} title="กระโดดไปเดือนล่าสุดที่มีข้อมูล"
+          style={{padding:'7px 13px',borderRadius:8,fontSize:13.5,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',
+            border:`1.5px solid ${atLatest?'#c0392b':'#f0c9c4'}`,background:atLatest?'#fdecea':'#fff',
+            color:'#c0392b',fontWeight:atLatest?700:500}}>
+          📌 เดือนล่าสุด ({M_TH[latestMon-1]})
+        </button>
         <div style={{display:'flex',gap:5}}>
           {[['auto','ย่อ'],['h1','1–15'],['h2','16–สิ้นเดือน'],['all','ทุกวัน']].map(([v,l])=>(
             <button key={v} onClick={()=>setView(v)}
