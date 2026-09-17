@@ -2747,12 +2747,14 @@ window.__dataReady.then(data => {
     const isAdmin=currentUser?.role==='admin';
     const tp={...DEFAULT_TAB_PERMS,...(currentUser?.tab_perms||{})};
     const dmgSubTabs=[
+      {value:'summary',label:'ตารางสรุป'},
       {value:'damage',label:'มูลค่าเสียหาย'},{value:'trend',label:'เทียบวิเคราะห์สาเหตุ'},
-      {value:'summary',label:'ตารางสรุป'},{value:'cause',label:'แยกสาเหตุ'},
+      {value:'cause',label:'แยกสาเหตุ'},
       {value:'customer',label:'แยกลูกค้า'},{value:'size',label:'วิเคราะห์ขนาดเสา'},{value:'worker',label:'วิเคราะห์ผู้ปฏิบัติงาน'},
       {value:'detail',label:'ตารางรายการ'}
     ].filter(t=>isAdmin||tp['dmg_'+t.value]!==false);
-    const [view,setView]   = useState('damage');
+    // เปิดแท็บมาเจอตารางสรุปก่อน — ถ้าผู้ใช้ไม่มีสิทธิ์ดูตารางสรุป ให้ตกไปที่แท็บแรกที่เขาดูได้
+    const [view,setView]   = useState(()=>(dmgSubTabs[0]||{value:'damage'}).value);
     const [workerTab,setWorkerTab] = useState('employee');
     const [filterCode,setFilterCode] = useState('ALL');
     const [filterYear,setFilterYear] = useState(()=>{
