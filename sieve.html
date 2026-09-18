@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>บันทึกผลทดสอบทราย/หิน — บางเลน</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:#f0f2f7;min-height:100vh;}
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+.wrap{max-width:480px;margin:0 auto;padding:0 0 40px;}
+.topbar{background:#1a56db;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12;}
+.topbar h1{font-size:18px;font-weight:800;line-height:1.2;}
+.topbar p{font-size:13px;opacity:.8;margin-top:2px;}
+.tabs{display:flex;background:#fff;border-bottom:2px solid #e6e8ee;}
+.tab{flex:1;padding:14px;text-align:center;font-size:16px;font-weight:700;color:#8b91a1;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;transition:.15s;}
+.tab.active{color:#1a56db;border-bottom-color:#1a56db;}
+.card{background:#fff;border-radius:14px;padding:20px 18px;margin:16px 14px 0;box-shadow:0 1px 6px rgba(0,0,0,.07);}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:14px;font-weight:700;color:#42465a;margin-bottom:6px;}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1.5px solid #d6d8e0;border-radius:10px;font-size:16px;font-family:inherit;outline:none;transition:.15s;background:#fff;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#1a56db;box-shadow:0 0 0 3px rgba(26,86,219,.12);}
+.sieve-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.sieve-item label{font-size:13px;font-weight:700;color:#42465a;display:block;margin-bottom:5px;}
+.sieve-item .sub{font-size:11px;color:#8b91a1;font-weight:400;}
+.sieve-item input{width:100%;padding:11px 12px;border:1.5px solid #d6d8e0;border-radius:10px;font-size:16px;font-family:inherit;text-align:right;outline:none;background:#fff;}
+.sieve-item input:focus{border-color:#1a56db;box-shadow:0 0 0 3px rgba(26,86,219,.12);}
+.fm-card{border-radius:12px;padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12;}
+.fm-card.null{background:#f4f6fa;border:1.5px solid #e6e8ee;}
+.fm-card.ok{background:#f0fdf4;border:1.5px solid #86efac;}
+.fm-card.bad{background:#fef2f2;border:1.5px solid #fca5a5;}
+.fm-val{font-size:38px;font-weight:800;line-height:1;}
+.fm-label{font-size:13px;font-weight:600;margin-bottom:4px;}
+.fm-note{font-size:12px;opacity:.8;}
+.bigbtn{width:100%;padding:16px;border-radius:12px;border:none;font-size:18px;font-weight:800;font-family:inherit;cursor:pointer;background:#1a56db;color:#fff;margin-top:8px;transition:.15s;}
+.bigbtn:active{opacity:.85;}
+.bigbtn:disabled{opacity:.45;cursor:not-allowed;}
+.bigbtn.green{background:#059669;}
+.success{text-align:center;padding:32px 20px;}
+.success .icon{font-size:64px;margin-bottom:16px;}
+.success h2{font-size:22px;font-weight:800;color:#059669;margin-bottom:8px;}
+.success p{font-size:15px;color:#5f6470;margin-bottom:24px;}
+.ghost{width:100%;padding:14px;border-radius:12px;border:1.5px solid #d6d8e0;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;background:#fff;color:#42465a;margin-top:10px;}
+.stone-tabs{display:flex;gap:8px;margin-bottom:16px;}
+.stone-tab{flex:1;padding:11px;text-align:center;font-size:15px;font-weight:700;border-radius:10px;border:1.5px solid #d6d8e0;background:#fff;color:#42465a;cursor:pointer;transition:.15s;}
+.stone-tab.active{background:#1a56db;color:#fff;border-color:#1a56db;}
+.result-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f7;font-size:14px;}
+.result-row:last-child{border-bottom:none;}
+.badge{padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+.badge.ok{background:#dcfce7;color:#059669;}
+.badge.bad{background:#fee2e2;color:#d13438;}
+.err{color:#d13438;font-size:14px;font-weight:600;padding:10px 14px;background:#fef2f2;border-radius:10px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo}=React;
+const SB=supabase.createClient(
+  'https://npxzerdirspwunuckcqr.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI'
+);
+function todayISO(){return new Date().toISOString().slice(0,10);}
+
+// ---- ทราย ----
+const FM_SIEVES=[
+  {key:'w9_5', label:'3/8″',      sub:'9.5 mm'},
+  {key:'w4_75',label:'เบอร์ 4',   sub:'4.75 mm'},
+  {key:'w2_36',label:'เบอร์ 8',   sub:'2.36 mm'},
+  {key:'w1_18',label:'เบอร์ 16',  sub:'1.18 mm'},
+  {key:'w0_60',label:'เบอร์ 30',  sub:'0.60 mm'},
+  {key:'w0_30',label:'เบอร์ 50',  sub:'0.30 mm'},
+  {key:'w0_15',label:'เบอร์ 100', sub:'0.15 mm'},
+];
+const FM_MIN=2.3,FM_MAX=3.1;
+function calcFM(w){
+  const wts=FM_SIEVES.map(s=>Number(w[s.key])||0);
+  const pan=Number(w.w_pan)||0;
+  const total=wts.reduce((a,b)=>a+b,0)+pan;
+  if(!total)return{total:0,fm:null,rows:[]};
+  let cum=0;
+  const rows=FM_SIEVES.map((s,i)=>{const ret=wts[i]/total*100;cum+=ret;return{...s,cum};});
+  return{total,fm:rows.reduce((a,r)=>a+r.cum,0)/100,rows};
+}
+
+// ---- หิน ----
+const STONE_SIZES=['3/4″','1″'];
+const STONE_SIEVES_ALL=[
+  {key:'w37_5',label:'1-1/2″',sub:'37.5 mm'},
+  {key:'w25_0',label:'1″',    sub:'25.0 mm'},
+  {key:'w19_0',label:'3/4″',  sub:'19.0 mm'},
+  {key:'w12_5',label:'1/2″',  sub:'12.5 mm'},
+  {key:'w9_5', label:'3/8″',  sub:'9.5 mm'},
+  {key:'w4_75',label:'เบอร์ 4',sub:'4.75 mm'},
+  {key:'w2_36',label:'เบอร์ 8',sub:'2.36 mm'},
+];
+const STONE_LIMITS={
+  '3/4″':{w25_0:[100,100],w19_0:[90,100],w9_5:[20,55],w4_75:[0,10],w2_36:[0,5]},
+  '1″':  {w37_5:[100,100],w25_0:[95,100],w12_5:[25,60],w4_75:[0,10],w2_36:[0,5]},
+};
+function calcStone(size,w){
+  const limits=STONE_LIMITS[size]||STONE_LIMITS['3/4″'];
+  const active=STONE_SIEVES_ALL.filter(s=>limits[s.key]);
+  const wts=active.map(s=>Number(w[s.key])||0);
+  const pan=Number(w.w_pan)||0;
+  const total=wts.reduce((a,b)=>a+b,0)+pan;
+  if(!total)return{total:0,rows:[]};
+  let cum=0;
+  const rows=active.map((s,i)=>{
+    const[lo,hi]=limits[s.key];
+    const ret=wts[i]/total*100;cum+=ret;
+    const pass=100-cum;
+    return{...s,lo,hi,pass};
+  });
+  return{total,rows};
+}
+
+// ---- Sand Form ----
+function SandForm(){
+  const blank={test_date:todayISO(),sand_source:'',w9_5:'',w4_75:'',w2_36:'',w1_18:'',w0_60:'',w0_30:'',w0_15:'',w_pan:'',note:''};
+  const[f,setF]=useState(blank);
+  const[saving,setSaving]=useState(false);
+  const[done,setDone]=useState(false);
+  const[err,setErr]=useState('');
+  const live=calcFM(f);
+  const fm=live.fm;
+  const fmClass=fm==null?'null':fm>=FM_MIN&&fm<=FM_MAX?'ok':'bad';
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const save=async()=>{
+    if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
+    if(!live.total){setErr('กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
+    setErr('');setSaving(true);
+    const rec={test_date:f.test_date,sand_source:f.sand_source||'',note:f.note||'',
+      fm:fm!=null?Math.round(fm*100)/100:null};
+    FM_SIEVES.forEach(s=>{rec[s.key]=Number(f[s.key])||0;});
+    rec.w_pan=Number(f.w_pan)||0;
+    const{error}=await SB.from('sand_fm_tests').insert([rec]);
+    setSaving(false);
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    setDone(true);
+  };
+
+  if(done)return(
+    <div className="card success">
+      <div className="icon">✅</div>
+      <h2>บันทึกแล้ว!</h2>
+      <p>ผลทดสอบขนาดคละทราย<br/>วันที่ {f.test_date.split('-').reverse().join('/')}<br/>
+      {fm!=null&&<>FM = <b>{fm.toFixed(2)}</b> {fm>=FM_MIN&&fm<=FM_MAX?'(ผ่าน)':'(ไม่ผ่าน)'}</>}</p>
+      <button className="bigbtn green" onClick={()=>{setF(blank);setDone(false);}}>+ บันทึกรายการใหม่</button>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="card">
+        <div className="field">
+          <label>วันที่ทดสอบ</label>
+          <input type="date" value={f.test_date} onChange={e=>set('test_date',e.target.value)}/>
+        </div>
+        <div className="field">
+          <label>แหล่งทราย (ถ้ามี)</label>
+          <input type="text" value={f.sand_source} onChange={e=>set('sand_source',e.target.value)} placeholder="เช่น บ่อหนองแค, แม่น้ำ..."/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:14}}>น้ำหนักค้างตะแกรง (กรัม)</div>
+        <div className="sieve-grid">
+          {FM_SIEVES.map(s=>(
+            <div className="sieve-item" key={s.key}>
+              <label>{s.label} <span className="sub">{s.sub}</span></label>
+              <input type="number" inputMode="decimal" min="0" value={f[s.key]} onChange={e=>set(s.key,e.target.value)} placeholder="0"/>
+            </div>
+          ))}
+          <div className="sieve-item">
+            <label>ถาดล่าง <span className="sub">Pan</span></label>
+            <input type="number" inputMode="decimal" min="0" value={f.w_pan} onChange={e=>set('w_pan',e.target.value)} placeholder="0"/>
+          </div>
+        </div>
+
+        <div className={`fm-card ${fmClass}`}>
+          <div>
+            <div className="fm-label" style={{color:fmClass==='ok'?'#059669':fmClass==='bad'?'#d13438':'#5f6470'}}>
+              ค่า FM (Fineness Modulus)
+            </div>
+            <div className="fm-note" style={{color:fmClass==='ok'?'#059669':fmClass==='bad'?'#d13438':'#8b91a1'}}>
+              {fm==null?'ใส่น้ำหนักเพื่อคำนวณ':fm>=FM_MIN&&fm<=FM_MAX?`✓ อยู่ในเกณฑ์ ${FM_MIN}–${FM_MAX}`:fm<FM_MIN?`✗ ทรายละเอียดเกินไป (เกณฑ์ ${FM_MIN}–${FM_MAX})`:`✗ ทรายหยาบเกินไป (เกณฑ์ ${FM_MIN}–${FM_MAX})`}
+            </div>
+          </div>
+          <div className="fm-val" style={{color:fmClass==='ok'?'#059669':fmClass==='bad'?'#d13438':'#c0c4ce'}}>
+            {fm!=null?fm.toFixed(2):'–'}
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="field">
+          <label>หมายเหตุ (ถ้ามี)</label>
+          <textarea rows={2} value={f.note} onChange={e=>set('note',e.target.value)} placeholder="..." style={{resize:'none'}}/>
+        </div>
+        {err&&<div className="err">{err}</div>}
+        <button className="bigbtn" disabled={saving} onClick={save}>
+          {saving?'กำลังบันทึก…':'บันทึกผลทดสอบทราย'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Stone Form ----
+function StoneForm(){
+  const blank={test_date:todayISO(),stone_size:'3/4″',stone_source:'',w37_5:'',w25_0:'',w19_0:'',w12_5:'',w9_5:'',w4_75:'',w2_36:'',w_pan:'',note:''};
+  const[f,setF]=useState(blank);
+  const[saving,setSaving]=useState(false);
+  const[done,setDone]=useState(false);
+  const[err,setErr]=useState('');
+  const live=calcStone(f.stone_size,f);
+  const activeKeys=Object.keys(STONE_LIMITS[f.stone_size]||STONE_LIMITS['3/4″']);
+  const activeSieves=STONE_SIEVES_ALL.filter(s=>activeKeys.includes(s.key));
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const changeSize=s=>setF(p=>({...blank,test_date:p.test_date,stone_source:p.stone_source,stone_size:s}));
+
+  const allPass=live.total>0&&live.rows.every(r=>r.pass>=r.lo-0.05&&r.pass<=r.hi+0.05);
+  const hasBad=live.total>0&&live.rows.some(r=>r.pass<r.lo-0.05||r.pass>r.hi+0.05);
+
+  const save=async()=>{
+    if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
+    if(!live.total){setErr('กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
+    setErr('');setSaving(true);
+    const rec={test_date:f.test_date,stone_size:f.stone_size,stone_source:f.stone_source||'',note:f.note||''};
+    STONE_SIEVES_ALL.forEach(s=>{rec[s.key]=Number(f[s.key])||0;});
+    rec.w_pan=Number(f.w_pan)||0;
+    const{error}=await SB.from('stone_gradation_tests').insert([rec]);
+    setSaving(false);
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    setDone(true);
+  };
+
+  if(done)return(
+    <div className="card success">
+      <div className="icon">✅</div>
+      <h2>บันทึกแล้ว!</h2>
+      <p>ผลทดสอบขนาดคละหิน {f.stone_size}<br/>วันที่ {f.test_date.split('-').reverse().join('/')}</p>
+      <button className="bigbtn green" onClick={()=>{setF(blank);setDone(false);}}>+ บันทึกรายการใหม่</button>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="card">
+        <div className="field">
+          <label>วันที่ทดสอบ</label>
+          <input type="date" value={f.test_date} onChange={e=>set('test_date',e.target.value)}/>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:14,fontWeight:700,color:'#42465a',display:'block',marginBottom:8}}>ขนาดหิน</label>
+          <div className="stone-tabs">
+            {STONE_SIZES.map(s=>(
+              <button key={s} className={`stone-tab${f.stone_size===s?' active':''}`} onClick={()=>changeSize(s)}>
+                หิน {s}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label>แหล่งหิน (ถ้ามี)</label>
+          <input type="text" value={f.stone_source} onChange={e=>set('stone_source',e.target.value)} placeholder="เช่น หินเขา, หินบดย่อย..."/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:4}}>น้ำหนักค้างตะแกรง (กรัม)</div>
+        <div style={{fontSize:12,color:'#8b91a1',marginBottom:14}}>หิน {f.stone_size} — ใส่เฉพาะตะแกรงที่ระบุตามเกณฑ์ ASTM C33</div>
+        <div className="sieve-grid">
+          {activeSieves.map(s=>(
+            <div className="sieve-item" key={s.key}>
+              <label>{s.label} <span className="sub">{s.sub}</span></label>
+              <input type="number" inputMode="decimal" min="0" value={f[s.key]} onChange={e=>set(s.key,e.target.value)} placeholder="0"/>
+            </div>
+          ))}
+          <div className="sieve-item">
+            <label>ถาดล่าง <span className="sub">Pan</span></label>
+            <input type="number" inputMode="decimal" min="0" value={f.w_pan} onChange={e=>set('w_pan',e.target.value)} placeholder="0"/>
+          </div>
+        </div>
+
+        {live.total>0&&(
+          <div style={{marginTop:4}}>
+            <div style={{fontSize:14,fontWeight:700,color:'#42465a',marginBottom:8}}>ผลขนาดคละเทียบเกณฑ์ ASTM C33</div>
+            {live.rows.map(r=>{
+              const ok=r.pass>=r.lo-0.05&&r.pass<=r.hi+0.05;
+              return(
+                <div className="result-row" key={r.key}>
+                  <span style={{fontWeight:600}}>{r.label} <span style={{fontWeight:400,color:'#8b91a1',fontSize:12}}>{r.sub}</span></span>
+                  <span style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{color:'#42465a',fontSize:13}}>ผ่าน {r.pass.toFixed(1)}%</span>
+                    <span className={`badge ${ok?'ok':'bad'}`}>{ok?'✓ ผ่าน':'✗ หลุด'}</span>
+                  </span>
+                </div>
+              );
+            })}
+            <div style={{marginTop:10,padding:'10px 14px',borderRadius:10,
+              background:allPass?'#f0fdf4':hasBad?'#fef2f2':'#f4f6fa',
+              border:`1.5px solid ${allPass?'#86efac':hasBad?'#fca5a5':'#e6e8ee'}`,
+              fontSize:14,fontWeight:700,
+              color:allPass?'#059669':hasBad?'#d13438':'#5f6470'}}>
+              {allPass?'✓ ผ่านเกณฑ์ทุกตะแกรง':hasBad?`✗ หลุดเกณฑ์ ${live.rows.filter(r=>r.pass<r.lo-0.05||r.pass>r.hi+0.05).map(r=>r.label).join(', ')}`:'-'}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="field">
+          <label>หมายเหตุ (ถ้ามี)</label>
+          <textarea rows={2} value={f.note} onChange={e=>set('note',e.target.value)} placeholder="..." style={{resize:'none'}}/>
+        </div>
+        {err&&<div className="err">{err}</div>}
+        <button className="bigbtn" disabled={saving} onClick={save}>
+          {saving?'กำลังบันทึก…':f.stone_size==='3/4″'?'บันทึกผลทดสอบหิน 3/4″':'บันทึกผลทดสอบหิน 1″'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- App ----
+function App(){
+  const[tab,setTab]=useState('sand');
+  return(
+    <div className="wrap">
+      <div className="topbar">
+        <div>
+          <h1>บันทึกผลทดสอบวัตถุดิบ</h1>
+          <p>บางเลน — ทดสอบขนาดคละทราย & หิน</p>
+        </div>
+      </div>
+      <div className="tabs">
+        <button className={`tab${tab==='sand'?' active':''}`} onClick={()=>setTab('sand')}>🏖 ทราย (FM)</button>
+        <button className={`tab${tab==='stone'?' active':''}`} onClick={()=>setTab('stone')}>🪨 หิน</button>
+      </div>
+      {tab==='sand'?<SandForm/>:<StoneForm/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
