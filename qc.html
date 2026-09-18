@@ -558,6 +558,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
   // การ์ดระยะยืดของลวด — แยกช่องกรอกตามขนาดลวด (บางแพใช้ทั้ง 4 และ 5 มม.)
   const elongCard=(()=>{
     if(!isPre||!head.bed_no) return null;
+    if(String(head.pile_spec||'').trim()==='เลนเดี่ยว') return null; // ไม่ใช่ขนาดเสาจริง ไม่มีระยะยืดให้ตรวจ
     // ผูกกับขนาดเสาที่ใช้จริงวันนี้ (head.pile_spec) ไม่ใช่เลขแพ — แพ S/แพที่เปลี่ยนขนาดได้จะได้ค่าตามขนาดที่ใช้จริง
     const specKey=elongSpecKey(head.pile_spec);
     const specs=(elong||[]).filter(e=>e.pile_spec?elongSpecKey(e.pile_spec)===specKey:String(e.raft_num)===String(head.bed_no))

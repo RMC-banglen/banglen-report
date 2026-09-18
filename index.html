@@ -3089,13 +3089,13 @@ window.__dataReady.then(data => {
               const specOf=e=>normSpec(e.pile_spec||('แพ '+e.raft_num));
               const bySpec={};
               elongSpec.forEach(e=>{(bySpec[specOf(e)]=bySpec[specOf(e)]||{})[e.wire_mm]=e;});
-              const STD_SIZES=['I18มอก.','I22มอก.','I26มอก.','I30มอก.','I35มอก.','I40มอก.','S18','S22','S26','S30','S35','S40','เลนเดี่ยว'];
+              const STD_SIZES=['I18มอก.','I22มอก.','I26มอก.','I30มอก.','I35มอก.','I40มอก.','S18','S22','S26','S30','S35','S40']; // เลนเดี่ยว = ไม่ใช่ขนาดเสาจริง ไม่ต้องตั้งค่าระยะยืด
               const specList=migrated
                 ? [...new Set([
                     ...rafts.map(r=>normSpec(((r.pile_type||'')+(r.section||'')).trim())),
                     ...plan.map(p=>normSpec(p.pile_spec)).filter(Boolean),
                     ...STD_SIZES,
-                  ])].filter(Boolean).sort((x,y)=>x.localeCompare(y,'th'))
+                  ])].filter(x=>x&&x!=='เลนเดี่ยว').sort((x,y)=>x.localeCompare(y,'th'))
                 : rafts.map(r=>'แพ '+r.raft_num);
               const tolOf=spec=>{
                 if(eForm['tol_'+spec]!=null) return eForm['tol_'+spec];
