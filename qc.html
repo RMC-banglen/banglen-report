@@ -185,7 +185,8 @@ function App(){
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
   return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} elong={elong} preset={preset}
-                    onBack={()=>{setPreset(null);formType==='mat'?setMaterial(null):setFormType(null);}}/>;
+                    onBack={()=>{setPreset(null);formType==='mat'?setMaterial(null):setFormType(null);}}
+                    onBackToList={()=>setPreset(null)}/>;
 }
 
 // เปิดลิงก์ผิด/ไม่มี ?u= → ให้เลือกชื่อ แล้วจำไว้ในเครื่อง
@@ -507,7 +508,7 @@ function PickMaterial({me,mats,onPick,onBack}){
   </>;
 }
 
-function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
+function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onBackToList}){
   const F=FORMS[formType];
   const isPre=formType==='pre';
   const isMat=formType==='mat';
@@ -702,7 +703,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
   };
 
   if(done) return <Done me={me} done={done}
-    onNew={done.isEdit?onBack:()=>{setDone(null);setVals({});setFiles([]);}}
+    onNew={done.isEdit?(onBackToList||onBack):()=>{setDone(null);setVals({});setFiles([]);}}
     onBack={onBack}/>;
 
   // การ์ดระยะยืดของลวด — แสดงรวมอยู่ในหมวดลวดอัดแรง/เหล็กเสริม
