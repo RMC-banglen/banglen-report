@@ -187,7 +187,11 @@ function App(){
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
   return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} elong={elong} preset={preset}
-                    onBack={()=>{setPreListDay(null);setPreset(null);formType==='mat'?setMaterial(null):setFormType(null);}}
+                    onBack={()=>{
+                      if(formType==='pre'){setPreListDay(preset?.day||null);setPreset(null);}
+                      else if(formType==='mat'){setPreset(null);setMaterial(null);}
+                      else{setPreListDay(null);setPreset(null);setFormType(null);}
+                    }}
                     onBackToList={(day)=>{setPreListDay(day||preset?.day||null);setPreset(null);}}/>;
 }
 
