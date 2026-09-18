@@ -365,7 +365,7 @@ function PhotoScanner({onExtracted,onManual,onBack}){
     <div>
       <div className="card">
         <div className="card-title">📷 ถ่าย/เลือกรูปใบรายงาน</div>
-        <input type="file" accept="image/*" capture="environment" ref={fileRef}
+        <input type="file" accept="image/*" ref={fileRef}
           style={{display:'none'}} onChange={onFile}/>
 
         <div className="photo-box" onClick={()=>fileRef.current.click()}>
@@ -373,8 +373,8 @@ function PhotoScanner({onExtracted,onManual,onBack}){
             ?<img src={imgSrc} alt="preview"/>
             :<>
               <span className="ph-icon">📄</span>
-              <div className="ph-label">กดเพื่อถ่ายรูปหรือเลือกไฟล์</div>
-              <div className="ph-sub">รองรับ JPG, PNG — ถ่ายให้ชัดทั้งใบ</div>
+              <div className="ph-label">กดเพื่อเลือกรูปจากอัลบั้ม หรือถ่ายใหม่</div>
+              <div className="ph-sub">รองรับ JPG, PNG — ถ่ายหรือเลือกให้ชัดทั้งใบ</div>
             </>
           }
         </div>
