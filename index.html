@@ -3120,8 +3120,11 @@ window.__dataReady.then(data => {
                 const v=Number(raw);
                 setEForm(f=>({...f,['tol_'+spec]:raw}));
                 if(!(v>0)) return;
-                WIRES.forEach(w=>{const row=bySpec[spec]&&bySpec[spec][w];
-                  if(row&&Number(row.tol_pct)!==v) db.from('qc_elongation_spec').update({tol_pct:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);});
+                // อัปเดตทุกแถวที่ normalize แล้วตรงกับ spec นี้ (ครอบคลุม S26มอก./S26รง. ที่เป็นคนละ row)
+                const allMatch=(elongSpec||[]).filter(e=>normSpec(e.pile_spec||(''+(e.raft_num||'')))===spec);
+                allMatch.forEach(row=>{
+                  if(Number(row.tol_pct)!==v) db.from('qc_elongation_spec').update({tol_pct:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);
+                });
               };
               const cellInp={width:96,padding:'7px 9px',borderRadius:8,fontSize:14.5,textAlign:'right',fontFamily:'inherit'};
               return <>
