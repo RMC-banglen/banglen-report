@@ -103,6 +103,7 @@ function fmt(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}/${m}/
 
 const FORMULAS=['NP280','NP315','NP325','NP355','NP315 CK','NP315 SM','NP355 CK','NP355 SM'];
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzyu-ZNgAu9Rxof-PP-JVG6wmKfw1nSnbr75novSi3VbThXxwBfUvZjKrs1OuuW3617/exec';
+const DEFAULT_GEMINI_KEY='AIzaSyAQ.Ab8RN6IkOVjXmCfQDrv1XiU6axWP0evqUXwCfFlzPga7Z3nrJw';
 const GAS_CODE=`function doPost(e) {
   var d = JSON.parse(e.postData.contents);
   var ss = SpreadsheetApp.openById('1ZYGnV8AqyR3a0uTNRftkguEdBPrQOjLQbWU6ZhpiFyk');
@@ -326,8 +327,7 @@ function PhotoScanner({onExtracted,onManual,onBack}){
   };
 
   const scan=async()=>{
-    const geminiKey=localStorage.getItem('gemini_key')||'';
-    if(!geminiKey){setErr('ยังไม่ได้ตั้งค่า Gemini API Key — กดไอคอน ⚙ มุมบน แล้วใส่ key (ฟรีที่ aistudio.google.com)');return;}
+    const geminiKey=localStorage.getItem('gemini_key')||DEFAULT_GEMINI_KEY;
     setLoading(true);setErr('');
     try{
       const base64=await resizeBase64(imgSrc,1200);
@@ -427,7 +427,7 @@ function App(){
   const[doneResult,setDoneResult]=useState(null);
 
   const hasGas=!!(localStorage.getItem('gas_url')||DEFAULT_GAS_URL);
-  const hasKey=!!localStorage.getItem('gemini_key');
+  const hasKey=!!(localStorage.getItem('gemini_key')||DEFAULT_GEMINI_KEY);
 
   if(screen==='settings')return<Settings onClose={()=>setScreen('home')}/>;
 
@@ -486,7 +486,7 @@ function App(){
         <button className="mode-btn primary" onClick={()=>{setPrefill(null);setScreen('photo');}}>
           <span className="icon">📷</span>
           <div className="label">ถ่ายรูปใบปริ้น</div>
-          <div className="sub">{hasKey?'Gemini อ่านอัตโนมัติ':'ต้องการ Gemini Key (ฟรี)'}</div>
+          <div className="sub">Gemini อ่านอัตโนมัติ</div>
         </button>
         <button className="mode-btn secondary" onClick={()=>{setPrefill(null);setScreen('form');}}>
           <span className="icon">✏️</span>
