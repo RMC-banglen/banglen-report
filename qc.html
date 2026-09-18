@@ -176,9 +176,9 @@ function App(){
   if(!me) return <PickUser inspectors={inspectors}/>;
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
   if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
-                                  onInspect={(n,day,spec)=>{setPreset({raft:String(n),day,spec});setFormType('pre');}}/>;
+                                  onInspect={(n,day,spec,isChecked)=>{setPreset({raft:String(n),day,spec,isChecked});setFormType('pre');}}/>;
   if(formType==='pre'&&!preset) return <PreListView me={me} rafts={rafts} onBack={()=>setFormType(null)}
-                                  onInspect={(n,day,spec)=>setPreset({raft:String(n),day,spec})}/>;
+                                  onInspect={(n,day,spec,isChecked)=>setPreset({raft:String(n),day,spec,isChecked})}/>;
   if(formType==='mat'&&!material){
     const mats=[...new Set(checklist.filter(c=>c.form_type==='mat').map(c=>c.section))].sort((x,y)=>x.localeCompare(y,'th'));
     return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
@@ -386,9 +386,9 @@ function PlanView({me,rafts,onBack,onInspect}){
                 </div>
               : (plan||[]).map(p=>{
                   const ok=isDone(p.raft_num);
-                  return <button key={p.raft_num} onClick={()=>!ok&&onInspect(p.raft_num,day,p.pile_spec)}
+                  return <button key={p.raft_num} onClick={()=>onInspect(p.raft_num,day,p.pile_spec,ok)}
                     style={{width:'100%',textAlign:'left',marginBottom:8,padding:'14px 15px',borderRadius:12,
-                      cursor:ok?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:12,
+                      cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:12,
                       border:`1.5px solid ${ok?'#a7e3d4':'#f3b8b0'}`,background:ok?'var(--okbg)':'var(--badbg)'}}>
                     <span style={{fontSize:20}}>{ok?'🟢':'🔴'}</span>
                     <span style={{flex:1}}>
@@ -467,7 +467,7 @@ function PreListView({me,rafts,onBack,onInspect}){
                   </div>
                 : (plan||[]).map(p=>{
                     const ok=isDone(p.raft_num);
-                    return <button key={p.raft_num} onClick={()=>onInspect(p.raft_num,day,p.pile_spec)}
+                    return <button key={p.raft_num} onClick={()=>onInspect(p.raft_num,day,p.pile_spec,ok)}
                       style={{width:'100%',textAlign:'left',marginBottom:8,padding:'14px 15px',borderRadius:12,
                         cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:12,
                         border:`1.5px solid ${ok?'#a7e3d4':'#f3b8b0'}`,background:ok?'var(--okbg)':'var(--badbg)'}}>
@@ -518,6 +518,9 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
   const [files,setFiles]=useState([]);      // {id, file, url}
   const [saving,setSaving]=useState(false);
   const [done,setDone]=useState(null);
+  const [viewMode,setViewMode]=useState(()=>preset?.isChecked?'view':null);
+  const [existingCheck,setExistingCheck]=useState(null);
+  const [existingItems,setExistingItems]=useState([]);
   const fileRef=useRef(null);
   // แพที่เลือกตรวจได้ = เฉพาะแพในใบงานผลิตของวันนั้น
   const [dayPlan,setDayPlan]=useState(null);
@@ -545,6 +548,31 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
     }catch(e){}
   },[memKey]);
 
+  useEffect(()=>{
+    if(!preset?.isChecked){setViewMode(null);setExistingCheck(null);setExistingItems([]);return;}
+    setViewMode('view');
+    DB.from('qc_checks')
+      .select('*').eq('form_type','pre').eq('check_date',preset.day).eq('bed_no',String(preset.raft))
+      .limit(1)
+      .then(({data,error})=>{
+        if(error||!data||!data.length){setViewMode(null);return;}
+        const chk=data[0];
+        setExistingCheck(chk);
+        setHead(h=>({...h,check_date:chk.check_date,bed_no:String(chk.bed_no),
+          lot_no:chk.lot_no||'',pile_spec:chk.pile_spec||'',
+          qty:chk.qty||'',supplier:chk.supplier||'',elong:{}}));
+        DB.from('qc_check_items').select('*').eq('check_id',chk.id)
+          .then(({data:items})=>{
+            const nv={},ev={};
+            (items||[]).forEach(it=>{
+              if(it.item_id!=null) nv[it.item_id]={yn:it.value_yn||undefined,num:it.value_num!=null?String(it.value_num):'',note:it.note||''};
+              else if(it.label&&it.label.includes('ระยะยืด')){const m=it.label.match(/(\d+)\s*มม/);if(m)ev[m[1]]=it.value_num!=null?String(it.value_num):'';}
+            });
+            setVals(nv);setHead(h=>({...h,elong:ev}));setExistingItems(items||[]);
+          });
+      }).catch(()=>{setViewMode(null);});
+  },[preset]);
+
   const set=(id,patch)=>setVals(v=>({...v,[id]:{...(v[id]||{}),...patch}}));
   const itemOk=it=>{
     const v=vals[it.id]||{};
@@ -568,6 +596,47 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
   };
 
   const submit=async()=>{
+    if(viewMode==='edit'&&existingCheck){
+      setSaving(true);
+      try{
+        const checkId=existingCheck.id;
+        const specKey=elongSpecKey(head.pile_spec);
+        const elongRows=!isPre?[]:(elong||[])
+          .filter(e=>e.pile_spec?elongSpecKey(e.pile_spec)===specKey:String(e.raft_num)===String(head.bed_no))
+          .sort((a,b)=>a.wire_mm-b.wire_mm)
+          .map(sp=>{
+            const raw=(head.elong||{})[sp.wire_mm];
+            if(raw===''||raw==null||!isFinite(Number(raw))) return null;
+            const n=Number(raw);
+            const ok=n>=sp.target_mm*(1-sp.tol_pct/100)&&n<=sp.target_mm*(1+sp.tol_pct/100);
+            return {sp,n,ok};
+          }).filter(Boolean);
+        const allFailed=failed.concat(elongRows.filter(r=>!r.ok).map(r=>({label:'ระยะยืดของลวด '+r.sp.wire_mm+' มม.'})));
+        const result=allFailed.length?'fail':'pass';
+        const {error:updErr}=await DB.from('qc_checks')
+          .update({pile_spec:head.pile_spec||'',result,fail_count:allFailed.length})
+          .eq('id',checkId);
+        if(updErr) throw updErr;
+        await DB.from('qc_check_items').delete().eq('check_id',checkId);
+        const rows=checklist.map(it=>{
+          const v=vals[it.id]||{};const ok=itemOk(it);
+          return {check_id:checkId,item_id:it.id,label:it.label,section:it.section,kind:it.kind,
+            value_yn:it.kind==='yn'?(v.yn||null):null,
+            value_num:it.kind==='num'&&v.num!==''&&v.num!=null?Number(v.num):null,
+            unit:it.unit||'',ok:ok,note:v.note||''};
+        });
+        elongRows.forEach(r=>{rows.push({check_id:checkId,item_id:null,
+          label:'ระยะยืดของลวด '+r.sp.wire_mm+' มม. (Elongation total)',section:'ลวดอัดแรง/เหล็กเสริม',
+          kind:'num',value_yn:null,value_num:r.n,unit:'มม.',ok:r.ok,
+          note:'เกณฑ์ '+r.sp.target_mm+' มม. ±'+r.sp.tol_pct+'%'});});
+        if(rows.length) await DB.from('qc_check_items').insert(rows);
+        setExistingCheck(c=>({...c,result,fail_count:allFailed.length}));
+        setExistingItems(rows);
+        setDone({result,failed:allFailed.map(f=>f.label),id:checkId,isEdit:true});
+      }catch(e){alert('แก้ไขไม่สำเร็จ: '+(e.message||e));}
+      finally{setSaving(false);}
+      return;
+    }
     if(!allAnswered){
       if(!window.confirm('ยังตอบไม่ครบ ('+answered.length+'/'+checklist.length+' ข้อ) — ส่งเลยไหม?')) return;
     }
@@ -632,7 +701,9 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
     }finally{ setSaving(false); }
   };
 
-  if(done) return <Done me={me} done={done} onNew={()=>{setDone(null);setVals({});setFiles([]);}} onBack={onBack}/>;
+  if(done) return <Done me={me} done={done}
+    onNew={done.isEdit?onBack:()=>{setDone(null);setVals({});setFiles([]);}}
+    onBack={onBack}/>;
 
   // การ์ดระยะยืดของลวด — แสดงรวมอยู่ในหมวดลวดอัดแรง/เหล็กเสริม
   // การ์ดระยะยืดของลวด — แยกช่องกรอกตามขนาดลวด (บางแพใช้ทั้ง 4 และ 5 มม.)
@@ -695,10 +766,11 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
     <div className="topbar">
       <button onClick={onBack} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',
         borderRadius:10,padding:'7px 11px',fontSize:16,cursor:'pointer'}}>←</button>
-      <div><div className="who">{material||F.label}</div><div className="sub">{me.name} · {thaiDate(head.check_date)}</div></div>
+      <div><div className="who">{material||F.label}</div><div className="sub">{me.name} · {thaiDate(head.check_date)}{viewMode==='view'?' · ดูผลตรวจ':viewMode==='edit'?' · แก้ไข':''}</div></div>
     </div>
 
     <div className="wrap">
+      <fieldset disabled={viewMode==='view'} style={{border:0,padding:0,margin:0,minWidth:0}}>
       <div className="card">
         <div className="field">
           <label>วันที่ตรวจ</label>
@@ -743,9 +815,9 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
         </>}
       </div>
 
-      <button onClick={passAll} className="ghost" style={{marginTop:12,color:'var(--ok)',borderColor:'#a7e3d4'}}>
+      {!viewMode&&<button onClick={passAll} className="ghost" style={{marginTop:12,color:'var(--ok)',borderColor:'#a7e3d4'}}>
         ✓ ติ๊กผ่านทั้งหมด แล้วแก้เฉพาะข้อที่มีปัญหา
-      </button>
+      </button>}
 
       {groups.map(g=>(
         <div key={g.name}>
@@ -775,6 +847,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
         </div>
       ))}
 
+      {viewMode!=='view'&&<>
       <div className="sec">รูปถ่าย</div>
       <div className="card">
         <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple
@@ -789,17 +862,49 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
           ))}
         </div>}
       </div>
+      </>}
+      </fieldset>
     </div>
 
     <div className="bottom">
       <div className="inner">
-        <span className="pill" style={{background:failed.length?'var(--badbg)':'var(--nabg)',
-          color:failed.length?'var(--bad)':'var(--muted)'}}>
-          {answered.length}/{checklist.length}{failed.length?' · ไม่ผ่าน '+failed.length:''}
-        </span>
-        <button className="bigbtn" style={{flex:1}} disabled={saving||answered.length===0} onClick={submit}>
-          {saving?'กำลังบันทึก…':'ส่งผลตรวจ'}
-        </button>
+        {viewMode==='view'
+          ? <>
+              <div style={{flex:1,fontSize:14,fontWeight:700,
+                color:existingCheck?.result==='fail'?'var(--bad)':'var(--ok)'}}>
+                {existingCheck
+                  ? existingCheck.result==='fail'
+                    ? '⚠️ ไม่ผ่าน '+existingCheck.fail_count+' ข้อ'
+                    : '✅ ผ่านทั้งหมด'
+                  : 'กำลังโหลด…'}
+              </div>
+              <button className="bigbtn" style={{flex:1,background:'#1a6fba'}} onClick={()=>setViewMode('edit')}>
+                ✎ แก้ไขผลตรวจ
+              </button>
+            </>
+          : viewMode==='edit'
+          ? <>
+              <button className="ghost" style={{width:100}} onClick={()=>{
+                  const nv={},ev={};
+                  existingItems.forEach(it=>{
+                    if(it.item_id!=null) nv[it.item_id]={yn:it.value_yn||undefined,num:it.value_num!=null?String(it.value_num):'',note:it.note||''};
+                    else if(it.label&&it.label.includes('ระยะยืด')){const m=it.label.match(/(\d+)\s*มม/);if(m)ev[m[1]]=it.value_num!=null?String(it.value_num):'';}
+                  });
+                  setVals(nv);setHead(h=>({...h,elong:ev}));setViewMode('view');
+                }}>ยกเลิก</button>
+              <button className="bigbtn" style={{flex:1,background:'#c47b00'}} disabled={saving} onClick={submit}>
+                {saving?'กำลังบันทึก…':'ยืนยันแก้ไข'}
+              </button>
+            </>
+          : <>
+              <span className="pill" style={{background:failed.length?'var(--badbg)':'var(--nabg)',
+                color:failed.length?'var(--bad)':'var(--muted)'}}>
+                {answered.length}/{checklist.length}{failed.length?' · ไม่ผ่าน '+failed.length:''}
+              </span>
+              <button className="bigbtn" style={{flex:1}} disabled={saving||answered.length===0} onClick={submit}>
+                {saving?'กำลังบันทึก…':'ส่งผลตรวจ'}
+              </button>
+            </>}
       </div>
     </div>
   </>;
@@ -807,8 +912,9 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
 
 function Done({me,done,onNew,onBack}){
   const bad=done.result==='fail';
+  const edited=done.isEdit;
   return <>
-    <div className="topbar"><div><div className="who">{bad?'บันทึกแล้ว — พบข้อบกพร่อง':'บันทึกแล้ว'}</div>
+    <div className="topbar"><div><div className="who">{bad?(edited?'แก้ไขแล้ว — พบข้อบกพร่อง':'บันทึกแล้ว — พบข้อบกพร่อง'):(edited?'แก้ไขแล้ว':'บันทึกแล้ว')}</div>
       <div className="sub">{me.name}</div></div></div>
     <div className="wrap">
       <div className="card" style={{marginTop:16,textAlign:'center',
@@ -823,7 +929,7 @@ function Done({me,done,onNew,onBack}){
         <div style={{fontWeight:700,marginBottom:8,color:'var(--bad)'}}>ข้อที่ไม่ผ่าน</div>
         {done.failed.map((l,i)=><div key={i} style={{fontSize:14.5,lineHeight:1.9}}>• {l}</div>)}
       </div>}
-      <button className="bigbtn" style={{marginTop:14}} onClick={onNew}>ตรวจใบใหม่</button>
+      <button className="bigbtn" style={{marginTop:14}} onClick={onNew}>{edited?'กลับไปรายการ':'ตรวจใบใหม่'}</button>
       <button className="ghost" style={{marginTop:10}} onClick={onBack}>เปลี่ยนงานตรวจ</button>
     </div>
   </>;
