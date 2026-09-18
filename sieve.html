@@ -8,8 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="ทดสอบทราย/หิน"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<link rel="apple-touch-icon" href="sieve-icon.png"/>
-<link rel="icon" type="image/png" href="sieve-icon.png"/>
+<link rel="apple-touch-icon" href="sieve-icon-v2.png"/>
+<link rel="icon" type="image/png" href="sieve-icon-v2.png"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -28,8 +28,9 @@ body{font-family:'Sarabun',sans-serif;background:#f0f2f7;min-height:100vh;}
 .card{background:#fff;border-radius:14px;padding:20px 18px;margin:16px 14px 0;box-shadow:0 1px 6px rgba(0,0,0,.07);}
 .field{margin-bottom:16px;}
 .field label{display:block;font-size:14px;font-weight:700;color:#42465a;margin-bottom:6px;}
-.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1.5px solid #d6d8e0;border-radius:10px;font-size:16px;font-family:inherit;outline:none;transition:.15s;background:#fff;}
+.field input,.field select,.field textarea{-webkit-appearance:none;appearance:none;display:block;width:100%;padding:12px 14px;border:1.5px solid #d6d8e0;border-radius:10px;font-size:16px;font-family:inherit;outline:none;transition:.15s;background:#fff;color:#22252e;}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:#1a56db;box-shadow:0 0 0 3px rgba(26,86,219,.12);}
+input[type=date]{-webkit-appearance:none;appearance:none;}
 .sieve-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
 .sieve-item label{font-size:13px;font-weight:700;color:#42465a;display:block;margin-bottom:5px;}
 .sieve-item .sub{font-size:11px;color:#8b91a1;font-weight:400;}
