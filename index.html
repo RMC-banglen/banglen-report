@@ -3075,23 +3075,36 @@ window.__dataReady.then(data => {
         </ChartCard>
 
         <ChartCard span="wide" title="ค่าระยะยืดของลวด (Elongation total)"
-          subtitle="กรอกไล่ลงมาได้เลย — พิมพ์แล้วคลิกออกจากช่อง = บันทึกทันที">
+          subtitle="ผูกกับขนาดเสา — แพ S/แพที่เปลี่ยนขนาดได้จะใช้ค่าตามขนาดที่ใช้จริงในวันนั้นเสมอ">
           {elongMissing
             ? <div style={{padding:'14px 16px',fontSize:14.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>
-                ⚠️ ยังไม่ได้สร้างตาราง — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-qc-elongation.sql</b> ก่อน
+                ⚠️ ยังไม่ได้สร้างตาราง — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-qc-elongation.sql</b> และ <b>supabase-qc-elongation-byspec.sql</b> ก่อน
               </div>
             : (()=>{
               const WIRES=[4,5];
-              const byRaft={};
-              elongSpec.forEach(e=>{(byRaft[e.raft_num]=byRaft[e.raft_num]||{})[e.wire_mm]=e;});
-              const tolOf=n=>{
-                if(eForm['tol_'+n]!=null) return eForm['tol_'+n];
-                const any=byRaft[n]&&(byRaft[n][4]||byRaft[n][5]);
+              // เจอ pile_spec แปลว่ารัน byspec.sql แล้ว — ถ้ายังไม่รัน ให้ใช้ raft_num ไปพลางก่อนกันพัง
+              const migrated=elongSpec.some(e=>e.pile_spec);
+              // เสา S มอก./รง. แรงดึงเท่ากัน รวมเป็นขนาดเดียว (I ไม่รวม เพราะยังไม่มีใครขอ)
+              const normSpec=spec=>{const s0=String(spec||'').trim();const m=s0.match(/^(S[0-9]+)/);if(!m)return s0;const suf=s0.slice(m[1].length);return (suf==='มอก.'||suf==='รง.')?m[1]:s0;};
+              const specOf=e=>normSpec(e.pile_spec||('แพ '+e.raft_num));
+              const bySpec={};
+              elongSpec.forEach(e=>{(bySpec[specOf(e)]=bySpec[specOf(e)]||{})[e.wire_mm]=e;});
+              const STD_SIZES=['I18มอก.','I22มอก.','I26มอก.','I30มอก.','I35มอก.','I40มอก.','S18','S22','S26','S30','S35','S40','เลนเดี่ยว'];
+              const specList=migrated
+                ? [...new Set([
+                    ...rafts.map(r=>normSpec(((r.pile_type||'')+(r.section||'')).trim())),
+                    ...plan.map(p=>normSpec(p.pile_spec)).filter(Boolean),
+                    ...STD_SIZES,
+                  ])].filter(Boolean).sort((x,y)=>x.localeCompare(y,'th'))
+                : rafts.map(r=>'แพ '+r.raft_num);
+              const tolOf=spec=>{
+                if(eForm['tol_'+spec]!=null) return eForm['tol_'+spec];
+                const any=bySpec[spec]&&(bySpec[spec][4]||bySpec[spec][5]);
                 return any?String(any.tol_pct):'5';
               };
               // พิมพ์ค่า → ไม่มีแถวก็เพิ่มให้ · มีแถวแล้วก็แก้ · ลบค่าออก = ลบแถวนั้น
-              const setVal=(n,w,raw)=>{
-                const row=byRaft[n]&&byRaft[n][w];
+              const setVal=(spec,w,raw)=>{
+                const row=bySpec[spec]&&bySpec[spec][w];
                 const v=Number(raw);
                 if(raw===''||raw==null||!(v>0)){
                   if(row) db.from('qc_elongation_spec').delete().eq('id',row.id).then(load);
@@ -3100,42 +3113,42 @@ window.__dataReady.then(data => {
                 if(row){
                   if(Number(row.target_mm)!==v) db.from('qc_elongation_spec').update({target_mm:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);
                 }else{
-                  db.from('qc_elongation_spec').insert([{raft_num:n,wire_mm:w,target_mm:v,tol_pct:Number(tolOf(n))||5}]).then(load);
+                  db.from('qc_elongation_spec').insert([{pile_spec:spec,wire_mm:w,target_mm:v,tol_pct:Number(tolOf(spec))||5}]).then(load);
                 }
               };
-              const setTol=(n,raw)=>{
+              const setTol=(spec,raw)=>{
                 const v=Number(raw);
-                setEForm(f=>({...f,['tol_'+n]:raw}));
+                setEForm(f=>({...f,['tol_'+spec]:raw}));
                 if(!(v>0)) return;
-                WIRES.forEach(w=>{const row=byRaft[n]&&byRaft[n][w];
+                WIRES.forEach(w=>{const row=bySpec[spec]&&bySpec[spec][w];
                   if(row&&Number(row.tol_pct)!==v) db.from('qc_elongation_spec').update({tol_pct:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);});
               };
               const cellInp={width:96,padding:'7px 9px',borderRadius:8,fontSize:14.5,textAlign:'right',fontFamily:'inherit'};
               return <>
+                {!migrated&&<div style={{marginBottom:12,padding:'10px 14px',fontSize:13.5,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,lineHeight:1.8}}>
+                  ⚠️ ยังผูกค่ากับเลขแพอยู่ — แพ S/แพที่เปลี่ยนขนาดได้จะไม่ตามขนาดที่เปลี่ยน รันไฟล์ <b>supabase-qc-elongation-byspec.sql</b> เพื่อแก้เป็นผูกกับขนาดเสาแทน
+                </div>}
                 <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse'}}>
                     <thead><tr style={{background:'#f4f6fa'}}>
-                      <th style={{...th,textAlign:'left'}}>แพ</th>
+                      <th style={{...th,textAlign:'left'}}>ขนาดเสา</th>
                       {WIRES.map(w=><th key={w} style={th}>ลวด {w} มม. (มม.)</th>)}
                       <th style={th}>ยอมรับ ±%</th><th style={{...th,textAlign:'left'}}>ช่วงที่ผ่าน</th>
                     </tr></thead>
                     <tbody>
-                      {rafts.map(r=>{
-                        const n=Number(r.raft_num);
-                        const rows=byRaft[n]||{};
+                      {specList.map(spec=>{
+                        const rows=bySpec[spec]||{};
                         const has=!!(rows[4]||rows[5]);
-                        return <tr key={n} style={{borderBottom:'1px solid #eef0f5',background:has?'#f7fdfb':'transparent'}}>
-                          <td style={{...td,textAlign:'left',fontWeight:700,whiteSpace:'nowrap'}}>
-                            แพ {n}<span style={{fontWeight:400,color:'#5f6470'}}> · {(r.pile_type||'')+(r.section||'')||'–'}</span>
-                          </td>
+                        return <tr key={spec} style={{borderBottom:'1px solid #eef0f5',background:has?'#f7fdfb':'transparent'}}>
+                          <td style={{...td,textAlign:'left',fontWeight:700,whiteSpace:'nowrap'}}>{spec}</td>
                           {WIRES.map(w=>{
                             const row=rows[w];
                             return <td key={w} style={{...td,padding:'4px 8px'}}>
                               {canEdit
                                 ? <input type="number" step="any" placeholder="–"
-                                    key={row?('v'+row.id+'-'+row.target_mm):('e'+n+'-'+w)}
+                                    key={row?('v'+row.id+'-'+row.target_mm):('e'+spec+'-'+w)}
                                     defaultValue={row?row.target_mm:''}
-                                    onBlur={ev=>setVal(n,w,ev.target.value)}
+                                    onBlur={ev=>setVal(spec,w,ev.target.value)}
                                     style={{...cellInp,
                                       border:row?'1.5px solid #0f766e':'1.5px dashed #cbd5e1',
                                       color:row?'#0f766e':'#334155',fontWeight:row?700:400}}/>
@@ -3144,11 +3157,11 @@ window.__dataReady.then(data => {
                           })}
                           <td style={{...td,padding:'4px 8px'}}>
                             {canEdit
-                              ? <input type="number" step="any" value={tolOf(n)}
-                                  onChange={ev=>setEForm(f=>({...f,['tol_'+n]:ev.target.value}))}
-                                  onBlur={ev=>setTol(n,ev.target.value)}
+                              ? <input type="number" step="any" value={tolOf(spec)}
+                                  onChange={ev=>setEForm(f=>({...f,['tol_'+spec]:ev.target.value}))}
+                                  onBlur={ev=>setTol(spec,ev.target.value)}
                                   style={{...cellInp,width:70,border:'1.5px solid #d6d8e0'}}/>
-                              : <span>±{tolOf(n)}%</span>}
+                              : <span>±{tolOf(spec)}%</span>}
                           </td>
                           <td style={{...td,textAlign:'left',color:'#5f6470',fontSize:12.5,whiteSpace:'normal'}}>
                             {WIRES.filter(w=>rows[w]).map(w=>{
@@ -3162,8 +3175,8 @@ window.__dataReady.then(data => {
                   </table>
                 </div>
                 <div style={{marginTop:10,fontSize:12.5,color:'#78839A',lineHeight:1.8}}>
-                  กรอกไล่ลงมาทีละแพได้เลย · แพไหนไม่ใช้ลวดขนาดนั้นก็เว้นว่าง ·
-                  ลบค่าออกจากช่อง = ยกเลิกการตั้งค่าของขนาดนั้น · แถวพื้นเขียวอ่อน = ตั้งค่าแล้ว
+                  ผูกกับขนาดเสา ไม่ใช่เลขแพ — แพไหนวันนี้เปลี่ยนเป็นขนาดนี้ ก็ใช้ค่ามาตรฐานนี้ทันที ·
+                  กรอกไล่ลงมาทีละขนาดได้เลย พิมพ์แล้วคลิกออกจากช่อง = บันทึกทันที · ลบค่าออก = ยกเลิกการตั้งค่า
                 </div>
               </>;
             })()}

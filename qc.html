@@ -98,6 +98,8 @@ const todayISO = () => {
 // ชื่อไทยขึ้นต้นด้วยสระหน้า (เ แ โ ใ ไ) เช่น ไผ่/เอิร์ธ ต้องข้ามไปเอาพยัญชนะ ไม่งั้นวงกลมจะขึ้น ไ เฉยๆ
 // แพผลิตเก็บชนิด (I/S) กับหน้าตัดแยกกัน เช่น I + 26รง. → I26รง.
 const raftLabel = r => r ? ((r.pile_type||'')+(r.section||'')).trim() : '';
+// เสา S มอก./รง. แรงดึงเท่ากัน รวมเป็นขนาดเดียวตอนเทียบค่าระยะยืด (ตอนเลือกแพยังแยกกันปกติ)
+const elongSpecKey = spec => { const s=String(spec||'').trim(); const m=s.match(/^(S[0-9]+)/); if(!m) return s; const suf=s.slice(m[1].length); return (suf==='มอก.'||suf==='รง.') ? m[1] : s; };
 const thaiInitial = name => {
   const t=String(name||'').trim();
   return (t.length>1 && /[เแโใไ]/.test(t[0])) ? t[1] : t.slice(0,1);
@@ -263,7 +265,8 @@ function PlanView({me,rafts,onBack,onInspect}){
   };
   // แพ S เปลี่ยนได้เฉพาะขนาด S · แพที่ 4 เปลี่ยนได้ทุกแบบ · แพอื่นล็อกตามระบบแพผลิต
   const FREE_RAFT=4;
-  const S_SIZES=['S18','S22','S26','S30','S35','S40'];
+  // แยก มอก. (มาตรฐาน) กับ รง. (โรงงาน) ให้เลือกถูกตอนลงใบงาน — ค่าระยะยืดไม่ต้องแยก ใช้ร่วมกัน
+  const S_SIZES=['S18มอก.','S18รง.','S22มอก.','S22รง.','S26มอก.','S26รง.','S30มอก.','S30รง.','S35มอก.','S35รง.','S40มอก.','S40รง.'];
   const ALL_SIZES=['I18','I22','I26','I30','I35','I40'].concat(S_SIZES).concat(['เลนเดี่ยว']);
   const sizeOptsFor=n=>{
     const r=rafts.find(x=>Number(x.raft_num)===Number(n));
@@ -555,7 +558,9 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
   // การ์ดระยะยืดของลวด — แยกช่องกรอกตามขนาดลวด (บางแพใช้ทั้ง 4 และ 5 มม.)
   const elongCard=(()=>{
     if(!isPre||!head.bed_no) return null;
-    const specs=(elong||[]).filter(e=>String(e.raft_num)===String(head.bed_no))
+    // ผูกกับขนาดเสาที่ใช้จริงวันนี้ (head.pile_spec) ไม่ใช่เลขแพ — แพ S/แพที่เปลี่ยนขนาดได้จะได้ค่าตามขนาดที่ใช้จริง
+    const specKey=elongSpecKey(head.pile_spec);
+    const specs=(elong||[]).filter(e=>e.pile_spec?elongSpecKey(e.pile_spec)===specKey:String(e.raft_num)===String(head.bed_no))
                            .sort((a,b)=>a.wire_mm-b.wire_mm);
     const judge=(sp,raw)=>{
       if(raw===''||raw==null) return null;
@@ -569,7 +574,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
         <div className="lbl">ระยะยืดของลวด (Elongation total)</div>
         {!specs.length
           ? <div className="spec" style={{margin:0,lineHeight:1.9}}>
-              ⚠️ แพ {head.bed_no} ยังไม่ได้ตั้งค่าระยะยืด — ให้แอดมินตั้งที่ แท็บงาน QC → ลิงก์ &amp; หัวข้อตรวจ
+              ⚠️ ขนาด {head.pile_spec||('แพ '+head.bed_no)} ยังไม่ได้ตั้งค่าระยะยืด — ให้แอดมินตั้งที่ แท็บงาน QC → ลิงก์ &amp; หัวข้อตรวจ
             </div>
           : specs.map((sp,i)=>{
               const raw=(head.elong||{})[sp.wire_mm];
