@@ -137,11 +137,11 @@ function calcResults(luk1,luk2,luk3){
 
 // ---- Settings ----
 function Settings({onClose}){
-  const[apiKey,setApiKey]=useState(()=>localStorage.getItem('anthropic_key')||'');
+  const[geminiKey,setGeminiKey]=useState(()=>localStorage.getItem('gemini_key')||'');
   const[gasUrl,setGasUrl]=useState(()=>localStorage.getItem('gas_url')||DEFAULT_GAS_URL);
   const[showCode,setShowCode]=useState(false);
   const save=()=>{
-    localStorage.setItem('anthropic_key',apiKey.trim());
+    localStorage.setItem('gemini_key',geminiKey.trim());
     localStorage.setItem('gas_url',gasUrl.trim());
     onClose();
   };
@@ -152,13 +152,13 @@ function Settings({onClose}){
         <button className="gear-btn" onClick={onClose}>✕</button>
       </div>
       <div className="card" style={{marginTop:14}}>
-        <div className="card-title">🔑 Claude API Key</div>
+        <div className="card-title">🔑 Gemini API Key (ฟรี)</div>
         <div className="settings-field">
-          <label>ใช้สำหรับอ่านรูปใบปริ้น (ถ้าไม่มีจะกรอกมือแทน)</label>
-          <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)}
-            placeholder="sk-ant-api03-…"/>
+          <label>ใช้สำหรับอ่านรูปใบปริ้น — รับฟรีที่ aistudio.google.com</label>
+          <input type="password" value={geminiKey} onChange={e=>setGeminiKey(e.target.value)}
+            placeholder="AIzaSy…"/>
         </div>
-        <div className="warn">รับ API Key ได้ที่ console.anthropic.com → API Keys</div>
+        <div className="warn">🆓 ฟรี 1,500 ครั้ง/วัน — ไปที่ aistudio.google.com → Get API Key → สร้าง key แล้ว copy มาวางตรงนี้</div>
       </div>
       <div className="card">
         <div className="card-title">📊 Google Apps Script URL</div>
@@ -307,29 +307,39 @@ function PhotoScanner({onExtracted,onManual,onBack}){
     setErr('');
   };
 
+  const resizeBase64=async(src,maxPx=1200)=>{
+    return new Promise(res=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>maxPx||h>maxPx){
+          if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
+          else{w=Math.round(w*maxPx/h);h=maxPx;}
+        }
+        const c=document.createElement('canvas');
+        c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        res(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+      };
+      img.src=src;
+    });
+  };
+
   const scan=async()=>{
-    const apiKey=localStorage.getItem('anthropic_key')||'';
-    if(!apiKey){setErr('ยังไม่ได้ตั้งค่า Claude API Key (กดไอคอน ⚙ มุมบน)');return;}
-    const base64=imgSrc.split(',')[1];
-    const mime=imgSrc.split(';')[0].split(':')[1];
+    const geminiKey=localStorage.getItem('gemini_key')||'';
+    if(!geminiKey){setErr('ยังไม่ได้ตั้งค่า Gemini API Key — กดไอคอน ⚙ มุมบน แล้วใส่ key (ฟรีที่ aistudio.google.com)');return;}
     setLoading(true);setErr('');
     try{
-      const resp=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{
-          'x-api-key':apiKey,
-          'anthropic-version':'2023-06-01',
-          'content-type':'application/json',
-          'anthropic-dangerous-direct-browser-access':'true'
-        },
-        body:JSON.stringify({
-          model:'claude-haiku-4-5-20251001',
-          max_tokens:512,
-          messages:[{
-            role:'user',
-            content:[
-              {type:'image',source:{type:'base64',media_type:mime,data:base64}},
-              {type:'text',text:`อ่านใบรายงานผลทดสอบคอนกรีตนี้แล้วตอบ JSON เท่านั้น ไม่ต้องอธิบาย:
+      const base64=await resizeBase64(imgSrc,1200);
+      const resp=await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            contents:[{parts:[
+              {inline_data:{mime_type:'image/jpeg',data:base64}},
+              {text:`อ่านใบรายงานผลทดสอบคอนกรีตนี้แล้วตอบ JSON เท่านั้น ไม่ต้องอธิบาย:
 {"cast_date":"YYYY-MM-DD","test_date":"YYYY-MM-DD","age":7,"formula":"NP315","cube_size":"15x15","luk1":1000.0,"luk2":1000.0,"luk3":1000.0}
 - cast_date = วันที่เก็บตัวอย่าง/วันหล่อ
 - test_date = วันที่ทดสอบ
@@ -337,13 +347,13 @@ function PhotoScanner({onExtracted,onManual,onBack}){
 - formula = ชื่อสูตร เช่น NP315 NP325 NP355
 - luk1/2/3 = กำลังอัดแต่ละลูก หน่วย kN (ตัวเลขทศนิยม)
 ถ้าไม่เห็นข้อมูลใดให้ใส่ null`}
-            ]
-          }]
-        })
-      });
+            ]}]
+          })
+        }
+      );
       const j=await resp.json();
-      if(!resp.ok)throw new Error(j.error?.message||'API error');
-      const text=j.content[0].text;
+      if(!resp.ok)throw new Error(j.error?.message||`Gemini error ${resp.status}`);
+      const text=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
       const match=text.match(/\{[\s\S]*\}/);
       if(!match)throw new Error('ไม่พบข้อมูลในรูป');
       const data=JSON.parse(match[0]);
@@ -356,7 +366,7 @@ function PhotoScanner({onExtracted,onManual,onBack}){
   if(loading)return(
     <div className="card loading">
       <div className="spinner"/>
-      <div style={{fontWeight:700,fontSize:15}}>Claude กำลังอ่านใบปริ้น…</div>
+      <div style={{fontWeight:700,fontSize:15}}>Gemini กำลังอ่านใบปริ้น…</div>
       <div style={{fontSize:13,color:'#8b91a1',marginTop:6}}>ใช้เวลาประมาณ 5–10 วินาที</div>
     </div>
   );
@@ -382,7 +392,7 @@ function PhotoScanner({onExtracted,onManual,onBack}){
         {err&&<div className="err">{err}</div>}
 
         {imgSrc&&<>
-          <button className="bigbtn blue" onClick={scan}>🔍 ให้ Claude อ่านข้อมูล</button>
+          <button className="bigbtn blue" onClick={scan}>🔍 ให้ Gemini อ่านข้อมูล</button>
           <button className="ghost" onClick={()=>{setImgSrc(null);setErr('');}}>เลือกรูปใหม่</button>
         </>}
         <button className="ghost" onClick={onManual} style={{marginTop:8}}>✏️ กรอกมือแทน</button>
@@ -417,7 +427,7 @@ function App(){
   const[doneResult,setDoneResult]=useState(null);
 
   const hasGas=!!(localStorage.getItem('gas_url')||DEFAULT_GAS_URL);
-  const hasKey=!!localStorage.getItem('anthropic_key');
+  const hasKey=!!localStorage.getItem('gemini_key');
 
   if(screen==='settings')return<Settings onClose={()=>setScreen('home')}/>;
 
@@ -476,7 +486,7 @@ function App(){
         <button className="mode-btn primary" onClick={()=>{setPrefill(null);setScreen('photo');}}>
           <span className="icon">📷</span>
           <div className="label">ถ่ายรูปใบปริ้น</div>
-          <div className="sub">{hasKey?'Claude อ่านอัตโนมัติ':'ต้องการ API Key'}</div>
+          <div className="sub">{hasKey?'Gemini อ่านอัตโนมัติ':'ต้องการ Gemini Key (ฟรี)'}</div>
         </button>
         <button className="mode-btn secondary" onClick={()=>{setPrefill(null);setScreen('form');}}>
           <span className="icon">✏️</span>
@@ -488,7 +498,7 @@ function App(){
       <div className="card" style={{marginTop:14}}>
         <div style={{fontSize:14,color:'#5f6470',lineHeight:1.7}}>
           <b style={{color:'#22252e'}}>วิธีใช้:</b><br/>
-          1. กด <b>ถ่ายรูปใบปริ้น</b> → ถ่ายรูปใบรายงาน → Claude อ่านข้อมูลให้อัตโนมัติ<br/>
+          1. กด <b>ถ่ายรูปใบปริ้น</b> → เลือกรูปจากอัลบั้ม/ถ่ายใหม่ → Gemini อ่านข้อมูลให้อัตโนมัติ<br/>
           2. ตรวจสอบข้อมูลที่อ่านได้ → กด <b>บันทึก</b><br/>
           3. ข้อมูลบันทึกลง Google Sheet โดยตรง
         </div>
