@@ -3102,16 +3102,18 @@ window.__dataReady.then(data => {
                 const any=bySpec[spec]&&(bySpec[spec][4]||bySpec[spec][5]);
                 return any?String(any.tol_pct):'5';
               };
-              // พิมพ์ค่า → ไม่มีแถวก็เพิ่มให้ · มีแถวแล้วก็แก้ · ลบค่าออก = ลบแถวนั้น
+              // พิมพ์ค่า → ไม่มีแถวก็เพิ่มให้ · มีแถวแล้วก็แก้ · ลบค่าออก = ลบแถวทั้งหมดที่ normalize ตรงกัน
               const setVal=(spec,w,raw)=>{
-                const row=bySpec[spec]&&bySpec[spec][w];
                 const v=Number(raw);
+                const allMatch=(elongSpec||[]).filter(e=>normSpec(e.pile_spec||(''+(e.raft_num||'')))===spec&&e.wire_mm===w);
                 if(raw===''||raw==null||!(v>0)){
-                  if(row) db.from('qc_elongation_spec').delete().eq('id',row.id).then(load);
+                  allMatch.forEach(row=>db.from('qc_elongation_spec').delete().eq('id',row.id).then(load));
                   return;
                 }
-                if(row){
-                  if(Number(row.target_mm)!==v) db.from('qc_elongation_spec').update({target_mm:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);
+                if(allMatch.length){
+                  allMatch.forEach(row=>{
+                    if(Number(row.target_mm)!==v) db.from('qc_elongation_spec').update({target_mm:v,updated_at:new Date().toISOString()}).eq('id',row.id).then(load);
+                  });
                 }else{
                   db.from('qc_elongation_spec').insert([{pile_spec:spec,wire_mm:w,target_mm:v,tol_pct:Number(tolOf(spec))||5}]).then(load);
                 }
