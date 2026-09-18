@@ -146,7 +146,7 @@ function App(){
   const [err,setErr]=useState('');
   const [formType,setFormType]=useState(null);
   const [material,setMaterial]=useState(null);   // ใช้เฉพาะฟอร์มตรวจวัตถุดิบ
-  const [presetRaft,setPresetRaft]=useState(null); // แพที่กดมาจากใบงานผลิต
+  const [preset,setPreset]=useState(null); // {raft, day, spec} ที่กดมาจากใบงานผลิต
 
   useEffect(()=>{
     Promise.all([
@@ -167,14 +167,14 @@ function App(){
   if(!me) return <PickUser inspectors={inspectors}/>;
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
   if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
-                                  onInspect={n=>{setPresetRaft(String(n));setFormType('pre');}}/>;
+                                  onInspect={(n,day,spec)=>{setPreset({raft:String(n),day,spec});setFormType('pre');}}/>;
   if(formType==='mat'&&!material){
     const mats=[...new Set(checklist.filter(c=>c.form_type==='mat').map(c=>c.section))].sort((x,y)=>x.localeCompare(y,'th'));
     return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
-  return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} elong={elong} presetRaft={presetRaft}
-                    onBack={()=>{setPresetRaft(null);formType==='mat'?setMaterial(null):setFormType(null);}}/>;
+  return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} elong={elong} preset={preset}
+                    onBack={()=>{setPreset(null);formType==='mat'?setMaterial(null):setFormType(null);}}/>;
 }
 
 // เปิดลิงก์ผิด/ไม่มี ?u= → ให้เลือกชื่อ แล้วจำไว้ในเครื่อง
@@ -368,7 +368,7 @@ function PlanView({me,rafts,onBack,onInspect}){
                 </div>
               : (plan||[]).map(p=>{
                   const ok=isDone(p.raft_num);
-                  return <button key={p.raft_num} onClick={()=>!ok&&onInspect(p.raft_num)}
+                  return <button key={p.raft_num} onClick={()=>!ok&&onInspect(p.raft_num,day,p.pile_spec)}
                     style={{width:'100%',textAlign:'left',marginBottom:8,padding:'14px 15px',borderRadius:12,
                       cursor:ok?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:12,
                       border:`1.5px solid ${ok?'#a7e3d4':'#f3b8b0'}`,background:ok?'var(--okbg)':'var(--badbg)'}}>
@@ -412,12 +412,12 @@ function PickMaterial({me,mats,onPick,onBack}){
   </>;
 }
 
-function CheckForm({me,formType,material,checklist,rafts,elong,presetRaft,onBack}){
+function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
   const F=FORMS[formType];
   const isPre=formType==='pre';
   const isMat=formType==='mat';
   const [head,setHead]=useState(()=>({
-    check_date: todayISO(), bed_no:'', lot_no:'', pile_spec:'', qty:'', supplier:'', elong:{},
+    check_date: (preset&&preset.day)||todayISO(), bed_no:'', lot_no:'', pile_spec:'', qty:'', supplier:'', elong:{},
   }));
   const [vals,setVals]=useState({});        // itemId -> {yn, num, note}
   const [files,setFiles]=useState([]);      // {id, file, url}
@@ -435,12 +435,13 @@ function CheckForm({me,formType,material,checklist,rafts,elong,presetRaft,onBack
 
   // จำค่าหัวเรื่องล่าสุดของคนนี้ไว้ กรอกครั้งต่อไปไม่ต้องพิมพ์ซ้ำ
   const memKey='qc_last_'+me.code+'_'+formType+(material?'_'+material:'');
-  // กดมาจากใบงานผลิต → เลือกแพให้เลย ไม่ต้องหาซ้ำ
+  // กดมาจากใบงานผลิต → ตั้งวันที่ แพ และขนาดตามใบงานนั้นเลย (ไม่ใช่ค่าจากระบบแพผลิต)
   useEffect(()=>{
-    if(!presetRaft) return;
-    const r=(rafts||[]).find(x=>String(x.raft_num)===String(presetRaft));
-    setHead(h=>({...h,bed_no:String(presetRaft),pile_spec:raftLabel(r)}));
-  },[presetRaft]);
+    if(!preset) return;
+    const r=(rafts||[]).find(x=>String(x.raft_num)===String(preset.raft));
+    setHead(h=>({...h,check_date:preset.day||h.check_date,
+      bed_no:String(preset.raft), pile_spec:preset.spec||raftLabel(r)}));
+  },[preset]);
   useEffect(()=>{
     try{
       const m=JSON.parse(localStorage.getItem(memKey)||'null');
@@ -629,7 +630,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,presetRaft,onBack
               </div>}
               {dayPlan===null&&<div className="spec" style={{marginTop:6,marginBottom:0}}>กำลังโหลดใบงาน…</div>}
             </div>
-            {head.bed_no&&<div className="field"><label>ขนาดเสา (จากแพผลิต)</label>
+            {head.bed_no&&<div className="field"><label>ขนาดเสา (จากใบงานผลิต)</label>
               <div style={{padding:'11px 12px',border:'1.5px solid var(--line)',borderRadius:10,
                 background:'#f8fafc',fontWeight:700,color:'var(--brand)'}}>{head.pile_spec||'ยังไม่ระบุขนาดในระบบแพผลิต'}</div></div>}
           </> : <>
