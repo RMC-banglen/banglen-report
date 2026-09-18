@@ -102,6 +102,7 @@ function addDays(iso,n){const d=new Date(iso);d.setDate(d.getDate()+n);return d.
 function fmt(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
 
 const FORMULAS=['NP280','NP315','NP325','NP355','NP315 CK','NP315 SM','NP355 CK','NP355 SM'];
+const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzyu-ZNgAu9Rxof-PP-JVG6wmKfw1nSnbr75novSi3VbThXxwBfUvZjKrs1OuuW3617/exec';
 const GAS_CODE=`function doPost(e) {
   var d = JSON.parse(e.postData.contents);
   var ss = SpreadsheetApp.openById('1ZYGnV8AqyR3a0uTNRftkguEdBPrQOjLQbWU6ZhpiFyk');
@@ -137,7 +138,7 @@ function calcResults(luk1,luk2,luk3){
 // ---- Settings ----
 function Settings({onClose}){
   const[apiKey,setApiKey]=useState(()=>localStorage.getItem('anthropic_key')||'');
-  const[gasUrl,setGasUrl]=useState(()=>localStorage.getItem('gas_url')||'');
+  const[gasUrl,setGasUrl]=useState(()=>localStorage.getItem('gas_url')||DEFAULT_GAS_URL);
   const[showCode,setShowCode]=useState(false);
   const save=()=>{
     localStorage.setItem('anthropic_key',apiKey.trim());
@@ -197,7 +198,7 @@ function ConcreteForm({prefill,onDone,onBack}){
 
   const testDate=castDate?addDays(castDate,age):'';
   const res=calcResults(luk1,luk2,luk3);
-  const gasUrl=localStorage.getItem('gas_url')||'';
+  const gasUrl=localStorage.getItem('gas_url')||DEFAULT_GAS_URL;
 
   const save=async()=>{
     if(!castDate){setErr('กรุณาเลือกวันที่เก็บตัวอย่าง');return;}
@@ -415,7 +416,7 @@ function App(){
   const[prefill,setPrefill]=useState(null);
   const[doneResult,setDoneResult]=useState(null);
 
-  const hasGas=!!localStorage.getItem('gas_url');
+  const hasGas=!!(localStorage.getItem('gas_url')||DEFAULT_GAS_URL);
   const hasKey=!!localStorage.getItem('anthropic_key');
 
   if(screen==='settings')return<Settings onClose={()=>setScreen('home')}/>;
