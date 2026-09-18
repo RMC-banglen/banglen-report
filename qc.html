@@ -459,6 +459,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
       bed_no:String(preset.raft), pile_spec:preset.spec||raftLabel(r)}));
   },[preset]);
   useEffect(()=>{
+    if(preset) return; // กดมาจากใบงาน → ใช้ขนาดจากใบงาน ไม่ใช่จาก localStorage
     try{
       const m=JSON.parse(localStorage.getItem(memKey)||'null');
       if(m) setHead(h=>({...h,pile_spec:m.pile_spec||'',supplier:m.supplier||''}));
