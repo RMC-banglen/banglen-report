@@ -803,7 +803,9 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack}){
             </div>
             {head.bed_no&&<div className="field"><label>ขนาดเสา (จากใบงานผลิต)</label>
               <div style={{padding:'11px 12px',border:'1.5px solid var(--line)',borderRadius:10,
-                background:'#f8fafc',fontWeight:700,color:'var(--brand)'}}>{head.pile_spec||'ยังไม่ระบุขนาดในระบบแพผลิต'}</div></div>}
+                background:'#f8fafc',fontWeight:700,color:'var(--brand)'}}>
+                {(dayPlan||[]).find(p=>String(p.raft_num)===String(head.bed_no))?.pile_spec||head.pile_spec||'ยังไม่ระบุขนาดในระบบแพผลิต'}
+              </div></div>}
           </> : <>
             <div className="field"><label>ล็อต/เลขที่ผลิต</label>
               <input value={head.lot_no} placeholder="เช่น L-0915" onChange={e=>setHead(h=>({...h,lot_no:e.target.value}))}/></div>
