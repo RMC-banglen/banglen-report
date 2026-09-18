@@ -156,6 +156,7 @@ function App(){
   const [formType,setFormType]=useState(null);
   const [material,setMaterial]=useState(null);   // ใช้เฉพาะฟอร์มตรวจวัตถุดิบ
   const [preset,setPreset]=useState(null); // {raft, day, spec} ที่กดมาจากใบงานผลิต
+  const [preListDay,setPreListDay]=useState(null); // จำวันที่ที่ดูอยู่ก่อนเข้าฟอร์ม
 
   useEffect(()=>{
     Promise.all([
@@ -177,16 +178,17 @@ function App(){
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
   if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
                                   onInspect={(n,day,spec,isChecked)=>{setPreset({raft:String(n),day,spec,isChecked});setFormType('pre');}}/>;
-  if(formType==='pre'&&!preset) return <PreListView me={me} rafts={rafts} onBack={()=>setFormType(null)}
-                                  onInspect={(n,day,spec,isChecked)=>setPreset({raft:String(n),day,spec,isChecked})}/>;
+  if(formType==='pre'&&!preset) return <PreListView me={me} rafts={rafts} initialDay={preListDay||undefined}
+                                  onBack={()=>{setPreListDay(null);setFormType(null);}}
+                                  onInspect={(n,day,spec,isChecked)=>{setPreListDay(day);setPreset({raft:String(n),day,spec,isChecked});}}/>;
   if(formType==='mat'&&!material){
     const mats=[...new Set(checklist.filter(c=>c.form_type==='mat').map(c=>c.section))].sort((x,y)=>x.localeCompare(y,'th'));
     return <PickMaterial me={me} mats={mats} onPick={setMaterial} onBack={()=>setFormType(null)}/>;
   }
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
   return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} elong={elong} preset={preset}
-                    onBack={()=>{setPreset(null);formType==='mat'?setMaterial(null):setFormType(null);}}
-                    onBackToList={()=>setPreset(null)}/>;
+                    onBack={()=>{setPreListDay(null);setPreset(null);formType==='mat'?setMaterial(null):setFormType(null);}}
+                    onBackToList={(day)=>{setPreListDay(day||preset?.day||null);setPreset(null);}}/>;
 }
 
 // เปิดลิงก์ผิด/ไม่มี ?u= → ให้เลือกชื่อ แล้วจำไว้ในเครื่อง
@@ -411,8 +413,8 @@ function PlanView({me,rafts,onBack,onInspect}){
 }
 
 // หน้าเลือกแพก่อนตรวจก่อนผลิต — แสดงสถานะแดง/เขียว เหมือนใบงานผลิต
-function PreListView({me,rafts,onBack,onInspect}){
-  const [day,setDay]=useState(todayISO());
+function PreListView({me,rafts,onBack,onInspect,initialDay}){
+  const [day,setDay]=useState(initialDay||todayISO());
   const [plan,setPlan]=useState(null);
   const [checked,setChecked]=useState([]);
   const [missing,setMissing]=useState(false);
@@ -703,7 +705,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onB
   };
 
   if(done) return <Done me={me} done={done}
-    onNew={done.isEdit?(onBackToList||onBack):()=>{setDone(null);setVals({});setFiles([]);}}
+    onNew={done.isEdit?(()=>(onBackToList||onBack)(existingCheck?.check_date)):()=>{setDone(null);setVals({});setFiles([]);}}
     onBack={onBack}/>;
 
   // การ์ดระยะยืดของลวด — แสดงรวมอยู่ในหมวดลวดอัดแรง/เหล็กเสริม
