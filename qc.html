@@ -137,7 +137,14 @@ function judgeNum(v,min,max){
 
 function App(){
   const params=new URLSearchParams(location.search);
-  const code=(params.get('u')||'').trim().toLowerCase();
+  const urlCode=(params.get('u')||'').trim().toLowerCase();
+  // จำคนใช้ไว้ในเครื่อง — เปิดจากไอคอนหน้าจอโฮม (ที่ไม่มี ?u=) ก็เข้าชื่อเดิมได้เลย ไม่ต้องเลือกซ้ำ
+  let saved='';
+  try{ saved=(localStorage.getItem('qc_user')||'').trim().toLowerCase(); }catch(e){}
+  const code=urlCode||saved;
+  useEffect(()=>{
+    if(urlCode){ try{ localStorage.setItem('qc_user',urlCode); }catch(e){} }
+  },[urlCode]);
 
   const [inspectors,setInspectors]=useState(null);
   const [checklist,setChecklist]=useState(null);
@@ -185,7 +192,8 @@ function PickUser({inspectors}){
       <div className="card" style={{marginTop:16}}>
         <div className="hint" style={{marginBottom:12}}>ลิงก์นี้ยังไม่ได้ระบุชื่อผู้ตรวจ — เลือกชื่อแล้วบันทึกลิงก์ของตัวเองไว้ใช้ครั้งต่อไป</div>
         {inspectors.map(i=>(
-          <a key={i.code} href={'?u='+i.code} style={{display:'block',textDecoration:'none',marginBottom:10}}>
+          <a key={i.code} href={'?u='+i.code} onClick={()=>{try{localStorage.setItem('qc_user',i.code);}catch(e){}}}
+             style={{display:'block',textDecoration:'none',marginBottom:10}}>
             <div className="ghost" style={{textAlign:'center',color:'var(--brand)'}}>{i.name}</div>
           </a>
         ))}
@@ -213,6 +221,11 @@ function PickForm({me,onPick}){
           <div className="hint" style={{marginTop:3}}>{f.full}</div>
         </button>
       ))}
+      <button onClick={()=>{try{localStorage.removeItem('qc_user');}catch(e){} location.href=location.pathname;}}
+        style={{width:'100%',marginTop:14,padding:'10px',border:'none',background:'none',
+          color:'var(--muted)',fontSize:13.5,cursor:'pointer',fontFamily:'inherit'}}>
+        เปลี่ยนชื่อผู้ตรวจ
+      </button>
     </div>
   </>;
 }
