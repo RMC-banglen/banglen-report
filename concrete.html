@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>บันทึกผลทดสอบคอนกรีต</title>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="ทดสอบคอนกรีต"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:#f0f2f7;min-height:100vh;color:#22252e;}
+.wrap{max-width:480px;margin:0 auto;padding:0 0 60px;}
+.topbar{background:#0f4c8a;color:#fff;padding:14px 18px 14px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h1{font-size:17px;font-weight:800;line-height:1.2;}
+.topbar p{font-size:12px;opacity:.75;margin-top:2px;}
+.gear-btn{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:4px;}
+.card{background:#fff;border-radius:14px;padding:20px 16px;margin:14px 14px 0;box-shadow:0 1px 6px rgba(0,0,0,.08);}
+.card-title{font-size:15px;font-weight:800;color:#22252e;margin-bottom:14px;}
+
+/* Mode buttons */
+.mode-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 14px 0;}
+.mode-btn{padding:18px 12px;border-radius:14px;border:1.5px solid #d6d8e0;background:#fff;cursor:pointer;text-align:center;transition:.15s;font-family:inherit;}
+.mode-btn.primary{background:#0f4c8a;border-color:#0f4c8a;color:#fff;}
+.mode-btn.secondary{background:#fff;color:#22252e;}
+.mode-btn .icon{font-size:28px;display:block;margin-bottom:6px;}
+.mode-btn .label{font-size:14px;font-weight:700;}
+.mode-btn .sub{font-size:11px;opacity:.7;margin-top:2px;}
+
+/* Field */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:13px;font-weight:700;color:#5f6470;margin-bottom:6px;}
+.field input,.field select,.field textarea{-webkit-appearance:none;appearance:none;display:block;width:100%;padding:12px 13px;border:1.5px solid #d6d8e0;border-radius:10px;font-size:16px;font-family:inherit;outline:none;background:#fff;color:#22252e;}
+.field input:focus,.field select:focus{border-color:#0f4c8a;box-shadow:0 0 0 3px rgba(15,76,138,.12);}
+.field input[readonly]{background:#f7f8fb;color:#5f6470;}
+
+/* Age buttons */
+.age-btns{display:flex;gap:8px;}
+.age-btn{flex:1;padding:12px 6px;border-radius:10px;border:1.5px solid #d6d8e0;background:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center;transition:.15s;}
+.age-btn.active{background:#0f4c8a;border-color:#0f4c8a;color:#fff;}
+
+/* kN grid */
+.kn-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.kn-item label{font-size:12px;font-weight:700;color:#5f6470;display:block;margin-bottom:5px;}
+.kn-item input{-webkit-appearance:none;appearance:none;width:100%;padding:11px 8px;border:1.5px solid #d6d8e0;border-radius:10px;font-size:17px;font-family:inherit;text-align:right;outline:none;background:#fff;color:#22252e;}
+.kn-item input:focus{border-color:#0f4c8a;box-shadow:0 0 0 3px rgba(15,76,138,.12);}
+
+/* Result bar */
+.result-bar{display:flex;gap:10px;margin:4px 0 14px;}
+.result-chip{flex:1;background:#f0f7ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:10px 8px;text-align:center;}
+.result-chip .rv{font-size:22px;font-weight:800;color:#0f4c8a;line-height:1.1;}
+.result-chip .rl{font-size:11px;color:#5f6470;margin-top:3px;font-weight:600;}
+
+/* Buttons */
+.bigbtn{width:100%;padding:15px;border-radius:12px;border:none;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer;transition:.15s;}
+.bigbtn.blue{background:#0f4c8a;color:#fff;}
+.bigbtn.green{background:#059669;color:#fff;}
+.bigbtn:disabled{opacity:.4;cursor:not-allowed;}
+.ghost{width:100%;padding:13px;border-radius:12px;border:1.5px solid #d6d8e0;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;background:#fff;color:#42465a;margin-top:10px;}
+
+/* Photo area */
+.photo-box{border:2px dashed #94afd4;border-radius:14px;padding:28px 16px;text-align:center;cursor:pointer;background:#f7faff;margin-bottom:14px;transition:.15s;}
+.photo-box:hover{background:#eef4ff;border-color:#0f4c8a;}
+.photo-box img{max-width:100%;max-height:280px;border-radius:10px;object-fit:contain;}
+.photo-box .ph-icon{font-size:44px;display:block;margin-bottom:10px;}
+.photo-box .ph-label{font-size:15px;font-weight:700;color:#0f4c8a;}
+.photo-box .ph-sub{font-size:12px;color:#8b91a1;margin-top:4px;}
+
+/* Success */
+.success{text-align:center;padding:36px 20px;}
+.success .icon{font-size:64px;margin-bottom:16px;}
+.success h2{font-size:22px;font-weight:800;margin-bottom:8px;}
+.success p{font-size:15px;color:#5f6470;margin-bottom:6px;}
+
+/* Loading */
+.loading{text-align:center;padding:32px 16px;}
+.spinner{display:inline-block;width:40px;height:40px;border:4px solid #e6e8ee;border-top-color:#0f4c8a;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.err{color:#d13438;font-size:14px;font-weight:600;padding:10px 13px;background:#fef2f2;border-radius:10px;margin-bottom:12px;}
+.warn{color:#c47b00;font-size:13px;padding:8px 13px;background:#fffbeb;border-radius:10px;margin-bottom:12px;border:1px solid #fde68a;}
+
+/* Settings */
+.settings-field{margin-bottom:16px;}
+.settings-field label{display:block;font-size:13px;font-weight:700;color:#5f6470;margin-bottom:6px;}
+.settings-field input,.settings-field textarea{-webkit-appearance:none;width:100%;padding:11px 13px;border:1.5px solid #d6d8e0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#22252e;}
+.settings-field input:focus,.settings-field textarea:focus{border-color:#0f4c8a;}
+.code-block{background:#1e1e2e;color:#a8d8a8;font-family:monospace;font-size:11px;padding:12px;border-radius:10px;overflow-x:auto;white-space:pre;margin:8px 0;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+function todayISO(){return new Date().toISOString().slice(0,10);}
+function addDays(iso,n){const d=new Date(iso);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function fmt(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
+
+const FORMULAS=['NP280','NP315','NP325','NP355','NP315 CK','NP315 SM','NP355 CK','NP355 SM'];
+const GAS_CODE=`function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.openById('1ZYGnV8AqyR3a0uTNRftkguEdBPrQOjLQbWU6ZhpiFyk');
+  var sheet = ss.getSheetByName('ผลทดสอบคอนกรีต');
+  var avgKN = (d.luk1 + d.luk2 + d.luk3) / 3;
+  var area = 150 * 150; // 15x15 cm = 150x150 mm
+  var avgMPa = avgKN * 1000 / area;
+  var avgKSC = Math.round(avgMPa * 10.197);
+  sheet.appendRow([
+    d.cast_date, d.test_date, d.age, d.formula,
+    d.cube_size || '15x15',
+    d.luk1, d.luk2, d.luk3,
+    Math.round(avgKN * 100) / 100,
+    Math.round(avgMPa * 100) / 100,
+    avgKSC,
+    d.cast_date.slice(0,7)
+  ]);
+  return ContentService
+    .createTextOutput(JSON.stringify({ok:true}))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+function calcResults(luk1,luk2,luk3){
+  const v1=Number(luk1)||0,v2=Number(luk2)||0,v3=Number(luk3)||0;
+  const filled=[v1,v2,v3].filter(v=>v>0);
+  if(!filled.length)return null;
+  const avgKN=filled.reduce((a,b)=>a+b,0)/filled.length;
+  const avgMPa=avgKN*1000/(150*150);
+  const avgKSC=avgMPa*10.197;
+  return{avgKN:Math.round(avgKN*100)/100,avgMPa:Math.round(avgMPa*100)/100,avgKSC:Math.round(avgKSC)};
+}
+
+// ---- Settings ----
+function Settings({onClose}){
+  const[apiKey,setApiKey]=useState(()=>localStorage.getItem('anthropic_key')||'');
+  const[gasUrl,setGasUrl]=useState(()=>localStorage.getItem('gas_url')||'');
+  const[showCode,setShowCode]=useState(false);
+  const save=()=>{
+    localStorage.setItem('anthropic_key',apiKey.trim());
+    localStorage.setItem('gas_url',gasUrl.trim());
+    onClose();
+  };
+  return(
+    <div className="wrap">
+      <div className="topbar">
+        <div><h1>ตั้งค่า</h1></div>
+        <button className="gear-btn" onClick={onClose}>✕</button>
+      </div>
+      <div className="card" style={{marginTop:14}}>
+        <div className="card-title">🔑 Claude API Key</div>
+        <div className="settings-field">
+          <label>ใช้สำหรับอ่านรูปใบปริ้น (ถ้าไม่มีจะกรอกมือแทน)</label>
+          <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)}
+            placeholder="sk-ant-api03-…"/>
+        </div>
+        <div className="warn">รับ API Key ได้ที่ console.anthropic.com → API Keys</div>
+      </div>
+      <div className="card">
+        <div className="card-title">📊 Google Apps Script URL</div>
+        <div className="settings-field">
+          <label>URL Web App สำหรับส่งข้อมูลเข้า Google Sheet</label>
+          <input type="url" value={gasUrl} onChange={e=>setGasUrl(e.target.value)}
+            placeholder="https://script.google.com/macros/s/…/exec"/>
+        </div>
+        <button className="ghost" onClick={()=>setShowCode(v=>!v)} style={{marginTop:4}}>
+          {showCode?'▲ ซ่อนโค้ด GAS':'▼ ดูโค้ดที่ต้องวางใน Apps Script'}
+        </button>
+        {showCode&&<>
+          <div style={{fontSize:13,color:'#5f6470',margin:'12px 0 6px'}}>
+            เปิด Google Sheet → Extensions → Apps Script → วางโค้ดนี้ → Deploy → New deployment → Web app → Execute as Me → Anyone → Copy URL
+          </div>
+          <div className="code-block">{GAS_CODE}</div>
+        </>}
+      </div>
+      <div className="card">
+        <button className="bigbtn blue" onClick={save}>บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Form ----
+function ConcreteForm({prefill,onDone,onBack}){
+  const[castDate,setCastDate]=useState(prefill?.cast_date||todayISO());
+  const[age,setAge]=useState(prefill?.age||7);
+  const[formula,setFormula]=useState(prefill?.formula||'');
+  const[cubeSize,setCubeSize]=useState(prefill?.cube_size||'15x15');
+  const[luk1,setLuk1]=useState(prefill?.luk1||'');
+  const[luk2,setLuk2]=useState(prefill?.luk2||'');
+  const[luk3,setLuk3]=useState(prefill?.luk3||'');
+  const[saving,setSaving]=useState(false);
+  const[err,setErr]=useState('');
+
+  const testDate=castDate?addDays(castDate,age):'';
+  const res=calcResults(luk1,luk2,luk3);
+  const gasUrl=localStorage.getItem('gas_url')||'';
+
+  const save=async()=>{
+    if(!castDate){setErr('กรุณาเลือกวันที่เก็บตัวอย่าง');return;}
+    if(!formula.trim()){setErr('กรุณาเลือกสูตรคอนกรีต');return;}
+    if(!luk1&&!luk2&&!luk3){setErr('กรุณาใส่ผลกำลังอัดอย่างน้อย 1 ลูก');return;}
+    if(!gasUrl){setErr('ยังไม่ได้ตั้งค่า Google Apps Script URL (กดไอคอน ⚙ มุมบน)');return;}
+    setErr('');setSaving(true);
+    const body={
+      cast_date:castDate,test_date:testDate,age,
+      formula:formula.trim(),cube_size:cubeSize,
+      luk1:Number(luk1)||0,luk2:Number(luk2)||0,luk3:Number(luk3)||0
+    };
+    try{
+      await fetch(gasUrl,{method:'POST',body:JSON.stringify(body),
+        headers:{'Content-Type':'application/json'},mode:'no-cors'});
+      onDone({cast_date:castDate,test_date:testDate,formula:formula.trim(),age,res});
+    }catch(e){
+      setErr('บันทึกไม่สำเร็จ: '+e.message);
+    }finally{setSaving(false);}
+  };
+
+  return(
+    <div>
+      <div className="card">
+        <div className="field">
+          <label>วันที่เก็บตัวอย่าง</label>
+          <input type="date" value={castDate} onChange={e=>setCastDate(e.target.value)}/>
+        </div>
+        <div className="field">
+          <label>สูตรคอนกรีต</label>
+          <input list="formula-list" value={formula} onChange={e=>setFormula(e.target.value)}
+            placeholder="NP315, NP325, NP355…"/>
+          <datalist id="formula-list">
+            {FORMULAS.map(f=><option key={f} value={f}/>)}
+          </datalist>
+        </div>
+        <div className="field">
+          <label>อายุทดสอบ</label>
+          <div className="age-btns">
+            {[1,3,5,7].map(d=>(
+              <button key={d} className={`age-btn${age===d?' active':''}`} onClick={()=>setAge(d)}>
+                {d} วัน
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label>วันที่ทดสอบ (อัตโนมัติ)</label>
+          <input type="text" value={testDate?fmt(testDate):''} readOnly/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontSize:15,fontWeight:800,color:'#22252e',marginBottom:12}}>ผลกำลังอัด (kN)</div>
+        <div className="kn-grid">
+          {[['luk1','ลูก 1',luk1,setLuk1],['luk2','ลูก 2',luk2,setLuk2],['luk3','ลูก 3',luk3,setLuk3]].map(([k,l,v,s])=>(
+            <div className="kn-item" key={k}>
+              <label>{l}</label>
+              <input type="number" inputMode="decimal" min="0" value={v}
+                onChange={e=>s(e.target.value)} placeholder="0"/>
+            </div>
+          ))}
+        </div>
+        {res&&(
+          <div className="result-bar">
+            <div className="result-chip">
+              <div className="rv">{res.avgKN.toFixed(1)}</div>
+              <div className="rl">เฉลี่ย kN</div>
+            </div>
+            <div className="result-chip">
+              <div className="rv">{res.avgMPa.toFixed(1)}</div>
+              <div className="rl">MPa</div>
+            </div>
+            <div className="result-chip" style={{background:res.avgKSC>=450?'#f0fdf4':'#fef2f2',borderColor:res.avgKSC>=450?'#86efac':'#fca5a5'}}>
+              <div className="rv" style={{color:res.avgKSC>=450?'#059669':'#d13438'}}>{res.avgKSC}</div>
+              <div className="rl" style={{color:res.avgKSC>=450?'#059669':'#d13438'}}>KSC {res.avgKSC>=450?'✓':'✗'}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        {err&&<div className="err">{err}</div>}
+        <button className="bigbtn blue" disabled={saving} onClick={save}>
+          {saving?'กำลังบันทึก…':'บันทึกลง Google Sheet'}
+        </button>
+        <button className="ghost" onClick={onBack}>ยกเลิก</button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Photo Scanner ----
+function PhotoScanner({onExtracted,onManual,onBack}){
+  const[imgSrc,setImgSrc]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState('');
+  const fileRef=useRef();
+
+  const onFile=e=>{
+    const f=e.target.files[0];
+    if(!f)return;
+    const reader=new FileReader();
+    reader.onload=ev=>setImgSrc(ev.target.result);
+    reader.readAsDataURL(f);
+    setErr('');
+  };
+
+  const scan=async()=>{
+    const apiKey=localStorage.getItem('anthropic_key')||'';
+    if(!apiKey){setErr('ยังไม่ได้ตั้งค่า Claude API Key (กดไอคอน ⚙ มุมบน)');return;}
+    const base64=imgSrc.split(',')[1];
+    const mime=imgSrc.split(';')[0].split(':')[1];
+    setLoading(true);setErr('');
+    try{
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{
+          'x-api-key':apiKey,
+          'anthropic-version':'2023-06-01',
+          'content-type':'application/json',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
+        body:JSON.stringify({
+          model:'claude-haiku-4-5-20251001',
+          max_tokens:512,
+          messages:[{
+            role:'user',
+            content:[
+              {type:'image',source:{type:'base64',media_type:mime,data:base64}},
+              {type:'text',text:`อ่านใบรายงานผลทดสอบคอนกรีตนี้แล้วตอบ JSON เท่านั้น ไม่ต้องอธิบาย:
+{"cast_date":"YYYY-MM-DD","test_date":"YYYY-MM-DD","age":7,"formula":"NP315","cube_size":"15x15","luk1":1000.0,"luk2":1000.0,"luk3":1000.0}
+- cast_date = วันที่เก็บตัวอย่าง/วันหล่อ
+- test_date = วันที่ทดสอบ
+- age = อายุ (วัน) ปกติ 1,3,5 หรือ 7
+- formula = ชื่อสูตร เช่น NP315 NP325 NP355
+- luk1/2/3 = กำลังอัดแต่ละลูก หน่วย kN (ตัวเลขทศนิยม)
+ถ้าไม่เห็นข้อมูลใดให้ใส่ null`}
+            ]
+          }]
+        })
+      });
+      const j=await resp.json();
+      if(!resp.ok)throw new Error(j.error?.message||'API error');
+      const text=j.content[0].text;
+      const match=text.match(/\{[\s\S]*\}/);
+      if(!match)throw new Error('ไม่พบข้อมูลในรูป');
+      const data=JSON.parse(match[0]);
+      onExtracted(data);
+    }catch(e){
+      setErr('อ่านรูปไม่สำเร็จ: '+e.message);
+    }finally{setLoading(false);}
+  };
+
+  if(loading)return(
+    <div className="card loading">
+      <div className="spinner"/>
+      <div style={{fontWeight:700,fontSize:15}}>Claude กำลังอ่านใบปริ้น…</div>
+      <div style={{fontSize:13,color:'#8b91a1',marginTop:6}}>ใช้เวลาประมาณ 5–10 วินาที</div>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="card">
+        <div className="card-title">📷 ถ่าย/เลือกรูปใบรายงาน</div>
+        <input type="file" accept="image/*" capture="environment" ref={fileRef}
+          style={{display:'none'}} onChange={onFile}/>
+
+        <div className="photo-box" onClick={()=>fileRef.current.click()}>
+          {imgSrc
+            ?<img src={imgSrc} alt="preview"/>
+            :<>
+              <span className="ph-icon">📄</span>
+              <div className="ph-label">กดเพื่อถ่ายรูปหรือเลือกไฟล์</div>
+              <div className="ph-sub">รองรับ JPG, PNG — ถ่ายให้ชัดทั้งใบ</div>
+            </>
+          }
+        </div>
+
+        {err&&<div className="err">{err}</div>}
+
+        {imgSrc&&<>
+          <button className="bigbtn blue" onClick={scan}>🔍 ให้ Claude อ่านข้อมูล</button>
+          <button className="ghost" onClick={()=>{setImgSrc(null);setErr('');}}>เลือกรูปใหม่</button>
+        </>}
+        <button className="ghost" onClick={onManual} style={{marginTop:8}}>✏️ กรอกมือแทน</button>
+        <button className="ghost" onClick={onBack}>← กลับ</button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Done ----
+function Done({result,onNew,onBack}){
+  const ok=result?.res?.avgKSC>=450;
+  return(
+    <div className="card success">
+      <div className="icon">{ok?'✅':'⚠️'}</div>
+      <h2 style={{color:ok?'#059669':'#d13438'}}>{ok?'บันทึกแล้ว — ผ่านเกณฑ์':'บันทึกแล้ว — ต่ำกว่าเกณฑ์'}</h2>
+      <p>{result?.formula} | อายุ {result?.age} วัน</p>
+      <p>เก็บ {fmt(result?.cast_date)} → ทดสอบ {fmt(result?.test_date)}</p>
+      {result?.res&&<p style={{marginTop:8,fontSize:17,fontWeight:800,color:ok?'#059669':'#d13438'}}>
+        {result.res.avgKSC} KSC ({result.res.avgMPa.toFixed(1)} MPa)
+      </p>}
+      <button className="bigbtn green" style={{marginTop:20}} onClick={onNew}>+ บันทึกรายการใหม่</button>
+      <button className="ghost" onClick={onBack}>กลับหน้าหลัก</button>
+    </div>
+  );
+}
+
+// ---- App ----
+function App(){
+  const[screen,setScreen]=useState('home'); // home | photo | form | done | settings
+  const[prefill,setPrefill]=useState(null);
+  const[doneResult,setDoneResult]=useState(null);
+
+  const hasGas=!!localStorage.getItem('gas_url');
+  const hasKey=!!localStorage.getItem('anthropic_key');
+
+  if(screen==='settings')return<Settings onClose={()=>setScreen('home')}/>;
+
+  const topbar=(
+    <div className="topbar">
+      <div>
+        <h1>บันทึกผลทดสอบคอนกรีต</h1>
+        <p>RMC บางเลน — กำลังอัดคอนกรีต</p>
+      </div>
+      <button className="gear-btn" onClick={()=>setScreen('settings')}>⚙</button>
+    </div>
+  );
+
+  if(screen==='done')return(
+    <div className="wrap">
+      {topbar}
+      <Done result={doneResult}
+        onNew={()=>{setPrefill(null);setScreen('form');}}
+        onBack={()=>setScreen('home')}/>
+    </div>
+  );
+
+  if(screen==='form')return(
+    <div className="wrap">
+      {topbar}
+      <ConcreteForm prefill={prefill}
+        onDone={r=>{setDoneResult(r);setScreen('done');}}
+        onBack={()=>setScreen('home')}/>
+    </div>
+  );
+
+  if(screen==='photo')return(
+    <div className="wrap">
+      {topbar}
+      <PhotoScanner
+        onExtracted={data=>{setPrefill(data);setScreen('form');}}
+        onManual={()=>{setPrefill(null);setScreen('form');}}
+        onBack={()=>setScreen('home')}/>
+    </div>
+  );
+
+  // Home
+  return(
+    <div className="wrap">
+      {topbar}
+
+      {!hasGas&&(
+        <div className="card" style={{marginTop:14,borderLeft:'4px solid #f59e0b'}}>
+          <div style={{fontSize:14,fontWeight:700,color:'#92400e'}}>⚠️ ยังไม่ได้ตั้งค่า</div>
+          <div style={{fontSize:13,color:'#5f6470',marginTop:4}}>กดไอคอน ⚙ เพื่อใส่ Google Apps Script URL ก่อนบันทึก</div>
+        </div>
+      )}
+
+      <div className="mode-btns">
+        <button className="mode-btn primary" onClick={()=>{setPrefill(null);setScreen('photo');}}>
+          <span className="icon">📷</span>
+          <div className="label">ถ่ายรูปใบปริ้น</div>
+          <div className="sub">{hasKey?'Claude อ่านอัตโนมัติ':'ต้องการ API Key'}</div>
+        </button>
+        <button className="mode-btn secondary" onClick={()=>{setPrefill(null);setScreen('form');}}>
+          <span className="icon">✏️</span>
+          <div className="label">กรอกเอง</div>
+          <div className="sub">ใส่ข้อมูลด้วยมือ</div>
+        </button>
+      </div>
+
+      <div className="card" style={{marginTop:14}}>
+        <div style={{fontSize:14,color:'#5f6470',lineHeight:1.7}}>
+          <b style={{color:'#22252e'}}>วิธีใช้:</b><br/>
+          1. กด <b>ถ่ายรูปใบปริ้น</b> → ถ่ายรูปใบรายงาน → Claude อ่านข้อมูลให้อัตโนมัติ<br/>
+          2. ตรวจสอบข้อมูลที่อ่านได้ → กด <b>บันทึก</b><br/>
+          3. ข้อมูลบันทึกลง Google Sheet โดยตรง
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
