@@ -383,7 +383,8 @@ function onEditConcreteResult(e) {
 //   ในไฟล์บน GitHub เว้นว่างไว้ เพราะเป็น repo สาธารณะ โทเคนจะหลุด
 // ============================================================
 var TELEGRAM_TOKEN = '';   // เช่น '8852411771:AAG...'
-var TELEGRAM_CHAT  = '';   // ไอดีกลุ่ม QC เช่น '-1001234567890'
+var TELEGRAM_CHAT  = '';   // ไอดีกลุ่มหลัก (แจ้งเตือนรอบงาน)
+var TELEGRAM_CHAT_QC = '';   // ★ ไอดีกลุ่ม QC — เรื่อง QC เข้ากลุ่มนี้ (เว้นว่าง = ใช้กลุ่มหลัก)
 
 // เกณฑ์กำลังอัด (ksc) ตามอายุ — ต้องตรงกับที่หน้าแดชบอร์ดใช้ (TARGET_NORMAL / TARGET_NP280)
 var TARGET_NORMAL = { 1: 340, 3: 400, 5: 420, 7: 450 };
@@ -424,7 +425,7 @@ function notifyIfBelowTarget(r) {
             + '<b>เกณฑ์:</b> ' + target + ' ksc\n'
             + '<b>ต่ำกว่าเกณฑ์:</b> ' + diff + ' ksc (' + pct + '%)\n\n'
             + 'เก็บตัวอย่าง ' + fmtThaiDate(r.sampleDate) + ' · ทดสอบ ' + fmtThaiDate(r.testDate);
-    sendTelegram(msg);
+    sendTelegram(msg, tgChatQC());
   } catch (err) {
     Logger.log('notifyIfBelowTarget error: ' + err.message);
   }
@@ -437,8 +438,13 @@ function tgChat() {
   return TELEGRAM_CHAT || PropertiesService.getScriptProperties().getProperty('TELEGRAM_CHAT') || '';
 }
 
-function sendTelegram(text) {
-  var token = tgToken(), chat = tgChat();
+// กลุ่ม QC — ถ้ายังไม่ได้ตั้ง ใช้กลุ่มหลักไปก่อน จะได้ไม่เงียบหาย
+function tgChatQC() {
+  return TELEGRAM_CHAT_QC || PropertiesService.getScriptProperties().getProperty('TELEGRAM_CHAT_QC') || tgChat();
+}
+
+function sendTelegram(text, chatOverride) {
+  var token = tgToken(), chat = chatOverride || tgChat();
   if (!token || !chat) { Logger.log('ยังไม่ได้ใส่ TELEGRAM_TOKEN / TELEGRAM_CHAT ที่หัวไฟล์'); return; }
   UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'post',
@@ -485,7 +491,7 @@ function findChatIds() {
 
 // กดจากเมนูเพื่อทดสอบว่าบอทส่งเข้ากลุ่มได้จริง
 function testTelegramAlert() {
-  sendTelegram('✅ ทดสอบการแจ้งเตือนผลลูกปูน — ถ้าเห็นข้อความนี้แปลว่าตั้งค่าถูกแล้ว');
+  sendTelegram('✅ ทดสอบการแจ้งเตือนผลลูกปูน — ถ้าเห็นข้อความนี้ในกลุ่ม QC แปลว่าตั้งค่าถูกแล้ว', tgChatQC());
   SpreadsheetApp.getUi().alert('ส่งข้อความทดสอบไป Telegram แล้ว — ลองเช็คในกลุ่ม');
 }
 
@@ -644,7 +650,7 @@ function qcCheckPending(dayOffset, whenLabel) {
       // ครบแล้ว — เตือนเฉพาะรอบเย็นให้รู้ว่าเรียบร้อย
       if ((dayOffset || 0) === 0) {
         sendTelegram('✅ <b>QC ตรวจก่อนผลิตครบแล้ว</b>\n' + qcThaiDate(ymd) +
-                     ' · ครบทั้ง ' + planned.length + ' แพ');
+                     ' · ครบทั้ง ' + planned.length + ' แพ', tgChatQC());
       }
       return;
     }
@@ -655,7 +661,7 @@ function qcCheckPending(dayOffset, whenLabel) {
 
     sendTelegram('🚨 <b>ยังไม่ได้ตรวจก่อนผลิต ' + pending.length + ' แพ</b>\n' +
                  'ใบงานผลิต ' + qcThaiDate(ymd) + ' (' + whenLabel + ')\n\n' + lines +
-                 '\n\nตรวจแล้ว ' + (planned.length - pending.length) + '/' + planned.length + ' แพ');
+                 '\n\nตรวจแล้ว ' + (planned.length - pending.length) + '/' + planned.length + ' แพ', tgChatQC());
   } catch (err) {
     Logger.log('qcCheckPending error: ' + err.message);
   }
