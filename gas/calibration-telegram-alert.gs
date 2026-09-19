@@ -61,12 +61,17 @@ function collect() {
   var items = fetchCalibrationItems();
   if (items === null) { Logger.log('❌ ดึงข้อมูลจาก Supabase ไม่ได้'); return null; }
 
-  // รายการที่ผูกกับผลทดสอบทราย → ใช้วันที่ล่าสุดจากตาราง sand_fm_tests
-  var latestSandFM = fetchLatestSandFM();
+  // รายการที่ผูกกับผลทดสอบวัตถุดิบ → ใช้วันที่ล่าสุดจากตารางนั้น
+  var LINK_TABLES = { sand_fm: 'sand_fm_tests', stone_gradation: 'stone_gradation_tests' };
+  var latestBySource = {};
+  Object.keys(LINK_TABLES).forEach(function(src) {
+    latestBySource[src] = fetchLatestTestDate(LINK_TABLES[src]);
+  });
   items = items.map(function(it) {
-    if (it.link_source === 'sand_fm' && latestSandFM) {
-      it.last_cal_date = latestSandFM;
-      it.next_cal_date = calcNext(latestSandFM, it.interval_type, Number(it.interval_value));
+    var latest = latestBySource[it.link_source];
+    if (latest) {
+      it.last_cal_date = latest;
+      it.next_cal_date = calcNext(latest, it.interval_type, Number(it.interval_value));
     }
     return it;
   });
@@ -155,11 +160,11 @@ function buildMessage(overdue, soon, today) {
 }
 
 // ============================================================
-// วันที่ทดสอบขนาดคละทรายล่าสุด (หน้าคุณภาพ-วัตถุดิบ)
+// วันที่ทดสอบล่าสุดของตารางวัตถุดิบ (หน้าคุณภาพ-วัตถุดิบ)
 // ============================================================
-function fetchLatestSandFM() {
+function fetchLatestTestDate(table) {
   try {
-    var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/sand_fm_tests?select=test_date&order=test_date.desc&limit=1', {
+    var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + table + '?select=test_date&order=test_date.desc&limit=1', {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
       muteHttpExceptions: true
     });
@@ -167,7 +172,7 @@ function fetchLatestSandFM() {
     var rows = JSON.parse(res.getContentText());
     return rows.length ? String(rows[0].test_date).slice(0, 10) : null;
   } catch (err) {
-    Logger.log('fetchLatestSandFM error: ' + err.message);
+    Logger.log('fetchLatestTestDate(' + table + ') error: ' + err.message);
     return null;
   }
 }
