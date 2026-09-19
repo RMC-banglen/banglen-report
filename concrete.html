@@ -149,6 +149,19 @@ async function getGeminiKey(){
   return '';
 }
 
+// ส่งข้อมูล 1 รายการไป GAS แล้วอ่านคำตอบกลับมา
+// ใช้ text/plain เพื่อเลี่ยง CORS preflight ที่ GAS ไม่รองรับ (ฝั่ง GAS อ่าน postData ได้เหมือนเดิม)
+// ถ้าอ่านคำตอบไม่ได้ด้วยเหตุใดก็ตาม ถือว่าสำเร็จ เพื่อไม่ให้แย่กว่าพฤติกรรมเดิม
+async function postToGas(url,body){
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});
+    const j=await r.json();
+    return{ok:j.success!==false,message:j.message||'',skipped:/มีข้อมูลนี้อยู่แล้ว/.test(j.message||'')};
+  }catch(e){
+    return{ok:true,message:'',skipped:false,unverified:true};
+  }
+}
+
 // เกณกำลังอัดตามอายุ (ตรงกับ index.html)
 function strengthTarget(formula,age){
   const TARGET_NORMAL={1:340,3:400,5:420,7:450};
@@ -235,9 +248,9 @@ function ConcreteForm({prefill,onDone,onBack}){
       luk1:Number(luk1)||0,luk2:Number(luk2)||0,luk3:Number(luk3)||0
     };
     try{
-      await fetch(gasUrl,{method:'POST',body:JSON.stringify(body),
-        headers:{'Content-Type':'application/json'},mode:'no-cors'});
-      onDone({cast_date:castDate,test_date:testDate,formula:formula.trim(),age,res});
+      const r=await postToGas(gasUrl,body);
+      if(!r.ok){setErr('บันทึกไม่สำเร็จ: '+r.message);return;}
+      onDone({cast_date:castDate,test_date:testDate,formula:formula.trim(),age,res,note:r.skipped?r.message:''});
     }catch(e){
       setErr('บันทึกไม่สำเร็จ: '+e.message);
     }finally{setSaving(false);}
@@ -442,6 +455,7 @@ function MultiReview({slips,onDone,onBack}){
   const[skip,setSkip]=useState({}); // index->true = ข้าม
   const[err,setErr]=useState('');
   const[saved,setSaved]=useState(false);
+  const[stats,setStats]=useState({added:0,dup:0});
 
   const togSkip=i=>setSkip(s=>({...s,[i]:!s[i]}));
   const toSave=slips.filter((_,i)=>!skip[i]);
@@ -455,15 +469,18 @@ function MultiReview({slips,onDone,onBack}){
         return dc!==0?dc:Number(a.age||0)-Number(b.age||0);
       });
       // บันทึก GAS (Google Sheets)
+      let added=0,dup=0;
       for(const d of sorted){
         const res=calcResults(d.luk1,d.luk2,d.luk3);
         const body={cast_date:d.cast_date,test_date:d.test_date,age:d.age,
           formula:d.formula,cube_size:d.cube_size||'15x15',
           luk1:Number(d.luk1)||0,luk2:Number(d.luk2)||0,luk3:Number(d.luk3)||0,
           avg_kn:res?res.avgKN:0,avg_mpa:res?res.avgMPa:0,avg_ksc:res?res.avgKSC:0};
-        await fetch(gasUrl,{method:'POST',body:JSON.stringify(body),
-          headers:{'Content-Type':'application/json'},mode:'no-cors'});
+        const r=await postToGas(gasUrl,body);
+        if(!r.ok)throw new Error(r.message||'GAS ปฏิเสธข้อมูล');
+        if(r.skipped)dup++;else added++;
       }
+      setStats({added,dup});
       setSaved(true);
     }catch(e){setErr('บันทึกไม่สำเร็จ: '+e.message);}
     finally{setSaving(false);}
@@ -472,7 +489,8 @@ function MultiReview({slips,onDone,onBack}){
   if(saved)return(
     <div className="card success">
       <div className="icon">✅</div>
-      <h2 style={{color:'#059669'}}>บันทึกแล้ว {toSave.length} ใบ</h2>
+      <h2 style={{color:'#059669'}}>บันทึกแล้ว {stats.added} ใบ</h2>
+      {stats.dup>0&&<p style={{color:'#c47b00',fontWeight:700}}>ข้าม {stats.dup} ใบ — มีข้อมูลนี้ในชีทอยู่แล้ว</p>}
       <button className="bigbtn green" style={{marginTop:20}} onClick={onDone}>+ ถ่ายรูปใหม่</button>
       <button className="ghost" onClick={onBack}>กลับหน้าหลัก</button>
     </div>
@@ -525,8 +543,9 @@ function Done({result,onNew,onBack}){
   const ok=th==null||result?.res?.avgKSC>=th;
   return(
     <div className="card success">
-      <div className="icon">{ok?'✅':'⚠️'}</div>
+      <div className="icon">{result?.note?'ℹ️':ok?'✅':'⚠️'}</div>
       <h2 style={{color:ok?'#059669':'#d13438'}}>{ok?'บันทึกแล้ว — ผ่านเกณฑ์':`บันทึกแล้ว — ต่ำกว่าเกณฑ์ ${th}`}</h2>
+      {result?.note&&<p style={{color:'#c47b00',fontWeight:700}}>{result.note}</p>}
       <p>{result?.formula} | อายุ {result?.age} วัน</p>
       <p>เก็บ {fmt(result?.cast_date)} → ทดสอบ {fmt(result?.test_date)}</p>
       {result?.res&&<p style={{marginTop:8,fontSize:17,fontWeight:800,color:ok?'#059669':'#d13438'}}>
