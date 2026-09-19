@@ -451,11 +451,10 @@ function MultiReview({slips,onDone,onBack}){
       </div>
       {slips.map((d,i)=>{
         const res=calcResults(d.luk1,d.luk2,d.luk3);
-        const ok=res&&res.avgKSC>=450;
         const skipped=!!skip[i];
         return(
           <div key={i} className="card" style={{marginBottom:10,opacity:skipped?0.45:1,
-            borderLeft:`4px solid ${skipped?'#e2e5ec':ok?'#22c55e':'#ef4444'}`}}>
+            borderLeft:`4px solid ${skipped?'#e2e5ec':'#3b82f6'}`}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <div style={{fontWeight:800,fontSize:15}}>{d.formula||'?'} · {d.age} วัน</div>
               <button onClick={()=>togSkip(i)} style={{fontSize:12,padding:'4px 10px',borderRadius:8,
@@ -467,8 +466,8 @@ function MultiReview({slips,onDone,onBack}){
               เก็บ {fmt(d.cast_date)} → ทดสอบ {fmt(d.test_date)}<br/>
               {d.luk1} / {d.luk2} / {d.luk3} kN
             </div>
-            {res&&<div style={{marginTop:8,fontWeight:800,fontSize:16,color:ok?'#059669':'#ef4444'}}>
-              {res.avgKSC} KSC ({res.avgMPa.toFixed(1)} MPa) {ok?'✓':'✗'}
+            {res&&<div style={{marginTop:8,fontWeight:800,fontSize:16,color:'#22252e'}}>
+              {res.avgKSC} KSC ({res.avgMPa.toFixed(1)} MPa)
             </div>}
           </div>
         );
