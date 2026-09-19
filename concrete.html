@@ -104,16 +104,6 @@ function fmt(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}/${m}/
 const FORMULAS=['NP280','NP315','NP325','NP355','NP315 CK','NP315 SM','NP355 CK','NP355 SM'];
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzyu-ZNgAu9Rxof-PP-JVG6wmKfw1nSnbr75novSi3VbThXxwBfUvZjKrs1OuuW3617/exec';
 const DEFAULT_GEMINI_KEY='';
-const SUPABASE_URL='https://npxzerdirspwunuckcqr.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
-const sbSave=async(rows)=>{
-  const res=await fetch(`${SUPABASE_URL}/rest/v1/concrete_results`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'},
-    body:JSON.stringify(rows)
-  });
-  if(!res.ok){const t=await res.text();throw new Error(t);}
-};
 const GAS_CODE=`function doPost(e) {
   var d = JSON.parse(e.postData.contents);
   var ss = SpreadsheetApp.openById('1ZYGnV8AqyR3a0uTNRftkguEdBPrQOjLQbWU6ZhpiFyk');
@@ -225,10 +215,6 @@ function ConcreteForm({prefill,onDone,onBack}){
     try{
       await fetch(gasUrl,{method:'POST',body:JSON.stringify(body),
         headers:{'Content-Type':'application/json'},mode:'no-cors'});
-      await sbSave([{sample_date:castDate,test_date:testDate,age_days:age,
-        formula_name:formula.trim(),cube_size:cubeSize,
-        result1_kn:Number(luk1)||0,result2_kn:Number(luk2)||0,result3_kn:Number(luk3)||0,
-        avg_kn:res?res.avgKN:0,avg_mpa:res?res.avgMPa:0,avg_ksc:res?res.avgKSC:0}]);
       onDone({cast_date:castDate,test_date:testDate,formula:formula.trim(),age,res});
     }catch(e){
       setErr('บันทึกไม่สำเร็จ: '+e.message);
@@ -449,15 +435,6 @@ function MultiReview({slips,onDone,onBack}){
         await fetch(gasUrl,{method:'POST',body:JSON.stringify(body),
           headers:{'Content-Type':'application/json'},mode:'no-cors'});
       }
-      // sync Supabase ทันที
-      const sbRows=sorted.map(d=>{
-        const res=calcResults(d.luk1,d.luk2,d.luk3);
-        return{sample_date:d.cast_date,test_date:d.test_date,age_days:Number(d.age||0),
-          formula_name:d.formula,cube_size:d.cube_size||'15x15',
-          result1_kn:Number(d.luk1)||0,result2_kn:Number(d.luk2)||0,result3_kn:Number(d.luk3)||0,
-          avg_kn:res?res.avgKN:0,avg_mpa:res?res.avgMPa:0,avg_ksc:res?res.avgKSC:0};
-      });
-      await sbSave(sbRows);
       setSaved(true);
     }catch(e){setErr('บันทึกไม่สำเร็จ: '+e.message);}
     finally{setSaving(false);}
