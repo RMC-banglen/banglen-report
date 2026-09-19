@@ -162,6 +162,7 @@ function Settings({onClose}){
   const[geminiKey,setGeminiKey]=useState(()=>localStorage.getItem('gemini_key')||'');
   const[gasUrl,setGasUrl]=useState(()=>localStorage.getItem('gas_url')||DEFAULT_GAS_URL);
   const[showCode,setShowCode]=useState(false);
+  useEffect(()=>{if(!geminiKey)getGeminiKey().then(k=>{if(k)setGeminiKey(k);});},[]);
   const save=()=>{
     localStorage.setItem('gemini_key',geminiKey.trim());
     localStorage.setItem('gas_url',gasUrl.trim());
