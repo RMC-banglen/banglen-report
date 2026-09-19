@@ -355,7 +355,8 @@ function PhotoScanner({onExtracted,onManual,onBack}){
       const j=await resp.json();
       if(!resp.ok)throw new Error(j.error?.message||`Gemini error ${resp.status}`);
       const text=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
-      const match=text.match(/\{[\s\S]*\}/);
+      const clean=text.replace(/```[a-z]*\n?/gi,'').replace(/```/g,'');
+      const match=clean.match(/\{[\s\S]*\}/);
       if(!match)throw new Error('ไม่พบข้อมูลในรูป');
       const parsed=JSON.parse(match[0]);
       const slips=parsed.slips||(parsed.cast_date?[parsed]:[]);
