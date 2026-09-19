@@ -421,7 +421,8 @@ function MultiReview({slips,onDone,onBack}){
     if(!gasUrl){setErr('ยังไม่ได้ตั้งค่า GAS URL');return;}
     setSaving(true);setErr('');
     try{
-      for(const d of toSave){
+      const sorted=[...toSave].sort((a,b)=>(a.cast_date||'').localeCompare(b.cast_date||''));
+      for(const d of sorted){
         const res=calcResults(d.luk1,d.luk2,d.luk3);
         const body={cast_date:d.cast_date,test_date:d.test_date,age:d.age,
           formula:d.formula,cube_size:d.cube_size||'15x15',
