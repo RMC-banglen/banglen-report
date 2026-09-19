@@ -136,6 +136,14 @@ function calcResults(luk1,luk2,luk3){
   return{avgKN:Math.round(avgKN*100)/100,avgMPa:Math.round(avgMPa*100)/100,avgKSC:Math.round(avgKSC)};
 }
 
+// เกณกำลังอัดตามอายุ (ตรงกับ index.html)
+function strengthTarget(formula,age){
+  const TARGET_NORMAL={1:340,3:400,5:420,7:450};
+  const TARGET_NP280={1:340,7:420};
+  const tbl=(formula||'').toUpperCase().includes('280')?TARGET_NP280:TARGET_NORMAL;
+  return tbl[Number(age)]??null;
+}
+
 // ---- Settings ----
 function Settings({onClose}){
   const[geminiKey,setGeminiKey]=useState(()=>localStorage.getItem('gemini_key')||'');
@@ -273,10 +281,16 @@ function ConcreteForm({prefill,onDone,onBack}){
               <div className="rv">{res.avgMPa.toFixed(1)}</div>
               <div className="rl">MPa</div>
             </div>
-            <div className="result-chip" style={{background:res.avgKSC>=450?'#f0fdf4':'#fef2f2',borderColor:res.avgKSC>=450?'#86efac':'#fca5a5'}}>
-              <div className="rv" style={{color:res.avgKSC>=450?'#059669':'#d13438'}}>{res.avgKSC}</div>
-              <div className="rl" style={{color:res.avgKSC>=450?'#059669':'#d13438'}}>KSC {res.avgKSC>=450?'✓':'✗'}</div>
-            </div>
+            {(()=>{
+              const th=strengthTarget(formula,age);
+              const pass=th==null||res.avgKSC>=th;
+              return(
+                <div className="result-chip" style={{background:pass?'#f0fdf4':'#fef2f2',borderColor:pass?'#86efac':'#fca5a5'}}>
+                  <div className="rv" style={{color:pass?'#059669':'#d13438'}}>{res.avgKSC}</div>
+                  <div className="rl" style={{color:pass?'#059669':'#d13438'}}>KSC {th==null?'':pass?'✓':`✗ (เกณ ${th})`}</div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -457,12 +471,7 @@ function MultiReview({slips,onDone,onBack}){
       {slips.map((d,i)=>{
         const res=calcResults(d.luk1,d.luk2,d.luk3);
         const skipped=!!skip[i];
-        // เกณตามอายุ (ตรงกับ index.html)
-        const TARGET_NORMAL={1:340,3:400,5:420,7:450};
-        const TARGET_NP280={1:340,7:420};
-        const isNP280=(d.formula||'').includes('280');
-        const tbl=isNP280?TARGET_NP280:TARGET_NORMAL;
-        const threshold=tbl[Number(d.age)]??null;
+        const threshold=strengthTarget(d.formula,d.age);
         const ok=threshold!=null&&res&&res.avgKSC>=threshold;
         const fail=threshold!=null&&res&&res.avgKSC<threshold;
         return(
@@ -497,11 +506,12 @@ function MultiReview({slips,onDone,onBack}){
 
 // ---- Done ----
 function Done({result,onNew,onBack}){
-  const ok=result?.res?.avgKSC>=450;
+  const th=strengthTarget(result?.formula,result?.age);
+  const ok=th==null||result?.res?.avgKSC>=th;
   return(
     <div className="card success">
       <div className="icon">{ok?'✅':'⚠️'}</div>
-      <h2 style={{color:ok?'#059669':'#d13438'}}>{ok?'บันทึกแล้ว — ผ่านเกณฑ์':'บันทึกแล้ว — ต่ำกว่าเกณฑ์'}</h2>
+      <h2 style={{color:ok?'#059669':'#d13438'}}>{ok?'บันทึกแล้ว — ผ่านเกณฑ์':`บันทึกแล้ว — ต่ำกว่าเกณฑ์ ${th}`}</h2>
       <p>{result?.formula} | อายุ {result?.age} วัน</p>
       <p>เก็บ {fmt(result?.cast_date)} → ทดสอบ {fmt(result?.test_date)}</p>
       {result?.res&&<p style={{marginTop:8,fontSize:17,fontWeight:800,color:ok?'#059669':'#d13438'}}>
