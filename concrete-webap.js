@@ -94,6 +94,17 @@ function doPost(e) {
 
 function doGet(e) {
   try {
+    // ?mode=key → คืน Gemini API key ให้แอปมือถือ จะได้ไม่ต้องพิมพ์ใหม่ทุกครั้งที่ iOS ล้าง storage
+    // key เก็บใน Script Properties ชื่อ GEMINI_KEY (ไม่ขึ้น GitHub) และจำกัดสิทธิ์ด้วย referrer ที่ Google Cloud
+    if (e && e.parameter && e.parameter.mode === 'key') {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: true,
+          key: PropertiesService.getScriptProperties().getProperty('GEMINI_KEY') || ''
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sh = ss.getSheetByName(SHEET_NAME);
     if (!sh) return respond(false, 'ไม่พบ Sheet: ' + SHEET_NAME);

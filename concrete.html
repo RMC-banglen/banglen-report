@@ -136,6 +136,19 @@ function calcResults(luk1,luk2,luk3){
   return{avgKN:Math.round(avgKN*100)/100,avgMPa:Math.round(avgMPa*100)/100,avgKSC:Math.round(avgKSC)};
 }
 
+// key เก็บใน Script Properties ของ GAS — iOS ล้าง localStorage เมื่อไหร่ก็ดึงกลับมาเองได้
+async function getGeminiKey(){
+  const local=localStorage.getItem('gemini_key')||DEFAULT_GEMINI_KEY;
+  if(local)return local;
+  try{
+    const url=localStorage.getItem('gas_url')||DEFAULT_GAS_URL;
+    const r=await fetch(url+'?mode=key');
+    const j=await r.json();
+    if(j&&j.key){localStorage.setItem('gemini_key',j.key);return j.key;}
+  }catch(e){}
+  return '';
+}
+
 // เกณกำลังอัดตามอายุ (ตรงกับ index.html)
 function strengthTarget(formula,age){
   const TARGET_NORMAL={1:340,3:400,5:420,7:450};
@@ -341,9 +354,10 @@ function PhotoScanner({onExtracted,onManual,onBack}){
   };
 
   const scan=async()=>{
-    const geminiKey=localStorage.getItem('gemini_key')||DEFAULT_GEMINI_KEY;
     setLoading(true);setErr('');
     try{
+      const geminiKey=await getGeminiKey();
+      if(!geminiKey)throw new Error('ยังไม่ได้ตั้งค่า Gemini API key (กดไอคอน ⚙ มุมบน)');
       const base64=await resizeBase64(imgSrc,1600);
       const resp=await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`,
@@ -531,7 +545,6 @@ function App(){
   const[doneResult,setDoneResult]=useState(null);
 
   const hasGas=!!(localStorage.getItem('gas_url')||DEFAULT_GAS_URL);
-  const hasKey=!!(localStorage.getItem('gemini_key')||DEFAULT_GEMINI_KEY);
 
   if(screen==='settings')return<Settings onClose={()=>setScreen('home')}/>;
 
