@@ -25,6 +25,16 @@ function doPost(e) {
       return respond(false, 'ไม่พบ Sheet: ' + SHEET_NAME);
     }
 
+    // แอป concrete.html ส่ง cast_date/age/formula/luk1-3 ส่วน skill เดิมส่ง sample_date/age_days/...
+    var sampleDate  = data.cast_date   || data.sample_date  || '';
+    var testDate    = data.test_date   || '';
+    var ageDays     = data.age         || data.age_days     || '';
+    var formulaName = data.formula     || data.formula_name || '';
+    var cubeSize    = data.cube_size   || '15x15';
+    var r1          = data.luk1 != null ? data.luk1 : data.result1_kn;
+    var r2          = data.luk2 != null ? data.luk2 : data.result2_kn;
+    var r3          = data.luk3 != null ? data.luk3 : data.result3_kn;
+
     // หาแถวสุดท้ายจาก column A จริง (ไม่นับสูตรที่ลากลงไป)
     var colA = sh.getRange('A:A').getValues();
     var lastRow = 1;
@@ -33,14 +43,14 @@ function doPost(e) {
     }
     var newRow = lastRow + 1;
     sh.getRange(newRow, 1, 1, 11).setValues([[
-      data.sample_date,
-      data.test_date,
-      data.age_days,
-      data.formula_name,
-      data.cube_size,
-      data.result1_kn,
-      data.result2_kn,
-      data.result3_kn,
+      sampleDate,
+      testDate,
+      ageDays,
+      formulaName,
+      cubeSize,
+      r1,
+      r2,
+      r3,
       data.avg_kn,
       data.avg_mpa,
       data.avg_ksc
@@ -48,10 +58,10 @@ function doPost(e) {
 
     // ผลไม่ผ่านเกณฑ์ → แจ้งเตือน Telegram ทันทีที่บันทึก
     notifyIfBelowTarget({
-      sampleDate: data.sample_date,
-      testDate:   data.test_date,
-      age:        data.age_days,
-      formula:    data.formula_name,
+      sampleDate: sampleDate,
+      testDate:   testDate,
+      age:        ageDays,
+      formula:    formulaName,
       ksc:        data.avg_ksc,
       row:        newRow
     });
