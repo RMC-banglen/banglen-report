@@ -41,6 +41,18 @@ function doPost(e) {
     for (var i = colA.length - 1; i >= 1; i--) {
       if (colA[i][0] !== '') { lastRow = i + 1; break; }
     }
+
+    // สแกนรูปเดิมซ้ำแล้วกดบันทึกอีกครั้ง ไม่ควรได้แถวซ้ำ
+    if (lastRow > 1) {
+      var existing = sh.getRange(2, 1, lastRow - 1, 8).getValues();
+      var newKey = dupKey([sampleDate, testDate, ageDays, formulaName, cubeSize, r1, r2, r3]);
+      for (var j = 0; j < existing.length; j++) {
+        if (dupKey(existing[j]) === newKey) {
+          return respond(true, 'มีข้อมูลนี้อยู่แล้ว (แถว ' + (j + 2) + ') ไม่บันทึกซ้ำ');
+        }
+      }
+    }
+
     var newRow = lastRow + 1;
     sh.getRange(newRow, 1, 1, 11).setValues([[
       sampleDate,
@@ -592,6 +604,20 @@ function fmtDate(v) {
   if (!v) return null;
   if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Bangkok', 'yyyy-MM-dd');
   return String(v).slice(0, 10) || null;
+}
+
+// ลายนิ้วมือของแถว ใช้เทียบว่าเป็นข้อมูลชุดเดียวกันไหม
+// ต้อง normalize เพราะ Sheet คืนวันที่เป็น Date ส่วนที่ส่งมาจากแอปเป็นข้อความ
+function dupKey(row) {
+  var num = function (v) { return (Math.round((Number(v) || 0) * 100) / 100).toFixed(2); };
+  return [
+    fmtDate(row[0]),
+    fmtDate(row[1]),
+    Number(row[2]) || 0,
+    String(row[3] || '').trim().toUpperCase(),
+    String(row[4] || '').trim(),
+    num(row[5]), num(row[6]), num(row[7])
+  ].join('|');
 }
 
 // ── syncConcrete: sync ผลทดสอบคอนกรีต + วัตถุดิบ → Supabase ──
