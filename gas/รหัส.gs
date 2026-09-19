@@ -60,6 +60,33 @@ function doPost(e) {
       }
     } catch(tgErr) { Logger.log('TG error: ' + tgErr.message); }
 
+    // Sync แถวใหม่ไป Supabase ทันที (upsert เฉพาะแถวนี้)
+    try {
+      UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        payload: JSON.stringify([{
+          sample_date:  sampleDate,
+          test_date:    testDate,
+          age_days:     ageDays,
+          formula_name: formulaName,
+          cube_size:    cubeSize,
+          result1_kn:   r1,
+          result2_kn:   r2,
+          result3_kn:   r3,
+          avg_kn:       avgKn,
+          avg_mpa:      avgMpa,
+          avg_ksc:      avgKsc
+        }]),
+        muteHttpExceptions: true
+      });
+    } catch(syncErr) { Logger.log('Supabase sync error: ' + syncErr.message); }
+
     Logger.log('บันทึกสำเร็จ: ' + JSON.stringify(data));
     return respond(true, 'บันทึกสำเร็จ');
 
