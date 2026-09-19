@@ -11,10 +11,15 @@
 var SHEET_NAME  = 'ผลทดสอบคอนกรีต';
 var SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
+var TG_TOKEN    = 'ใส่ BOT TOKEN ที่นี่';
+var TG_CHAT_ID  = 'ใส่ CHAT ID ที่นี่';
 
 // ============================================================
 // รับข้อมูลจาก skill → เขียน Sheet + sync Supabase อัตโนมัติ
 // ============================================================
+var TARGET_NORMAL = {1:340, 3:400, 5:420, 7:450};
+var TARGET_NP280  = {1:340, 7:420};
+
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
@@ -22,52 +27,38 @@ function doPost(e) {
     var sh = ss.getSheetByName(SHEET_NAME);
     if (!sh) return respond(false, 'ไม่พบ Sheet: ' + SHEET_NAME);
 
-    sh.appendRow([
-      data.sample_date,
-      data.test_date,
-      data.age_days,
-      data.formula_name,
-      data.cube_size,
-      data.result1_kn,
-      data.result2_kn,
-      data.result3_kn,
-      data.avg_kn,
-      data.avg_mpa,
-      data.avg_ksc
-    ]);
+    // รองรับทั้ง field name เก่า (sample_date/age_days/...) และใหม่ (cast_date/age/...)
+    var sampleDate  = data.cast_date   || data.sample_date  || '';
+    var testDate    = data.test_date   || '';
+    var ageDays     = Number(data.age  || data.age_days)    || 0;
+    var formulaName = data.formula     || data.formula_name || '';
+    var cubeSize    = data.cube_size   || '15x15';
+    var r1          = Number(data.luk1 || data.result1_kn)  || 0;
+    var r2          = Number(data.luk2 || data.result2_kn)  || 0;
+    var r3          = Number(data.luk3 || data.result3_kn)  || 0;
+    var avgKn       = Number(data.avg_kn)  || 0;
+    var avgMpa      = Number(data.avg_mpa) || 0;
+    var avgKsc      = Number(data.avg_ksc) || 0;
+
+    sh.appendRow([sampleDate, testDate, ageDays, formulaName, cubeSize, r1, r2, r3, avgKn, avgMpa, avgKsc]);
 
     var lastRow = sh.getLastRow();
     sh.getRange(lastRow, 12).setFormula('=TEXT(A' + lastRow + ',"YYYY-MM")');
     sh.getRange(2, 1, lastRow - 1, 12).sort({ column: 1, ascending: true });
 
-    // Auto-sync ไป Supabase ทันที
+    // Telegram alert ถ้าไม่ผ่านเกณ
     try {
-      UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/concrete_results', {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        payload: JSON.stringify([{
-          sample_date:  data.sample_date,
-          test_date:    data.test_date,
-          age_days:     Number(data.age_days) || 0,
-          formula_name: data.formula_name,
-          cube_size:    data.cube_size,
-          result1_kn:   Number(data.result1_kn) || 0,
-          result2_kn:   Number(data.result2_kn) || 0,
-          result3_kn:   Number(data.result3_kn) || 0,
-          avg_kn:       Number(data.avg_kn) || 0,
-          avg_mpa:      Number(data.avg_mpa) || 0,
-          avg_ksc:      Number(data.avg_ksc) || 0
-        }]),
-        muteHttpExceptions: true
-      });
-    } catch(syncErr) {
-      Logger.log('Supabase sync error: ' + syncErr.message);
-    }
+      var isNP280 = formulaName.indexOf('280') !== -1;
+      var tbl     = isNP280 ? TARGET_NP280 : TARGET_NORMAL;
+      var thresh  = tbl[ageDays];
+      if (thresh !== undefined && avgKsc > 0 && avgKsc < thresh) {
+        var msg = '⚠️ คอนกรีต ไม่ผ่านเกณ!\n'
+          + 'สูตร: ' + formulaName + '\n'
+          + 'วันเก็บ: ' + sampleDate + '  อายุ: ' + ageDays + ' วัน\n'
+          + 'ผล: ' + avgKsc + ' KSC  (เกณ: ' + thresh + ' KSC)';
+        sendTelegram(msg);
+      }
+    } catch(tgErr) { Logger.log('TG error: ' + tgErr.message); }
 
     Logger.log('บันทึกสำเร็จ: ' + JSON.stringify(data));
     return respond(true, 'บันทึกสำเร็จ');
@@ -173,42 +164,6 @@ function syncMaterials() {
   var records = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
     return {
       mat_label:    String(r[0]),
-      cement_total: Number(r[1]) || null,
-      cement_large: Number(r[2]) || null,
-      cement_18:    Number(r[3]) || null,
-      stone_34:     Number(r[4]) || null,
-      stone_1:      Number(r[5]) || null,
-      sand:         Number(r[6]) || null
-    };
-  });
-
-  // ลบข้อมูลเก่าก่อน
-  UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/materials_daily?id=gte.0', {
-    method: 'DELETE',
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-    muteHttpExceptions: true
-  });
-
-  // แทรกใหม่
-  UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/materials_daily', {
-    method: 'POST',
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-    payload: JSON.stringify(records),
-    muteHttpExceptions: true
-  });
-
-  SpreadsheetApp.getUi().alert('✅ Sync วัตถุดิบสำเร็จ ' + records.length + ' แถว');
-}
-
-function syncMaterials() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName('วัตถุดิบ');
-  if (!sh) { SpreadsheetApp.getUi().alert('❌ ไม่พบ Sheet วัตถุดิบ'); return; }
-
-  var rows = sh.getDataRange().getValues();
-  var records = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
-    return {
-      mat_label:    String(r[0]),
       cement_total: r[1] !== '' ? Number(r[1]) : null,
       cement_big:   r[2] !== '' ? Number(r[2]) : null,
       cement_i18:   r[3] !== '' ? Number(r[3]) : null,
@@ -287,6 +242,8 @@ function onOpen() {
     .addItem('🧪 Sync เฉพาะผลคอนกรีต', 'syncConcrete')
     .addItem('🧱 Sync เฉพาะวัตถุดิบ', 'syncMaterials')
     .addItem('🗑️ ลบแถวซ้ำ', 'removeDuplicates')
+    .addSeparator()
+    .addItem('📨 ทดสอบ Telegram', 'testTelegram')
     .addToUi();
 }
 
@@ -336,6 +293,21 @@ function showMonth_2026_09(){handleMonthMenu('2026-09');}
 function showMonth_2026_10(){handleMonthMenu('2026-10');}
 function showMonth_2026_11(){handleMonthMenu('2026-11');}
 function showMonth_2026_12(){handleMonthMenu('2026-12');}
+
+function testTelegram() {
+  sendTelegram('✅ ทดสอบแจ้งเตือน Telegram จาก QC คอนกรีต บางเลน');
+  SpreadsheetApp.getUi().alert('ส่ง Telegram แล้ว');
+}
+
+function sendTelegram(msg) {
+  if (TG_TOKEN.indexOf('ใส่') === 0) { Logger.log('⚠️ ยังไม่ได้ใส่ TG_TOKEN'); return; }
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
+    method: 'POST',
+    contentType: 'application/json',
+    payload: JSON.stringify({chat_id: TG_CHAT_ID, text: msg}),
+    muteHttpExceptions: true
+  });
+}
 
 function respond(success, message) {
   return ContentService
