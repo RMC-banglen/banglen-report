@@ -66,6 +66,25 @@ function doPost(e) {
       row:        newRow
     });
 
+    // ส่งแถวใหม่เข้า Supabase ทันที แดชบอร์ดจะเห็นโดยไม่ต้องกด Sync เอง
+    try {
+      sbRequest('post', 'concrete_results', [{
+        sample_date:  fmtDate(sampleDate),
+        test_date:    fmtDate(testDate),
+        age_days:     Number(ageDays) || 0,
+        formula_name: String(formulaName),
+        cube_size:    String(cubeSize),
+        result1_kn:   Number(r1) || 0,
+        result2_kn:   Number(r2) || 0,
+        result3_kn:   Number(r3) || 0,
+        avg_kn:       Number(data.avg_kn)  || 0,
+        avg_mpa:      Number(data.avg_mpa) || 0,
+        avg_ksc:      Number(data.avg_ksc) || 0
+      }]);
+    } catch (syncErr) {
+      Logger.log('Supabase sync error: ' + syncErr.message);
+    }
+
     return respond(true, 'บันทึกสำเร็จ');
 
   } catch (err) {
