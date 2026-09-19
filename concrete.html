@@ -452,9 +452,17 @@ function MultiReview({slips,onDone,onBack}){
       {slips.map((d,i)=>{
         const res=calcResults(d.luk1,d.luk2,d.luk3);
         const skipped=!!skip[i];
+        // เกณตามอายุ (ตรงกับ index.html)
+        const TARGET_NORMAL={1:340,3:400,5:420,7:450};
+        const TARGET_NP280={1:340,7:420};
+        const isNP280=(d.formula||'').includes('280');
+        const tbl=isNP280?TARGET_NP280:TARGET_NORMAL;
+        const threshold=tbl[Number(d.age)]??null;
+        const ok=threshold!=null&&res&&res.avgKSC>=threshold;
+        const fail=threshold!=null&&res&&res.avgKSC<threshold;
         return(
           <div key={i} className="card" style={{marginBottom:10,opacity:skipped?0.45:1,
-            borderLeft:`4px solid ${skipped?'#e2e5ec':'#3b82f6'}`}}>
+            borderLeft:`4px solid ${skipped?'#e2e5ec':fail?'#ef4444':'#22c55e'}`}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <div style={{fontWeight:800,fontSize:15}}>{d.formula||'?'} · {d.age} วัน</div>
               <button onClick={()=>togSkip(i)} style={{fontSize:12,padding:'4px 10px',borderRadius:8,
@@ -466,8 +474,9 @@ function MultiReview({slips,onDone,onBack}){
               เก็บ {fmt(d.cast_date)} → ทดสอบ {fmt(d.test_date)}<br/>
               {d.luk1} / {d.luk2} / {d.luk3} kN
             </div>
-            {res&&<div style={{marginTop:8,fontWeight:800,fontSize:16,color:'#22252e'}}>
+            {res&&<div style={{marginTop:8,fontWeight:800,fontSize:16,color:fail?'#ef4444':ok?'#059669':'#22252e'}}>
               {res.avgKSC} KSC ({res.avgMPa.toFixed(1)} MPa)
+              {ok&&' ✓'}{fail&&` ✗ (เกณ ${threshold})`}
             </div>}
           </div>
         );
