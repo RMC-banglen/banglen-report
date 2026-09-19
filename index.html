@@ -600,7 +600,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
   let boxEls=null;
   if(showValues&&boxedLabels&&W>0){
     const lbls=[];
-    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||(s.dashed&&!s.showLabel))return;const danger=dangerBelow!=null&&v<dangerBelow;const pass=dangerBelow!=null&&v>=dangerBelow;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger,pass});});});
+    series.forEach((s)=>{const db=s.danger??dangerBelow;s.data.forEach((v,i)=>{if(v==null||(s.dashed&&!s.showLabel))return;const danger=db!=null&&v<db;const pass=db!=null&&v>=db;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger,pass});});});
     const byXi={};
     lbls.forEach((l,idx)=>{if(!byXi[l.xi])byXi[l.xi]=[];byXi[l.xi].push({...l,idx});});
     const NEEDED=28; // box height(17) + gap(11)
@@ -655,8 +655,8 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       {area&&series.length===1&&<path d={`${lp(series[0].data)} L${x(categories.length-1)},${pad.t+iH} L${x(0)},${pad.t+iH} Z`} fill={series[0].color} opacity="0.10"/>}
       {series.map((s,si)=><g key={si}>
         <path d={lp(s.data)} fill="none" stroke={s.color} strokeWidth={s.dashed?1.8:2.4} strokeDasharray={s.dashed?"6 4":undefined} strokeLinejoin="round" strokeLinecap="round"/>
-        {showValues&&!boxedLabels&&!s.dashed&&s.data.map((v,i)=>v==null?null:<text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>)}
-        {s.data.map((v,i)=>{if(v==null)return null;const r=s.dashed?3.5:(hover===i?5:(dangerBelow!=null&&v<dangerBelow?4:3.5));const sc=dangerBelow!=null&&v<dangerBelow?PALETTE.cancel:s.color;const sf=s.dashed?s.color:'#fff';const sh=s.shape||'circle';const cx2=x(i),cy2=y(v);if(sh==='square')return <rect key={i} x={cx2-r} y={cy2-r} width={r*2} height={r*2} fill={sf} stroke={sc} strokeWidth="2"/>;if(sh==='triangle'){const pts=`${cx2},${cy2-r} ${cx2-r*0.9},${cy2+r*0.7} ${cx2+r*0.9},${cy2+r*0.7}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='diamond'){const pts=`${cx2},${cy2-r*1.2} ${cx2+r*0.9},${cy2} ${cx2},${cy2+r*1.2} ${cx2-r*0.9},${cy2}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='star'){const pts=Array.from({length:10},(_,k)=>{const a=k*Math.PI/5-Math.PI/2;const ro=k%2===0?r*1.3:r*0.5;return `${cx2+ro*Math.cos(a)},${cy2+ro*Math.sin(a)}`;}).join(' ');return <polygon key={i} points={pts} fill={sc} stroke={sc} strokeWidth="1"/>;}return <circle key={i} cx={cx2} cy={cy2} r={r} fill={sf} stroke={sc} strokeWidth="2"/>;})}
+        {showValues&&!boxedLabels&&!s.dashed&&s.data.map((v,i)=>{if(v==null)return null;const db=s.danger??dangerBelow;return <text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={db!=null&&v<db?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>;})}
+        {s.data.map((v,i)=>{if(v==null)return null;const db=s.danger??dangerBelow;const r=s.dashed?3.5:(hover===i?5:(db!=null&&v<db?4:3.5));const sc=db!=null&&v<db?PALETTE.cancel:s.color;const sf=s.dashed?s.color:'#fff';const sh=s.shape||'circle';const cx2=x(i),cy2=y(v);if(sh==='square')return <rect key={i} x={cx2-r} y={cy2-r} width={r*2} height={r*2} fill={sf} stroke={sc} strokeWidth="2"/>;if(sh==='triangle'){const pts=`${cx2},${cy2-r} ${cx2-r*0.9},${cy2+r*0.7} ${cx2+r*0.9},${cy2+r*0.7}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='diamond'){const pts=`${cx2},${cy2-r*1.2} ${cx2+r*0.9},${cy2} ${cx2},${cy2+r*1.2} ${cx2-r*0.9},${cy2}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='star'){const pts=Array.from({length:10},(_,k)=>{const a=k*Math.PI/5-Math.PI/2;const ro=k%2===0?r*1.3:r*0.5;return `${cx2+ro*Math.cos(a)},${cy2+ro*Math.sin(a)}`;}).join(' ');return <polygon key={i} points={pts} fill={sc} stroke={sc} strokeWidth="1"/>;}return <circle key={i} cx={cx2} cy={cy2} r={r} fill={sf} stroke={sc} strokeWidth="2"/>;})}
       </g>)}
       {boxEls}
       {hover!=null&&<line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t+iH} stroke={PALETTE.axis} strokeDasharray="3 3" opacity="0.5"/>}
@@ -4521,6 +4521,10 @@ window.__dataReady.then(data => {
     const activeAges=selAges.length?selAges:allAges;
 
     // series = formula × age แยกกัน ไม่รวมกัน
+    const isNP280=f=>f.toUpperCase().includes('280');
+    const TARGET_NORMAL={1:340,3:400,5:420,7:450};
+    const TARGET_NP280={1:340,7:420};
+
     const c1Series=[];
     activeForms.forEach((f,fi)=>{
       activeAges.forEach((a,ai)=>{
@@ -4528,6 +4532,7 @@ window.__dataReady.then(data => {
         const label=activeAges.length>1?`${f} Day${a}`:f;
         c1Series.push({
           label, color:fColor(f,ci), shape:fShape(f,ci),
+          danger:(isNP280(f)?TARGET_NP280:TARGET_NORMAL)[a]??null,
           data:c1Dates.map(d=>{
             const rs=filt.filter(r=>sd(r)===d&&fm(r)===f&&ag(r)===a);
             if(!rs.length) return null;
@@ -4552,11 +4557,6 @@ window.__dataReady.then(data => {
         return Math.round((rs.reduce((s,r)=>s+ks(r),0)/rs.length)*10)/10;
       })
     })):[];
-
-    // target helper
-    const isNP280=f=>f.toUpperCase().includes('280');
-    const TARGET_NORMAL={1:340,3:400,5:420,7:450};
-    const TARGET_NP280={1:340,7:420};
 
     // chart 1 — horizontal target lines + average
     const c1Targets=[];
