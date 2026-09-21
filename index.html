@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-21b';
+var APP_VERSION='2026-09-21c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5421,6 +5421,13 @@ window.__dataReady.then(data => {
     </>;
   }
 
+  // เกณฑ์สำเร็จรูปตาม ASTM C33 (วัสดุที่ละเอียดกว่าตะแกรงเบอร์ 200 ในทราย)
+  const SILT_PRESETS=[
+    {pct:3,label:'มาตรฐาน 3%',hint:'ASTM C33 — คอนกรีตที่ต้องทนการขัดสี'},
+    {pct:5,label:'มาตรฐาน 5%',hint:'ASTM C33 — คอนกรีตทั่วไป'},
+  ];
+  const presetLabel=v=>{const p=SILT_PRESETS.find(x=>x.pct===Number(v));return p?p.hint:'ตั้งค่าเอง';};
+
   // ปริมาณฝุ่นในทราย วิธีเขย่าขวด — % ฝุ่น = ชั้นฝุ่น ÷ (ชั้นฝุ่น + ชั้นทราย)
   function SandSiltSection({canEdit}){
     const db=DB;
@@ -5523,15 +5530,35 @@ window.__dataReady.then(data => {
                 {thDate(String(latest.test_date).slice(0,10))}{latest.sand_source?' · '+latest.sand_source:''}
               </div>}
             </div>
-            <div style={{flex:'1 1 200px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
-              <div style={{fontSize:13,color:'#5f6470',marginBottom:6}}>เกณฑ์ที่ยอมรับได้ (%)</div>
+            <div style={{flex:'1 1 320px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:6}}>
+                เกณฑ์ที่ยอมรับได้ — ปัจจุบัน <b style={{color:'#22252e'}}>{maxPct}%</b> ({presetLabel(maxPct)})
+              </div>
               {canEdit
-                ? <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                    <input type="number" step="0.1" value={pctDraft} onChange={e=>setPctDraft(e.target.value)} style={{...inp,width:90}}/>
-                    <button style={btn('#0f766e','#fff')} onClick={saveSpec}>บันทึก</button>
-                  </div>
+                ? <>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+                      {SILT_PRESETS.map(p=>{
+                        const on=Number(pctDraft)===p.pct;
+                        return <button key={p.pct} onClick={()=>setPctDraft(String(p.pct))} title={p.hint}
+                          style={{padding:'7px 13px',borderRadius:8,fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                            border:`1.5px solid ${on?'#0f766e':'#d6d8e0'}`,background:on?'#ecfdf5':'#fff',color:on?'#0f766e':'#42465a'}}>
+                          {p.label}
+                        </button>;
+                      })}
+                    </div>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600}}>ตั้งเอง</span>
+                      <input type="number" step="0.1" value={pctDraft} onChange={e=>setPctDraft(e.target.value)} style={{...inp,width:90}}/>
+                      <span style={{fontSize:14,color:'#5f6470'}}>%</span>
+                      <button style={btn('#0f766e','#fff')} onClick={saveSpec}>บันทึก</button>
+                    </div>
+                  </>
                 : <div style={{fontSize:28,fontWeight:800,color:'#22252e'}}>{maxPct}%</div>}
-              <div style={{fontSize:12.5,color:'#8b91a1',marginTop:8}}>ใช้ตัดสินผ่าน/ไม่ผ่านทั้งในแอปมือถือและหน้านี้</div>
+              <div style={{fontSize:12.5,color:'#8b91a1',marginTop:10,lineHeight:1.7}}>
+                ASTM C33 กำหนดปริมาณวัสดุที่ละเอียดกว่าตะแกรงเบอร์ 200 ในทราย —
+                ไม่เกิน 3% สำหรับคอนกรีตที่ต้องทนการขัดสี และไม่เกิน 5% สำหรับคอนกรีตทั่วไป
+                (วิธีเขย่าขวดเป็นการประมาณค่าภาคสนาม ไม่ใช่การทดสอบตามมาตรฐานเต็มรูปแบบ)
+              </div>
             </div>
           </div>
 
