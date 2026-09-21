@@ -18,6 +18,14 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
+
+    // แอปทดสอบทราย/หินบันทึกตรงเข้า Supabase เองได้ แต่ส่ง Telegram ไม่ได้
+    // เพราะโทเคนอยู่ที่นี่ จึงยิงมาบอกเฉพาะตอนผลไม่ผ่าน
+    if (data.kind === 'material_alert') {
+      notifyMaterialFail(data);
+      return respond(true, 'แจ้งเตือนแล้ว');
+    }
+
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sh = ss.getSheetByName(SHEET_NAME);
 
@@ -481,6 +489,42 @@ function notifyIfBelowTarget(r) {
   } catch (err) {
     Logger.log('notifyIfBelowTarget error: ' + err.message);
   }
+}
+
+// แจ้งเตือนผลทดสอบวัตถุดิบที่ไม่ผ่านเกณฑ์ → กลุ่ม QC
+// ยิงมาจากหน้า sieve.html หลังบันทึกลง Supabase สำเร็จแล้วเท่านั้น
+function notifyMaterialFail(d) {
+  try {
+    var L = [];
+    if (d.test === 'sand_fm') {
+      L.push('⚠️ <b>ขนาดคละทราย ไม่ผ่านเกณฑ์</b>');
+      L.push('ค่า FM: <b>' + d.fm + '</b>  (เกณฑ์ ' + d.lo + '–' + d.hi + ')');
+      L.push(Number(d.fm) < Number(d.lo) ? 'ทรายละเอียดเกินไป' : 'ทรายหยาบเกินไป');
+    } else if (d.test === 'sand_sieve') {
+      L.push('⚠️ <b>ขนาดคละทราย ไม่ผ่านเกณฑ์</b>');
+      L.push('ตะแกรงที่หลุดเกณฑ์: <b>' + esc(d.detail || '-') + '</b>');
+      if (d.fm) L.push('ค่า FM: ' + d.fm);
+    } else if (d.test === 'sand_silt') {
+      L.push('⚠️ <b>ฝุ่นในทราย เกินเกณฑ์</b>');
+      L.push('ปริมาณฝุ่น: <b>' + d.pct + '%</b>  (เกณฑ์ไม่เกิน ' + d.max_pct + '%)');
+      L.push('ชั้นทราย ' + d.sand_mm + ' มม. · ชั้นฝุ่น ' + d.silt_mm + ' มม.');
+    } else if (d.test === 'stone') {
+      L.push('⚠️ <b>ขนาดคละหิน ไม่ผ่านเกณฑ์</b>');
+      L.push('หิน ' + esc(d.size || '') + ' — ตะแกรงที่หลุดเกณฑ์: <b>' + esc(d.detail || '-') + '</b>');
+    } else {
+      return;
+    }
+    L.push('');
+    L.push('วันที่ทดสอบ ' + fmtThaiDate(d.test_date));
+    if (d.source) L.push('แหล่ง: ' + esc(d.source));
+    sendTelegram(L.join('\n'), tgChatQC());
+  } catch (err) {
+    Logger.log('notifyMaterialFail error: ' + err.message);
+  }
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function tgToken() {

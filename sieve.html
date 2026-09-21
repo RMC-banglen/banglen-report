@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-21c';
+var APP_VERSION='2026-09-21d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -90,6 +90,16 @@ const SB=supabase.createClient(
 );
 function todayISO(){return new Date().toISOString().slice(0,10);}
 
+// โทเคน Telegram อยู่ใน Google Apps Script ไม่ใช่ในหน้านี้ (หน้านี้เป็น public)
+// จึงยิงไปบอก GAS ให้ส่งแจ้งเตือนแทน เฉพาะตอนผลไม่ผ่านเกณฑ์
+const ALERT_URL='https://script.google.com/macros/s/AKfycbzyu-ZNgAu9Rxof-PP-JVG6wmKfw1nSnbr75novSi3VbThXxwBfUvZjKrs1OuuW3617/exec';
+function alertFail(payload){
+  try{
+    fetch(ALERT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({kind:'material_alert',...payload})}).catch(()=>{});
+  }catch(e){}
+}
+
 // ---- ทราย ----
 const FM_SIEVES=[
   {key:'w9_5', label:'3/8″',      sub:'9.5 mm'},
@@ -166,6 +176,8 @@ function SandForm(){
     const{error}=await SB.from('sand_fm_tests').insert([rec]);
     setSaving(false);
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    if(fm!=null&&(fm<FM_MIN||fm>FM_MAX))
+      alertFail({test:'sand_fm',fm:fm.toFixed(2),lo:FM_MIN,hi:FM_MAX,test_date:f.test_date,source:f.sand_source});
     setDone(true);
   };
 
@@ -265,6 +277,8 @@ function SiltForm(){
       sand_mm:sand,silt_mm:silt,silt_pct:pct,note:f.note||''}]);
     setSaving(false);
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    if(!ok) alertFail({test:'sand_silt',pct:pct,max_pct:maxPct,
+      sand_mm:sand,silt_mm:silt,test_date:f.test_date,source:f.sand_source});
     setDone(true);
   };
 
@@ -359,6 +373,9 @@ function StoneForm(){
     const{error}=await SB.from('stone_gradation_tests').insert([rec]);
     setSaving(false);
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    const bad=live.rows.filter(r=>r.pass<r.lo-0.05||r.pass>r.hi+0.05);
+    if(bad.length) alertFail({test:'stone',size:f.stone_size,
+      detail:bad.map(r=>r.label).join(', '),test_date:f.test_date,source:f.stone_source});
     setDone(true);
   };
 
