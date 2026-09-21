@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-21';
+var APP_VERSION='2026-09-21b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4808,6 +4808,7 @@ window.__dataReady.then(data => {
 
       <CementSavingSection canEdit={canEdit}/>
       <SandFMSection canEdit={canEdit}/>
+      <SandSiltSection canEdit={canEdit}/>
       <StoneGradationSection canEdit={canEdit}/>
     </div>;
   }
@@ -5418,6 +5419,178 @@ window.__dataReady.then(data => {
         </div>
       </div>}
     </>;
+  }
+
+  // ปริมาณฝุ่นในทราย วิธีเขย่าขวด — % ฝุ่น = ชั้นฝุ่น ÷ (ชั้นฝุ่น + ชั้นทราย)
+  function SandSiltSection({canEdit}){
+    const db=DB;
+    const [tests,setTests]=useState([]);
+    const [maxPct,setMaxPct]=useState(3);
+    const [pctDraft,setPctDraft]=useState('');
+    const [loading,setLoading]=useState(true);
+    const [missing,setMissing]=useState(false);
+    const [showForm,setShowForm]=useState(false);
+    const [saving,setSaving]=useState(false);
+    const [msg,setMsg]=useState('');
+    const blank={test_date:new Date().toISOString().slice(0,10),sand_source:'',sand_mm:'',silt_mm:'',note:''};
+    const [form,setForm]=useState(blank);
+
+    const load=()=>{
+      Promise.all([
+        db.from('sand_silt_tests').select('*').order('test_date',{ascending:false}).order('id',{ascending:false}).limit(200),
+        db.from('sand_silt_spec').select('max_pct').eq('id',1).limit(1),
+      ]).then(([t,s])=>{
+        if(t.error){setMissing(true);setLoading(false);return;}
+        setMissing(false);
+        setTests(t.data||[]);
+        const v=(s&&s.data&&s.data.length)?Number(s.data[0].max_pct):3;
+        setMaxPct(v);setPctDraft(String(v));
+        setLoading(false);
+      }).catch(()=>{setMissing(true);setLoading(false);});
+    };
+    useEffect(load,[]);
+
+    const thDate=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return Number(p[2])+'/'+Number(p[1])+'/'+(Number(p[0])+543);};
+    const pctOf=r=>{const tot=Number(r.sand_mm||0)+Number(r.silt_mm||0);return tot>0?Math.round(Number(r.silt_mm||0)/tot*1000)/10:null;};
+    const livePct=(()=>{const s=Number(form.sand_mm)||0,d=Number(form.silt_mm)||0;return (s+d)>0?Math.round(d/(s+d)*1000)/10:null;})();
+
+    // แถวค่าเกณฑ์อาจยังไม่มี จึง upsert เพื่อให้สร้างเองครั้งแรก
+    const saveSpec=()=>{
+      if(!canEdit)return;
+      const v=Number(pctDraft);
+      if(!isFinite(v)||v<=0){setMsg('❌ เกณฑ์ต้องเป็นตัวเลขมากกว่า 0');return;}
+      db.from('sand_silt_spec').upsert([{id:1,max_pct:v,updated_at:new Date().toISOString()}])
+        .then(({error})=>{if(error){setMsg('❌ '+error.message);return;}setMsg('✅ บันทึกเกณฑ์แล้ว');load();});
+    };
+
+    const save=()=>{
+      if(!canEdit)return;
+      if(!form.test_date){setMsg('❌ กรุณาใส่วันที่ทดสอบ');return;}
+      if(!Number(form.sand_mm)){setMsg('❌ กรุณาใส่ความสูงชั้นทราย');return;}
+      setSaving(true);setMsg('');
+      db.from('sand_silt_tests').insert([{
+        test_date:form.test_date,sand_source:form.sand_source||'',
+        sand_mm:Number(form.sand_mm)||0,silt_mm:Number(form.silt_mm)||0,
+        silt_pct:livePct,note:form.note||''}])
+        .then(({error})=>{
+          setSaving(false);
+          if(error){setMsg('❌ '+error.message);return;}
+          setMsg('✅ บันทึกแล้ว');setShowForm(false);setForm(blank);load();
+        });
+    };
+
+    const del=t=>{
+      if(!canEdit)return;
+      if(!window.confirm('ลบผลทดสอบวันที่ '+thDate(String(t.test_date).slice(0,10))+' ?'))return;
+      db.from('sand_silt_tests').delete().eq('id',t.id).then(load);
+    };
+
+    const inp={padding:'8px 10px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:15,width:'100%',fontFamily:'inherit'};
+    const lbl={fontSize:13,color:'#5f6470',marginBottom:4,fontWeight:600};
+    const btn=(bg,fg)=>({padding:'9px 18px',borderRadius:8,border:'none',background:bg,color:fg,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'});
+    const th2={padding:'9px 11px',fontSize:13,fontWeight:700,color:'#5f6470',borderBottom:'1px solid #e6e8ee'};
+    const td2={padding:'9px 11px',fontSize:14,borderBottom:'1px solid #f0f1f5'};
+
+    const latest=tests[0];
+    const latestPct=latest?pctOf(latest):null;
+    const latestOK=latestPct!=null&&latestPct<=maxPct;
+
+    return <ChartCard span="wide"
+      title="ปริมาณฝุ่นในทราย (วิธีเขย่าขวด)"
+      subtitle={`% ฝุ่น = ชั้นฝุ่น ÷ (ชั้นฝุ่น + ชั้นทราย) • เกณฑ์ไม่เกิน ${maxPct}%`}
+      right={canEdit&&<button style={btn('#1a56db','#fff')} onClick={()=>{setForm(blank);setMsg('');setShowForm(s=>!s);}}>
+        {showForm?'ปิดฟอร์ม':'+ บันทึกผลทดสอบ'}</button>}>
+
+      {missing
+        ? <div style={{padding:20,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.9}}>
+            ⚠️ ยังไม่ได้สร้างตาราง — ให้แอดมินรันไฟล์ <b>supabase-sand-silt.sql</b> ใน Supabase ก่อน
+          </div>
+        : loading? <div style={{padding:24,color:'#888'}}>กำลังโหลด…</div>
+        : <>
+          {msg&&<div style={{marginBottom:12,fontSize:14,fontWeight:600}}>{msg}</div>}
+
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
+            <div style={{flex:'1 1 200px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px',
+              background:latestPct==null?'#fff':latestOK?'#f2fbf6':'#fdf2f2'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ผลล่าสุด</div>
+              <div style={{fontSize:32,fontWeight:800,lineHeight:1.1,color:latestPct==null?'#8b91a1':latestOK?'#059669':'#d13438'}}>
+                {latestPct!=null?latestPct+'%':'–'}
+              </div>
+              <div style={{fontSize:13,marginTop:4,fontWeight:600,color:latestOK?'#059669':'#d13438'}}>
+                {latestPct==null?'ยังไม่มีผลทดสอบ':latestOK?`✓ ไม่เกินเกณฑ์ ${maxPct}%`:`✗ เกินเกณฑ์ ${maxPct}%`}
+              </div>
+              {latest&&<div style={{fontSize:12.5,color:'#8b91a1',marginTop:6}}>
+                {thDate(String(latest.test_date).slice(0,10))}{latest.sand_source?' · '+latest.sand_source:''}
+              </div>}
+            </div>
+            <div style={{flex:'1 1 200px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:6}}>เกณฑ์ที่ยอมรับได้ (%)</div>
+              {canEdit
+                ? <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                    <input type="number" step="0.1" value={pctDraft} onChange={e=>setPctDraft(e.target.value)} style={{...inp,width:90}}/>
+                    <button style={btn('#0f766e','#fff')} onClick={saveSpec}>บันทึก</button>
+                  </div>
+                : <div style={{fontSize:28,fontWeight:800,color:'#22252e'}}>{maxPct}%</div>}
+              <div style={{fontSize:12.5,color:'#8b91a1',marginTop:8}}>ใช้ตัดสินผ่าน/ไม่ผ่านทั้งในแอปมือถือและหน้านี้</div>
+            </div>
+          </div>
+
+          {showForm&&canEdit&&<div style={{border:'1px solid #e6e8ee',borderRadius:12,padding:16,marginBottom:18,background:'#fafbfd'}}>
+            <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 150px'}}><div style={lbl}>วันที่ทดสอบ</div>
+                <input type="date" style={inp} value={form.test_date} onChange={e=>setForm(f=>({...f,test_date:e.target.value}))}/></div>
+              <div style={{flex:'1 1 150px'}}><div style={lbl}>แหล่งทราย</div>
+                <input style={inp} value={form.sand_source} onChange={e=>setForm(f=>({...f,sand_source:e.target.value}))}/></div>
+              <div style={{flex:'1 1 120px'}}><div style={lbl}>ชั้นทราย (มม.)</div>
+                <input type="number" step="0.1" style={inp} value={form.sand_mm} onChange={e=>setForm(f=>({...f,sand_mm:e.target.value}))}/></div>
+              <div style={{flex:'1 1 120px'}}><div style={lbl}>ชั้นฝุ่น (มม.)</div>
+                <input type="number" step="0.1" style={inp} value={form.silt_mm} onChange={e=>setForm(f=>({...f,silt_mm:e.target.value}))}/></div>
+              <div style={{flex:'1 1 150px'}}><div style={lbl}>หมายเหตุ</div>
+                <input style={inp} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))}/></div>
+            </div>
+            <div style={{marginTop:12,display:'flex',gap:12,alignItems:'center'}}>
+              <button style={btn('#1a56db','#fff')} disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+              {livePct!=null&&<span style={{fontSize:15,fontWeight:700,color:livePct<=maxPct?'#059669':'#d13438'}}>
+                ฝุ่น {livePct}% {livePct<=maxPct?'(ผ่าน)':'(เกินเกณฑ์)'}</span>}
+            </div>
+          </div>}
+
+          {tests.length===0
+            ? <div style={{padding:24,color:'#888',fontSize:15}}>ยังไม่มีข้อมูล — บันทึกได้จากแอปมือถือ เมนู “บันทึกผลทดสอบทราย/หิน” แท็บ 💧 ฝุ่นในทราย</div>
+            : <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{background:'#f4f6fa'}}>
+                    <th style={{...th2,textAlign:'left'}}>วันที่</th>
+                    <th style={{...th2,textAlign:'left'}}>แหล่งทราย</th>
+                    <th style={{...th2,textAlign:'right'}}>ชั้นทราย</th>
+                    <th style={{...th2,textAlign:'right'}}>ชั้นฝุ่น</th>
+                    <th style={{...th2,textAlign:'right'}}>% ฝุ่น</th>
+                    <th style={{...th2,textAlign:'left'}}>ผล</th>
+                    <th style={{...th2,textAlign:'left'}}>หมายเหตุ</th>
+                    {canEdit&&<th style={th2}></th>}
+                  </tr></thead>
+                  <tbody>
+                    {tests.map(t=>{
+                      const p=pctOf(t); const ok=p!=null&&p<=maxPct;
+                      return <tr key={t.id}>
+                        <td style={td2}>{thDate(String(t.test_date).slice(0,10))}</td>
+                        <td style={td2}>{t.sand_source||'–'}</td>
+                        <td style={{...td2,textAlign:'right'}}>{t.sand_mm}</td>
+                        <td style={{...td2,textAlign:'right'}}>{t.silt_mm}</td>
+                        <td style={{...td2,textAlign:'right',fontWeight:700}}>{p!=null?p+'%':'–'}</td>
+                        <td style={{...td2,color:ok?'#059669':'#d13438',fontWeight:700}}>{p==null?'–':ok?'✓ ผ่าน':'✗ ไม่ผ่าน'}</td>
+                        <td style={{...td2,color:'#6b7280'}}>{t.note||''}</td>
+                        {canEdit&&<td style={td2}>
+                          <button onClick={()=>del(t)} style={{border:'1px solid #fca5a5',background:'#fff',color:'#d13438',
+                            borderRadius:7,padding:'4px 10px',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>ลบ</button>
+                        </td>}
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>}
+        </>}
+    </ChartCard>;
   }
 
   function SandFMSection({canEdit}){
