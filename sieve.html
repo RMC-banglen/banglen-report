@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-21d';
+var APP_VERSION='2026-09-21e';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -249,36 +249,51 @@ function SandForm(){
 }
 
 // ---- Stone Form ----
-// ฝุ่นในทราย วิธีเขย่าขวด — วัดความสูงชั้นฝุ่นที่ตกตะกอนทับชั้นทราย
+// ฝุ่นในทราย 2 วิธี — เขย่าขวดวัดปริมาตร, ล้างตะแกรงเบอร์ 200 ชั่งน้ำหนัก
+// คนละหน่วยกัน เกณฑ์จึงแยกคนละค่า
 function SiltForm(){
-  const blank={test_date:todayISO(),sand_source:'',sand_mm:'',silt_mm:'',note:''};
+  const blank={test_date:todayISO(),sand_source:'',method:'bottle',
+    sand_mm:'',silt_mm:'',w_before:'',w_after:'',note:''};
   const[f,setF]=useState(blank);
   const[saving,setSaving]=useState(false);
   const[done,setDone]=useState(false);
   const[err,setErr]=useState('');
-  const[maxPct,setMaxPct]=useState(3);
+  const[spec,setSpec]=useState({bottle:6,wash:3});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const isWash=f.method==='wash';
+  const maxPct=isWash?spec.wash:spec.bottle;
 
   useEffect(()=>{
-    SB.from('sand_silt_spec').select('max_pct').eq('id',1).limit(1)
-      .then(({data})=>{if(data&&data.length)setMaxPct(Number(data[0].max_pct));});
+    SB.from('sand_silt_spec').select('max_pct_bottle,max_pct_wash').eq('id',1).limit(1)
+      .then(({data})=>{if(data&&data.length)setSpec({
+        bottle:Number(data[0].max_pct_bottle),wash:Number(data[0].max_pct_wash)});});
   },[]);
 
   const sand=Number(f.sand_mm)||0, silt=Number(f.silt_mm)||0;
-  const pct=(sand+silt)>0?Math.round(silt/(sand+silt)*1000)/10:null;
+  const wb=Number(f.w_before)||0, wa=Number(f.w_after)||0;
+  const pct=isWash
+    ? (wb>0&&wa>0&&wa<=wb ? Math.round((wb-wa)/wb*1000)/10 : null)
+    : ((sand+silt)>0 ? Math.round(silt/(sand+silt)*1000)/10 : null);
   const ok=pct!=null&&pct<=maxPct;
 
   const save=async()=>{
     if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
-    if(!sand){setErr('กรุณาใส่ความสูงชั้นทราย');return;}
+    if(isWash){
+      if(!wb||!wa){setErr('กรุณาใส่น้ำหนักก่อนและหลังล้าง');return;}
+      if(wa>wb){setErr('น้ำหนักหลังล้างต้องไม่มากกว่าก่อนล้าง');return;}
+    }else if(!sand){setErr('กรุณาใส่ความสูงชั้นทราย');return;}
     setErr('');setSaving(true);
     const{error}=await SB.from('sand_silt_tests').insert([{
-      test_date:f.test_date,sand_source:f.sand_source||'',
-      sand_mm:sand,silt_mm:silt,silt_pct:pct,note:f.note||''}]);
+      test_date:f.test_date,sand_source:f.sand_source||'',method:f.method,
+      sand_mm:isWash?null:sand,silt_mm:isWash?null:silt,
+      w_before:isWash?wb:null,w_after:isWash?wa:null,
+      silt_pct:pct,note:f.note||''}]);
     setSaving(false);
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
-    if(!ok) alertFail({test:'sand_silt',pct:pct,max_pct:maxPct,
-      sand_mm:sand,silt_mm:silt,test_date:f.test_date,source:f.sand_source});
+    if(!ok) alertFail({test:'sand_silt',method:f.method,pct:pct,max_pct:maxPct,
+      sand_mm:isWash?'':sand,silt_mm:isWash?'':silt,
+      w_before:isWash?wb:'',w_after:isWash?wa:'',
+      test_date:f.test_date,source:f.sand_source});
     setDone(true);
   };
 
@@ -286,7 +301,8 @@ function SiltForm(){
     <div className="card success">
       <div className="icon">{ok?'✅':'⚠️'}</div>
       <h2>บันทึกแล้ว!</h2>
-      <p>ฝุ่นในทราย วันที่ {f.test_date.split('-').reverse().join('/')}<br/>
+      <p>ฝุ่นในทราย · {isWash?'ล้างตะแกรง #200':'เขย่าขวด'}<br/>
+      วันที่ {f.test_date.split('-').reverse().join('/')}<br/>
       ฝุ่น = <b>{pct}%</b> {ok?'(ผ่าน)':`(เกินเกณฑ์ ${maxPct}%)`}</p>
       <button className="bigbtn green" onClick={()=>{setF(blank);setDone(false);}}>+ บันทึกรายการใหม่</button>
     </div>
@@ -306,29 +322,53 @@ function SiltForm(){
       </div>
 
       <div className="card">
-        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>ความสูงที่วัดได้ (มม.)</div>
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:10}}>วิธีทดสอบ</div>
+        <div className="stone-tabs">
+          <button className={`stone-tab${!isWash?' active':''}`} onClick={()=>set('method','bottle')}>เขย่าขวด</button>
+          <button className={`stone-tab${isWash?' active':''}`} onClick={()=>set('method','wash')}>ล้างตะแกรง #200</button>
+        </div>
         <div style={{fontSize:13,color:'#8b91a1',marginBottom:14,lineHeight:1.8}}>
-          ใส่ทรายครึ่งขวด เติมน้ำ เขย่าแรงๆ แล้วตั้งทิ้งไว้ให้ตกตะกอน — ฝุ่นจะเป็นชั้นบางๆ อยู่เหนือชั้นทราย
+          {isWash
+            ? 'ชั่งทรายแห้ง → ล้างผ่านตะแกรงเบอร์ 200 จนน้ำใส → อบให้แห้งแล้วชั่งใหม่ (ASTM C117) — ได้ % โดยน้ำหนัก เทียบเกณฑ์ ASTM C33 ได้โดยตรง'
+            : 'ใส่ทรายครึ่งขวด เติมน้ำ เขย่าแรงๆ แล้วตั้งทิ้งไว้ให้ตกตะกอน — ฝุ่นจะเป็นชั้นบางๆ อยู่เหนือชั้นทราย ได้ % โดยปริมาตร ซึ่งอ่านค่าได้สูงกว่าวิธีล้าง'}
         </div>
-        <div className="field">
-          <label>ชั้นทราย</label>
-          <input type="number" inputMode="decimal" value={f.sand_mm} onChange={e=>set('sand_mm',e.target.value)} placeholder="0"/>
-        </div>
-        <div className="field">
-          <label>ชั้นฝุ่นที่ทับอยู่ด้านบน</label>
-          <input type="number" inputMode="decimal" value={f.silt_mm} onChange={e=>set('silt_mm',e.target.value)} placeholder="0"/>
-        </div>
+
+        {isWash ? <>
+          <div className="field">
+            <label>น้ำหนักทรายแห้ง ก่อนล้าง (g)</label>
+            <input type="number" inputMode="decimal" value={f.w_before} onChange={e=>set('w_before',e.target.value)} placeholder="0"/>
+          </div>
+          <div className="field">
+            <label>น้ำหนักทรายแห้ง หลังล้าง (g)</label>
+            <input type="number" inputMode="decimal" value={f.w_after} onChange={e=>set('w_after',e.target.value)} placeholder="0"/>
+          </div>
+        </> : <>
+          <div className="field">
+            <label>ชั้นทราย (มม.)</label>
+            <input type="number" inputMode="decimal" value={f.sand_mm} onChange={e=>set('sand_mm',e.target.value)} placeholder="0"/>
+          </div>
+          <div className="field">
+            <label>ชั้นฝุ่นที่ทับอยู่ด้านบน (มม.)</label>
+            <input type="number" inputMode="decimal" value={f.silt_mm} onChange={e=>set('silt_mm',e.target.value)} placeholder="0"/>
+          </div>
+        </>}
+
         {pct!=null&&(
           <div style={{marginTop:6,padding:'14px 16px',borderRadius:12,textAlign:'center',
             background:ok?'#ecfdf5':'#fdecea',border:`1.5px solid ${ok?'#a7e3d4':'#f3b8b0'}`}}>
-            <div style={{fontSize:13,color:'#5f6470'}}>ปริมาณฝุ่น</div>
+            <div style={{fontSize:13,color:'#5f6470'}}>ปริมาณฝุ่น ({isWash?'โดยน้ำหนัก':'โดยปริมาตร'})</div>
             <div style={{fontSize:30,fontWeight:800,color:ok?'#0f766e':'#c0392b'}}>{pct}%</div>
             <div style={{fontSize:13,fontWeight:700,color:ok?'#0f766e':'#c0392b'}}>
               {ok?`✓ ผ่าน (เกณฑ์ไม่เกิน ${maxPct}%)`:`✗ เกินเกณฑ์ ${maxPct}%`}
             </div>
-            <div style={{fontSize:11.5,color:'#8b91a1',marginTop:4}}>
-              {maxPct===3?'ASTM C33 — คอนกรีตที่ต้องทนการขัดสี':maxPct===5?'ASTM C33 — คอนกรีตทั่วไป':'เกณฑ์ที่ตั้งเองในหน้าเว็บ'}
+            <div style={{fontSize:11.5,color:'#8b91a1',marginTop:4,lineHeight:1.7}}>
+              {isWash
+                ? (maxPct===3?'ASTM C33 — คอนกรีตที่ต้องทนการขัดสี':maxPct===5?'ASTM C33 — คอนกรีตทั่วไป':'เกณฑ์ที่ตั้งเองในหน้าเว็บ')
+                : 'เกณฑ์คัดกรองภาคสนาม ไม่ใช่ค่าตามมาตรฐาน'}
             </div>
+            {!isWash&&!ok&&<div style={{fontSize:12,color:'#c47b00',marginTop:6,lineHeight:1.7}}>
+              ควรยืนยันด้วยวิธีล้างตะแกรง #200 ก่อนตัดสินว่าทรายใช้ไม่ได้
+            </div>}
           </div>
         )}
       </div>

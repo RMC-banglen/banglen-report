@@ -505,9 +505,13 @@ function notifyMaterialFail(d) {
       L.push('ตะแกรงที่หลุดเกณฑ์: <b>' + esc(d.detail || '-') + '</b>');
       if (d.fm) L.push('ค่า FM: ' + d.fm);
     } else if (d.test === 'sand_silt') {
+      var isWash = d.method === 'wash';
       L.push('⚠️ <b>ฝุ่นในทราย เกินเกณฑ์</b>');
+      L.push('วิธี: ' + (isWash ? 'ล้างตะแกรง #200 (% โดยน้ำหนัก)' : 'เขย่าขวด (% โดยปริมาตร)'));
       L.push('ปริมาณฝุ่น: <b>' + d.pct + '%</b>  (เกณฑ์ไม่เกิน ' + d.max_pct + '%)');
-      L.push('ชั้นทราย ' + d.sand_mm + ' มม. · ชั้นฝุ่น ' + d.silt_mm + ' มม.');
+      if (isWash) L.push('ก่อนล้าง ' + d.w_before + ' g · หลังล้าง ' + d.w_after + ' g');
+      else L.push('ชั้นทราย ' + d.sand_mm + ' มม. · ชั้นฝุ่น ' + d.silt_mm + ' มม.');
+      if (!isWash) L.push('<i>วิธีเขย่าขวดเป็นการคัดกรอง ควรยืนยันด้วยวิธีล้างก่อนตัดสิน</i>');
     } else if (d.test === 'stone') {
       L.push('⚠️ <b>ขนาดคละหิน ไม่ผ่านเกณฑ์</b>');
       L.push('หิน ' + esc(d.size || '') + ' — ตะแกรงที่หลุดเกณฑ์: <b>' + esc(d.detail || '-') + '</b>');
