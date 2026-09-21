@@ -4,6 +4,23 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>ทดสอบทราย/หิน</title>
+<script>
+// iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
+// จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
+var APP_VERSION='2026-09-21';
+(function(){
+  var check=function(){
+    fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
+      .then(function(r){return r.text();})
+      .then(function(t){
+        var m=t.match(/APP_VERSION='([^']+)'/);
+        if(m&&m[1]!==APP_VERSION) location.replace(location.pathname+'?v='+m[1]);
+      }).catch(function(){});
+  };
+  check();
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
+})();
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="ทดสอบทราย/หิน"/>
@@ -220,6 +237,100 @@ function SandForm(){
 }
 
 // ---- Stone Form ----
+// ฝุ่นในทราย วิธีเขย่าขวด — วัดความสูงชั้นฝุ่นที่ตกตะกอนทับชั้นทราย
+function SiltForm(){
+  const blank={test_date:todayISO(),sand_source:'',sand_mm:'',silt_mm:'',note:''};
+  const[f,setF]=useState(blank);
+  const[saving,setSaving]=useState(false);
+  const[done,setDone]=useState(false);
+  const[err,setErr]=useState('');
+  const[maxPct,setMaxPct]=useState(3);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  useEffect(()=>{
+    SB.from('sand_silt_spec').select('max_pct').eq('id',1).limit(1)
+      .then(({data})=>{if(data&&data.length)setMaxPct(Number(data[0].max_pct));});
+  },[]);
+
+  const sand=Number(f.sand_mm)||0, silt=Number(f.silt_mm)||0;
+  const pct=(sand+silt)>0?Math.round(silt/(sand+silt)*1000)/10:null;
+  const ok=pct!=null&&pct<=maxPct;
+
+  const save=async()=>{
+    if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
+    if(!sand){setErr('กรุณาใส่ความสูงชั้นทราย');return;}
+    setErr('');setSaving(true);
+    const{error}=await SB.from('sand_silt_tests').insert([{
+      test_date:f.test_date,sand_source:f.sand_source||'',
+      sand_mm:sand,silt_mm:silt,silt_pct:pct,note:f.note||''}]);
+    setSaving(false);
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    setDone(true);
+  };
+
+  if(done)return(
+    <div className="card success">
+      <div className="icon">{ok?'✅':'⚠️'}</div>
+      <h2>บันทึกแล้ว!</h2>
+      <p>ฝุ่นในทราย วันที่ {f.test_date.split('-').reverse().join('/')}<br/>
+      ฝุ่น = <b>{pct}%</b> {ok?'(ผ่าน)':`(เกินเกณฑ์ ${maxPct}%)`}</p>
+      <button className="bigbtn green" onClick={()=>{setF(blank);setDone(false);}}>+ บันทึกรายการใหม่</button>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="card">
+        <div className="field">
+          <label>วันที่ทดสอบ</label>
+          <input type="date" value={f.test_date} onChange={e=>set('test_date',e.target.value)}/>
+        </div>
+        <div className="field">
+          <label>แหล่งทราย (ถ้ามี)</label>
+          <input type="text" value={f.sand_source} onChange={e=>set('sand_source',e.target.value)} placeholder="เช่น วันวิสาข์"/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>ความสูงที่วัดได้ (มม.)</div>
+        <div style={{fontSize:13,color:'#8b91a1',marginBottom:14,lineHeight:1.8}}>
+          ใส่ทรายครึ่งขวด เติมน้ำ เขย่าแรงๆ แล้วตั้งทิ้งไว้ให้ตกตะกอน — ฝุ่นจะเป็นชั้นบางๆ อยู่เหนือชั้นทราย
+        </div>
+        <div className="field">
+          <label>ชั้นทราย</label>
+          <input type="number" inputMode="decimal" value={f.sand_mm} onChange={e=>set('sand_mm',e.target.value)} placeholder="0"/>
+        </div>
+        <div className="field">
+          <label>ชั้นฝุ่นที่ทับอยู่ด้านบน</label>
+          <input type="number" inputMode="decimal" value={f.silt_mm} onChange={e=>set('silt_mm',e.target.value)} placeholder="0"/>
+        </div>
+        {pct!=null&&(
+          <div style={{marginTop:6,padding:'14px 16px',borderRadius:12,textAlign:'center',
+            background:ok?'#ecfdf5':'#fdecea',border:`1.5px solid ${ok?'#a7e3d4':'#f3b8b0'}`}}>
+            <div style={{fontSize:13,color:'#5f6470'}}>ปริมาณฝุ่น</div>
+            <div style={{fontSize:30,fontWeight:800,color:ok?'#0f766e':'#c0392b'}}>{pct}%</div>
+            <div style={{fontSize:13,fontWeight:700,color:ok?'#0f766e':'#c0392b'}}>
+              {ok?`✓ ผ่าน (เกณฑ์ไม่เกิน ${maxPct}%)`:`✗ เกินเกณฑ์ ${maxPct}%`}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="field" style={{marginBottom:0}}>
+          <label>หมายเหตุ</label>
+          <input type="text" value={f.note} onChange={e=>set('note',e.target.value)} placeholder="ถ้ามี"/>
+        </div>
+      </div>
+
+      {err&&<div className="card" style={{color:'#d13438',fontWeight:600}}>{err}</div>}
+      <button className="bigbtn blue" disabled={saving} onClick={save}>
+        {saving?'กำลังบันทึก…':'บันทึกผลทดสอบ'}
+      </button>
+    </div>
+  );
+}
+
 function StoneForm(){
   const blank={test_date:todayISO(),stone_size:'3/4″',stone_source:'',w37_5:'',w25_0:'',w19_0:'',w12_5:'',w9_5:'',w4_75:'',w2_36:'',w_pan:'',note:''};
   const[f,setF]=useState(blank);
@@ -345,14 +456,15 @@ function App(){
         <a href="qc.html" style={{color:'#fff',fontSize:22,textDecoration:'none',padding:'4px 8px 4px 0',lineHeight:1}}>‹</a>
         <div style={{flex:1}}>
           <h1>บันทึกผลทดสอบวัตถุดิบ</h1>
-          <p>บางเลน — ทดสอบขนาดคละทราย & หิน</p>
+          <p>บางเลน — ขนาดคละทราย · ฝุ่นในทราย · หิน</p>
         </div>
       </div>
       <div className="tabs">
         <button className={`tab${tab==='sand'?' active':''}`} onClick={()=>setTab('sand')}>🏖 ทราย (FM)</button>
+        <button className={`tab${tab==='silt'?' active':''}`} onClick={()=>setTab('silt')}>💧 ฝุ่นในทราย</button>
         <button className={`tab${tab==='stone'?' active':''}`} onClick={()=>setTab('stone')}>🪨 หิน</button>
       </div>
-      {tab==='sand'?<SandForm/>:<StoneForm/>}
+      {tab==='sand'?<SandForm/>:tab==='silt'?<SiltForm/>:<StoneForm/>}
     </div>
   );
 }
