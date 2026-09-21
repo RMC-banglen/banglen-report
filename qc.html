@@ -682,8 +682,11 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onB
     try{
       // ระยะยืดของลวดเป็นหัวข้อพิเศษ (ไม่ได้อยู่ในเช็คลิสต์) ต้องรวมผลก่อนตัดสินทั้งใบ
       // ระยะยืดของลวด — ตัดสินแยกทีละขนาดลวด แล้วรวมเข้ากับผลรวมของใบ
+      // ต้องจับคู่ด้วยขนาดเสาก่อน เพราะแพเดียวกันผลิตขนาดต่างกันได้ในแต่ละวัน
+      // (ใช้ให้ตรงกับตอนแก้ไขและตอนแสดงผล ไม่งั้นได้เกณฑ์คนละตัว)
+      const specKeyNew=elongSpecKey(head.pile_spec);
       const elongRows=!isPre?[]:(elong||[])
-        .filter(e=>String(e.raft_num)===String(head.bed_no))
+        .filter(e=>e.pile_spec?elongSpecKey(e.pile_spec)===specKeyNew:String(e.raft_num)===String(head.bed_no))
         .sort((a,b)=>a.wire_mm-b.wire_mm)
         .map(sp=>{
           const raw=(head.elong||{})[sp.wire_mm];
