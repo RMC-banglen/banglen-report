@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-21c';
+var APP_VERSION='2026-09-21d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -599,8 +599,13 @@ function BarChart({categories,values,color=PALETTE.produced,target=null,targetLa
   </div>;
 }
 
-function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,boxedLabels=false,padRight=null}){
+function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,dangerAbove=null,boxedLabels=false,padRight=null}){
   const [ref,W]=useMeasure(); const [hover,setHover]=useState(null);
+  // บางเรื่องผิดเกณฑ์เมื่อ "ต่ำกว่า" (เช่น กำลังอัด) บางเรื่องผิดเมื่อ "สูงกว่า" (เช่น ฝุ่นในทราย)
+  const isBad=(v,s)=>{const lo=s&&s.danger!=null?s.danger:dangerBelow;
+    return (lo!=null&&v<lo)||(dangerAbove!=null&&v>dangerAbove);};
+  const isGood=(v,s)=>{const lo=s&&s.danger!=null?s.danger:dangerBelow;
+    return (lo!=null||dangerAbove!=null)&&!isBad(v,s);};
   const tMaxLen=targets.reduce((mx,t)=>{if(!t.label)return mx;const s=`${t.label} ${fmt(t.value,decimals)}`;return Math.max(mx,s.length);},0);
   const rPad=padRight!=null?padRight:boxedLabels?(targets.length?Math.max(130,tMaxLen*7+18):52):(tMaxLen?Math.max(80,tMaxLen*7+12):24);
   const pad={t:boxedLabels?44:20,r:rPad,b:40,l:62},H=height,iW=Math.max(10,W-pad.l-pad.r),iH=H-pad.t-pad.b;
@@ -617,7 +622,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
   let boxEls=null;
   if(showValues&&boxedLabels&&W>0){
     const lbls=[];
-    series.forEach((s)=>{const db=s.danger??dangerBelow;s.data.forEach((v,i)=>{if(v==null||(s.dashed&&!s.showLabel))return;const danger=db!=null&&v<db;const pass=db!=null&&v>=db;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger,pass});});});
+    series.forEach((s)=>{s.data.forEach((v,i)=>{if(v==null||(s.dashed&&!s.showLabel))return;lbls.push({xi:i,cx:x(i),cy:y(v)-16,color:s.color,text:fmt(v,decimals),danger:isBad(v,s),pass:isGood(v,s)});});});
     const byXi={};
     lbls.forEach((l,idx)=>{if(!byXi[l.xi])byXi[l.xi]=[];byXi[l.xi].push({...l,idx});});
     const NEEDED=28; // box height(17) + gap(11)
@@ -672,8 +677,8 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       {area&&series.length===1&&<path d={`${lp(series[0].data)} L${x(categories.length-1)},${pad.t+iH} L${x(0)},${pad.t+iH} Z`} fill={series[0].color} opacity="0.10"/>}
       {series.map((s,si)=><g key={si}>
         <path d={lp(s.data)} fill="none" stroke={s.color} strokeWidth={s.dashed?1.8:2.4} strokeDasharray={s.dashed?"6 4":undefined} strokeLinejoin="round" strokeLinecap="round"/>
-        {showValues&&!boxedLabels&&!s.dashed&&s.data.map((v,i)=>{if(v==null)return null;const db=s.danger??dangerBelow;return <text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={db!=null&&v<db?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>;})}
-        {s.data.map((v,i)=>{if(v==null)return null;const db=s.danger??dangerBelow;const r=s.dashed?3.5:(hover===i?5:(db!=null&&v<db?4:3.5));const sc=db!=null&&v<db?PALETTE.cancel:s.color;const sf=s.dashed?s.color:'#fff';const sh=s.shape||'circle';const cx2=x(i),cy2=y(v);if(sh==='square')return <rect key={i} x={cx2-r} y={cy2-r} width={r*2} height={r*2} fill={sf} stroke={sc} strokeWidth="2"/>;if(sh==='triangle'){const pts=`${cx2},${cy2-r} ${cx2-r*0.9},${cy2+r*0.7} ${cx2+r*0.9},${cy2+r*0.7}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='diamond'){const pts=`${cx2},${cy2-r*1.2} ${cx2+r*0.9},${cy2} ${cx2},${cy2+r*1.2} ${cx2-r*0.9},${cy2}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='star'){const pts=Array.from({length:10},(_,k)=>{const a=k*Math.PI/5-Math.PI/2;const ro=k%2===0?r*1.3:r*0.5;return `${cx2+ro*Math.cos(a)},${cy2+ro*Math.sin(a)}`;}).join(' ');return <polygon key={i} points={pts} fill={sc} stroke={sc} strokeWidth="1"/>;}return <circle key={i} cx={cx2} cy={cy2} r={r} fill={sf} stroke={sc} strokeWidth="2"/>;})}
+        {showValues&&!boxedLabels&&!s.dashed&&s.data.map((v,i)=>{if(v==null)return null;return <text key={'vl'+i} x={x(i)} y={y(v)-11} textAnchor="middle" className="bar-val" fill={isBad(v,s)?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>;})}
+        {s.data.map((v,i)=>{if(v==null)return null;const bad=isBad(v,s);const r=s.dashed?3.5:(hover===i?5:(bad?4:3.5));const sc=bad?PALETTE.cancel:s.color;const sf=s.dashed?s.color:'#fff';const sh=s.shape||'circle';const cx2=x(i),cy2=y(v);if(sh==='square')return <rect key={i} x={cx2-r} y={cy2-r} width={r*2} height={r*2} fill={sf} stroke={sc} strokeWidth="2"/>;if(sh==='triangle'){const pts=`${cx2},${cy2-r} ${cx2-r*0.9},${cy2+r*0.7} ${cx2+r*0.9},${cy2+r*0.7}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='diamond'){const pts=`${cx2},${cy2-r*1.2} ${cx2+r*0.9},${cy2} ${cx2},${cy2+r*1.2} ${cx2-r*0.9},${cy2}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='star'){const pts=Array.from({length:10},(_,k)=>{const a=k*Math.PI/5-Math.PI/2;const ro=k%2===0?r*1.3:r*0.5;return `${cx2+ro*Math.cos(a)},${cy2+ro*Math.sin(a)}`;}).join(' ');return <polygon key={i} points={pts} fill={sc} stroke={sc} strokeWidth="1"/>;}return <circle key={i} cx={cx2} cy={cy2} r={r} fill={sf} stroke={sc} strokeWidth="2"/>;})}
       </g>)}
       {boxEls}
       {hover!=null&&<line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t+iH} stroke={PALETTE.axis} strokeDasharray="3 3" opacity="0.5"/>}
@@ -5501,8 +5506,10 @@ window.__dataReady.then(data => {
     const latest=tests[0];
     const latestPct=latest?pctOf(latest):null;
     const latestOK=latestPct!=null&&latestPct<=maxPct;
+    const chrono=[...tests].reverse();   // กราฟไล่จากเก่าไปใหม่
 
-    return <ChartCard span="wide"
+    return <>
+    <ChartCard span="wide"
       title="ปริมาณฝุ่นในทราย (วิธีเขย่าขวด)"
       subtitle={`% ฝุ่น = ชั้นฝุ่น ÷ (ชั้นฝุ่น + ชั้นทราย) • เกณฑ์ไม่เกิน ${maxPct}%`}
       right={canEdit&&<button style={btn('#1a56db','#fff')} onClick={()=>{setForm(blank);setMsg('');setShowForm(s=>!s);}}>
@@ -5617,7 +5624,18 @@ window.__dataReady.then(data => {
                 </table>
               </div>}
         </>}
-    </ChartCard>;
+    </ChartCard>
+
+    {!missing&&tests.length>1&&<ChartCard span="wide" title="แนวโน้มปริมาณฝุ่นในทราย"
+      subtitle={`เส้นประ = เกณฑ์ไม่เกิน ${maxPct}% • จุดแดง = ครั้งที่เกินเกณฑ์`}>
+      <LineChart
+        categories={chrono.map(t=>String(t.test_date).slice(5,10))}
+        unit="%" decimals={1} showValues boxedLabels dangerAbove={maxPct}
+        series={[{label:'% ฝุ่น',color:'#1a56db',data:chrono.map(pctOf)}]}
+        targets={[{value:maxPct,color:'#d13438',label:'เกณฑ์'}]}
+        height={280} padRight={130}/>
+    </ChartCard>}
+    </>;
   }
 
   function SandFMSection({canEdit}){
