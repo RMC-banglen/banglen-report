@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-21f';
+var APP_VERSION='2026-09-21g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -884,14 +884,15 @@ window.__dataReady.then(data => {
     const latestMon=monthsWithData.length?monthsWithData[monthsWithData.length-1]:nowD.getMonth()+1;
     const atLatest=mon===latestMon;
 
-    // แถวที่จะแสดง — ปกติโชว์เฉพาะวันที่มีข้อมูลแล้ว + วันนี้ (กรอกง่าย ไม่ต้องเลื่อนผ่าน 31 แถว)
+    // แถวที่จะแสดง — ปกติโชว์ถึงวันนี้ ไม่ตัดวันที่ผ่านมาแล้วแต่ยังไม่ได้กรอกทิ้ง
+    // ไม่งั้นลืมกรอกวันไหนก็จะไม่มีแถวให้กรอกย้อนหลัง และมองไม่เห็นว่าขาดไป
     const todayKey=nowD.getFullYear()+'-'+pad(nowD.getMonth()+1)+'-'+pad(nowD.getDate());
     const allDays=Array.from({length:daysInMonth},(_,i)=>i+1);
     const shownDays=
         view==='all' ? allDays
       : view==='h1'  ? allDays.filter(d=>d<=15)
       : view==='h2'  ? allDays.filter(d=>d>15)
-      : allDays.filter(d=>byDate[key(d)]||key(d)===todayKey||draft[key(d)]);
+      : allDays.filter(d=>byDate[key(d)]||draft[key(d)]||key(d)<=todayKey);
 
     const val=(k,f)=>{
       if(draft[k]&&draft[k][f]!==undefined) return draft[k][f];
@@ -1029,11 +1030,14 @@ window.__dataReady.then(data => {
             {shownDays.map(d=>{
               const k=key(d);
               const isToday=k===todayKey, edited=!!draft[k], has=!!byDate[k];
+              const missed=!has&&!edited&&!isToday&&k<todayKey;   // วันผ่านไปแล้วแต่ยังไม่ได้กรอก
               const cancel=cancelOf(k);
               return <tr key={k} style={{borderBottom:'1px solid #eef0f5',
-                background:edited?'#fffbeb':isToday?'#f0f9ff':'transparent'}}>
+                background:edited?'#fffbeb':isToday?'#f0f9ff':missed?'#fdf6f6':'transparent'}}>
                 <td style={{padding:'6px 8px',fontSize:13.5,fontWeight:700,whiteSpace:'nowrap'}}>
-                  {d}/{mon}/{year}{isToday&&<span style={{marginLeft:6,fontSize:11,color:'#1a56db'}}>วันนี้</span>}
+                  {d}/{mon}/{year}
+                  {isToday&&<span style={{marginLeft:6,fontSize:11,color:'#1a56db'}}>วันนี้</span>}
+                  {missed&&<span style={{marginLeft:6,fontSize:11,color:'#c0392b'}}>ยังไม่กรอก</span>}
                 </td>
                 {[['raft_order',62],['raft_produced',62]].map(([f,w])=>(
                   <td key={f} style={{padding:'4px 6px',textAlign:'center'}}>
@@ -1071,7 +1075,7 @@ window.__dataReady.then(data => {
       </div>
 
       <div style={{marginTop:10,fontSize:12.5,color:'#78839A',lineHeight:1.8}}>
-        <b>ย่อ</b> = เฉพาะวันที่มีข้อมูลและวันนี้ · <b>1–15</b> / <b>16–สิ้นเดือน</b> = กรอกทีละครึ่งเดือน · <b>ทุกวัน</b> = ทั้งเดือน ·
+        <b>ย่อ</b> = ถึงวันนี้ (วันที่ยังไม่กรอกขึ้นพื้นชมพู) · <b>1–15</b> / <b>16–สิ้นเดือน</b> = กรอกทีละครึ่งเดือน · <b>ทุกวัน</b> = ทั้งเดือน ·
         ช่องที่แก้แล้วยังไม่บันทึกจะเป็น<span style={{background:'#fffbeb',padding:'1px 5px',borderRadius:4}}>พื้นเหลือง</span> ·
         ช่องเวลาพิมพ์ตัวเลขติดกันได้เลย เช่น <b>1658</b> → กด Enter หรือคลิกออกจะกลายเป็น <b>16:58</b> เอง ·
         <b style={{color:'#c0392b'}}>ยกเลิก/ค้างเท</b> คำนวณอัตโนมัติจาก แพสั่งผลิต − แพผลิต ไม่ต้องกรอกเอง
