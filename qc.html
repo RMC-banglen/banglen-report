@@ -178,7 +178,7 @@ function App(){
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
   if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
                                   onInspect={(n,day,spec,isChecked)=>{setPreset({raft:String(n),day,spec,isChecked});setFormType('pre');}}/>;
-  if(formType==='pre'&&!preset) return <PreListView me={me} rafts={rafts} initialDay={preListDay||undefined}
+  if((formType==='pre'||formType==='post')&&!preset) return <PreListView me={me} rafts={rafts} formType={formType} initialDay={preListDay||undefined}
                                   onBack={()=>{setPreListDay(null);setFormType(null);}}
                                   onInspect={(n,day,spec,isChecked)=>{setPreListDay(day);setPreset({raft:String(n),day,spec,isChecked});}}/>;
   if(formType==='mat'&&!material){
@@ -188,7 +188,7 @@ function App(){
   const list=checklist.filter(c=>c.form_type===formType&&(formType!=='mat'||c.section===material));
   return <CheckForm me={me} formType={formType} material={material} checklist={list} rafts={rafts} elong={elong} preset={preset}
                     onBack={()=>{
-                      if(formType==='pre'){setPreListDay(preset?.day||null);setPreset(null);}
+                      if(formType==='pre'||formType==='post'){setPreListDay(preset?.day||null);setPreset(null);}
                       else if(formType==='mat'){setPreset(null);setMaterial(null);}
                       else{setPreListDay(null);setPreset(null);setFormType(null);}
                     }}
@@ -429,7 +429,9 @@ function PlanView({me,rafts,onBack,onInspect}){
 }
 
 // หน้าเลือกแพก่อนตรวจก่อนผลิต — แสดงสถานะแดง/เขียว เหมือนใบงานผลิต
-function PreListView({me,rafts,onBack,onInspect,initialDay}){
+function PreListView({me,rafts,onBack,onInspect,initialDay,formType='pre'}){
+  const isPost=formType==='post';
+  const title=isPost?'ตรวจหลังผลิต':'ตรวจก่อนผลิต';
   const [day,setDay]=useState(initialDay||todayISO());
   const [plan,setPlan]=useState(null);
   const [checked,setChecked]=useState([]);
@@ -438,7 +440,7 @@ function PreListView({me,rafts,onBack,onInspect,initialDay}){
   const load=(d)=>{
     Promise.all([
       DB.from('qc_production_day').select('raft_num,pile_spec').eq('d',d).order('raft_num'),
-      DB.from('qc_checks').select('bed_no').eq('form_type','pre').eq('check_date',d),
+      DB.from('qc_checks').select('bed_no').eq('form_type',formType).eq('check_date',d),
     ]).then(([p,c])=>{
       if(p.error){setMissing(true);return;}
       setMissing(false);
@@ -456,12 +458,12 @@ function PreListView({me,rafts,onBack,onInspect,initialDay}){
     <div className="topbar">
       <button onClick={onBack} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',
         borderRadius:10,padding:'7px 11px',fontSize:16,cursor:'pointer'}}>←</button>
-      <div><div className="who">ตรวจก่อนผลิต</div><div className="sub">{me.name} · {thaiDate(day)}</div></div>
+      <div><div className="who">{title}</div><div className="sub">{me.name} · {thaiDate(day)}</div></div>
     </div>
     <div className="wrap">
       <div className="card">
         <div className="field" style={{marginBottom:0}}>
-          <label>วันที่</label>
+          <label>{isPost?'วันที่ผลิตของแพ':'วันที่'}</label>
           <input type="date" value={day} onChange={e=>setDay(e.target.value)}/>
         </div>
       </div>
@@ -476,7 +478,7 @@ function PreListView({me,rafts,onBack,onInspect,initialDay}){
               <div className="card" style={{marginTop:12,textAlign:'center',
                 background:total&&done===total?'var(--okbg)':'#fff',
                 borderColor:total&&done===total?'#a7e3d4':'var(--line)'}}>
-                <div style={{fontSize:13,color:'var(--muted)'}}>ตรวจก่อนผลิตแล้ว</div>
+                <div style={{fontSize:13,color:'var(--muted)'}}>{title}แล้ว</div>
                 <div className="big" style={{color:total&&done===total?'var(--ok)':'var(--bad)'}}>{done}/{total} แพ</div>
               </div>
 
@@ -571,7 +573,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onB
     if(!preset?.isChecked){setViewMode(null);setExistingCheck(null);setExistingItems([]);return;}
     setViewMode('view');
     DB.from('qc_checks')
-      .select('*').eq('form_type','pre').eq('check_date',preset.day).eq('bed_no',String(preset.raft))
+      .select('*').eq('form_type',formType).eq('check_date',preset.day).eq('bed_no',String(preset.raft))
       .limit(1)
       .then(({data,error})=>{
         if(error||!data||!data.length){setViewMode(null);return;}
