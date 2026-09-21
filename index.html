@@ -2977,12 +2977,12 @@ window.__dataReady.then(data => {
         const isDone=(d,n)=>doneSet.has(d+'|'+String(n));
         const isPostDone=(d,n)=>postSet.has(d+'|'+String(n));
         // ค้างข้ามวัน = วันผ่านไปแล้วแต่ยังไม่ตรวจ
-        const overdue=[];
-        days.forEach(d=>rowsOf(d).forEach(p=>{if(d<todayStr&&!isDone(d,p.raft_num))overdue.push({d,...p});}));
+        const overdueOf=fn=>{const o=[];days.forEach(d=>rowsOf(d).forEach(p=>{if(d<todayStr&&!fn(d,p.raft_num))o.push({d,...p});}));return o;};
 
-        return <>
-          <ChartCard span="full" title="ใบงานผลิต — สถานะการตรวจ"
-            subtitle="🔴 ยังไม่ตรวจ · 🟢 ตรวจแล้ว — แต่ละแพแสดงทั้งก่อนผลิตและหลังผลิต">
+        // บล็อกก่อนผลิต/หลังผลิต หน้าตาเหมือนกัน ต่างแค่ว่านับจากใบตรวจชนิดไหน
+        const grid=fn=>{
+          const overdue=overdueOf(fn);
+          return <>
             {overdue.length>0&&<div style={{marginBottom:14,padding:'12px 15px',borderRadius:10,
               background:'#fdecea',border:'1px solid #f3b8b0',color:'#c0392b',fontSize:14,lineHeight:1.9}}>
               ⚠️ <b>ค้างข้ามวัน {overdue.length} แพ</b> — {overdue.slice(0,8).map(o=>'แพ '+o.raft_num+' ('+fmtD(o.d)+')').join(' · ')}
@@ -2994,45 +2994,45 @@ window.__dataReady.then(data => {
                 </div>
               : days.map(d=>{
                   const rs=rowsOf(d);
-                  const done=rs.filter(p=>isDone(d,p.raft_num)).length;
-                  const donePost=rs.filter(p=>isPostDone(d,p.raft_num)).length;
+                  const done=rs.filter(p=>fn(d,p.raft_num)).length;
                   const all=done===rs.length;
-                  const allPost=donePost===rs.length;
                   return <div key={d} style={{marginBottom:16}}>
                     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
                       <span style={{fontSize:15,fontWeight:800}}>{fmtD(d)}</span>
                       {d===todayStr&&<span style={{fontSize:11.5,fontWeight:700,color:'#1a56db',background:'#eff6ff',
                         border:'1px solid #bfdbfe',borderRadius:6,padding:'1px 7px'}}>วันนี้</span>}
                       <span style={{fontSize:13.5,fontWeight:700,color:all?'#0f766e':'#c0392b'}}>
-                        ก่อนผลิต {done}/{rs.length}
-                      </span>
-                      <span style={{fontSize:13.5,fontWeight:700,color:allPost?'#0f766e':'#c0392b'}}>
-                        หลังผลิต {donePost}/{rs.length}
+                        ตรวจแล้ว {done}/{rs.length} แพ
                       </span>
                     </div>
                     <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                       {rs.map(p=>{
-                        const ok=isDone(d,p.raft_num);
-                        const okPost=isPostDone(d,p.raft_num);
-                        const both=ok&&okPost;
+                        const ok=fn(d,p.raft_num);
                         const late=!ok&&d<todayStr;
-                        return <div key={p.raft_num} style={{minWidth:132,padding:'9px 13px',borderRadius:10,
-                          border:`1.5px solid ${both?'#a7e3d4':ok?'#cbd5e1':late?'#e07a6d':'#f3b8b0'}`,
-                          background:both?'#ecfdf5':ok?'#f8fafc':'#fdecea'}}>
+                        return <div key={p.raft_num} style={{minWidth:126,padding:'9px 13px',borderRadius:10,
+                          border:`1.5px solid ${ok?'#a7e3d4':late?'#e07a6d':'#f3b8b0'}`,
+                          background:ok?'#ecfdf5':'#fdecea'}}>
                           <div style={{fontSize:14.5,fontWeight:800,color:ok?'#0f766e':'#c0392b'}}>
-                            แพ {p.raft_num}
+                            {ok?'🟢':'🔴'} แพ {p.raft_num}
                           </div>
                           <div style={{fontSize:12,color:'#5f6470',marginTop:2}}>{p.pile_spec||'ยังไม่ระบุขนาด'}</div>
-                          <div style={{fontSize:11.5,marginTop:4,lineHeight:1.7}}>
-                            <div style={{color:ok?'#0f766e':'#c0392b'}}>{ok?'🟢':'🔴'} ก่อนผลิต</div>
-                            <div style={{color:okPost?'#0f766e':'#c0392b'}}>{okPost?'🟢':'🔴'} หลังผลิต</div>
-                          </div>
                           {late&&<div style={{fontSize:11,fontWeight:700,color:'#c0392b',marginTop:3}}>ค้างข้ามวัน</div>}
                         </div>;
                       })}
                     </div>
                   </div>;
                 })}
+          </>;
+        };
+
+        return <>
+          <ChartCard span="full" title="ใบงานผลิต — สถานะการตรวจก่อนผลิต"
+            subtitle="🔴 ยังไม่ตรวจ · 🟢 ตรวจแล้ว — ใบงานลงจากลิงก์ QC ในมือถือ">
+            {grid(isDone)}
+          </ChartCard>
+          <ChartCard span="full" title="ใบงานผลิต — สถานะการตรวจหลังผลิต"
+            subtitle="🔴 ยังไม่ตรวจ · 🟢 ตรวจแล้ว — ยึดวันที่ผลิตของแพ ไม่ใช่วันที่เข้าไปตรวจ">
+            {grid(isPostDone)}
           </ChartCard>
         </>;
       })()}
