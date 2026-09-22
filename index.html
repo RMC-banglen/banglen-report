@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22f';
+var APP_VERSION='2026-09-22g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5857,6 +5857,82 @@ window.__dataReady.then(data => {
   ];
   const aciGrade=cv=>ACI_GRADES.find(g=>cv<g.max);
 
+  // เกณฑ์ความเหวี่ยงภายในชุด (ลูก 1/2/3 ของครั้งเดียวกัน) ตาม ACI 214R-11 งานหน้างาน
+  const TEST_GRADES=[
+    {max:3, label:'ดีเยี่ยม', color:'#0f766e'},
+    {max:4, label:'ดีมาก',   color:'#059669'},
+    {max:5, label:'ดี',      color:'#65a30d'},
+    {max:6, label:'พอใช้',    color:'#d97706'},
+    {max:Infinity,label:'ต้องปรับปรุง',color:'#c0392b'},
+  ];
+  const testGrade=cv=>TEST_GRADES.find(g=>cv<g.max);
+
+  // ความเหวี่ยงมาจาก 2 ที่ — วิธีทดสอบ กับ การผสม แยกให้เห็นว่าควรไปแก้ตรงไหนก่อน
+  function WithinTestBlock({g}){
+    const [open,setOpen]=useState(false);   // รายการชุดที่พิสัยกว้าง ปกติไม่ได้ดูทุกครั้ง
+    const tq=testGrade(g.cvTest);
+    const share=g.testShare;
+    const bar=(label,val,color)=>{
+      const pct=Math.min(100,val/Math.max(g.cv,0.01)*100);
+      return <div style={{marginBottom:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+          <span style={{color:'var(--ink-soft)'}}>{label}</span>
+          <b style={{color}}>{fmt(val,1)}%</b>
+        </div>
+        <div style={{height:9,borderRadius:6,background:'#eef0f5',overflow:'hidden'}}>
+          <div style={{width:pct+'%',height:'100%',background:color,borderRadius:6}}/>
+        </div>
+      </div>;
+    };
+    return <div style={{marginTop:22,paddingTop:18,borderTop:'1.5px solid var(--line)'}}>
+      <div style={{fontSize:15,fontWeight:800,color:'var(--ink)',marginBottom:4}}>ความเหวี่ยงนี้มาจากไหน</div>
+      <div style={{fontSize:13,color:'var(--muted-text)',marginBottom:14,lineHeight:1.8}}>
+        ลูก 1/2/3 ของครั้งเดียวกันมาจากเบ้าเดียวกัน ถ้าค่าต่างกันมากแปลว่าปัญหาอยู่ที่วิธีทดสอบ ไม่ใช่ที่คอนกรีต
+        · คำนวณจาก {g.nRng} ครั้งที่มีครบ 3 ลูก
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:20}}>
+        <div>
+          {bar('ความเหวี่ยงรวม',g.cv,'#5f6470')}
+          {bar('จากวิธีทดสอบ (หล่อ/บ่ม/กด)',g.cvTest,'#d97706')}
+          {bar('จากการผสม (ชั่งตวง/วัตถุดิบ)',g.cvMix,'#2f5fd0')}
+        </div>
+        <div style={{padding:'14px 16px',borderRadius:12,background:'var(--primary-wash)',border:'1.5px solid var(--line)',lineHeight:1.85,fontSize:13.5}}>
+          <div>คุณภาพการทดสอบ: <b style={{color:tq.color}}>{tq.label}</b> (ACI แนะนำต่ำกว่า 4%)</div>
+          {share!=null&&<div style={{marginTop:6}}>
+            {share>=60
+              ?<>ความเหวี่ยงที่เห็น <b>{fmt(share,0)}%</b> มาจากการทดสอบ ไม่ใช่จากคอนกรีต — คอนกรีตชุดนี้สม่ำเสมอกว่าที่ตัวเลขรวมบอก ควรไปปรับวิธีหล่อ/บ่มลูกปูนก่อน</>
+              :share>=35
+                ?<>มาจากการทดสอบ <b>{fmt(share,0)}%</b> ที่เหลือมาจากการผสม ควรแก้ทั้งสองทาง</>
+                :<>มาจากการทดสอบแค่ <b>{fmt(share,0)}%</b> ที่เหลือเป็นความต่างของคอนกรีตจริง ต้องไปดูที่การชั่งตวงและวัตถุดิบ</>}
+          </div>}
+          {g.wide.length>0&&<div style={{marginTop:8,color:'var(--muted-text)'}}>
+            มี <b style={{color:'#c0392b'}}>{g.wide.length}</b> ครั้งจาก {g.nRng} ที่ 3 ลูกต่างกันเกิน 8% (เกณฑ์ ASTM C39)
+          </div>}
+        </div>
+      </div>
+
+      {g.wide.length>0&&<>
+        <button onClick={()=>setOpen(!open)} style={{marginTop:14,padding:'8px 14px',borderRadius:8,
+          border:'1px solid var(--line)',background:'#fff',cursor:'pointer',fontFamily:'inherit',fontSize:13.5}}>
+          {open?'▲ ซ่อนรายการ':`▼ ดูรายการ ${g.wide.length} ครั้งที่ 3 ลูกต่างกันมาก`}
+        </button>
+        {open&&<div className="table-wrap" style={{marginTop:10}}>
+          <table className="dt"><thead><tr>
+            <th className="ta-l">วันที่เก็บตัวอย่าง</th><th>เฉลี่ย 3 ลูก (kN)</th><th>พิสัย (kN)</th><th>คิดเป็น %</th>
+          </tr></thead><tbody>
+            {g.wide.slice(0,40).map((w,i)=><tr key={i}>
+              <td className="ta-l">{w.d.slice(8)+'/'+w.d.slice(5,7)+'/'+(Number(w.d.slice(0,4))+543)}</td>
+              <td>{fmt(w.cuMean,0)}</td><td>{fmt(w.rng,0)}</td>
+              <td style={{fontWeight:700,color:w.rngPct>12?'#c0392b':'#d97706'}}>{fmt(w.rngPct,1)}%</td>
+            </tr>)}
+          </tbody></table>
+          {g.wide.length>40&&<div style={{fontSize:12.5,color:'var(--muted-text)',marginTop:8}}>แสดง 40 อันดับแรกจาก {g.wide.length} ครั้ง</div>}
+        </div>}
+      </>}
+    </div>;
+  }
+
   function ConcreteStatsSection({rows}){
     const TN={1:340,3:400,5:420,7:450}, T280={1:340,7:420};
     const sd=r=>String(r.sample_date||'').slice(0,10);
@@ -5872,7 +5948,12 @@ window.__dataReady.then(data => {
       (rows||[]).forEach(r=>{
         const f=fm_(r), a=ag(r), v=ks(r);
         if(!f||!a||!v) return;
-        (bag[f+'|'+a]=bag[f+'|'+a]||[]).push({d:sd(r),v});
+        // ลูก 1/2/3 ของครั้งเดียวกัน มาจากเบ้าเดียวกัน ต่างกันได้เท่าไหร่บอกคุณภาพการทดสอบ
+        const cu=[r.result1_kn,r.result2_kn,r.result3_kn].map(Number).filter(x=>x>0);
+        const rng=cu.length===3?Math.max(...cu)-Math.min(...cu):null;
+        const cuMean=cu.length===3?(cu[0]+cu[1]+cu[2])/3:null;
+        (bag[f+'|'+a]=bag[f+'|'+a]||[]).push({d:sd(r),v,rng,cuMean,
+          rngPct:rng!=null&&cuMean?rng/cuMean*100:null});
       });
       return Object.entries(bag).map(([k,arr])=>{
         const[f,a]=k.split('|');
@@ -5884,7 +5965,26 @@ window.__dataReady.then(data => {
         const tg=targetOf(f,Number(a));
         // ACI 318: ถ้าจะให้มั่นใจว่าไม่หลุดเกณฑ์ ค่าเฉลี่ยต้องสูงกว่าเกณฑ์อยู่ 1.34 เท่าของ SD
         const need=tg!=null?tg+1.34*sdv:null;
+
+        // แยกความเหวี่ยงเป็น 2 ส่วน ตาม ACI 214
+        // ส่วนของการทดสอบ: SD = พิสัยเฉลี่ย / 1.693 (ค่า d2 เมื่อทดสอบครั้งละ 3 ลูก)
+        // ส่วนของการผสม: หาจาก SD รวม² = SD ทดสอบ² + SD ผสม²
+        const withRng=arr.filter(x=>x.rngPct!=null);
+        let cvTest=null,cvMix=null,testShare=null;
+        if(withRng.length>=MIN_N){
+          const mr=withRng.reduce((s,x)=>s+x.rng,0)/withRng.length;
+          const mcm=withRng.reduce((s,x)=>s+x.cuMean,0)/withRng.length;
+          cvTest=mcm?(mr/1.693)/mcm*100:null;
+          if(cvTest!=null){
+            cvMix=Math.sqrt(Math.max(0,cv*cv-cvTest*cvTest));
+            testShare=cv>0?Math.min(100,(cvTest*cvTest)/(cv*cv)*100):null;
+          }
+        }
+        // ASTM C39: 3 ลูกจากเบ้าเดียวกันไม่ควรต่างกันเกิน 8% ของค่าเฉลี่ย
+        const wide=withRng.filter(x=>x.rngPct>8).sort((p,q)=>q.rngPct-p.rngPct);
+
         return{key:k,f,a:Number(a),n,mean,sd:sdv,cv,tg,need,
+          cvTest,cvMix,testShare,nRng:withRng.length,wide,
           head:need!=null?mean-need:null,
           below:tg!=null?vals.filter(v=>v<tg).length:0,
           pts:arr.sort((x,y)=>x.d<y.d?-1:1)};
@@ -5942,13 +6042,16 @@ window.__dataReady.then(data => {
         <LineChart categories={cats} unit="ksc" decimals={0} height={300} padRight={130}
           dangerBelow={cur.tg} targets={tgts}
           series={[{label:`${cur.f} อายุ ${cur.a} วัน`,color:'#1a56db',data:cur.pts.map(p=>p.v)}]}/>
+
+        {cur.cvTest!=null&&<WithinTestBlock g={cur}/>}
       </ChartCard>
 
       <ChartCard title="ตารางเทียบทุกสูตร/อายุ" subtitle={`แสดงเฉพาะกลุ่มที่มีอย่างน้อย ${MIN_N} ตัวอย่าง`} span="full">
         <div className="table-wrap">
         <table className="dt"><thead><tr>
           <th className="ta-l">สูตร</th><th>อายุ</th><th>ตัวอย่าง</th>
-          <th>เฉลี่ย</th><th>เกณฑ์</th><th>SD</th><th>CV%</th>
+          <th>เฉลี่ย</th><th>เกณฑ์</th><th>SD</th><th>CV รวม%</th>
+          <th>จากทดสอบ%</th><th>จากผสม%</th>
           <th className="ta-l">การควบคุม</th><th>ต่ำกว่าเกณฑ์</th>
         </tr></thead><tbody>
           {groups.map(g=>{const q=aciGrade(g.cv);return <tr key={g.key}
@@ -5960,6 +6063,8 @@ window.__dataReady.then(data => {
             <td style={{color:'var(--muted-text)'}}>{g.tg??'–'}</td>
             <td>{fmt(g.sd,1)}</td>
             <td style={{fontWeight:700,color:q.color}}>{fmt(g.cv,1)}</td>
+            <td style={{color:g.cvTest!=null?testGrade(g.cvTest).color:'var(--muted-text)'}}>{g.cvTest!=null?fmt(g.cvTest,1):'–'}</td>
+            <td style={{color:'var(--muted-text)'}}>{g.cvMix!=null?fmt(g.cvMix,1):'–'}</td>
             <td className="ta-l" style={{color:q.color,fontWeight:700}}>{q.label}</td>
             <td style={{color:g.below?'#c0392b':'var(--muted-text)'}}>{g.below?`${g.below} (${fmt(g.below/g.n*100,1)}%)`:'–'}</td>
           </tr>;})}
