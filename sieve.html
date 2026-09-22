@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22c';
+var APP_VERSION='2026-09-22d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -382,7 +382,7 @@ function OrganicForm(){
           แช่ทรายในสารละลาย NaOH 3% ทิ้งไว้ 24 ชม. แล้วถ่ายรูปขวด —
           <b> ต้องมีกระดาษขาวอยู่ในรูปด้วย</b> เพื่อให้ระบบปรับสีตามแสงได้ ไม่งั้นเทียบข้ามวันไม่ได้
         </div>
-        <input type="file" accept="image/*" capture="environment" onChange={onPick}
+        <input type="file" accept="image/*" onChange={onPick}
           style={{width:'100%',padding:12,border:'1.5px dashed #94afd4',borderRadius:10,background:'#f7faff'}}/>
 
         {img&&<>
@@ -521,7 +521,7 @@ function OrganicCalib({warn,onSaved}){
           ระบบจะอ่านค่าไปตั้งเป็นเกณฑ์เตือนให้ ทำครั้งเดียวพอ<br/>
           <span style={{color:'#8b91a1'}}>ต้องเป็นแผ่นจริงของโรงงานที่ถ่ายเอง ใช้รูปจากอินเทอร์เน็ตไม่ได้ เพราะสีเพี้ยนไปแล้ว</span>
         </div>
-        <input type="file" accept="image/*" capture="environment" onChange={onPick}
+        <input type="file" accept="image/*" onChange={onPick}
           style={{width:'100%',padding:12,border:'1.5px dashed #94afd4',borderRadius:10,background:'#f7faff'}}/>
         {img&&<>
           <div style={{fontSize:13.5,fontWeight:700,color:pick==='white'?'#1a56db':'#42465a',margin:'14px 0 6px'}}>
