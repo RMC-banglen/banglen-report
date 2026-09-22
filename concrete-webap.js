@@ -89,7 +89,8 @@ function doPost(e) {
       row:        newRow
     });
 
-    sortSheet(sh);
+    // เรียงพลาดไม่ควรทำให้การบันทึกล้มทั้งรายการ ข้อมูลลงชีทไปแล้ว
+    try { sortSheet(sh); } catch (sortErr) { Logger.log('sortSheet error: ' + sortErr.message); }
 
     // ส่งแถวใหม่เข้า Supabase ทันที แดชบอร์ดจะเห็นโดยไม่ต้องกด Sync เอง
     try {
@@ -147,9 +148,8 @@ function normalizeDates(sh) {
 // ต้องเรียงทั้งความกว้างที่ใช้จริง เพราะคอลัมน์ M เก็บธงกันแจ้งเตือนซ้ำของแต่ละแถว
 // ถ้าเรียงแค่บางคอลัมน์ ธงจะค้างอยู่กับแถวเดิมแล้วผิดแถวทันที
 function sortSheet(sh) {
-  try {
     var last = sh.getLastRow(), width = sh.getLastColumn();
-    if (last < 3) return;
+    if (last < 3) return 0;
     normalizeDates(sh);
 
     // เรียงเองในโค้ดแทนการใช้ Range.sort ของ Sheets
@@ -167,17 +167,24 @@ function sortSheet(sh) {
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
     rng.setValues(v);
-  } catch (err) {
-    Logger.log('sortSheet error: ' + err.message);
-  }
+    return v.length;
 }
 
 // เรียงชีทจากเมนู + เติมคอลัมน์เดือนที่ยังว่าง (ใช้กับข้อมูลเก่า)
+// ไม่กลืน error — ถ้าพังต้องเห็นบนหน้าจอ ไม่ใช่เงียบแล้วนึกว่าสำเร็จ
 function sortSheetNow() {
-  var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
-  sortSheet(sh);
-  var n = fillMonthColumn(sh);
-  try { SpreadsheetApp.getUi().alert('เรียงตามวันที่เก็บตัวอย่างแล้ว\nเติมคอลัมน์เดือนเพิ่ม ' + n + ' แถว'); } catch (e) {}
+  var msg;
+  try {
+    var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+    var sorted = sortSheet(sh);
+    var filled = fillMonthColumn(sh);
+    msg = 'เรียงเสร็จแล้ว [v3]\n'
+        + '• เรียง ' + sorted + ' แถว\n'
+        + '• เติมคอลัมน์เดือน ' + filled + ' แถว';
+  } catch (err) {
+    msg = '❌ ไม่สำเร็จ\n' + err.message;
+  }
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
 }
 
 // เติมคอลัมน์ "เดือน" (คอลัมน์ L) จากวันที่เก็บตัวอย่าง เฉพาะแถวที่ยังว่าง
