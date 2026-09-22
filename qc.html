@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22';
+var APP_VERSION='2026-09-22b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -261,11 +261,12 @@ function PickForm({me,onPick}){
         <div style={{fontSize:19,fontWeight:800,color:'var(--brand)'}}>บันทึกผลทดสอบทราย/หิน</div>
         <div className="hint" style={{marginTop:3}}>ทดสอบขนาดคละทราย FM และหิน ASTM C33</div>
       </a>
-      <button onClick={()=>{try{localStorage.removeItem('qc_user');}catch(e){} location.href=location.pathname;}}
-        style={{width:'100%',marginTop:14,padding:'10px',border:'none',background:'none',
-          color:'var(--muted)',fontSize:13.5,cursor:'pointer',fontFamily:'inherit'}}>
-        เปลี่ยนชื่อผู้ตรวจ
-      </button>
+      {/* ไม่มีปุ่มเปลี่ยนชื่อผู้ตรวจแล้ว — ชื่อในผลตรวจต้องเป็นคนที่ตรวจจริง
+          ถ้าเครื่องไหนติดชื่อผิด ให้เปิดลิงก์ ?u= ของคนนั้นทับ เดี๋ยวชื่อเปลี่ยนตาม */}
+      <div className="hint" style={{textAlign:'center',marginTop:16,lineHeight:1.7}}>
+        ลงชื่อเป็น <b>{me.name}</b> — ผลตรวจจะบันทึกในชื่อนี้<br/>
+        ถ้าไม่ใช่คุณ ให้เปิดลิงก์ของตัวเอง
+      </div>
     </div>
   </>;
 }
