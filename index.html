@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22';
+var APP_VERSION='2026-09-22b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4818,6 +4818,7 @@ window.__dataReady.then(data => {
       <CementSavingSection canEdit={canEdit}/>
       <SandFMSection canEdit={canEdit}/>
       <SandSiltSection canEdit={canEdit}/>
+      <SandOrganicSection canEdit={canEdit}/>
       <StoneGradationSection canEdit={canEdit}/>
     </div>;
   }
@@ -5440,6 +5441,152 @@ window.__dataReady.then(data => {
     bottle:{label:'เขย่าขวด',unit:'โดยปริมาตร',color:'#1a56db'},
     wash:  {label:'ล้างตะแกรง #200',unit:'โดยน้ำหนัก',color:'#0f766e'},
   };
+
+  // สารอินทรีย์ในทราย (ASTM C40) — อ่านสีน้ำจากรูปที่ปรับสมดุลขาวแล้ว
+  // ใช้เฝ้าดูแนวโน้ม ไม่ใช่ตัดสินตามมาตรฐาน เพราะการอ่านสีจากภาพไม่แม่นพอ
+  function SandOrganicSection({canEdit}){
+    const db=DB;
+    const [tests,setTests]=useState([]);
+    const [warn,setWarn]=useState(35);
+    const [draft,setDraft]=useState('35');
+    const [loading,setLoading]=useState(true);
+    const [missing,setMissing]=useState(false);
+    const [msg,setMsg]=useState('');
+
+    const load=()=>{
+      Promise.all([
+        db.from('sand_organic_tests').select('*').order('test_date',{ascending:false}).order('id',{ascending:false}).limit(200),
+        db.from('sand_silt_spec').select('organic_warn_index').eq('id',1).limit(1),
+      ]).then(([t,s])=>{
+        if(t.error){setMissing(true);setLoading(false);return;}
+        setMissing(false);setTests(t.data||[]);
+        const w=(s&&s.data&&s.data.length&&s.data[0].organic_warn_index!=null)?Number(s.data[0].organic_warn_index):35;
+        setWarn(w);setDraft(String(w));setLoading(false);
+      }).catch(()=>{setMissing(true);setLoading(false);});
+    };
+    useEffect(load,[]);
+
+    const thDate=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return Number(p[2])+'/'+Number(p[1])+'/'+(Number(p[0])+543);};
+    const saveWarn=()=>{
+      if(!canEdit)return;
+      const v=Number(draft);
+      if(!isFinite(v)||v<0){setMsg('❌ ต้องเป็นตัวเลขไม่ติดลบ');return;}
+      db.from('sand_silt_spec').upsert([{id:1,organic_warn_index:v,updated_at:new Date().toISOString()}])
+        .then(({error})=>{if(error){setMsg('❌ '+error.message);return;}setMsg('✅ บันทึกแล้ว');load();});
+    };
+    const del=t=>{
+      if(!canEdit)return;
+      if(!window.confirm('ลบผลทดสอบวันที่ '+thDate(t.test_date)+' ?'))return;
+      db.from('sand_organic_tests').delete().eq('id',t.id).then(load);
+    };
+
+    const inp={padding:'8px 10px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:15,fontFamily:'inherit'};
+    const btn=(bg,fg)=>({padding:'9px 18px',borderRadius:8,border:'none',background:bg,color:fg,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'});
+    const th2={padding:'9px 11px',fontSize:13,fontWeight:700,color:'#5f6470',borderBottom:'1px solid #e6e8ee'};
+    const td2={padding:'9px 11px',fontSize:14,borderBottom:'1px solid #f0f1f5'};
+    const swatch=t=>({display:'inline-block',width:38,height:22,borderRadius:5,border:'1px solid #d6d8e0',
+      background:`rgb(${t.color_r||255},${t.color_g||255},${t.color_b||255})`,verticalAlign:'middle'});
+
+    const latest=tests[0];
+    const latestIdx=latest&&latest.color_index!=null?Number(latest.color_index):null;
+    const over=latestIdx!=null&&latestIdx>warn;
+    const chrono=[...tests].reverse();
+
+    return <>
+    <ChartCard span="wide"
+      title="สารอินทรีย์ในทราย (ASTM C40 — เทียบสี)"
+      subtitle={`ดัชนีความเข้มของสีน้ำหลังแช่ NaOH 24 ชม. • เตือนเมื่อเกิน ${warn}`}>
+      {missing
+        ? <div style={{padding:20,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.9}}>
+            ⚠️ ยังไม่ได้สร้างตาราง — ให้แอดมินรันไฟล์ <b>supabase-sand-organic.sql</b> ใน Supabase ก่อน
+          </div>
+        : loading? <div style={{padding:24,color:'#888'}}>กำลังโหลด…</div>
+        : <>
+          {msg&&<div style={{marginBottom:12,fontSize:14,fontWeight:600}}>{msg}</div>}
+
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
+            <div style={{flex:'1 1 200px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px',
+              background:latestIdx==null?'#fff':over?'#fdf2f2':'#f2fbf6'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ผลล่าสุด</div>
+              <div style={{fontSize:32,fontWeight:800,lineHeight:1.1,color:latestIdx==null?'#8b91a1':over?'#d13438':'#059669'}}>
+                {latestIdx!=null?latestIdx:'–'}
+              </div>
+              {latest&&<div style={{margin:'6px 0'}}><span style={swatch(latest)}/></div>}
+              <div style={{fontSize:13,fontWeight:600,color:over?'#d13438':'#059669'}}>
+                {latestIdx==null?'ยังไม่มีผลทดสอบ':over?`เข้มกว่าที่ตั้งเตือนไว้ (${warn})`:'อยู่ในช่วงปกติ'}
+              </div>
+              {latest&&<div style={{fontSize:12.5,color:'#8b91a1',marginTop:6}}>
+                {thDate(latest.test_date)}{latest.sand_source?' · '+latest.sand_source:''}
+              </div>}
+            </div>
+            <div style={{flex:'1 1 320px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
+              <div style={{fontSize:13,color:'#5f6470',marginBottom:8}}>เกณฑ์เตือน (ตั้งเอง)</div>
+              {canEdit
+                ? <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                    <input type="number" step="1" value={draft} onChange={e=>setDraft(e.target.value)} style={{...inp,width:90}}/>
+                    <button style={btn('#0f766e','#fff')} onClick={saveWarn}>บันทึก</button>
+                  </div>
+                : <div style={{fontSize:28,fontWeight:800,color:'#22252e'}}>{warn}</div>}
+              <div style={{fontSize:12.5,color:'#8b91a1',marginTop:10,lineHeight:1.7}}>
+                ดัชนี 0 = น้ำใส · ยิ่งสูงยิ่งเหลืองเข้มถึงน้ำตาล
+                ค่านี้ไม่ใช่เกณฑ์ตามมาตรฐาน เป็นเส้นเตือนที่โรงงานตั้งเองจากค่าที่วัดได้ปกติ
+                ถ้าเกินควรตรวจซ้ำด้วยแผ่นเทียบสีจริงก่อนตัดสินว่าทรายใช้ไม่ได้
+              </div>
+            </div>
+          </div>
+
+          {tests.length===0
+            ? <div style={{padding:24,color:'#888',fontSize:15}}>ยังไม่มีข้อมูล — บันทึกได้จากแอปมือถือ เมนู “บันทึกผลทดสอบทราย/หิน” แท็บ 🧪 สารอินทรีย์</div>
+            : <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{background:'#f4f6fa'}}>
+                    <th style={{...th2,textAlign:'left'}}>วันที่</th>
+                    <th style={{...th2,textAlign:'left'}}>แหล่งทราย</th>
+                    <th style={{...th2,textAlign:'left'}}>สี</th>
+                    <th style={{...th2,textAlign:'right'}}>ดัชนี</th>
+                    <th style={{...th2,textAlign:'left'}}>ผล</th>
+                    <th style={{...th2,textAlign:'left'}}>รูป</th>
+                    <th style={{...th2,textAlign:'left'}}>หมายเหตุ</th>
+                    {canEdit&&<th style={th2}></th>}
+                  </tr></thead>
+                  <tbody>
+                    {tests.map(t=>{
+                      const v=t.color_index!=null?Number(t.color_index):null;
+                      const bad=v!=null&&v>warn;
+                      return <tr key={t.id}>
+                        <td style={td2}>{thDate(t.test_date)}</td>
+                        <td style={td2}>{t.sand_source||'–'}</td>
+                        <td style={td2}><span style={swatch(t)}/></td>
+                        <td style={{...td2,textAlign:'right',fontWeight:700}}>{v!=null?v:'–'}</td>
+                        <td style={{...td2,color:bad?'#d13438':'#059669',fontWeight:700}}>{v==null?'–':bad?'เข้มผิดปกติ':'ปกติ'}</td>
+                        {/* ไม่โหลดรูปมาแสดงในตาราง เปิดดูเมื่อกดเท่านั้น จะได้ไม่กินเน็ต */}
+                        <td style={td2}>{t.image_url
+                          ? <a href={t.image_url} target="_blank" rel="noreferrer" style={{color:'#1a56db',fontSize:13}}>เปิดรูป</a>
+                          : <span style={{color:'#b9bec9',fontSize:13}}>–</span>}</td>
+                        <td style={{...td2,color:'#6b7280'}}>{t.note||''}</td>
+                        {canEdit&&<td style={td2}>
+                          <button onClick={()=>del(t)} style={{border:'1px solid #fca5a5',background:'#fff',color:'#d13438',
+                            borderRadius:7,padding:'4px 10px',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>ลบ</button>
+                        </td>}
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>}
+        </>}
+    </ChartCard>
+
+    {!missing&&chrono.length>1&&<ChartCard span="wide" title="แนวโน้มสารอินทรีย์ในทราย"
+      subtitle={`เส้นประ = เส้นเตือนที่ตั้งไว้ ${warn} • จุดแดง = ครั้งที่เข้มผิดปกติ`}>
+      <LineChart
+        categories={chrono.map(t=>String(t.test_date).slice(5,10))}
+        unit="" decimals={1} showValues boxedLabels dangerAbove={warn}
+        series={[{label:'ดัชนีสี',color:'#b45309',data:chrono.map(t=>t.color_index!=null?Number(t.color_index):null)}]}
+        targets={[{value:warn,color:'#d13438',label:'เส้นเตือน'}]}
+        height={280} padRight={130}/>
+    </ChartCard>}
+    </>;
+  }
 
   // ปริมาณฝุ่นในทราย วิธีเขย่าขวด — % ฝุ่น = ชั้นฝุ่น ÷ (ชั้นฝุ่น + ชั้นทราย)
   function SandSiltSection({canEdit}){
