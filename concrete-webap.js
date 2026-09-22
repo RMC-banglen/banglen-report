@@ -77,6 +77,7 @@ function doPost(e) {
     ]]);
 
     // ผลไม่ผ่านเกณฑ์ → แจ้งเตือน Telegram ทันทีที่บันทึก
+    // ต้องทำก่อนเรียงชีท เพราะใช้เลขแถวไปเขียนธงกันแจ้งซ้ำ
     notifyIfBelowTarget({
       sampleDate: sampleDate,
       testDate:   testDate,
@@ -85,6 +86,8 @@ function doPost(e) {
       ksc:        data.avg_ksc,
       row:        newRow
     });
+
+    sortSheet(sh);
 
     // ส่งแถวใหม่เข้า Supabase ทันที แดชบอร์ดจะเห็นโดยไม่ต้องกด Sync เอง
     try {
@@ -110,6 +113,44 @@ function doPost(e) {
   } catch (err) {
     return respond(false, err.message);
   }
+}
+
+// เรียงชีทตามวันที่เก็บตัวอย่าง แล้วตามอายุ
+// ต้องเรียงทั้งความกว้างที่ใช้จริง เพราะคอลัมน์ M เก็บธงกันแจ้งเตือนซ้ำของแต่ละแถว
+// ถ้าเรียงแค่บางคอลัมน์ ธงจะค้างอยู่กับแถวเดิมแล้วผิดแถวทันที
+function sortSheet(sh) {
+  try {
+    var last = sh.getLastRow();
+    if (last < 3) return;
+    sh.getRange(2, 1, last - 1, sh.getLastColumn())
+      .sort([{ column: 1, ascending: true }, { column: 3, ascending: true }]);
+  } catch (err) {
+    Logger.log('sortSheet error: ' + err.message);
+  }
+}
+
+// เรียงชีทจากเมนู (ใช้กับข้อมูลเก่าที่ยังไม่ได้เรียง)
+function sortSheetNow() {
+  var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  sortSheet(sh);
+  try { SpreadsheetApp.getUi().alert('เรียงตามวันที่เก็บตัวอย่างแล้ว'); } catch (e) {}
+}
+
+// ตั้ง/ยกเลิกซิงก์อัตโนมัติ — กันกรณีแก้ข้อมูลในชีทเองแล้วลืมกดซิงก์
+function installAutoSync() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'syncConcrete') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('syncConcrete').timeBased().everyHours(4).create();
+  try { SpreadsheetApp.getUi().alert('ตั้งซิงก์อัตโนมัติทุก 4 ชั่วโมงแล้ว\n(การบันทึกจากแอปยังซิงก์ทันทีเหมือนเดิม)'); } catch (e) {}
+}
+
+function removeAutoSync() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'syncConcrete') { ScriptApp.deleteTrigger(t); n++; }
+  });
+  try { SpreadsheetApp.getUi().alert('ยกเลิกซิงก์อัตโนมัติแล้ว (' + n + ' ตัว)'); } catch (e) {}
 }
 
 function doGet(e) {
@@ -253,6 +294,10 @@ function onOpen() {
   ui.createMenu('Sync Dashboard')
     .addItem('Sync ทันที', 'syncConcrete')
     .addItem('ดู Log', 'viewLog')
+    .addSeparator()
+    .addItem('เรียงชีทตามวันที่', 'sortSheetNow')
+    .addItem('ตั้งซิงก์อัตโนมัติทุก 4 ชม.', 'installAutoSync')
+    .addItem('ยกเลิกซิงก์อัตโนมัติ', 'removeAutoSync')
     .addToUi();
 
   ui.createMenu('🚨 แจ้งเตือนผลลูกปูน')
