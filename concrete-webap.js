@@ -62,9 +62,10 @@ function doPost(e) {
     }
 
     var newRow = lastRow + 1;
+    // เขียนเป็นวันที่จริง ไม่ใช่ข้อความ ไม่งั้นคอลัมน์จะมี 2 ชนิดปนกันแล้วเรียงเพี้ยน
     sh.getRange(newRow, 1, 1, 12).setValues([[
-      sampleDate,
-      testDate,
+      toDate(sampleDate),
+      toDate(testDate),
       ageDays,
       formulaName,
       cubeSize,
@@ -116,6 +117,32 @@ function doPost(e) {
   }
 }
 
+// '2026-09-20' → Date จริง (ถ้าแปลงไม่ได้คืนค่าเดิม)
+function toDate(v) {
+  if (v instanceof Date) return v;
+  var m = String(v == null ? '' : v).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : v;
+}
+
+// คอลัมน์วันที่มีทั้งข้อความและวันที่จริงปนกัน ทำให้ Sheets แยกเรียงคนละกลุ่ม
+// แปลงให้เป็นวันที่จริงทั้งหมดก่อน การเรียงถึงจะถูกต้อง
+function normalizeDates(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return 0;
+  var rng = sh.getRange(2, 1, last - 1, 2);
+  var v = rng.getValues();
+  var n = 0;
+  for (var i = 0; i < v.length; i++) {
+    for (var c = 0; c < 2; c++) {
+      if (!v[i][c] || v[i][c] instanceof Date) continue;
+      var d = toDate(v[i][c]);
+      if (d instanceof Date) { v[i][c] = d; n++; }
+    }
+  }
+  if (n) rng.setValues(v);
+  return n;
+}
+
 // เรียงชีทตามวันที่เก็บตัวอย่าง แล้วตามอายุ
 // ต้องเรียงทั้งความกว้างที่ใช้จริง เพราะคอลัมน์ M เก็บธงกันแจ้งเตือนซ้ำของแต่ละแถว
 // ถ้าเรียงแค่บางคอลัมน์ ธงจะค้างอยู่กับแถวเดิมแล้วผิดแถวทันที
@@ -123,6 +150,7 @@ function sortSheet(sh) {
   try {
     var last = sh.getLastRow();
     if (last < 3) return;
+    normalizeDates(sh);
     sh.getRange(2, 1, last - 1, sh.getLastColumn())
       .sort([{ column: 1, ascending: true }, { column: 3, ascending: true }]);
   } catch (err) {
