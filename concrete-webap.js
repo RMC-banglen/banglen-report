@@ -62,7 +62,7 @@ function doPost(e) {
     }
 
     var newRow = lastRow + 1;
-    sh.getRange(newRow, 1, 1, 11).setValues([[
+    sh.getRange(newRow, 1, 1, 12).setValues([[
       sampleDate,
       testDate,
       ageDays,
@@ -73,7 +73,8 @@ function doPost(e) {
       r3,
       data.avg_kn,
       data.avg_mpa,
-      data.avg_ksc
+      data.avg_ksc,
+      String(fmtDate(sampleDate) || '').slice(0, 7)   // คอลัมน์ "เดือน" ใช้กรองตามเดือน
     ]]);
 
     // ผลไม่ผ่านเกณฑ์ → แจ้งเตือน Telegram ทันทีที่บันทึก
@@ -129,11 +130,29 @@ function sortSheet(sh) {
   }
 }
 
-// เรียงชีทจากเมนู (ใช้กับข้อมูลเก่าที่ยังไม่ได้เรียง)
+// เรียงชีทจากเมนู + เติมคอลัมน์เดือนที่ยังว่าง (ใช้กับข้อมูลเก่า)
 function sortSheetNow() {
   var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
   sortSheet(sh);
-  try { SpreadsheetApp.getUi().alert('เรียงตามวันที่เก็บตัวอย่างแล้ว'); } catch (e) {}
+  var n = fillMonthColumn(sh);
+  try { SpreadsheetApp.getUi().alert('เรียงตามวันที่เก็บตัวอย่างแล้ว\nเติมคอลัมน์เดือนเพิ่ม ' + n + ' แถว'); } catch (e) {}
+}
+
+// เติมคอลัมน์ "เดือน" (คอลัมน์ L) จากวันที่เก็บตัวอย่าง เฉพาะแถวที่ยังว่าง
+function fillMonthColumn(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return 0;
+  var a = sh.getRange(2, 1, last - 1, 1).getValues();     // วันที่เก็บตัวอย่าง
+  var l = sh.getRange(2, 12, last - 1, 1).getValues();    // เดือน
+  var n = 0;
+  for (var i = 0; i < a.length; i++) {
+    if (!a[i][0]) continue;
+    if (String(l[i][0] || '').trim() !== '') continue;
+    var ym = String(fmtDate(a[i][0]) || '').slice(0, 7);
+    if (ym) { l[i][0] = ym; n++; }
+  }
+  if (n) sh.getRange(2, 12, last - 1, 1).setValues(l);
+  return n;
 }
 
 // ตั้ง/ยกเลิกซิงก์อัตโนมัติ — กันกรณีแก้ข้อมูลในชีทเองแล้วลืมกดซิงก์
@@ -307,27 +326,31 @@ function onOpen() {
     .addItem('ทดสอบเตือน QC แพค้างตรวจ', 'qcTestAlertNow')
     .addToUi();
 
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sh = ss.getSheetByName(SHEET_NAME);
+  // onOpen เป็น simple trigger สิทธิ์จำกัด เรียก openById ไม่ได้ (จะโยน error แล้วเมนูที่เหลือไม่ขึ้น)
+  // ใช้ชีทที่เปิดอยู่แทน และครอบ try ไว้ เผื่ออ่านข้อมูลไม่ได้ก็ยังได้เมนูพื้นฐาน
   var menu = ui.createMenu('เลือกเดือน');
-
-  if (sh && sh.getLastRow() > 1) {
-    var dates = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
-    var months = {};
-    dates.forEach(function(r) {
-      var d = r[0];
-      var ym = d instanceof Date
-        ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM')
-        : String(d).slice(0, 7);
-      if (ym && ym.length === 7) months[ym] = true;
-    });
-    var sortedMonths = Object.keys(months).sort().reverse();
-    sortedMonths.forEach(function(ym) {
-      var parts = ym.split('-');
-      var be = Number(parts[0]) + 543;
-      var label = 'เดือน ' + parts[1] + '/' + String(be).slice(2) + '  (' + ym + ')';
-      menu.addItem(label, 'showMonth_' + ym.replace('-', '_'));
-    });
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (sh && sh.getLastRow() > 1) {
+      var dates = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+      var months = {};
+      dates.forEach(function(r) {
+        var d = r[0];
+        var ym = d instanceof Date
+          ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM')
+          : String(d).slice(0, 7);
+        if (ym && /^\d{4}-\d{2}$/.test(ym)) months[ym] = true;
+      });
+      Object.keys(months).sort().reverse().forEach(function(ym) {
+        var fn = 'showMonth_' + ym.replace('-', '_');
+        if (!MONTH_FNS[fn]) return;   // ไม่มีฟังก์ชันรองรับก็ข้าม กันกดแล้ว error
+        var parts = ym.split('-');
+        var be = Number(parts[0]) + 543;
+        menu.addItem('เดือน ' + parts[1] + '/' + String(be).slice(2) + '  (' + ym + ')', fn);
+      });
+    }
+  } catch (err) {
+    Logger.log('onOpen month menu error: ' + err.message);
   }
 
   menu.addSeparator();
@@ -335,6 +358,15 @@ function onOpen() {
   menu.addItem('แค่เดือนล่าสุด', 'showLatestMonthOnly');
   menu.addToUi();
 }
+
+// รายชื่อฟังก์ชันเลือกเดือนที่มีจริงด้านล่าง — ใช้กันเมนูชี้ไปฟังก์ชันที่ไม่มี (กดแล้ว error)
+// ถ้าเพิ่มปีใหม่ ต้องเพิ่มทั้งฟังก์ชันและรายชื่อในนี้ให้ตรงกัน
+var MONTH_FNS = {};
+['2026','2027'].forEach(function (y) {
+  ['01','02','03','04','05','06','07','08','09','10','11','12'].forEach(function (m) {
+    MONTH_FNS['showMonth_' + y + '_' + m] = true;
+  });
+});
 
 function handleMonthMenu(ym) {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -358,6 +390,7 @@ function showAllRows() {
   try { SpreadsheetApp.getUi().alert('แสดงทั้งหมดแล้ว'); } catch(e) {}
 }
 
+function showMonth_2026_01(){handleMonthMenu('2026-01');}
 function showMonth_2026_02(){handleMonthMenu('2026-02');}
 function showMonth_2026_03(){handleMonthMenu('2026-03');}
 function showMonth_2026_04(){handleMonthMenu('2026-04');}
@@ -369,6 +402,18 @@ function showMonth_2026_09(){handleMonthMenu('2026-09');}
 function showMonth_2026_10(){handleMonthMenu('2026-10');}
 function showMonth_2026_11(){handleMonthMenu('2026-11');}
 function showMonth_2026_12(){handleMonthMenu('2026-12');}
+function showMonth_2027_01(){handleMonthMenu('2027-01');}
+function showMonth_2027_02(){handleMonthMenu('2027-02');}
+function showMonth_2027_03(){handleMonthMenu('2027-03');}
+function showMonth_2027_04(){handleMonthMenu('2027-04');}
+function showMonth_2027_05(){handleMonthMenu('2027-05');}
+function showMonth_2027_06(){handleMonthMenu('2027-06');}
+function showMonth_2027_07(){handleMonthMenu('2027-07');}
+function showMonth_2027_08(){handleMonthMenu('2027-08');}
+function showMonth_2027_09(){handleMonthMenu('2027-09');}
+function showMonth_2027_10(){handleMonthMenu('2027-10');}
+function showMonth_2027_11(){handleMonthMenu('2027-11');}
+function showMonth_2027_12(){handleMonthMenu('2027-12');}
 
 function showLatestMonthOnly() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
