@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22e';
+var APP_VERSION='2026-09-22f';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -462,7 +462,7 @@ window.__dataReady = (async function loadData() {
      Charts — SVG primitives
      ============================================================ -->
 <script type="text/babel">
-const { useState, useRef, useEffect, useLayoutEffect } = React;
+const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
 
 const PALETTE = {
   produced:'#2f5fd0', order:'#9fb4dd', transport:'#15a39b', stock:'#d98a2b',
