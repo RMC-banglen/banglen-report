@@ -148,11 +148,25 @@ function normalizeDates(sh) {
 // ถ้าเรียงแค่บางคอลัมน์ ธงจะค้างอยู่กับแถวเดิมแล้วผิดแถวทันที
 function sortSheet(sh) {
   try {
-    var last = sh.getLastRow();
+    var last = sh.getLastRow(), width = sh.getLastColumn();
     if (last < 3) return;
     normalizeDates(sh);
-    sh.getRange(2, 1, last - 1, sh.getLastColumn())
-      .sort([{ column: 1, ascending: true }, { column: 3, ascending: true }]);
+
+    // เรียงเองในโค้ดแทนการใช้ Range.sort ของ Sheets
+    // เพราะ Sheets แยกเรียงตามชนิดข้อมูล (ข้อความ/วันที่/ตัวเลข) ทำให้ได้ 2 กลุ่มที่ต่อกันผิด
+    var rng = sh.getRange(2, 1, last - 1, width);
+    var v = rng.getValues();
+    var keyOf = function (r) {
+      var d = fmtDate(r[0]) || '9999-99-99';           // แถวที่ไม่มีวันที่ไปอยู่ท้ายสุด
+      var age = String(Number(r[2]) || 0);
+      while (age.length < 3) age = '0' + age;
+      return d + '|' + age;
+    };
+    v.sort(function (a, b) {
+      var ka = keyOf(a), kb = keyOf(b);
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+    rng.setValues(v);
   } catch (err) {
     Logger.log('sortSheet error: ' + err.message);
   }
