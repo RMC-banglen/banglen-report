@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22b';
+var APP_VERSION='2026-09-22c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -427,6 +427,127 @@ function OrganicForm(){
       <button className="bigbtn blue" disabled={saving} onClick={save}>
         {saving?'กำลังบันทึก…':'บันทึกผลทดสอบ'}
       </button>
+
+      <OrganicCalib warn={warn} onSaved={setWarn}/>
+    </div>
+  );
+}
+
+// ตั้งเกณฑ์จากแผ่นเทียบสี Gardner ของโรงงานเอง
+// ทำครั้งเดียวพอ — ถ่ายแผ่นคู่กับกระดาษขาว แตะช่อง No.3 แล้วเก็บดัชนีไว้เป็นเกณฑ์
+// ได้แบบนี้เกณฑ์จะตรงมาตรฐานจริง ไม่ใช่เลขที่เดาไว้
+function OrganicCalib({warn,onSaved}){
+  const[open,setOpen]=useState(false);
+  const[img,setImg]=useState(null);
+  const[white,setWhite]=useState(null);
+  const[glass,setGlass]=useState(null);
+  const[pick,setPick]=useState('white');
+  const[saving,setSaving]=useState(false);
+  const[msg,setMsg]=useState('');
+  const cv=useRef(null);
+
+  const onPick=e=>{
+    const file=e.target.files&&e.target.files[0]; if(!file)return;
+    const im=new Image(), u=URL.createObjectURL(file);
+    im.onload=()=>{
+      URL.revokeObjectURL(u);
+      const MAX=640, s=Math.min(1,MAX/Math.max(im.width,im.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(im.width*s); c.height=Math.round(im.height*s);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      setImg(c.toDataURL('image/jpeg',0.7));
+      setWhite(null);setGlass(null);setPick('white');setMsg('');
+    };
+    im.src=u;
+  };
+
+  useEffect(()=>{
+    if(!img||!cv.current)return;
+    const im=new Image();
+    im.onload=()=>{const c=cv.current;c.width=im.width;c.height=im.height;c.getContext('2d').drawImage(im,0,0);};
+    im.src=img;
+  },[img]);
+
+  const sample=e=>{
+    const c=cv.current; if(!c)return;
+    const r=c.getBoundingClientRect();
+    const t=e.touches&&e.touches[0]?e.touches[0]:e;
+    const x=Math.round((t.clientX-r.left)/r.width*c.width);
+    const y=Math.round((t.clientY-r.top)/r.height*c.height);
+    const g=c.getContext('2d');
+    let R=0,G=0,B=0,n=0;
+    for(let dx=-4;dx<=4;dx++)for(let dy=-4;dy<=4;dy++){
+      const px=x+dx,py=y+dy;
+      if(px<0||py<0||px>=c.width||py>=c.height)continue;
+      const d=g.getImageData(px,py,1,1).data;
+      R+=d[0];G+=d[1];B+=d[2];n++;
+    }
+    if(!n)return;
+    const col={r:Math.round(R/n),g:Math.round(G/n),b:Math.round(B/n)};
+    if(pick==='white'){setWhite(col);setPick('glass');}else setGlass(col);
+  };
+
+  // คิดดัชนีด้วยสูตรเดียวกับตอนอ่านน้ำในขวด เกณฑ์กับผลจึงเทียบกันได้ตรง
+  const idx=(()=>{
+    if(!white||!glass)return null;
+    const k=v=>Math.max(1,v);
+    const r=Math.min(255,Math.round(glass.r/k(white.r)*255));
+    const b=Math.min(255,Math.round(glass.b/k(white.b)*255));
+    return Math.max(0,Math.min(100,Math.round((1-b/Math.max(1,r))*1000)/10));
+  })();
+
+  const save=async()=>{
+    if(idx==null)return;
+    setSaving(true);setMsg('');
+    const{error}=await SB.from('sand_silt_spec').update({organic_warn_index:idx}).eq('id',1);
+    setSaving(false);
+    if(error){setMsg('บันทึกไม่สำเร็จ: '+error.message);return;}
+    onSaved(idx);
+    setMsg('ตั้งเกณฑ์เป็น '+idx+' แล้ว — ตรงตาม ASTM C40 (Plate No. 3)');
+  };
+
+  const sw=c=>({display:'inline-block',width:26,height:26,borderRadius:6,verticalAlign:'middle',
+    border:'1.5px solid #d6d8e0',background:c?`rgb(${c.r},${c.g},${c.b})`:'#fff'});
+
+  return(
+    <div className="card">
+      <button className="ghost" style={{marginTop:0}} onClick={()=>setOpen(!open)}>
+        {open?'▲ ปิด':'⚙️ ตั้งเกณฑ์จากแผ่นเทียบสีมาตรฐาน'}
+      </button>
+      {open&&<div style={{marginTop:14}}>
+        <div style={{fontSize:13,color:'#5f6470',lineHeight:1.8,marginBottom:12}}>
+          ถ้ามีแผ่นเทียบสี Gardner (ASTM C40) ให้ถ่ายรูปแผ่น <b>พร้อมกระดาษขาวในเฟรมเดียวกัน</b>
+          แล้วแตะที่ช่องสี <b>No. 3</b> ซึ่งเป็นเกณฑ์ตัดสินตามมาตรฐาน
+          ระบบจะอ่านค่าไปตั้งเป็นเกณฑ์เตือนให้ ทำครั้งเดียวพอ<br/>
+          <span style={{color:'#8b91a1'}}>ต้องเป็นแผ่นจริงของโรงงานที่ถ่ายเอง ใช้รูปจากอินเทอร์เน็ตไม่ได้ เพราะสีเพี้ยนไปแล้ว</span>
+        </div>
+        <input type="file" accept="image/*" capture="environment" onChange={onPick}
+          style={{width:'100%',padding:12,border:'1.5px dashed #94afd4',borderRadius:10,background:'#f7faff'}}/>
+        {img&&<>
+          <div style={{fontSize:13.5,fontWeight:700,color:pick==='white'?'#1a56db':'#42465a',margin:'14px 0 6px'}}>
+            {pick==='white'?'① แตะที่กระดาษขาว':'② แตะที่ช่องสี No. 3'}
+          </div>
+          <canvas ref={cv} onClick={sample}
+            style={{width:'100%',borderRadius:10,border:'1.5px solid #d6d8e0',cursor:'crosshair',display:'block'}}/>
+          <div style={{display:'flex',gap:16,alignItems:'center',marginTop:10,fontSize:13.5,flexWrap:'wrap'}}>
+            <span><span style={sw(white)}/> กระดาษขาว</span>
+            <span><span style={sw(glass)}/> ช่อง No. 3</span>
+            <button className="ghost" style={{width:'auto',padding:'6px 14px',marginTop:0,fontSize:13}}
+              onClick={()=>{setWhite(null);setGlass(null);setPick('white');}}>เลือกใหม่</button>
+          </div>
+        </>}
+        {idx!=null&&<div style={{marginTop:14,padding:'14px 16px',borderRadius:12,textAlign:'center',
+          background:'#f7faff',border:'1.5px solid #cbd9f0'}}>
+          <div style={{fontSize:13,color:'#5f6470'}}>ดัชนีของช่อง No. 3 (เกณฑ์ใหม่)</div>
+          <div style={{fontSize:30,fontWeight:800,color:'#1a56db'}}>{idx}</div>
+          <div style={{fontSize:12,color:'#8b91a1',marginTop:4}}>เกณฑ์ที่ใช้อยู่ตอนนี้ {warn}</div>
+          <button className="bigbtn" style={{marginTop:12}} disabled={saving} onClick={save}>
+            {saving?'กำลังบันทึก…':'ใช้ค่านี้เป็นเกณฑ์'}
+          </button>
+        </div>}
+        {msg&&<div style={{marginTop:10,fontSize:13.5,fontWeight:700,
+          color:/ไม่สำเร็จ/.test(msg)?'#d13438':'#0f766e'}}>{msg}</div>}
+      </div>}
     </div>
   );
 }
