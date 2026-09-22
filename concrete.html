@@ -262,7 +262,8 @@ function ConcreteForm({prefill,onDone,onBack}){
     const body={
       cast_date:castDate,test_date:testDate,age,
       formula:formula.trim(),cube_size:cubeSize,
-      luk1:Number(luk1)||0,luk2:Number(luk2)||0,luk3:Number(luk3)||0
+      luk1:Number(luk1)||0,luk2:Number(luk2)||0,luk3:Number(luk3)||0,
+      avg_kn:res?res.avgKN:0, avg_mpa:res?res.avgMPa:0, avg_ksc:res?res.avgKSC:0
     };
     try{
       const r=await postToGas(gasUrl,body);

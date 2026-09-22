@@ -43,6 +43,12 @@ function doPost(e) {
     var r2          = data.luk2 != null ? data.luk2 : data.result2_kn;
     var r3          = data.luk3 != null ? data.luk3 : data.result3_kn;
 
+    // ฟอร์มบันทึกใบเดียวเคยไม่ส่งค่าเฉลี่ยมา ช่องในชีทเลยว่าง — คิดเองถ้าไม่ได้รับ
+    var avg = calcAvg(r1, r2, r3, cubeSize) || {};
+    var avgKn  = data.avg_kn  != null && data.avg_kn  !== '' ? data.avg_kn  : (avg.kn  != null ? avg.kn  : '');
+    var avgMpa = data.avg_mpa != null && data.avg_mpa !== '' ? data.avg_mpa : (avg.mpa != null ? avg.mpa : '');
+    var avgKsc = data.avg_ksc != null && data.avg_ksc !== '' ? data.avg_ksc : (avg.ksc != null ? avg.ksc : '');
+
     // หาแถวสุดท้ายจาก column A จริง (ไม่นับสูตรที่ลากลงไป)
     var colA = sh.getRange('A:A').getValues();
     var lastRow = 1;
@@ -72,9 +78,9 @@ function doPost(e) {
       r1,
       r2,
       r3,
-      data.avg_kn,
-      data.avg_mpa,
-      data.avg_ksc,
+      avgKn,
+      avgMpa,
+      avgKsc,
       String(fmtDate(sampleDate) || '').slice(0, 7)   // คอลัมน์ "เดือน" ใช้กรองตามเดือน
     ]]);
 
@@ -85,7 +91,7 @@ function doPost(e) {
       testDate:   testDate,
       age:        ageDays,
       formula:    formulaName,
-      ksc:        data.avg_ksc,
+      ksc:        avgKsc,
       row:        newRow
     });
 
@@ -103,9 +109,9 @@ function doPost(e) {
         result1_kn:   Number(r1) || 0,
         result2_kn:   Number(r2) || 0,
         result3_kn:   Number(r3) || 0,
-        avg_kn:       Number(data.avg_kn)  || 0,
-        avg_mpa:      Number(data.avg_mpa) || 0,
-        avg_ksc:      Number(data.avg_ksc) || 0
+        avg_kn:       Number(avgKn)  || 0,
+        avg_mpa:      Number(avgMpa) || 0,
+        avg_ksc:      Number(avgKsc) || 0
       }]);
     } catch (syncErr) {
       Logger.log('Supabase sync error: ' + syncErr.message);
@@ -116,6 +122,19 @@ function doPost(e) {
   } catch (err) {
     return respond(false, err.message);
   }
+}
+
+// คำนวณค่าเฉลี่ยจากลูก 1-3 เอง เผื่อฝั่งที่ส่งมาไม่ได้คิดมาให้
+// ('15x15' คือหน้าตัดเป็นเซนติเมตร → 150 มม.)
+function calcAvg(r1, r2, r3, cubeSize) {
+  var v = [Number(r1) || 0, Number(r2) || 0, Number(r3) || 0].filter(function (x) { return x > 0; });
+  if (!v.length) return null;
+  var side = 150;
+  var m = String(cubeSize || '').match(/(\d+)\s*[xX×]\s*(\d+)/);
+  if (m) side = Number(m[1]) * 10;
+  var kn = v.reduce(function (a, b) { return a + b; }, 0) / v.length;
+  var mpa = kn * 1000 / (side * side);
+  return { kn: Math.round(kn * 100) / 100, mpa: Math.round(mpa * 100) / 100, ksc: Math.round(mpa * 10.197) };
 }
 
 // '2026-09-20' → Date จริง (ถ้าแปลงไม่ได้คืนค่าเดิม)
@@ -178,13 +197,34 @@ function sortSheetNow() {
     var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
     var sorted = sortSheet(sh);
     var filled = fillMonthColumn(sh);
-    msg = 'เรียงเสร็จแล้ว [v3]\n'
+    var avgs   = fillAverages(sh);
+    msg = 'เรียงเสร็จแล้ว [v4]\n'
         + '• เรียง ' + sorted + ' แถว\n'
-        + '• เติมคอลัมน์เดือน ' + filled + ' แถว';
+        + '• เติมคอลัมน์เดือน ' + filled + ' แถว\n'
+        + '• เติมค่าเฉลี่ย ' + avgs + ' แถว';
   } catch (err) {
     msg = '❌ ไม่สำเร็จ\n' + err.message;
   }
   try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
+}
+
+// เติมค่าเฉลี่ย kN/MPa/KSC (คอลัมน์ I–K) จากลูก 1-3 เฉพาะแถวที่ยังว่าง
+function fillAverages(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return 0;
+  var rng = sh.getRange(2, 5, last - 1, 7);   // E=ขนาด cube, F-H=ลูก1-3, I-K=เฉลี่ย
+  var v = rng.getValues();
+  var n = 0;
+  for (var i = 0; i < v.length; i++) {
+    var blank = String(v[i][4] || '').trim() === '' || String(v[i][5] || '').trim() === '' || String(v[i][6] || '').trim() === '';
+    if (!blank) continue;
+    var a = calcAvg(v[i][1], v[i][2], v[i][3], v[i][0]);
+    if (!a) continue;
+    v[i][4] = a.kn; v[i][5] = a.mpa; v[i][6] = a.ksc;
+    n++;
+  }
+  if (n) rng.setValues(v);
+  return n;
 }
 
 // เติมคอลัมน์ "เดือน" (คอลัมน์ L) จากวันที่เก็บตัวอย่าง เฉพาะแถวที่ยังว่าง
