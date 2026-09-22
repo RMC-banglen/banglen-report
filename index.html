@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22g';
+var APP_VERSION='2026-09-22h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5857,6 +5857,15 @@ window.__dataReady.then(data => {
   ];
   const aciGrade=cv=>ACI_GRADES.find(g=>cv<g.max);
 
+  // สัดส่วนของการแจกแจงปกติที่อยู่ต่ำกว่า z — ใช้บอกโอกาสที่ครั้งหน้าจะหลุดเกณฑ์
+  // ประมาณ erf ด้วยสูตร Abramowitz & Stegun 7.1.26 คลาดเคลื่อนไม่เกิน 1.5e-7
+  function normBelow(z){
+    const s=z<0?-1:1, x=Math.abs(z)/Math.SQRT2;
+    const t=1/(1+0.3275911*x);
+    const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
+    return 0.5*(1+s*y);
+  }
+
   // เกณฑ์ความเหวี่ยงภายในชุด (ลูก 1/2/3 ของครั้งเดียวกัน) ตาม ACI 214R-11 งานหน้างาน
   const TEST_GRADES=[
     {max:3, label:'ดีเยี่ยม', color:'#0f766e'},
@@ -5963,8 +5972,11 @@ window.__dataReady.then(data => {
         const sdv=n>1?Math.sqrt(vals.reduce((s,x)=>s+(x-mean)**2,0)/(n-1)):0;
         const cv=mean?sdv/mean*100:0;
         const tg=targetOf(f,Number(a));
-        // ACI 318: ถ้าจะให้มั่นใจว่าไม่หลุดเกณฑ์ ค่าเฉลี่ยต้องสูงกว่าเกณฑ์อยู่ 1.34 เท่าของ SD
-        const need=tg!=null?tg+1.34*sdv:null;
+        // เกณฑ์ที่โรงงานใช้เผื่อค่าไว้แล้ว จึงไม่เอาสูตร f'cr = f'c + 1.34xSD ของ ACI 318 มาทับ
+        // ใช้วิธีบอกโอกาสหลุดเกณฑ์แทน ซึ่งไม่ต้องรู้ว่าเผื่อไว้เท่าไหร่
+        const riskPct=tg!=null&&sdv>0?normBelow((tg-mean)/sdv)*100:null;
+        // อยากให้โอกาสหลุดเหลือ 10% ต้องกด SD ลงมาเท่าไหร่ (z ที่ 10% = 1.2816)
+        const sdCut=tg!=null&&mean>tg?(mean-tg)/1.2816:null;
 
         // แยกความเหวี่ยงเป็น 2 ส่วน ตาม ACI 214
         // ส่วนของการทดสอบ: SD = พิสัยเฉลี่ย / 1.693 (ค่า d2 เมื่อทดสอบครั้งละ 3 ลูก)
@@ -5983,9 +5995,8 @@ window.__dataReady.then(data => {
         // ASTM C39: 3 ลูกจากเบ้าเดียวกันไม่ควรต่างกันเกิน 8% ของค่าเฉลี่ย
         const wide=withRng.filter(x=>x.rngPct>8).sort((p,q)=>q.rngPct-p.rngPct);
 
-        return{key:k,f,a:Number(a),n,mean,sd:sdv,cv,tg,need,
+        return{key:k,f,a:Number(a),n,mean,sd:sdv,cv,tg,riskPct,sdCut,
           cvTest,cvMix,testShare,nRng:withRng.length,wide,
-          head:need!=null?mean-need:null,
           below:tg!=null?vals.filter(v=>v<tg).length:0,
           pts:arr.sort((x,y)=>x.d<y.d?-1:1)};
       }).filter(g=>g.n>=MIN_N).sort((x,y)=>x.f<y.f?-1:x.f>y.f?1:x.a-y.a);
@@ -6009,7 +6020,6 @@ window.__dataReady.then(data => {
     const cats=cur.pts.map(p=>p.d.slice(8)+'/'+p.d.slice(5,7));
     const tgts=[{value:cur.mean,color:'#059669',label:'เฉลี่ย'}];
     if(cur.tg!=null) tgts.push({value:cur.tg,color:'#d13438',label:'เกณฑ์'});
-    if(cur.need!=null) tgts.push({value:cur.need,color:'#d97706',label:'ควรทำได้'});
 
     return <>
       <ChartCard title="ความสม่ำเสมอของกำลังอัด (ACI 214)"
@@ -6027,16 +6037,17 @@ window.__dataReady.then(data => {
           </div>)}
         </div>
 
-        {cur.head!=null&&<div style={{padding:'14px 16px',borderRadius:12,marginBottom:16,lineHeight:1.8,fontSize:14,
-          background:cur.head>0?'#ecfdf5':'#fdecea',border:`1.5px solid ${cur.head>0?'#a7e3d4':'#f3b8b0'}`}}>
-          {cur.head>0
-            ?<>เฉลี่ยสูงกว่าที่จำเป็นอยู่ <b>{fmt(cur.head,0)} ksc</b> — ตาม ACI 318 ค่าเฉลี่ยควรอยู่ที่ {fmt(cur.need,0)} ksc
-              (เกณฑ์ {cur.tg} + 1.34×SD) จึงจะมั่นใจว่าไม่หลุด ตอนนี้ทำได้ {fmt(cur.mean,0)} ksc
-              <div style={{color:'#5f6470',fontSize:13,marginTop:6}}>มีช่องให้พิจารณาลดปูนได้ แต่ควรลดทีละน้อยแล้วดูว่า SD ไม่โตตาม</div></>
-            :<>เฉลี่ยต่ำกว่าที่ควรจะเป็น <b>{fmt(-cur.head,0)} ksc</b> — ด้วย SD ขนาดนี้ ค่าเฉลี่ยควรอยู่ที่ {fmt(cur.need,0)} ksc
-              จึงจะมั่นใจว่าไม่หลุดเกณฑ์ {cur.tg}
-              <div style={{color:'#5f6470',fontSize:13,marginTop:6}}>ทางแก้มี 2 ทาง คือเพิ่มกำลังอัดเฉลี่ย หรือลดความเหวี่ยง (SD) ลง</div></>}
-          {cur.below>0&&<div style={{marginTop:6}}>มีตัวที่ต่ำกว่าเกณฑ์จริง <b>{cur.below}</b> จาก {cur.n} ครั้ง ({fmt(cur.below/cur.n*100,1)}%)</div>}
+        {cur.riskPct!=null&&<div style={{padding:'14px 16px',borderRadius:12,marginBottom:16,lineHeight:1.85,fontSize:14,
+          background:cur.riskPct<=10?'#ecfdf5':cur.riskPct<=25?'#fffbeb':'#fdecea',
+          border:`1.5px solid ${cur.riskPct<=10?'#a7e3d4':cur.riskPct<=25?'#f5d98a':'#f3b8b0'}`}}>
+          <div>ด้วยค่าเฉลี่ย {fmt(cur.mean,0)} และ SD {fmt(cur.sd,1)} โอกาสที่ครั้งต่อไปจะต่ำกว่าเกณฑ์ {cur.tg}
+            {' '}อยู่ที่ราว <b>{fmt(cur.riskPct,0)}%</b> — ที่ผ่านมาหลุดจริง <b>{fmt(cur.below/cur.n*100,0)}%</b> ({cur.below} จาก {cur.n} ครั้ง)</div>
+          <div style={{color:'#5f6470',fontSize:13,marginTop:6}}>
+            {/* เกณฑ์ของโรงงานเผื่อค่าไว้แล้ว จึงไม่บวก 1.34xSD ของ ACI 318 ซ้ำอีก
+                วัดเป็นโอกาสหลุดแทน ซึ่งไม่ต้องรู้ว่าเผื่อไว้เท่าไหร่ */}
+            เกณฑ์นี้เผื่อค่าไว้แล้ว การหลุดเกณฑ์จึงยังไม่ได้แปลว่าเสาใช้ไม่ได้ ตัวเลขนี้ใช้ดูว่าคุมได้แน่นพอไหม
+            {cur.sdCut!=null&&cur.riskPct>10&&<> · ถ้าลด SD ลงเหลือ {fmt(cur.sdCut,0)} โดยค่าเฉลี่ยเท่าเดิม โอกาสหลุดจะเหลือ 10%</>}
+          </div>
         </div>}
 
         <LineChart categories={cats} unit="ksc" decimals={0} height={300} padRight={130}
@@ -6052,7 +6063,7 @@ window.__dataReady.then(data => {
           <th className="ta-l">สูตร</th><th>อายุ</th><th>ตัวอย่าง</th>
           <th>เฉลี่ย</th><th>เกณฑ์</th><th>SD</th><th>CV รวม%</th>
           <th>จากทดสอบ%</th><th>จากผสม%</th>
-          <th className="ta-l">การควบคุม</th><th>ต่ำกว่าเกณฑ์</th>
+          <th className="ta-l">การควบคุม</th><th>โอกาสหลุด</th><th>หลุดจริง</th>
         </tr></thead><tbody>
           {groups.map(g=>{const q=aciGrade(g.cv);return <tr key={g.key}
             style={{cursor:'pointer',background:g.key===cur.key?'var(--primary-wash)':undefined}}
@@ -6066,7 +6077,9 @@ window.__dataReady.then(data => {
             <td style={{color:g.cvTest!=null?testGrade(g.cvTest).color:'var(--muted-text)'}}>{g.cvTest!=null?fmt(g.cvTest,1):'–'}</td>
             <td style={{color:'var(--muted-text)'}}>{g.cvMix!=null?fmt(g.cvMix,1):'–'}</td>
             <td className="ta-l" style={{color:q.color,fontWeight:700}}>{q.label}</td>
-            <td style={{color:g.below?'#c0392b':'var(--muted-text)'}}>{g.below?`${g.below} (${fmt(g.below/g.n*100,1)}%)`:'–'}</td>
+            <td style={{color:g.riskPct==null?'var(--muted-text)':g.riskPct>25?'#c0392b':g.riskPct>10?'#d97706':'#0f766e'}}>
+              {g.riskPct!=null?fmt(g.riskPct,0)+'%':'–'}</td>
+            <td style={{color:g.below?'#c0392b':'var(--muted-text)'}}>{g.below?`${g.below} (${fmt(g.below/g.n*100,0)}%)`:'–'}</td>
           </tr>;})}
         </tbody></table>
         </div>
