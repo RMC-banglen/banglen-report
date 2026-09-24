@@ -28,9 +28,15 @@ var TG_CHAT_ID = 'ใส่_CHAT_ID_ที่นี่';
 var SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
 
-// แจ้งเตือนล่วงหน้ากี่วัน
-var WARN_DAYS       = 30;   // รอบที่นับเป็นเดือน/ปี
-var WARN_DAYS_SHORT = 3;    // รอบที่นับเป็นวัน (เช่น ทุก 7 วัน) — เตือนกระชั้นกว่า
+// แจ้งเตือนล่วงหน้ากี่วัน — คิดจากความยาวของรอบงานนั้น ๆ ประมาณ 1 ใน 4 ของรอบ
+//
+// เดิมใช้ค่าตายตัว 2 ค่า (30 วันสำหรับรอบเดือน/ปี, 3 วันสำหรับรอบวัน)
+// ปัญหาคือของที่รอบ 1 เดือนจะโดนเตือนล่วงหน้า 30 วัน ซึ่งยาวเท่ากับรอบพอดี
+// พอทดสอบเสร็จวันรุ่งขึ้นก็เข้าเงื่อนไขเตือนทันที แล้วเตือนทุกวันจนกว่าจะทำรอบใหม่
+// เตือนตลอดเวลาเท่ากับไม่ได้เตือน คนจะเริ่มมองข้ามข้อความในกลุ่ม
+var WARN_FRACTION = 0.25;   // เตือนเมื่อเหลือเวลาไม่ถึง 1 ใน 4 ของรอบ
+var WARN_MIN_DAYS = 3;      // แต่ไม่สั้นกว่านี้ จะได้มีเวลาเตรียมตัว
+var WARN_MAX_DAYS = 30;     // และไม่ยาวกว่านี้ ของรอบปีจะได้ไม่เตือนข้ามเดือน
 
 // ส่งข้อความ "ไม่มีรายการใกล้ครบกำหนด" ด้วยไหม (false = เงียบเมื่อไม่มีอะไร)
 var NOTIFY_WHEN_EMPTY = false;
@@ -93,9 +99,21 @@ function collect() {
   return { items: items, today: today, overdue: overdue, soon: soon };
 }
 
-// รอบที่นับเป็นวันเตือนกระชั้นกว่า
+// ช่วงเตือนของแต่ละรายการ — ยาวตามรอบงาน แต่คุมไว้ไม่ให้สั้นหรือยาวเกินไป
 function warnDays(it) {
-  return it.interval_type === 'day' ? WARN_DAYS_SHORT : WARN_DAYS;
+  var len = cycleDays(it);
+  if (!len) return WARN_MIN_DAYS;
+  var d = Math.round(len * WARN_FRACTION);
+  return Math.max(WARN_MIN_DAYS, Math.min(WARN_MAX_DAYS, d));
+}
+
+// ความยาวรอบเป็นวัน (ประมาณ — เดือนคิด 30 ปีคิด 365 พอสำหรับใช้ตั้งช่วงเตือน)
+function cycleDays(it) {
+  var v = Number(it.interval_value) || 0;
+  if (!v) return 0;
+  if (it.interval_type === 'day')  return v;
+  if (it.interval_type === 'year') return v * 365;
+  return v * 30;   // month
 }
 
 // ============================================================
