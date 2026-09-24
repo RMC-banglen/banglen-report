@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-24b';
+var APP_VERSION='2026-09-24c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4821,6 +4821,10 @@ window.__dataReady.then(data => {
       {sub==='aci'&&<ConcreteStatsSection rows={rows}/>}
 
       {sub==='mix'&&<>
+      {/* น้ำต่อปูนอยู่บนสุด เพราะเป็นตัวเดียวในแท็บนี้ที่ต้องดูทุกวันแล้วทำอะไรต่อทันที
+          ส่วนกราฟใช้ปูน/หิน-ทราย เป็นภาพรวมราย 10 วัน ดูเดือนละครั้งก็พอ */}
+      <WaterControlSection/>
+
       {/* ปูน + หิน-ทราย จาก sheet วัตถุดิบ */}
       {matDKeys.length>0&&(()=>{
         const T=D.mixTarget||{};
@@ -4842,7 +4846,6 @@ window.__dataReady.then(data => {
         </>;
       })()}
 
-      <WaterControlSection/>
       <CementSavingSection canEdit={canEdit}/>
       </>}
 
