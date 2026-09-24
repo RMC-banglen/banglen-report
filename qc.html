@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-24a';
+var APP_VERSION='2026-09-24b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -117,6 +117,26 @@ const todayISO = () => {
 const raftLabel = r => r ? ((r.pile_type||'')+(r.section||'')).trim() : '';
 // เสา S มอก./รง. แรงดึงเท่ากัน รวมเป็นขนาดเดียวตอนเทียบค่าระยะยืด (ตอนเลือกแพยังแยกกันปกติ)
 const elongSpecKey = spec => { const s=String(spec||'').trim(); const m=s.match(/^(S[0-9]+)/); if(!m) return s; const suf=s.slice(m[1].length); return (suf==='มอก.'||suf==='รง.') ? m[1] : s; };
+
+// เลือกค่ามาตรฐานระยะยืดของขนาดเสาที่กำลังตรวจ
+//
+// การยุบคีย์ข้างบนทำให้ 'S22' กับ 'S22มอก.' กลายเป็นคีย์เดียวกัน พอในตารางมีทั้งสองชื่อ
+// (แพ 9 กับ แพ 12) การกรองด้วยคีย์จึงได้มาทั้งคู่ ลวดขนาดเดียวเลยขึ้นซ้ำสองแถว
+// จึงไล่จากตรงตัวก่อน ถ้าไม่เจอค่อยยุบคีย์ ถ้ายังไม่เจอค่อยใช้เลขแพ
+// แล้วกันซ้ำด้วยการเอาลวดขนาดละแถวเดียวเป็นด่านสุดท้าย
+const pickElongSpecs = (list, pileSpec, bedNo) => {
+  const all = list || [];
+  const raw = String(pileSpec||'').trim();
+  let rows = raw ? all.filter(e => String(e.pile_spec||'').trim() === raw) : [];
+  if (!rows.length && raw) {
+    const key = elongSpecKey(raw);
+    rows = all.filter(e => e.pile_spec && elongSpecKey(e.pile_spec) === key);
+  }
+  if (!rows.length) rows = all.filter(e => !e.pile_spec && String(e.raft_num) === String(bedNo));
+  const seen = {};
+  return rows.filter(e => seen[e.wire_mm] ? false : (seen[e.wire_mm] = 1, true))
+             .sort((a,b) => a.wire_mm - b.wire_mm);
+};
 const thaiInitial = name => {
   const t=String(name||'').trim();
   return (t.length>1 && /[เแโใไ]/.test(t[0])) ? t[1] : t.slice(0,1);
@@ -639,10 +659,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onB
       setSaving(true);
       try{
         const checkId=existingCheck.id;
-        const specKey=elongSpecKey(head.pile_spec);
-        const elongRows=!isPre?[]:(elong||[])
-          .filter(e=>e.pile_spec?elongSpecKey(e.pile_spec)===specKey:String(e.raft_num)===String(head.bed_no))
-          .sort((a,b)=>a.wire_mm-b.wire_mm)
+        const elongRows=!isPre?[]:pickElongSpecs(elong,head.pile_spec,head.bed_no)
           .map(sp=>{
             const raw=(head.elong||{})[sp.wire_mm];
             if(raw===''||raw==null||!isFinite(Number(raw))) return null;
@@ -685,10 +702,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onB
       // ระยะยืดของลวด — ตัดสินแยกทีละขนาดลวด แล้วรวมเข้ากับผลรวมของใบ
       // ต้องจับคู่ด้วยขนาดเสาก่อน เพราะแพเดียวกันผลิตขนาดต่างกันได้ในแต่ละวัน
       // (ใช้ให้ตรงกับตอนแก้ไขและตอนแสดงผล ไม่งั้นได้เกณฑ์คนละตัว)
-      const specKeyNew=elongSpecKey(head.pile_spec);
-      const elongRows=!isPre?[]:(elong||[])
-        .filter(e=>e.pile_spec?elongSpecKey(e.pile_spec)===specKeyNew:String(e.raft_num)===String(head.bed_no))
-        .sort((a,b)=>a.wire_mm-b.wire_mm)
+      const elongRows=!isPre?[]:pickElongSpecs(elong,head.pile_spec,head.bed_no)
         .map(sp=>{
           const raw=(head.elong||{})[sp.wire_mm];
           if(raw===''||raw==null||!isFinite(Number(raw))) return null;
@@ -753,9 +767,7 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onB
     if(!isPre||!head.bed_no) return null;
     if(String(head.pile_spec||'').trim()==='เลนเดี่ยว') return null; // ไม่ใช่ขนาดเสาจริง ไม่มีระยะยืดให้ตรวจ
     // ผูกกับขนาดเสาที่ใช้จริงวันนี้ (head.pile_spec) ไม่ใช่เลขแพ — แพ S/แพที่เปลี่ยนขนาดได้จะได้ค่าตามขนาดที่ใช้จริง
-    const specKey=elongSpecKey(head.pile_spec);
-    const specs=(elong||[]).filter(e=>e.pile_spec?elongSpecKey(e.pile_spec)===specKey:String(e.raft_num)===String(head.bed_no))
-                           .sort((a,b)=>a.wire_mm-b.wire_mm);
+    const specs=pickElongSpecs(elong,head.pile_spec,head.bed_no);
     const judge=(sp,raw)=>{
       if(raw===''||raw==null) return null;
       const n=Number(raw); if(!isFinite(n)) return null;
