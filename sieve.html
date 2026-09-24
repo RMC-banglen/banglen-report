@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-24a';
+var APP_VERSION='2026-09-24b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -850,6 +850,8 @@ function MoistureForm(){
   const save=async()=>{
     if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
     if(!r){setErr('กรุณากรอกน้ำหนักเปียกและแห้ง (เปียกต้องไม่น้อยกว่าแห้ง)');return;}
+    // ต่ำกว่า 500 ก. ตาม ASTM C566 ค่าจะเพี้ยนง่าย เตือนแต่ไม่ห้าม เผื่อมีเหตุจำเป็น
+    if(dry<500&&!window.confirm('ตัวอย่างแห้งหนัก '+dry+' หน่วย ซึ่งน้อยกว่า 500 กรัมที่ ASTM C566 กำหนด\nค่าที่ได้อาจคลาดเคลื่อน ต้องการบันทึกต่อไหม?')) return;
     setErr('');setSaving(true);
     const{error}=await SB.from('sand_moisture_tests').insert([{
       test_date:f.test_date,sand_source:f.sand_source||'',
@@ -886,8 +888,10 @@ function MoistureForm(){
       <div className="card">
         <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>ชั่งน้ำหนัก</div>
         <div style={{fontSize:13,color:'#8b91a1',marginBottom:14,lineHeight:1.8}}>
-          ตักทรายจากกองที่ใช้จริง ชั่งตอนเปียก แล้วอบหรือผึ่งให้แห้งสนิท ชั่งอีกครั้ง
-          ใช้หน่วยเดียวกันทั้งสองค่า (กรัมก็ได้)
+          ตักทรายจากกองที่ใช้จริง <b>หลายจุดแล้วคลุกรวมกัน</b> (ผิวกองแห้งกว่าข้างใน)
+          ชั่งตอนเปียก แล้วอบให้แห้งสนิท ชั่งอีกครั้ง ใช้หน่วยเดียวกันทั้งสองค่า<br/>
+          <b style={{color:'#42465a'}}>ใช้อย่างน้อย 500 กรัม</b> ตาม ASTM C566 — ถ้าได้ 1,000 กรัมยิ่งแม่น
+          เพราะความชื้นเป็นตัวเลขเล็ก ตัวอย่างน้อยไปค่าจะเพี้ยนง่าย
         </div>
         <div className="sieve-grid">
           <div className="sieve-item">
