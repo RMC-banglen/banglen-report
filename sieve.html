@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22d';
+var APP_VERSION='2026-09-24a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -811,7 +811,318 @@ function StoneForm(){
   );
 }
 
+// ความชื้นทราย (ASTM C566)
+// ทรายกองนอกโดนฝน ความชื้นเปลี่ยนทุกวัน ถ้าไม่หักน้ำส่วนนี้ออก
+// น้ำต่อปูนจะเพี้ยนทุกครั้งโดยไม่มีใครรู้ กำลังอัดก็เหวี่ยงตาม
+function MoistureForm(){
+  const blank={test_date:todayISO(),sand_source:'',w_wet:'',w_dry:'',note:''};
+  const[f,setF]=useState(blank);
+  const[spec,setSpec]=useState({abs:1.0,sandKg:822});
+  const[saving,setSaving]=useState(false);
+  const[done,setDone]=useState(false);
+  const[err,setErr]=useState('');
+  const[editSpec,setEditSpec]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  useEffect(()=>{
+    SB.from('sand_silt_spec').select('sand_absorption_pct,sand_kg_per_m3').eq('id',1).limit(1)
+      .then(({data})=>{if(data&&data.length)setSpec({
+        abs:Number(data[0].sand_absorption_pct)||1.0,
+        sandKg:Number(data[0].sand_kg_per_m3)||822});});
+  },[]);
+
+  const wet=Number(f.w_wet)||0, dry=Number(f.w_dry)||0;
+  const r=(()=>{
+    if(!(wet>0&&dry>0&&wet>=dry))return null;
+    const total=(wet-dry)/dry*100;
+    const free=total-spec.abs;              // น้ำที่ซึมเข้าเนื้อเม็ดไม่ได้ออกมาผสม จึงหักค่าดูดซึมทิ้ง
+    const adj=spec.sandKg*free/100;         // ลิตรต่อคอนกรีต 1 ม³ (น้ำ 1 กก. = 1 ลิตร)
+    return{total:Math.round(total*100)/100,free:Math.round(free*100)/100,adj:Math.round(adj*10)/10};
+  })();
+
+  const saveSpec=async()=>{
+    const{error}=await SB.from('sand_silt_spec')
+      .update({sand_absorption_pct:spec.abs,sand_kg_per_m3:spec.sandKg}).eq('id',1);
+    if(error){setErr('บันทึกค่าตั้งต้นไม่สำเร็จ: '+error.message);return;}
+    setEditSpec(false);setErr('');
+  };
+
+  const save=async()=>{
+    if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
+    if(!r){setErr('กรุณากรอกน้ำหนักเปียกและแห้ง (เปียกต้องไม่น้อยกว่าแห้ง)');return;}
+    setErr('');setSaving(true);
+    const{error}=await SB.from('sand_moisture_tests').insert([{
+      test_date:f.test_date,sand_source:f.sand_source||'',
+      w_wet:wet,w_dry:dry,total_pct:r.total,free_pct:r.free,water_adj_l:r.adj,
+      note:f.note||''}]);
+    setSaving(false);
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    setDone(true);
+  };
+
+  if(done)return(
+    <div className="card success">
+      <div className="icon">✅</div>
+      <h2>บันทึกแล้ว!</h2>
+      <p>ความชื้นทราย วันที่ {f.test_date.split('-').reverse().join('/')}<br/>
+      ความชื้นผิว <b>{r&&r.free}%</b> → หักน้ำ <b>{r&&r.adj} ลิตร</b> ต่อคอนกรีต 1 ม³</p>
+      <button className="bigbtn green" onClick={()=>{setF(blank);setDone(false);}}>+ บันทึกรายการใหม่</button>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="card">
+        <div className="field">
+          <label>วันที่ทดสอบ</label>
+          <input type="date" value={f.test_date} onChange={e=>set('test_date',e.target.value)}/>
+        </div>
+        <div className="field" style={{marginBottom:0}}>
+          <label>แหล่งทราย (ถ้ามี)</label>
+          <input type="text" value={f.sand_source} onChange={e=>set('sand_source',e.target.value)} placeholder="เช่น วันวิสาข์"/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>ชั่งน้ำหนัก</div>
+        <div style={{fontSize:13,color:'#8b91a1',marginBottom:14,lineHeight:1.8}}>
+          ตักทรายจากกองที่ใช้จริง ชั่งตอนเปียก แล้วอบหรือผึ่งให้แห้งสนิท ชั่งอีกครั้ง
+          ใช้หน่วยเดียวกันทั้งสองค่า (กรัมก็ได้)
+        </div>
+        <div className="sieve-grid">
+          <div className="sieve-item">
+            <label>ทรายเปียก <span className="sub">ก่อนอบ</span></label>
+            <input type="number" inputMode="decimal" value={f.w_wet} onChange={e=>set('w_wet',e.target.value)} placeholder="0"/>
+          </div>
+          <div className="sieve-item">
+            <label>ทรายแห้ง <span className="sub">หลังอบ</span></label>
+            <input type="number" inputMode="decimal" value={f.w_dry} onChange={e=>set('w_dry',e.target.value)} placeholder="0"/>
+          </div>
+        </div>
+
+        {r&&<div style={{marginTop:6,padding:'16px 18px',borderRadius:12,
+          background:r.free<0?'#fffbeb':'#f7faff',border:`1.5px solid ${r.free<0?'#f5d98a':'#cbd9f0'}`}}>
+          <div className="result-row"><span>ความชื้นรวม</span><b>{r.total}%</b></div>
+          <div className="result-row"><span>หักค่าดูดซึมของทราย</span><span style={{color:'#8b91a1'}}>−{spec.abs}%</span></div>
+          <div className="result-row"><span><b>ความชื้นผิว</b></span><b style={{color:'#1a56db'}}>{r.free}%</b></div>
+          <div style={{marginTop:12,paddingTop:12,borderTop:'1.5px solid #e6e8ee',textAlign:'center'}}>
+            {r.free>=0?<>
+              <div style={{fontSize:13,color:'#5f6470'}}>ต้องหักน้ำที่เติมลง</div>
+              <div style={{fontSize:32,fontWeight:800,color:'#0f766e'}}>{r.adj} <span style={{fontSize:16}}>ลิตร / ม³</span></div>
+              <div style={{fontSize:12,color:'#8b91a1',marginTop:4}}>คิดจากทรายในสูตร {spec.sandKg} กก./ม³</div>
+            </>:<>
+              <div style={{fontSize:14,fontWeight:700,color:'#b45309'}}>ทรายแห้งกว่าค่าดูดซึม</div>
+              <div style={{fontSize:12.5,color:'#8b91a1',marginTop:6,lineHeight:1.7}}>
+                ทรายจะดูดน้ำจากส่วนผสมไปแทน ควรเติมน้ำเพิ่มราว {Math.abs(r.adj)} ลิตร/ม³
+                หรือรดน้ำกองทรายไว้ก่อนใช้
+              </div>
+            </>}
+          </div>
+        </div>}
+      </div>
+
+      <div className="card">
+        <button className="ghost" style={{marginTop:0}} onClick={()=>setEditSpec(!editSpec)}>
+          {editSpec?'▲ ปิด':'⚙️ ค่าตั้งต้น (ดูดซึม '+spec.abs+'% · ทราย '+spec.sandKg+' กก./ม³)'}
+        </button>
+        {editSpec&&<div style={{marginTop:14}}>
+          <div className="field">
+            <label>ค่าการดูดซึมน้ำของทราย (%)</label>
+            <input type="number" inputMode="decimal" value={spec.abs}
+              onChange={e=>setSpec(p=>({...p,abs:Number(e.target.value)}))}/>
+            <div style={{fontSize:12.5,color:'#8b91a1',marginTop:6,lineHeight:1.7}}>
+              วัดตาม ASTM C128 ครั้งเดียวต่อแหล่งทราย ใช้ได้ยาว ไม่ต้องวัดทุกวัน
+              ทรายแม่น้ำทั่วไปอยู่ราว 0.5–2% ถ้ายังไม่ได้วัด ใช้ 1% ไปก่อนได้
+            </div>
+          </div>
+          <div className="field" style={{marginBottom:12}}>
+            <label>น้ำหนักทรายในสูตร (กก. ต่อคอนกรีต 1 ม³)</label>
+            <input type="number" inputMode="decimal" value={spec.sandKg}
+              onChange={e=>setSpec(p=>({...p,sandKg:Number(e.target.value)}))}/>
+          </div>
+          <button className="bigbtn green" onClick={saveSpec}>บันทึกค่าตั้งต้น</button>
+        </div>}
+      </div>
+
+      <div className="card">
+        <div className="field" style={{marginBottom:0}}>
+          <label>หมายเหตุ</label>
+          <input type="text" value={f.note} onChange={e=>set('note',e.target.value)} placeholder="ถ้ามี"/>
+        </div>
+      </div>
+
+      {err&&<div className="card" style={{color:'#d13438',fontWeight:600}}>{err}</div>}
+      <button className="bigbtn" disabled={saving} onClick={save}>
+        {saving?'กำลังบันทึก…':'บันทึกผลทดสอบ'}
+      </button>
+    </div>
+  );
+}
+
+// หน่วยน้ำหนักคอนกรีตสด (ASTM C138)
+// รู้ผลทันทีหน้างาน ไม่ต้องรอ 7 วัน ถ้าต่ำกว่าปกติแปลว่าน้ำเยอะเกินหรือชั่งตวงเพี้ยน
+function UnitWeightForm(){
+  const blank={test_date:todayISO(),formula_name:'',container_l:'',w_empty:'',w_full:'',slump_cm:'',note:''};
+  const[f,setF]=useState(blank);
+  const[spec,setSpec]=useState({target:2380,warn:2.0});
+  const[saving,setSaving]=useState(false);
+  const[done,setDone]=useState(false);
+  const[err,setErr]=useState('');
+  const[editSpec,setEditSpec]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  useEffect(()=>{
+    SB.from('sand_silt_spec').select('target_unit_weight,uw_warn_pct').eq('id',1).limit(1)
+      .then(({data})=>{if(data&&data.length)setSpec({
+        target:Number(data[0].target_unit_weight)||2380,
+        warn:Number(data[0].uw_warn_pct)||2.0});});
+  },[]);
+
+  const vol=Number(f.container_l)||0, we=Number(f.w_empty)||0, wf=Number(f.w_full)||0;
+  const r=(()=>{
+    if(!(vol>0&&wf>we))return null;
+    const uw=(wf-we)/vol*1000;
+    const diff=spec.target?(uw-spec.target)/spec.target*100:0;
+    return{uw:Math.round(uw),diff:Math.round(diff*100)/100};
+  })();
+  const low=r&&r.diff<-spec.warn, high=r&&r.diff>spec.warn;
+
+  const saveSpec=async()=>{
+    const{error}=await SB.from('sand_silt_spec')
+      .update({target_unit_weight:spec.target,uw_warn_pct:spec.warn}).eq('id',1);
+    if(error){setErr('บันทึกค่าตั้งต้นไม่สำเร็จ: '+error.message);return;}
+    setEditSpec(false);setErr('');
+  };
+
+  const save=async()=>{
+    if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
+    if(!r){setErr('กรุณากรอกปริมาตรภาชนะและน้ำหนักให้ครบ (น้ำหนักรวมต้องมากกว่าภาชนะเปล่า)');return;}
+    setErr('');setSaving(true);
+    const{error}=await SB.from('concrete_unit_weight_tests').insert([{
+      test_date:f.test_date,formula_name:f.formula_name||'',
+      container_l:vol,w_empty:we,w_full:wf,unit_weight:r.uw,
+      target_uw:spec.target,diff_pct:r.diff,
+      slump_cm:f.slump_cm===''?null:Number(f.slump_cm),note:f.note||''}]);
+    setSaving(false);
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    if(low) alertFail({test:'unit_weight',test_date:f.test_date,formula:f.formula_name||'-',
+      value:r.uw,target:spec.target,diff:r.diff,slump:f.slump_cm||''});
+    setDone(true);
+  };
+
+  if(done)return(
+    <div className="card success">
+      <div className="icon">{low?'⚠️':'✅'}</div>
+      <h2>บันทึกแล้ว!</h2>
+      <p>หน่วยน้ำหนักคอนกรีตสด วันที่ {f.test_date.split('-').reverse().join('/')}<br/>
+      <b>{r&&r.uw} kg/m³</b> {low?'(ต่ำกว่าค่าอ้างอิง — แจ้งเตือนแล้ว)':high?'(สูงกว่าค่าอ้างอิง)':'(ปกติ)'}</p>
+      <button className="bigbtn green" onClick={()=>{setF(blank);setDone(false);}}>+ บันทึกรายการใหม่</button>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="card">
+        <div className="field">
+          <label>วันที่ทดสอบ</label>
+          <input type="date" value={f.test_date} onChange={e=>set('test_date',e.target.value)}/>
+        </div>
+        <div className="field" style={{marginBottom:0}}>
+          <label>สูตรคอนกรีต</label>
+          <input type="text" value={f.formula_name} onChange={e=>set('formula_name',e.target.value)} placeholder="เช่น NP335"/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>ชั่งน้ำหนัก</div>
+        <div style={{fontSize:13,color:'#8b91a1',marginBottom:14,lineHeight:1.8}}>
+          ใส่คอนกรีต 3 ชั้น กระทุ้งชั้นละ 25 ครั้ง เคาะข้างภาชนะไล่ฟองอากาศ
+          ปาดหน้าให้เรียบเสมอขอบ แล้วเช็ดข้างภาชนะให้สะอาดก่อนชั่ง
+        </div>
+        <div className="field">
+          <label>ปริมาตรภาชนะ (ลิตร)</label>
+          <input type="number" inputMode="decimal" value={f.container_l} onChange={e=>set('container_l',e.target.value)} placeholder="เช่น 7"/>
+        </div>
+        <div className="sieve-grid">
+          <div className="sieve-item">
+            <label>ภาชนะเปล่า <span className="sub">กก.</span></label>
+            <input type="number" inputMode="decimal" value={f.w_empty} onChange={e=>set('w_empty',e.target.value)} placeholder="0"/>
+          </div>
+          <div className="sieve-item">
+            <label>ภาชนะ+คอนกรีต <span className="sub">กก.</span></label>
+            <input type="number" inputMode="decimal" value={f.w_full} onChange={e=>set('w_full',e.target.value)} placeholder="0"/>
+          </div>
+        </div>
+        <div className="field" style={{marginBottom:0}}>
+          <label>ค่ายุบตัวของชุดเดียวกัน (ซม.) <span style={{fontWeight:400,color:'#8b91a1'}}>ถ้าวัด</span></label>
+          <input type="number" inputMode="decimal" value={f.slump_cm} onChange={e=>set('slump_cm',e.target.value)} placeholder="เช่น 7.5"/>
+        </div>
+
+        {r&&<div style={{marginTop:16,padding:'16px 18px',borderRadius:12,textAlign:'center',
+          background:low?'#fdecea':high?'#fffbeb':'#ecfdf5',
+          border:`1.5px solid ${low?'#f3b8b0':high?'#f5d98a':'#a7e3d4'}`}}>
+          <div style={{fontSize:13,color:'#5f6470'}}>หน่วยน้ำหนักคอนกรีตสด</div>
+          <div style={{fontSize:34,fontWeight:800,color:low?'#c0392b':high?'#b45309':'#0f766e'}}>
+            {r.uw} <span style={{fontSize:16}}>kg/m³</span></div>
+          <div style={{fontSize:13.5,fontWeight:700,marginTop:4,color:low?'#c0392b':high?'#b45309':'#0f766e'}}>
+            {r.diff>0?'+':''}{r.diff}% จากค่าอ้างอิง {spec.target}
+          </div>
+          <div style={{fontSize:12.5,color:'#8b91a1',marginTop:8,lineHeight:1.75}}>
+            {low?'ต่ำกว่าปกติ — มักเกิดจากน้ำเยอะเกิน ฟองอากาศมาก หรือชั่งตวงเพี้ยน ควรตรวจก่อนเทต่อ'
+              :high?'สูงกว่าปกติ — อาจชั่งหินทรายเกิน หรือน้ำน้อยไป ลองเทียบกับค่ายุบตัว'
+              :'อยู่ในช่วงปกติ ส่วนผสมน่าจะตรงตามสูตร'}
+          </div>
+        </div>}
+      </div>
+
+      <div className="card">
+        <button className="ghost" style={{marginTop:0}} onClick={()=>setEditSpec(!editSpec)}>
+          {editSpec?'▲ ปิด':'⚙️ ค่าอ้างอิง ('+spec.target+' kg/m³ · เตือนเมื่อต่าง '+spec.warn+'%)'}
+        </button>
+        {editSpec&&<div style={{marginTop:14}}>
+          <div className="field">
+            <label>หน่วยน้ำหนักอ้างอิง (kg/m³)</label>
+            <input type="number" inputMode="decimal" value={spec.target}
+              onChange={e=>setSpec(p=>({...p,target:Number(e.target.value)}))}/>
+            <div style={{fontSize:12.5,color:'#8b91a1',marginTop:6,lineHeight:1.7}}>
+              เอาน้ำหนักวัสดุทั้งหมดในสูตรต่อ 1 ม³ มารวมกัน (ปูน+หิน+ทราย+น้ำ)
+              คอนกรีตเสาเข็มทั่วไปอยู่ราว 2,350–2,450 ถ้ายังไม่แน่ใจ
+              ให้วัดจริงสัก 10 ครั้งตอนที่งานปกติ แล้วเอาค่าเฉลี่ยมาตั้ง
+            </div>
+          </div>
+          <div className="field" style={{marginBottom:12}}>
+            <label>เตือนเมื่อต่างจากค่าอ้างอิงเกิน (%)</label>
+            <input type="number" inputMode="decimal" value={spec.warn}
+              onChange={e=>setSpec(p=>({...p,warn:Number(e.target.value)}))}/>
+          </div>
+          <button className="bigbtn green" onClick={saveSpec}>บันทึกค่าอ้างอิง</button>
+        </div>}
+      </div>
+
+      <div className="card">
+        <div className="field" style={{marginBottom:0}}>
+          <label>หมายเหตุ</label>
+          <input type="text" value={f.note} onChange={e=>set('note',e.target.value)} placeholder="ถ้ามี"/>
+        </div>
+      </div>
+
+      {err&&<div className="card" style={{color:'#d13438',fontWeight:600}}>{err}</div>}
+      <button className="bigbtn" disabled={saving} onClick={save}>
+        {saving?'กำลังบันทึก…':'บันทึกผลทดสอบ'}
+      </button>
+    </div>
+  );
+}
+
 // ---- App ----
+const TABS=[
+  {k:'sand', icon:'🏖', label:'FM'},
+  {k:'silt', icon:'💧', label:'ฝุ่น'},
+  {k:'org',  icon:'🧪', label:'สารอินทรีย์'},
+  {k:'moist',icon:'💦', label:'ความชื้น'},
+  {k:'uw',   icon:'⚖️', label:'นน.คอนกรีต'},
+  {k:'stone',icon:'🪨', label:'หิน'},
+];
 function App(){
   const[tab,setTab]=useState('sand');
   return(
@@ -820,16 +1131,22 @@ function App(){
         <a href="qc.html" style={{color:'#fff',fontSize:22,textDecoration:'none',padding:'4px 8px 4px 0',lineHeight:1}}>‹</a>
         <div style={{flex:1}}>
           <h1>บันทึกผลทดสอบวัตถุดิบ</h1>
-          <p>บางเลน — ขนาดคละ · ฝุ่น · สารอินทรีย์ · หิน</p>
+          <p>บางเลน — ทราย · หิน · คอนกรีตสด</p>
         </div>
       </div>
-      <div className="tabs" style={{fontSize:14}}>
-        <button className={`tab${tab==='sand'?' active':''}`} onClick={()=>setTab('sand')} style={{fontSize:14,padding:'12px 4px'}}>🏖 FM</button>
-        <button className={`tab${tab==='silt'?' active':''}`} onClick={()=>setTab('silt')} style={{fontSize:14,padding:'12px 4px'}}>💧 ฝุ่น</button>
-        <button className={`tab${tab==='org'?' active':''}`} onClick={()=>setTab('org')} style={{fontSize:14,padding:'12px 4px'}}>🧪 สารอินทรีย์</button>
-        <button className={`tab${tab==='stone'?' active':''}`} onClick={()=>setTab('stone')} style={{fontSize:14,padding:'12px 4px'}}>🪨 หิน</button>
+      {/* 6 แท็บใส่แถวเดียวบนมือถือแล้วตัวหนังสือเบียดกัน จึงให้ตกบรรทัดเป็น 3 ต่อแถว */}
+      <div className="tabs" style={{flexWrap:'wrap'}}>
+        {TABS.map(t=>(
+          <button key={t.k} className={`tab${tab===t.k?' active':''}`} onClick={()=>setTab(t.k)}
+            style={{flex:'1 0 33.33%',fontSize:13.5,padding:'11px 2px'}}>{t.icon} {t.label}</button>
+        ))}
       </div>
-      {tab==='sand'?<SandForm/>:tab==='silt'?<SiltForm/>:tab==='org'?<OrganicForm/>:<StoneForm/>}
+      {tab==='sand'?<SandForm/>
+        :tab==='silt'?<SiltForm/>
+        :tab==='org'?<OrganicForm/>
+        :tab==='moist'?<MoistureForm/>
+        :tab==='uw'?<UnitWeightForm/>
+        :<StoneForm/>}
     </div>
   );
 }

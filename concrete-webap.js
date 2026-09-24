@@ -691,6 +691,13 @@ function notifyMaterialFail(d) {
       if (isWash) L.push('ก่อนล้าง ' + d.w_before + ' g · หลังล้าง ' + d.w_after + ' g');
       else L.push('ชั้นทราย ' + d.sand_mm + ' มม. · ชั้นฝุ่น ' + d.silt_mm + ' มม.');
       if (!isWash) L.push('<i>วิธีเขย่าขวดเป็นการคัดกรอง ควรยืนยันด้วยวิธีล้างก่อนตัดสิน</i>');
+    } else if (d.test === 'unit_weight') {
+      L.push('⚠️ <b>หน่วยน้ำหนักคอนกรีตสด ต่ำกว่าค่าอ้างอิง</b>');
+      L.push('สูตร: <b>' + esc(d.formula || '-') + '</b>');
+      L.push('วัดได้: <b>' + d.value + ' kg/m³</b>  (อ้างอิง ' + d.target + ')');
+      L.push('ต่างจากอ้างอิง: <b>' + d.diff + '%</b>');
+      if (d.slump) L.push('ค่ายุบตัวชุดเดียวกัน: ' + d.slump + ' ซม.');
+      L.push('<i>มักเกิดจากน้ำเยอะเกิน ฟองอากาศมาก หรือชั่งตวงเพี้ยน ควรตรวจก่อนเทต่อ</i>');
     } else if (d.test === 'stone') {
       L.push('⚠️ <b>ขนาดคละหิน ไม่ผ่านเกณฑ์</b>');
       L.push('หิน ' + esc(d.size || '') + ' — ตะแกรงที่หลุดเกณฑ์: <b>' + esc(d.detail || '-') + '</b>');

@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22h';
+var APP_VERSION='2026-09-24a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4816,6 +4816,7 @@ window.__dataReady.then(data => {
       })()}
 
       <ConcreteStatsSection rows={rows}/>
+      <WaterControlSection/>
       <CementSavingSection canEdit={canEdit}/>
       <SandFMSection canEdit={canEdit}/>
       <SandSiltSection canEdit={canEdit}/>
@@ -6087,6 +6088,81 @@ window.__dataReady.then(data => {
           เกณฑ์ CV ตาม ACI 214R-11 (งานก่อสร้างทั่วไป): ต่ำกว่า 7% ดีเยี่ยม · 7–9% ดีมาก · 9–11% ดี · 11–14% พอใช้ · เกิน 14% ต้องปรับปรุง<br/>
           ตารางนี้ตั้งมาจากการทดสอบที่ 28 วัน ส่วนที่นี่ทดสอบ 1/3/7 วัน ค่าจึงใช้เทียบแนวโน้มระหว่างสูตรของเราเองได้ดี
           แต่อย่าเอาไปอ้างอิงข้ามโรงงานตรง ๆ
+        </div>
+      </ChartCard>
+    </>;
+  }
+
+  // ความชื้นทราย + หน่วยน้ำหนักคอนกรีตสด — สองตัวนี้คุมอัตราส่วนน้ำต่อปูนเหมือนกัน
+  // จึงวางไว้ด้วยกัน ถ้าทรายชื้นขึ้นแล้วไม่หักน้ำ หน่วยน้ำหนักมักตกตามในวันเดียวกัน
+  function WaterControlSection(){
+    const [moist,setMoist]=useState(null);
+    const [uw,setUw]=useState(null);
+    const [spec,setSpec]=useState(null);
+    useEffect(()=>{
+      DB.from('sand_moisture_tests').select('*').order('test_date',{ascending:false}).limit(120)
+        .then(({data})=>setMoist(data||[]));
+      DB.from('concrete_unit_weight_tests').select('*').order('test_date',{ascending:false}).limit(120)
+        .then(({data})=>setUw(data||[]));
+      DB.from('sand_silt_spec').select('sand_absorption_pct,sand_kg_per_m3,target_unit_weight,uw_warn_pct')
+        .eq('id',1).limit(1).then(({data})=>setSpec((data&&data[0])||{}));
+    },[]);
+    if(moist===null||uw===null) return null;
+    if(!moist.length&&!uw.length) return <ChartCard title="คุมน้ำต่อปูน" span="full">
+      <div className="empty">ยังไม่มีข้อมูล — บันทึกได้จากแอปมือถือ แท็บ 💦 ความชื้น และ ⚖️ นน.คอนกรีต</div>
+    </ChartCard>;
+
+    const target=Number(spec&&spec.target_unit_weight)||2380;
+    const warn=Number(spec&&spec.uw_warn_pct)||2;
+    const mChron=moist.slice().reverse(), uChron=uw.slice().reverse();
+    const lastM=moist[0], lastU=uw[0];
+    const lowN=uw.filter(x=>Number(x.diff_pct)<-warn).length;
+    const shortDay=d=>String(d||'').slice(8)+'/'+String(d||'').slice(5,7);
+
+    const kpi=[
+      lastM&&{label:'ความชื้นผิวทรายล่าสุด',value:fmt(lastM.free_pct,2),unit:'%',
+        sub:`หักน้ำ ${fmt(lastM.water_adj_l,1)} ลิตร/ม³ · ${shortDay(lastM.test_date)}`,
+        accent:Number(lastM.free_pct)<0?'#b45309':'#2f5fd0'},
+      lastU&&{label:'หน่วยน้ำหนักล่าสุด',value:fmt(lastU.unit_weight,0),unit:'kg/m³',
+        sub:`${Number(lastU.diff_pct)>0?'+':''}${fmt(lastU.diff_pct,1)}% จากอ้างอิง ${target} · ${shortDay(lastU.test_date)}`,
+        accent:Number(lastU.diff_pct)<-warn?'#c0392b':'#0f766e'},
+      uw.length>0&&{label:'ครั้งที่ต่ำกว่าอ้างอิง',value:lowN,unit:`จาก ${uw.length}`,
+        sub:lowN?'ตรวจว่าเติมน้ำหรือชั่งตวงเพี้ยนไหม':'ยังไม่พบผิดปกติ',
+        accent:lowN?'#c0392b':'#3f7d2b'},
+    ].filter(Boolean);
+
+    return <>
+      <ChartCard title="คุมน้ำต่อปูน — ความชื้นทราย + หน่วยน้ำหนักคอนกรีตสด"
+        subtitle="ทรายชื้นขึ้นแล้วไม่หักน้ำ หรือเติมน้ำหน้างาน จะทำให้กำลังอัดตก สองค่านี้จับได้ตั้งแต่วันที่ผสม ไม่ต้องรอ 7 วัน"
+        span="full">
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:14,marginBottom:18}}>
+          {kpi.map((k,i)=><div key={i} className="kpi">
+            <div className="kpi__label">{k.label}</div>
+            <div className="kpi__value" style={{color:k.accent}}>{k.value}<span className="kpi__unit"> {k.unit}</span></div>
+            <div className="kpi__sub">{k.sub}</div>
+          </div>)}
+        </div>
+
+        {mChron.length>1&&<div style={{marginBottom:22}}>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--ink)',marginBottom:8}}>ความชื้นผิวทราย (%)</div>
+          <LineChart categories={mChron.map(x=>shortDay(x.test_date))} unit="%" decimals={2} height={240} padRight={120}
+            targets={[{value:0,color:'#8b91a1',label:'อิ่มตัวพอดี'}]}
+            series={[{label:'ความชื้นผิว',color:'#2f5fd0',data:mChron.map(x=>Number(x.free_pct))}]}/>
+        </div>}
+
+        {uChron.length>1&&<div>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--ink)',marginBottom:8}}>หน่วยน้ำหนักคอนกรีตสด (kg/m³)</div>
+          <LineChart categories={uChron.map(x=>shortDay(x.test_date))} unit="kg/m³" decimals={0} height={240} padRight={130}
+            dangerBelow={target*(1-warn/100)}
+            targets={[{value:target,color:'#059669',label:'อ้างอิง'},
+                      {value:Math.round(target*(1-warn/100)),color:'#d13438',label:'ขีดเตือน'}]}
+            series={[{label:'หน่วยน้ำหนัก',color:'#7b61c4',data:uChron.map(x=>Number(x.unit_weight))}]}/>
+        </div>}
+
+        <div style={{fontSize:12.5,color:'var(--muted-text)',marginTop:14,lineHeight:1.8}}>
+          ความชื้นผิว = ความชื้นรวม − ค่าการดูดซึมของทราย ({fmt(Number(spec&&spec.sand_absorption_pct)||1,1)}%)
+          · ค่าติดลบแปลว่าทรายแห้งกว่าจุดอิ่มตัว จะไปดูดน้ำจากส่วนผสมแทน<br/>
+          หน่วยน้ำหนักตาม ASTM C138 · ต่ำกว่าอ้างอิงมักหมายถึงน้ำเยอะเกินหรือฟองอากาศมาก
         </div>
       </ChartCard>
     </>;
