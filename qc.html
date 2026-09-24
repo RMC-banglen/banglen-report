@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-22b';
+var APP_VERSION='2026-09-24a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -888,7 +888,8 @@ function CheckForm({me,formType,material,checklist,rafts,elong,preset,onBack,onB
       {viewMode!=='view'&&<>
       <div className="sec">รูปถ่าย</div>
       <div className="card">
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple
+        {/* ปุ่มเขียนว่าเลือกรูปได้ แต่ capture บังคับเปิดกล้องอย่างเดียว เอาออกให้ตรงกับที่เขียน */}
+        <input ref={fileRef} type="file" accept="image/*" multiple
                style={{display:'none'}} onChange={addFiles}/>
         <button className="ghost" onClick={()=>fileRef.current&&fileRef.current.click()}>📷 ถ่ายรูป / เลือกรูป</button>
         {files.length>0&&<div className="thumbs">
