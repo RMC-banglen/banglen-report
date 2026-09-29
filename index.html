@@ -9400,7 +9400,10 @@ window.__dataReady.then(data => {
         DB.from('transport_day_notes').select('*'),
       ]).then(([a,b,c])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setLoading(false);});
     }
-    const DAY_NOTE_OPTIONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน','ลาหยุด'];
+    const DAY_NOTE_OPTIONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน','ลาหยุด','วันหยุดเทศกาล'];
+    // วันหยุดตามปฏิทิน: แสดงป้ายได้แต่ไม่นับในสถิติหยุด (วันทำงานของเดือนหักวันเหล่านี้อยู่แล้ว) · รวมข้อความเดิมที่เคยพิมพ์เอง
+    const HOLIDAY_NOTES=['วันหยุดเทศกาล','เทศกาล','เทสกาล'];
+    const isHolidayNote=t=>HOLIDAY_NOTES.includes((t||'').trim());
     // สาเหตุที่เป็นเรื่องของรถ (นับตามทะเบียน) กับเรื่องของคน (นับตามคนขับ)
     const VEHICLE_REASONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน'];
     const PERSON_REASONS=['ลาหยุด'];
@@ -9420,7 +9423,8 @@ window.__dataReady.then(data => {
     const [dayNoteModal,setDayNoteModal]=useState(null); // {vt,name,day,value}
     function editDayNote(vt,name,d){
       const cur=dayNoteOf(vt,name,d);
-      setDayNoteModal({vt,name,day:d,value:cur&&!DAY_NOTE_OPTIONS.includes(cur)?'อื่นๆ':(cur||''),customText:cur&&!DAY_NOTE_OPTIONS.includes(cur)?cur:''});
+      const curStd=isHolidayNote(cur)?'วันหยุดเทศกาล':cur;
+      setDayNoteModal({vt,name,day:d,value:curStd&&!DAY_NOTE_OPTIONS.includes(curStd)?'อื่นๆ':(curStd||''),customText:curStd&&!DAY_NOTE_OPTIONS.includes(curStd)?curStd:''});
     }
     async function saveDayNote(){
       const {vt,name,day,value,customText}=dayNoteModal;
@@ -9860,7 +9864,7 @@ window.__dataReady.then(data => {
         const vehNotes=companyNotes.filter(n=>VEHICLE_REASONS.includes(noteText(n)));
         const personNotes=companyNotes.filter(n=>PERSON_REASONS.includes(noteText(n)));
         // ป้ายที่พิมพ์เอง (อื่นๆ) ไม่นับในสถิติ แสดงไว้ให้ตรวจ/แก้
-        const otherNotes=companyNotes.filter(n=>!DAY_NOTE_OPTIONS.includes(noteText(n))).sort((a,b)=>a.month-b.month||a.day-b.day);
+        const otherNotes=companyNotes.filter(n=>!DAY_NOTE_OPTIONS.includes(noteText(n))&&!isHolidayNote(noteText(n))).sort((a,b)=>a.month-b.month||a.day-b.day);
         const cnt=(list,reason)=>list.filter(n=>noteText(n)===reason).length;
         const daysInMonth=new Date(selYear-543,selDayMonth,0).getDate();
 
@@ -10301,7 +10305,9 @@ window.__dataReady.then(data => {
                         style={{textAlign:'center',padding:'4px 3px',color:v?(extraClick?'#0f766e':'#334155'):note?'#dc2626':'#e2e8f0',fontWeight:extraClick?700:undefined,borderBottom:'1px solid #f1f5f9',cursor:clickable||extraClick?'pointer':'default'}}>
                         {v>0&&<span style={extraClick?{textDecoration:'underline',textDecorationStyle:'dotted'}:undefined}>{v}</span>}
                         {v===0&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
-                          {note&&<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap',color:'#dc2626'}}>{note.length>4?note.slice(0,4):note}</span>}
+                          {note&&(isHolidayNote(note)
+                            ?<span style={{fontSize:10,fontWeight:700,background:'#f1f5f9',border:'1px solid #cbd5e1',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap',color:'#64748b'}}>เทศกาล</span>
+                            :<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap',color:'#dc2626'}}>{note.length>4?note.slice(0,4):note}</span>)}
                           {!note&&'·'}
                         </div>}
                         {note&&ownV===0&&v>0&&<div style={{fontSize:9,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'0 3px',color:'#dc2626',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</div>}
@@ -10425,7 +10431,7 @@ window.__dataReady.then(data => {
           <div style={{marginBottom:dayNoteModal.value==='อื่นๆ'?12:16}}>
             <select value={dayNoteModal.value} onChange={e=>setDayNoteModal(m=>({...m,value:e.target.value}))} style={{...inp,fontSize:15}}>
               <option value="">(ไม่มีเหตุผล / ลบ)</option>
-              {DAY_NOTE_OPTIONS.map(opt=><option key={opt} value={opt}>{opt}</option>)}
+              {DAY_NOTE_OPTIONS.map(opt=><option key={opt} value={opt}>{opt}{isHolidayNote(opt)?' (วันหยุดตามปฏิทิน · ไม่นับในสถิติ)':''}</option>)}
               <option value="อื่นๆ">อื่นๆ</option>
             </select>
           </div>
