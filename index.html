@@ -10181,7 +10181,14 @@ window.__dataReady.then(data => {
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · {MO[selDayMonth-1]} {selYear} (รายวัน 1-{dLen})</div>
             </div>
             <div style={{overflowX:'auto'}}>
-              <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
+              {/* table-layout fixed + colgroup ให้คอลัมน์วันที่กว้างเท่ากันทุกตาราง (เทรลเลอร์/12ล้อ) วันที่จะตรงกัน */}
+              <table style={{borderCollapse:'collapse',width:'100%',minWidth:1150,tableLayout:'fixed',fontSize:13}}>
+                <colgroup>
+                  <col style={{width:210}}/>
+                  {dayList.map(d=><col key={d}/>)}
+                  <col style={{width:64}}/>
+                  {canEdit&&<col style={{width:120}}/>}
+                </colgroup>
                 <thead>
                   <tr style={{background:'#f8fafc'}}>
                     <th style={{textAlign:'left',padding:'6px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
@@ -10193,7 +10200,7 @@ window.__dataReady.then(data => {
                 <tbody>
                   {dayItems.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
                   {dayItems.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                    <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{dispName(it.name)}</td>
+                    <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={it.name}>{dispName(it.name)}</td>
                     {dayList.map(d=>{
                       // v = ยอดที่แสดง (ของตัวเอง + ที่ได้รับเครดิตจากการช่วยขับ) · ownV = ของทะเบียนตัวเองล้วนๆ ใช้เช็คว่ารถคันนี้ว่างไหม (บันทึกเหตุผลได้แม้ v>0 จากการไปช่วยขับที่อื่น)
                       const v=dayCell(it.name,d);
