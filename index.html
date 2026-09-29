@@ -9381,6 +9381,7 @@ window.__dataReady.then(data => {
     const [view,setView]=useState('monthly');
     const [selMonth,setSelMonth]=useState(new Date().getMonth()+1);
     const [hideEmptyDay,setHideEmptyDay]=useState(false);
+    const [latestMonthOnly,setLatestMonthOnly]=useState(false);
     const [helpPopup,setHelpPopup]=useState(null); // {vt,name,month,day?}
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({id:null,year:2569,vehicle_type:'เทรลเลอร์',driver_name:'',sort_order:0,trips:{}});
@@ -9996,7 +9997,9 @@ window.__dataReady.then(data => {
       })()}
 
       {view==='monthly'&&TYPES.map(t=>{
-        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows,typeRows,persons,personOwn,personHelp,isExtraPerson}=getTypeData(t.k);
+        const {items,months:allMonths,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows,typeRows,persons,personOwn,personHelp,isExtraPerson}=getTypeData(t.k);
+        // ติ๊ก "เดือนล่าสุด" = โชว์เฉพาะคอลัมน์เดือนล่าสุด ส่วนคอลัมน์รวมยังเป็นยอดทั้งปี
+        const months=latestMonthOnly&&allMonths.length?[allMonths[allMonths.length-1]]:allMonths;
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
             <span style={{fontSize:18}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
@@ -10060,7 +10063,13 @@ window.__dataReady.then(data => {
           <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'clip',marginBottom:8}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · ปี {selYear}</div>
-              {canEdit&&<button onClick={()=>openAdd(t.k)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                {allMonths.length>1&&<label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
+                  <input type="checkbox" checked={latestMonthOnly} onChange={e=>setLatestMonthOnly(e.target.checked)}/>
+                  เดือนล่าสุด ({MO[allMonths[allMonths.length-1]-1]})
+                </label>}
+                {canEdit&&<button onClick={()=>openAdd(t.k)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
+              </div>
             </div>
             <div className="tt-scroll-m">
               <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
@@ -10068,7 +10077,7 @@ window.__dataReady.then(data => {
                   <tr style={{background:'#f8fafc'}}>
                     <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,top:0,zIndex:3,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
                     {months.map(m=><th key={m} style={{textAlign:'right',padding:'7px 24px 7px 6px',position:'sticky',top:0,zIndex:2,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
-                    <th style={{textAlign:'right',padding:'7px 8px',position:'sticky',top:0,zIndex:2,color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
+                    <th style={{textAlign:'right',padding:'7px 8px',position:'sticky',top:0,zIndex:2,color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9',whiteSpace:'nowrap'}}>{latestMonthOnly?'รวมทั้งปี':'รวม'}</th>
                     {canEdit&&<th style={{position:'sticky',top:0,zIndex:2,borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
                   </tr>
                 </thead>
@@ -10107,7 +10116,7 @@ window.__dataReady.then(data => {
                     const companyItems=items.filter(i=>!i.name.includes('รถร่วม')&&!i.name.includes('รับเอง')&&!i.name.includes('บ่อตะกั่ว'));
                     const companyCol=m=>companyItems.reduce((s,it)=>s+cell(it.name,m),0);
                     const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
-                    const wdTotal=months.reduce((s,m)=>s+(workdaysOf(m)||0),0);
+                    const wdTotal=allMonths.reduce((s,m)=>s+(workdaysOf(m)||0),0);
                     return<>
                       <tr style={{background:'#f8fafc',fontWeight:700,fontSize:13}}>
                         <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',whiteSpace:'nowrap',borderTop:'2px solid #cbd5e1'}}>จำนวนวันทำงาน</td>
