@@ -9369,7 +9369,8 @@ window.__dataReady.then(data => {
     const TYPES=[{k:'เทรลเลอร์',color:'#2563eb',bg:'#eff6ff'},{k:'10ล้อ-12ล้อ',color:'#15803d',bg:'#f0fdf4'}];
     const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const fmt=n=>n==null||n===''||n===0?'–':Number(n).toLocaleString('th-TH');
-    const dispName=n=>String(n||'').replace(/\s*\/\s*\d{2}-\d{4}\s*$/,'').trim();
+    const [showPlate,setShowPlate]=useState(false);
+    const dispName=n=>showPlate?String(n||''):String(n||'').replace(/\s*\/\s*\d{2}-\d{4}\s*$/,'').trim();
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
     const [selYear,setSelYear]=useState(2569);
@@ -9523,8 +9524,10 @@ window.__dataReady.then(data => {
 
     function openDayForm(type,name){
       const {dayRows}=getTypeData(type);
-      const days={};dayList.forEach(d=>{const matched=dayRows.filter(r=>r.driver_name===name&&r.month===selDayMonth&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
-      setDayForm({vehicle_type:type,driver_name:name,original_name:name,days});
+      // เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ (มี helper) ไม่แสดงในฟอร์ม และจะไม่ถูกลบตอนบันทึก
+      const days={};dayList.forEach(d=>{const matched=dayRows.filter(r=>r.driver_name===name&&!r.helper&&r.month===selDayMonth&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
+      const helps=yearRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day!=null).sort((a,b)=>a.day-b.day).map(r=>({day:String(r.day),target:r.vehicle_type+'||'+r.driver_name,trips:String(r.trips||'')}));
+      setDayForm({vehicle_type:type,driver_name:name,original_name:name,days,helps});
       setShowDayForm(true);
     }
     async function handleSaveDay(){
@@ -9535,13 +9538,27 @@ window.__dataReady.then(data => {
       if(dayForm.original_name&&dayForm.driver_name!==dayForm.original_name){
         const {error:renameErr}=await DB.from('transport_trips').update({driver_name:dayForm.driver_name}).eq('vehicle_type',type).eq('driver_name',dayForm.original_name);
         if(renameErr){setSavingDay(false);alert('เปลี่ยนชื่อไม่สำเร็จ: '+renameErr.message);return;}
+        await DB.from('transport_trips').update({helper:dayForm.driver_name}).eq('helper',dayForm.original_name);
       }
       const {items}=getTypeData(type);
       const existingOrder=items.find(i=>i.name===dayForm.driver_name)?.order;
       const dayOrder=existingOrder!=null?existingOrder:(items.length+1);
       let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
-      const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).not('day','is',null);
+      // ลบเฉพาะเที่ยวที่ขับรถตัวเอง (helper ว่าง) เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ต้องเก็บไว้
+      const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).not('day','is',null).is('helper',null);
       if(delErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ (ลบข้อมูลเก่า): '+delErr.message);return;}
+      // เที่ยวที่คนนี้ไปช่วยขับรถคันอื่น: ลบของเดือนนี้ทั้งหมดแล้วบันทึกใหม่ตามฟอร์ม
+      const orderOf=(vt,n)=>getTypeData(vt).items.find(i=>i.name===n)?.order??0;
+      const helpIns=(dayForm.helps||[]).filter(h=>h.day&&h.target&&Number(h.trips)>0).map(h=>{
+        const [vt,n]=h.target.split('||');
+        return {year:selYear,month:selDayMonth,day:Number(h.day),vehicle_type:vt,driver_name:n,sort_order:orderOf(vt,n),trips:Number(h.trips),helper:dayForm.driver_name};
+      });
+      const {error:delHelpErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('helper',dayForm.driver_name).not('day','is',null);
+      if(delHelpErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ (ลบข้อมูลช่วยขับเก่า): '+delHelpErr.message);return;}
+      if(helpIns.length){
+        const {error:helpErr}=await DB.from('transport_trips').insert(helpIns);
+        if(helpErr){setSavingDay(false);alert('บันทึกข้อมูลช่วยขับไม่สำเร็จ: '+helpErr.message);return;}
+      }
       if(ins.length===0){
         // ยังไม่มียอดเดือนนี้ -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
         const existsElsewhere=rows.some(r=>r.vehicle_type===type&&r.driver_name===dayForm.driver_name&&!(r.year===selYear&&r.month===selDayMonth));
@@ -9772,6 +9789,10 @@ window.__dataReady.then(data => {
           <div style={{fontSize:13,color:'#64748b',marginTop:2}}>ติดตามจำนวนเที่ยววิ่งของรถแต่ละคัน/คนขับ รายเดือน (ดึงจาก Supabase)</div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer',marginRight:4}}>
+            <input type="checkbox" checked={showPlate} onChange={e=>setShowPlate(e.target.checked)}/>
+            แสดงทะเบียน
+          </label>
           {(years.length?years:[2569]).map(y=><button key={y} onClick={()=>setSelYear(y)} style={{padding:'6px 16px',border:'none',borderRadius:8,background:selYear===y?'#2f5fd0':'#f1f5f9',color:selYear===y?'#fff':'#475569',fontWeight:700,cursor:'pointer',fontSize:13}}>ปี {y}</button>)}
           {canEdit&&<>
             <button onClick={()=>{setAddDriverType('เทรลเลอร์');setAddDriverName('');setShowAddDriver(true);}} style={{padding:'6px 14px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มคนขับ/ทะเบียนรถ</button>
@@ -10223,13 +10244,38 @@ window.__dataReady.then(data => {
           <div style={{fontSize:17,fontWeight:700,marginBottom:12}}>แก้ไขรายวัน</div>
           <div style={{fontSize:12,color:'#64748b',marginBottom:4}}>ชื่อคนขับ/ทะเบียนรถ</div>
           <input type="text" value={dayForm.driver_name} onChange={e=>setDayForm(f=>({...f,driver_name:e.target.value}))} style={{...inp,marginBottom:8}}/>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>{dayForm.vehicle_type} · {MO[selDayMonth-1]} {selYear}</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:12}}>{dayForm.vehicle_type} · {MO[selDayMonth-1]} {selYear}</div>
+          <div style={{fontSize:13,fontWeight:700,color:'#334155',marginBottom:6}}>เที่ยวที่ขับรถตัวเอง</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:8,marginBottom:16}}>
             {dayList.map(d=><div key={d}>
               <div style={{fontSize:11,color:'#94a3b8',marginBottom:2}}>วันที่ {d}</div>
               <input type="number" value={dayForm.days[d]!=null?dayForm.days[d]:''} onChange={e=>setDayForm(f=>({...f,days:{...f.days,[d]:e.target.value}}))} placeholder="0" style={{...inp,padding:'6px 6px',fontSize:12}}/>
             </div>)}
           </div>
+          {(()=>{
+            const helps=dayForm.helps||[];
+            const targets=TYPES.flatMap(t=>getTypeData(t.k).items.map(i=>({vt:t.k,name:i.name}))).filter(o=>!(o.vt===dayForm.vehicle_type&&o.name===dayForm.driver_name));
+            const setHelp=(i,patch)=>setDayForm(f=>({...f,helps:(f.helps||[]).map((h,j)=>j===i?{...h,...patch}:h)}));
+            return<div style={{borderTop:'1px dashed #cbd5e1',paddingTop:12,marginBottom:16}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#0f766e'}}>🤝 ไปช่วยขับรถคันอื่น</div>
+                <button onClick={()=>setDayForm(f=>({...f,helps:[...(f.helps||[]),{day:'',target:'',trips:''}]}))} style={{padding:'5px 12px',borderRadius:8,border:'1px solid #99f6e4',background:'#f0fdfa',color:'#0f766e',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่ม</button>
+              </div>
+              {helps.length===0&&<div style={{fontSize:12,color:'#94a3b8'}}>ไม่มี — กด "+ เพิ่ม" ถ้าวันไหนไปขับรถคันอื่นแทน</div>}
+              {helps.map((h,i)=><div key={i} style={{display:'grid',gridTemplateColumns:'78px 1fr 64px 32px',gap:6,marginBottom:6,alignItems:'center'}}>
+                <select value={h.day} onChange={e=>setHelp(i,{day:e.target.value})} style={{...inp,padding:'6px',fontSize:12}}>
+                  <option value="">วันที่</option>
+                  {dayList.map(d=><option key={d} value={String(d)}>วันที่ {d}</option>)}
+                </select>
+                <select value={h.target} onChange={e=>setHelp(i,{target:e.target.value})} style={{...inp,padding:'6px',fontSize:12}}>
+                  <option value="">-- เลือกรถที่ไปขับ --</option>
+                  {targets.map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
+                </select>
+                <input type="number" value={h.trips} onChange={e=>setHelp(i,{trips:e.target.value})} placeholder="เที่ยว" style={{...inp,padding:'6px',fontSize:12}}/>
+                <button onClick={()=>setDayForm(f=>({...f,helps:(f.helps||[]).filter((_,j)=>j!==i)}))} title="ลบรายการนี้" style={{padding:'4px',border:'1px solid #fecaca',borderRadius:6,background:'#fff',color:'#dc2626',cursor:'pointer',fontSize:12}}>✕</button>
+              </div>)}
+            </div>;
+          })()}
           <div style={{display:'flex',gap:10,justifyContent:'space-between',flexWrap:'wrap'}}>
             <div style={{display:'flex',gap:8}}>
               <button onClick={()=>setDayForm(f=>({...f,days:{}}))} style={{padding:'9px 14px',borderRadius:8,border:'1px solid #fde68a',background:'#fffbeb',color:'#b45309',fontSize:13,cursor:'pointer'}}>ล้างจำนวนเที่ยวเดือนนี้</button>
