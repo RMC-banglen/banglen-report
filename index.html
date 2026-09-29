@@ -9485,7 +9485,7 @@ window.__dataReady.then(data => {
       const typeGrand=items.reduce((s,it)=>s+rowTotal(it.name),0);
       const monthGrand=colTotal(selMonth);
       // เที่ยวที่คนขับไปช่วยขับรถสำรอง (บันทึกไว้ใน helper) นับรวมเป็นผลงานของคนขับคนนั้นด้วย
-      const helperMonth=name=>yearRows.filter(r=>r.helper===name&&r.month===selMonth).reduce((s,r)=>s+(r.trips||0),0);
+      const helperMonth=name=>typeRows.filter(r=>r.helper===name&&r.month===selMonth).reduce((s,r)=>s+(r.trips||0),0);
       const monthItems=items.map(it=>{const h=helperMonth(it.name);return{...it,trips:monthValue(it.name,selMonth)+h,helped:h};}).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
       // รถที่ไม่มีคนขับประจำ (สำรอง/บ่อตะกั่ว) ให้โชว์ยอดจริงเสมอ ไม่หักออก เพราะทุกเที่ยวจะถูกติด helper ไว้หมด ถ้าหักจะทำให้ยอดหายไปทั้งคัน
       // ส่วนคนขับที่มีทะเบียนของตัวเอง (เช่น สมนึก, ฐา) ถ้าถูกคนอื่นยืมไปขับ ให้หักออกจากทะเบียนต้นทาง แล้วไปนับที่คนขับที่ไปช่วยแทน
@@ -9993,7 +9993,7 @@ window.__dataReady.then(data => {
                 }
                 // ผู้ช่วยขับรถสำรองของเดือนนี้ (โชว์เสมอ แม้ไม่ติด Top 3) พร้อมแยกว่าไปขับคันไหนกี่เที่ยว
                 const helpers={};
-                yearRows.filter(r=>r.helper&&!r.helper.includes('บ่อตะกั่ว')&&r.month===selMonth).forEach(r=>{
+                typeRows.filter(r=>r.helper&&!r.helper.includes('บ่อตะกั่ว')&&r.month===selMonth).forEach(r=>{
                   if(!helpers[r.helper])helpers[r.helper]={total:0,byTarget:{}};
                   helpers[r.helper].total+=(r.trips||0);
                   helpers[r.helper].byTarget[r.driver_name]=(helpers[r.helper].byTarget[r.driver_name]||0)+(r.trips||0);
@@ -10049,7 +10049,7 @@ window.__dataReady.then(data => {
                       if(dSum>0)return dSum;
                       return typeRows.filter(r=>r.driver_name===it.name&&r.day==null&&(isSpareVeh(it.name)||!r.helper)&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
                     };
-                    const helperAt=m=>yearRows.filter(r=>r.helper===it.name&&!r.helper.includes('บ่อตะกั่ว')&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
+                    const helperAt=m=>typeRows.filter(r=>r.helper===it.name&&!r.helper.includes('บ่อตะกั่ว')&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
                     const ownTotal=[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+ownAt(m),0);
                     const helperTotal=[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+helperAt(m),0);
                     return<tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
