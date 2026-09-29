@@ -9369,6 +9369,7 @@ window.__dataReady.then(data => {
     const TYPES=[{k:'เทรลเลอร์',color:'#2563eb',bg:'#eff6ff'},{k:'10ล้อ-12ล้อ',color:'#15803d',bg:'#f0fdf4'}];
     const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const fmt=n=>n==null||n===''||n===0?'–':Number(n).toLocaleString('th-TH');
+    const dispName=n=>String(n||'').replace(/\s*\/\s*\d{2}-\d{4}\s*$/,'').trim();
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
     const [selYear,setSelYear]=useState(2569);
@@ -9485,9 +9486,19 @@ window.__dataReady.then(data => {
       const colTotal=m=>items.reduce((s,it)=>s+monthValue(it.name,m),0);
       const typeGrand=items.reduce((s,it)=>s+rowTotal(it.name),0);
       const monthGrand=colTotal(selMonth);
-      // เที่ยวที่คนขับไปช่วยขับรถสำรอง (บันทึกไว้ใน helper) นับรวมเป็นผลงานของคนขับคนนั้นด้วย
-      const helperMonth=name=>typeRows.filter(r=>r.helper===name&&r.month===selMonth).reduce((s,r)=>s+(r.trips||0),0);
-      const monthItems=items.map(it=>{const h=helperMonth(it.name);return{...it,trips:monthValue(it.name,selMonth)+h,helped:h};}).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
+      // นับเที่ยวรายคน: เที่ยวที่มี helper จะนับให้คนที่ไปขับ (ไม่นับที่ทะเบียนรถ) แยกตามประเภทรถที่ไปขับ
+      // คนจากอีกประเภทที่มาช่วยขับรถประเภทนี้ จะเพิ่มเป็นแถวของตัวเองในตารางประเภทนี้
+      const credited=r=>!!r.helper&&!r.helper.includes('บ่อตะกั่ว');
+      const sumTrips=list=>list.reduce((s,r)=>s+(r.trips||0),0);
+      const personOwn=(name,m)=>{
+        const d=sumTrips(dayRows.filter(r=>r.driver_name===name&&!credited(r)&&r.month===m));
+        if(d>0)return d;
+        return sumTrips(monthRows.filter(r=>r.driver_name===name&&!credited(r)&&r.month===m));
+      };
+      const personHelp=(name,m)=>sumTrips(typeRows.filter(r=>credited(r)&&r.helper===name&&r.month===m));
+      const persons=[...items.map(i=>i.name),...new Set(typeRows.filter(r=>credited(r)&&!items.some(i=>i.name===r.helper)).map(r=>r.helper))];
+      const isExtraPerson=name=>!items.some(i=>i.name===name);
+      const monthItems=persons.map(name=>{const h=personHelp(name,selMonth);return{name,trips:personOwn(name,selMonth)+h,helped:h};}).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
       // รถที่ไม่มีคนขับประจำ (สำรอง/บ่อตะกั่ว) ให้โชว์ยอดจริงเสมอ ไม่หักออก เพราะทุกเที่ยวจะถูกติด helper ไว้หมด ถ้าหักจะทำให้ยอดหายไปทั้งคัน
       // ส่วนคนขับที่มีทะเบียนของตัวเอง (เช่น สมนึก, ฐา) ถ้าถูกคนอื่นยืมไปขับ ให้หักออกจากทะเบียนต้นทาง แล้วไปนับที่คนขับที่ไปช่วยแทน
       const isSpareVeh=n=>n.includes('สำรอง')||n.includes('บ่อตะกั่ว');
@@ -9506,7 +9517,7 @@ window.__dataReady.then(data => {
       const dayHelpedTotal=name=>dayRows.filter(r=>r.helper===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
       const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       const dayGrand=dayRows.filter(r=>r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-      return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal};
+      return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal,persons,personOwn,personHelp,isExtraPerson};
     }
 
     function openDayForm(type,name){
@@ -9834,7 +9845,7 @@ window.__dataReady.then(data => {
                     const mList=vehNotesOf(monthNotes,v.vt,v.name);
                     const yList=vehNotesOf(companyNotes,v.vt,v.name);
                     return<tr key={v.vt+'|'+v.name} style={{borderBottom:'1px solid #f1f5f9'}}>
-                      <td style={{padding:'5px 10px',fontWeight:600,color:'#334155',whiteSpace:'nowrap'}}>{v.vt==='เทรลเลอร์'?'🚛':'🚚'} {v.name}</td>
+                      <td style={{padding:'5px 10px',fontWeight:600,color:'#334155',whiteSpace:'nowrap'}}>{v.vt==='เทรลเลอร์'?'🚛':'🚚'} {dispName(v.name)}</td>
                       {reasons.map((r,i)=><td key={'m'+i} style={{textAlign:'right',padding:'5px 8px',color:'#475569',borderRight:i===reasons.length-1?'2px solid #fde68a':'none'}}>{cnt(mList,r)||0}</td>)}
                       {reasons.map((r,i)=><td key={'y'+i} style={{textAlign:'right',padding:'5px 8px',fontWeight:700,color:'#b45309'}}>{cnt(yList,r)||0}</td>)}
                     </tr>;
@@ -9878,12 +9889,14 @@ window.__dataReady.then(data => {
         const SHARE_COLORS={'รถบริษัท':'#2f5fd0','รถบ่อตะกั่ว':'#7b61c4','รับเอง':'#d98a2b','รถร่วม':'#d65b5b'};
         const segments=Object.entries(shareMap).filter(([,v])=>v>0).map(([label,value])=>({label,value,color:SHARE_COLORS[label]||'#94a3b8'}));
         // อันดับคนขับ (ทั้งปี รวม 2 ประเภท ทุกทะเบียน รวมรถร่วม/รับเอง/บ่อตะกั่วด้วย)
-        const rank=[...trailer.items.map(i=>({label:'🚛 '+i.name,value:trailer.rowTotal(i.name)})),
-                    ...wheel.items.map(i=>({label:'🚚 '+i.name,value:wheel.rowTotal(i.name)}))]
+        // นับรายคน: เที่ยวที่ไปช่วยขับนับให้คนขับ แยกตามประเภทรถที่ไปขับ
+        const personYear=(td,n)=>[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+td.personOwn(n,m)+td.personHelp(n,m),0);
+        const rank=[...trailer.persons.map(n=>({label:'🚛 '+dispName(n),value:personYear(trailer,n)})),
+                    ...wheel.persons.map(n=>({label:'🚚 '+dispName(n),value:personYear(wheel,n)}))]
                     .filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
         // อันดับคนขับของเดือนล่าสุดที่มีข้อมูล
-        const rankMonth=lastM?[...trailer.items.map(i=>({label:'🚛 '+i.name,value:trailer.cell(i.name,lastM)})),
-                    ...wheel.items.map(i=>({label:'🚚 '+i.name,value:wheel.cell(i.name,lastM)}))]
+        const rankMonth=lastM?[...trailer.persons.map(n=>({label:'🚛 '+dispName(n),value:trailer.personOwn(n,lastM)+trailer.personHelp(n,lastM)})),
+                    ...wheel.persons.map(n=>({label:'🚚 '+dispName(n),value:wheel.personOwn(n,lastM)+wheel.personHelp(n,lastM)}))]
                     .filter(i=>i.value>0).sort((a,b)=>b.value-a.value):[];
         const card=(title,sub,children)=><div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
           <div style={{fontSize:15,fontWeight:800,color:'#1e293b'}}>{title}</div>
@@ -9964,7 +9977,7 @@ window.__dataReady.then(data => {
       })()}
 
       {view==='monthly'&&TYPES.map(t=>{
-        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows,typeRows}=getTypeData(t.k);
+        const {items,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows,typeRows,persons,personOwn,personHelp,isExtraPerson}=getTypeData(t.k);
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
             <span style={{fontSize:18}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
@@ -10003,7 +10016,7 @@ window.__dataReady.then(data => {
                 return<div style={{display:'flex',flexDirection:'column',gap:7}}>
                   {ranked.map(it=><div key={it.name} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#475569'}}>
                     <span style={{fontSize:16,minWidth:20,textAlign:'center'}}>{['🥇','🥈','🥉'][it.rank-1]||<span style={{fontSize:12,fontWeight:700,color:'#94a3b8'}}>{it.rank}</span>}</span>
-                    <span style={{flex:1,fontWeight:600,color:'#1e293b'}}>{it.name}{it.helped>0&&<span title={`รวมเที่ยวที่ไปช่วยขับรถสำรอง ${fmt(it.helped)} เที่ยว`} style={{marginLeft:6,fontSize:11,color:'#0f766e',fontWeight:700}}>🤝 +{fmt(it.helped)}</span>}</span>
+                    <span style={{flex:1,fontWeight:600,color:'#1e293b'}}>{dispName(it.name)}{it.helped>0&&<span title={`รวมเที่ยวที่ไปช่วยขับรถสำรอง ${fmt(it.helped)} เที่ยว`} style={{marginLeft:6,fontSize:11,color:'#0f766e',fontWeight:700}}>🤝 +{fmt(it.helped)}</span>}</span>
                     <b style={{color:t.color}}>{fmt(it.trips)} เที่ยว</b>
                   </div>)}
                   {rankedAll.length>3&&<button onClick={()=>setRankExpanded(s=>({...s,[t.k]:!expanded}))} style={{alignSelf:'flex-start',fontSize:12,color:t.color,background:'none',border:'none',padding:'2px 0',cursor:'pointer',fontWeight:600}}>
@@ -10013,10 +10026,10 @@ window.__dataReady.then(data => {
                     <div style={{fontSize:11,fontWeight:700,color:'#0f766e',marginBottom:4}}>🤝 ช่วยขับรถสำรอง</div>
                     {helperList.map(([name,d])=><div key={name} style={{marginBottom:4}}>
                       <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#475569'}}>
-                        <span style={{fontWeight:600}}>{name}</span><b style={{color:'#0f766e'}}>{fmt(d.total)} เที่ยว</b>
+                        <span style={{fontWeight:600}}>{dispName(name)}</span><b style={{color:'#0f766e'}}>{fmt(d.total)} เที่ยว</b>
                       </div>
                       {Object.entries(d.byTarget).sort((a,b)=>b[1]-a[1]).map(([target,n])=><div key={target} style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#94a3b8',paddingLeft:10}}>
-                        <span>→ {target}</span><span>{fmt(n)} เที่ยว</span>
+                        <span>→ {dispName(target)}</span><span>{fmt(n)} เที่ยว</span>
                       </div>)}
                     </div>)}
                   </div>}
@@ -10041,26 +10054,21 @@ window.__dataReady.then(data => {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-                  {items.map((it,idx)=>{
-                    // รถที่ไม่มีคนขับประจำ (สำรอง/บ่อตะกั่ว) โชว์ยอดจริงเสมอ · คนขับที่มีทะเบียนตัวเอง ถ้าถูกยืมไปขับ ให้หักออกจากทะเบียนต้นทาง ไปนับที่คนช่วยขับแทน
-                    const isSpareVeh=n=>n.includes('สำรอง')||n.includes('บ่อตะกั่ว');
-                    const ownAt=m=>{
-                      const dSum=dayRows.filter(r=>r.driver_name===it.name&&(isSpareVeh(it.name)||!r.helper)&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-                      if(dSum>0)return dSum;
-                      return typeRows.filter(r=>r.driver_name===it.name&&r.day==null&&(isSpareVeh(it.name)||!r.helper)&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-                    };
-                    const helperAt=m=>typeRows.filter(r=>r.helper===it.name&&!r.helper.includes('บ่อตะกั่ว')&&r.month===m).reduce((s,r)=>s+(r.trips||0),0);
-                    const ownTotal=[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+ownAt(m),0);
-                    const helperTotal=[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+helperAt(m),0);
-                    return<tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                    <td style={{padding:'5px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
-                    {months.map(m=>{const v=ownAt(m),h=helperAt(m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว`:undefined}>{total?fmt(total):'–'}{h>0&&<span style={{fontSize:10,color:'#0f766e',fontWeight:700}}> 🤝</span>}</td>;})}
+                  {persons.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
+                  {persons.map((name,idx)=>{
+                    const extra=isExtraPerson(name);
+                    const ALLM=[1,2,3,4,5,6,7,8,9,10,11,12];
+                    const ownTotal=ALLM.reduce((s,m)=>s+personOwn(name,m),0);
+                    const helperTotal=ALLM.reduce((s,m)=>s+personHelp(name,m),0);
+                    const bg=extra?'#f0fdfa':idx%2?'#fcfcfd':'#fff';
+                    return<tr key={name} style={{background:bg}}>
+                    <td style={{padding:'5px 8px',position:'sticky',left:0,background:bg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={extra?`มาช่วยขับรถ${t.k}`:undefined}>{dispName(name)}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
+                    {months.map(m=>{const v=personOwn(name,m),h=personHelp(name,m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว`:undefined}>{total?fmt(total):'–'}{h>0&&!extra&&<span style={{fontSize:10,color:'#0f766e',fontWeight:700}}> 🤝</span>}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
-                      {canEdit?<span onClick={()=>openEdit(t.k,it.name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
+                      {canEdit&&!extra?<span onClick={()=>openEdit(t.k,name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
                     </td>
                     {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
-                      <button onClick={()=>setConfirmDel({type:t.k,name:it.name})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>
+                      {!extra&&<button onClick={()=>setConfirmDel({type:t.k,name})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>}
                     </td>}
                   </tr>;})}
                 </tbody>
@@ -10163,7 +10171,7 @@ window.__dataReady.then(data => {
                 <tbody>
                   {dayItems.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
                   {dayItems.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                    <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{it.name}</td>
+                    <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>{dispName(it.name)}</td>
                     {dayList.map(d=>{
                       // v = ยอดที่แสดง (ของตัวเอง + ที่ได้รับเครดิตจากการช่วยขับ) · ownV = ของทะเบียนตัวเองล้วนๆ ใช้เช็คว่ารถคันนี้ว่างไหม (บันทึกเหตุผลได้แม้ v>0 จากการไปช่วยขับที่อื่น)
                       const v=dayCell(it.name,d);
@@ -10286,7 +10294,7 @@ window.__dataReady.then(data => {
                 <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
                   <thead><tr style={{background:'#f8fafc'}}>
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ประเภทรถ</th>
-                    <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
+                    <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ไปขับรถของ (ถ้ามี)</th>
@@ -10298,7 +10306,7 @@ window.__dataReady.then(data => {
                       const choice=spareTargetChoice[key]||'';
                       return<tr key={key} style={{background:i%2?'#fcfcfd':'#fff'}}>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
-                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name}</td>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{dispName(d.name)}</td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
@@ -10309,7 +10317,7 @@ window.__dataReady.then(data => {
                             if(!v)setSpareAssign(s=>{const n={...s};delete n[key];return n;});
                           }} style={{width:'100%',padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11}}>
                             <option value="">-- ไม่ย้าย --</option>
-                            {allDrivers.filter(o=>!(o.vt===d.vt&&o.name===d.name)).map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
+                            {allDrivers.filter(o=>!(o.vt===d.vt&&o.name===d.name)).map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{dispName(o.name)} ({o.vt})</option>)}
                           </select>
                         </td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
@@ -10362,16 +10370,16 @@ window.__dataReady.then(data => {
       </div>}
 
       {view==='summary'&&TYPES.map(t=>{
-        const {items,rowTotal,typeGrand}=getTypeData(t.k);
+        const {typeGrand,persons,personOwn,personHelp,isExtraPerson}=getTypeData(t.k);
+        const ALLM=[1,2,3,4,5,6,7,8,9,10,11,12];
         return<div key={t.k} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
           <div style={{fontSize:15,fontWeight:800,color:t.color,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><span>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>สรุปทั้งปี {selYear} · {t.k}</div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {items.map(it=>{
-              const tot=rowTotal(it.name);
+            {persons.map(name=>({name,tot:ALLM.reduce((s,m)=>s+personOwn(name,m)+personHelp(name,m),0)})).filter(p=>p.tot>0||!isExtraPerson(p.name)).map(({name,tot})=>{
               const pct=typeGrand>0?(tot/typeGrand*100):0;
-              return<div key={it.name}>
+              return<div key={name}>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
-                  <span style={{fontWeight:600,color:'#334155'}}>{it.name}</span>
+                  <span style={{fontWeight:600,color:'#334155'}}>{dispName(name)}{isExtraPerson(name)&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</span>
                   <span style={{fontWeight:800,color:t.color}}>{fmt(tot)} เที่ยว <span style={{color:'#94a3b8',fontWeight:600}}>({pct.toFixed(1)}%)</span></span>
                 </div>
                 <div style={{height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
