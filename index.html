@@ -9471,6 +9471,8 @@ window.__dataReady.then(data => {
     // ===== นำเข้า Excel (รายวัน) =====
     const [showImport,setShowImport]=useState(false);
     const [importRows,setImportRows]=useState([]);
+    const [importDropped,setImportDropped]=useState(null); // {trips,days,months} ข้อมูลวันที่ 16+ ที่ถูกตัดตอนนำเข้าครึ่งเดือน
+    const UNKNOWN_PREFIX='❓';
     const [importing,setImporting]=useState(false);
     const [importType,setImportType]=useState('เทรลเลอร์');
     const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ไปขับรถคันอื่นแทน (หักจากคนขับ ไปเข้ารถปลายทางที่เลือก)
@@ -9675,8 +9677,8 @@ window.__dataReady.then(data => {
             const firstWord=n=>n.trim().split(/\s+/)[0];
             const byFirstWord=existingList.find(e=>aliasOf(e.name)===firstWord(rawName));
             if(byFirstWord)return{name:byFirstWord.name,vt:byFirstWord.vt};
-            const fallback=existingList.find(e=>e.name==='รถบ่อตะกั่ว'||aliasOf(e.name)==='รถบ่อตะกั่ว');
-            return fallback?{name:fallback.name,vt:fallback.vt}:{name:'รถบ่อตะกั่ว',vt:importType};
+            // ไม่พบชื่อในระบบ: ไม่เดาเอง ใส่ชื่อชั่วคราวไว้ให้ผู้ใช้เลือกจับคู่ในหน้าตรวจสอบก่อนนำเข้า
+            return{name:UNKNOWN_PREFIX+rawName,vt:importType};
           }
           const counts={}; // key: vt|driver|y|m|d|prefix -> จำนวนเที่ยว(บิล)ของวันนั้น แยกตามชุดเลขที่บิล (เช่น BLV, BLF)
           let currentGroup=null,lastDt=null; // lastDt = วันที่ล่าสุดในบล็อกเดียวกัน ใช้แทนแถวบิลที่อ่านวันที่ไม่ออก
@@ -9719,6 +9721,8 @@ window.__dataReady.then(data => {
           const maxDayOf={};parsed.forEach(r=>{const k=r.year+'|'+r.month;if((r.day||0)>(maxDayOf[k]||0))maxDayOf[k]=r.day;});
           const daysInMonth=(y,m)=>new Date(y-543,m,0).getDate();
           const snapped=parsed.filter(r=>{const dim=daysInMonth(r.year,r.month);return maxDayOf[r.year+'|'+r.month]>=dim?true:r.day<=15;});
+          const dropped=parsed.filter(r=>!snapped.includes(r));
+          setImportDropped(dropped.length?{trips:dropped.reduce((s,r)=>s+r.trips,0),days:[...new Set(dropped.map(r=>r.day))].sort((a,b)=>a-b),months:[...new Set(dropped.map(r=>MO[r.month-1]))]}:null);
           setImportRows(snapped);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
@@ -9768,6 +9772,7 @@ window.__dataReady.then(data => {
       return list.filter(r=>r.trips>0);
     }
     async function confirmImport(){
+      if(importRows.some(r=>r.driver_name.startsWith(UNKNOWN_PREFIX))){alert('ยังมีชื่อที่ไม่มีในระบบ กรุณาเลือกว่าเป็นใครก่อนนำเข้า');return;}
       setImporting(true);
       const adjustedRows=buildAdjustedImportRows();
       // ลบเฉพาะข้อมูลเดิมที่มาจาก "ชุดเลขที่บิลเดียวกัน" (source เดียวกัน เช่น BLV) ของเดือน/ปี/ประเภทรถนี้ แล้วนำเข้าใหม่แทนที่
@@ -10474,7 +10479,30 @@ window.__dataReady.then(data => {
             const prefixesFound=[...new Set(importRows.map(r=>r.source))];
             return<>
               <div style={{fontSize:12,color:'#64748b',marginBottom:14}}>{typesFound.join(', ')} · {monthsFound.join(', ')} · เลขที่บิล: {prefixesFound.join(', ')} · พบ {drivers.length} คนขับ/ทะเบียนรถ · {importRows.length} วัน-เที่ยว</div>
-              <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลเดิมเฉพาะชุดเลขที่บิล {prefixesFound.join(', ')}</b> ของ {typesFound.join(', ')} เดือน {monthsFound.join(', ')} แล้วแทนที่ด้วยไฟล์นี้ (ชุดเลขที่บิลอื่นที่นำเข้าไว้ก่อนหน้าจะไม่ถูกลบ ยอดจะรวมกัน) · ชื่อที่ตรงกับที่มีอยู่แล้วจะเข้าคนนั้น ชื่อที่ไม่ระบุ/รับเองจะเข้า "รับเอง" ชื่อที่ไม่พบในระบบจะเข้า "รถบ่อตะกั่ว"</div>
+              <div style={{fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',marginBottom:14}}>⚠️ การนำเข้าจะ<b>ลบข้อมูลเดิมเฉพาะชุดเลขที่บิล {prefixesFound.join(', ')}</b> ของ {typesFound.join(', ')} เดือน {monthsFound.join(', ')} แล้วแทนที่ด้วยไฟล์นี้ (ชุดเลขที่บิลอื่นที่นำเข้าไว้ก่อนหน้าจะไม่ถูกลบ ยอดจะรวมกัน) · ชื่อที่ตรงกับที่มีอยู่แล้วจะเข้าคนนั้น ชื่อที่ไม่ระบุ/รับเองจะเข้า "รับเอง" ชื่อที่ไม่พบในระบบต้องเลือกจับคู่ก่อน</div>
+              {importDropped&&<div style={{fontSize:12,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'8px 12px',marginBottom:14}}>
+                ℹ️ ไฟล์นี้มีข้อมูลไม่ถึงสิ้นเดือน ระบบนำเข้าเฉพาะวันที่ 1–15 ({importDropped.months.join(', ')}) · <b>ข้อมูลวันที่ {importDropped.days.join(', ')} รวม {importDropped.trips} เที่ยว จะไม่ถูกนำเข้า</b> ให้นำเข้าอีกครั้งเมื่อได้ไฟล์ครบเดือน
+              </div>}
+              {(()=>{
+                const unknowns=[...new Set(importRows.filter(r=>r.driver_name.startsWith(UNKNOWN_PREFIX)).map(r=>r.vehicle_type+'|'+r.driver_name))];
+                if(!unknowns.length)return null;
+                return<div style={{background:'#fff7ed',border:'2px solid #fdba74',borderRadius:10,padding:'10px 14px',marginBottom:14}}>
+                  <div style={{fontSize:13,fontWeight:800,color:'#9a3412',marginBottom:4}}>❓ พบชื่อที่ไม่มีในระบบ {unknowns.length} ชื่อ — เลือกว่าเป็นใครก่อนนำเข้า</div>
+                  <div style={{fontSize:11.5,color:'#9a3412',marginBottom:8}}>ถ้าเป็นคนขับใหม่ ให้กด "+ เพิ่มคนขับ/ทะเบียนรถ" ในหน้าหลักก่อน แล้วนำเข้าใหม่</div>
+                  {unknowns.map(k=>{
+                    const [uvt,uname]=k.split('|');
+                    const raw=uname.slice(UNKNOWN_PREFIX.length);
+                    const trips=importRows.filter(r=>r.vehicle_type===uvt&&r.driver_name===uname).reduce((s,r)=>s+r.trips,0);
+                    return<div key={k} style={{display:'grid',gridTemplateColumns:'1fr 1.3fr',gap:8,alignItems:'center',marginBottom:6}}>
+                      <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>"{raw}" <span style={{fontWeight:500,color:'#94a3b8'}}>· {trips} เที่ยว</span></div>
+                      <select value="" onChange={e=>{const v=e.target.value;if(!v)return;const [tvt,tname]=v.split('||');setImportRows(list=>list.map(r=>r.vehicle_type===uvt&&r.driver_name===uname?{...r,vehicle_type:tvt,driver_name:tname}:r));}} style={{padding:'5px 8px',border:'1px solid #fdba74',borderRadius:6,fontSize:12}}>
+                        <option value="">-- เลือกว่าเป็นใคร --</option>
+                        {allDrivers.map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
+                      </select>
+                    </div>;
+                  })}
+                </div>;
+              })()}
               <div style={{overflowX:'auto',border:'1px solid #e2e8f0',borderRadius:10,marginBottom:16}}>
                 <table style={{borderCollapse:'collapse',width:'100%',fontSize:11}}>
                   <thead><tr style={{background:'#f8fafc'}}>
@@ -10549,7 +10577,7 @@ window.__dataReady.then(data => {
           })()}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={confirmImport} disabled={importing} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',opacity:importing?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>
+            {(()=>{const blocked=importRows.some(r=>r.driver_name.startsWith(UNKNOWN_PREFIX));return<button onClick={confirmImport} disabled={importing||blocked} title={blocked?'เลือกชื่อที่ไม่มีในระบบให้ครบก่อน':undefined} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:blocked?'not-allowed':'pointer',opacity:importing||blocked?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>;})()}
           </div>
         </div>
       </div>}
