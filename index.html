@@ -10354,7 +10354,7 @@ window.__dataReady.then(data => {
                             if(!v)setSpareAssign(s=>{const n={...s};delete n[key];return n;});
                           }} style={{width:'100%',padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11}}>
                             <option value="">-- ไม่ย้าย --</option>
-                            {allDrivers.filter(o=>!(o.vt===d.vt&&o.name===d.name)).map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{dispName(o.name)} ({o.vt})</option>)}
+                            {allDrivers.filter(o=>!(o.vt===d.vt&&o.name===d.name)).map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
                           </select>
                         </td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
