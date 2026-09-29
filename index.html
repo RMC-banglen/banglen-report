@@ -103,6 +103,10 @@ var APP_VERSION='2026-09-24c';
   .seg__btn.is-active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(22,34,51,0.12); }
 
   /* tabs — เลื่อนแนวนอนบรรทัดเดียว กันข้อความตัดบรรทัดจนอ่านยากตอนมีแท็บเยอะ */
+  /* ตารางขนส่ง: จอแคบเลื่อนซ้าย-ขวาได้ · จอกว้างไม่ตัดกรอบ เพื่อให้หัวตาราง sticky ค้างตอนเลื่อนทั้งหน้า */
+  .tt-scroll-m, .tt-scroll-d { overflow-x: auto; }
+  @media (min-width: 760px) { .tt-scroll-m { overflow: visible; } }
+  @media (min-width: 1260px) { .tt-scroll-d { overflow: visible; } }
   .tabs { display: flex; gap: 2px; border-bottom: 1.5px solid var(--line); margin-bottom: 24px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
   .tabs__btn { border: 0; background: transparent; font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--muted-text); padding: 12px 14px; cursor: pointer; position: relative; transition: color .15s; white-space: nowrap; flex-shrink: 0; }
   .tabs__btn:hover { color: var(--ink); }
@@ -9374,7 +9378,7 @@ window.__dataReady.then(data => {
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
     const [selYear,setSelYear]=useState(2569);
-    const [view,setView]=useState('dashboard');
+    const [view,setView]=useState('monthly');
     const [selMonth,setSelMonth]=useState(new Date().getMonth()+1);
     const [hideEmptyDay,setHideEmptyDay]=useState(false);
     const [helpPopup,setHelpPopup]=useState(null); // {vt,name,month,day?}
@@ -9793,13 +9797,13 @@ window.__dataReady.then(data => {
         </div>
       </div>
 
-      {/* Sub-tab: Dashboard / รายวัน / รายเดือน / สรุปทั้งปี */}
+      {/* Sub-tab: รายเดือน / หยุดวิ่ง / Dashboard / รายวัน / สรุปทั้งปี */}
       <div style={{display:'flex',gap:6,marginBottom:20,borderBottom:'2px solid #f1f5f9'}}>
+        <button onClick={()=>setView('monthly')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='monthly'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='monthly'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📅 รายเดือน</button>
+        <button onClick={()=>setView('stopped')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='stopped'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='stopped'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🛑 หยุดวิ่ง</button>
         <button onClick={()=>setView('dashboard')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='dashboard'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='dashboard'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📈 Dashboard</button>
         <button onClick={()=>setView('daily')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='daily'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='daily'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📆 รายวัน</button>
-        <button onClick={()=>setView('monthly')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='monthly'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='monthly'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📅 รายเดือน</button>
         <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='summary'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
-        <button onClick={()=>setView('stopped')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='stopped'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='stopped'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🛑 หยุดวิ่ง</button>
       </div>
 
       {view==='stopped'&&(()=>{
@@ -10053,19 +10057,19 @@ window.__dataReady.then(data => {
             </div>
           </div>
 
-          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:8}}>
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'clip',marginBottom:8}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · ปี {selYear}</div>
               {canEdit&&<button onClick={()=>openAdd(t.k)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
             </div>
-            <div style={{overflowX:'auto'}}>
+            <div className="tt-scroll-m">
               <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
                 <thead>
                   <tr style={{background:'#f8fafc'}}>
-                    <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
-                    {months.map(m=><th key={m} style={{textAlign:'right',padding:'7px 6px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
-                    <th style={{textAlign:'right',padding:'7px 8px',color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
-                    {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
+                    <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,top:0,zIndex:3,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
+                    {months.map(m=><th key={m} style={{textAlign:'right',padding:'7px 6px',position:'sticky',top:0,zIndex:2,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'}}>{MO[m-1]}</th>)}
+                    <th style={{textAlign:'right',padding:'7px 8px',position:'sticky',top:0,zIndex:2,color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
+                    {canEdit&&<th style={{position:'sticky',top:0,zIndex:2,borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -10172,11 +10176,11 @@ window.__dataReady.then(data => {
             <span style={{fontSize:15}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
             <div style={{fontSize:15,fontWeight:800,color:t.color}}>รายวัน {t.k} · ปี {selYear}</div>
           </div>
-          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:8}}>
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'clip',marginBottom:8}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · {MO[selDayMonth-1]} {selYear} (รายวัน 1-{dLen})</div>
             </div>
-            <div style={{overflowX:'auto'}}>
+            <div className="tt-scroll-d">
               {/* table-layout fixed + colgroup ให้คอลัมน์วันที่กว้างเท่ากันทุกตาราง (เทรลเลอร์/12ล้อ) วันที่จะตรงกัน */}
               <table style={{borderCollapse:'collapse',width:'100%',minWidth:1150,tableLayout:'fixed',fontSize:13}}>
                 <colgroup>
@@ -10187,10 +10191,10 @@ window.__dataReady.then(data => {
                 </colgroup>
                 <thead>
                   <tr style={{background:'#f8fafc'}}>
-                    <th style={{textAlign:'left',padding:'6px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
-                    {dayList.map(d=><th key={d} style={{textAlign:'center',padding:'6px 4px',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{d}</th>)}
-                    <th style={{textAlign:'right',padding:'6px 8px',color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
-                    {canEdit&&<th style={{borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
+                    <th style={{textAlign:'left',padding:'6px 8px',position:'sticky',left:0,top:0,zIndex:3,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
+                    {dayList.map(d=><th key={d} style={{textAlign:'center',padding:'6px 4px',position:'sticky',top:0,zIndex:2,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>{d}</th>)}
+                    <th style={{textAlign:'right',padding:'6px 8px',position:'sticky',top:0,zIndex:2,color:t.color,fontWeight:800,borderBottom:'2px solid #e2e8f0',background:'#f1f5f9'}}>รวม</th>
+                    {canEdit&&<th style={{position:'sticky',top:0,zIndex:2,borderBottom:'2px solid #e2e8f0',background:'#f8fafc'}}></th>}
                   </tr>
                 </thead>
                 <tbody>
