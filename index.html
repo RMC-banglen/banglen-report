@@ -10082,7 +10082,9 @@ window.__dataReady.then(data => {
                     const bg=extra?'#f0fdfa':idx%2?'#fcfcfd':'#fff';
                     return<tr key={name} style={{background:bg}}>
                     <td style={{padding:'5px 8px',position:'sticky',left:0,background:bg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={extra?`มาช่วยขับรถ${t.k}`:undefined}>{dispName(name)}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
-                    {months.map(m=>{const v=personOwn(name,m),h=personHelp(name,m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={()=>setHelpPopup({vt:t.k,name,month:m})} style={{fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer',marginLeft:2}}>🤝</span>}</td>;})}
+                    {months.map(m=>{const v=personOwn(name,m),h=personHelp(name,m),total=v+h;
+                      if(extra)return<td key={m} onClick={h>0?()=>setHelpPopup({vt:t.k,name,month:m}):undefined} style={{textAlign:'right',padding:'5px 6px',color:total?'#0f766e':'#cbd5e1',fontWeight:total?700:undefined,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:h>0?'pointer':'default'}} title={h>0?'กดดูรายละเอียด':undefined}>{total?<span style={{textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(total)}</span>:'–'}</td>;
+                      return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={()=>setHelpPopup({vt:t.k,name,month:m})} style={{fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer',marginLeft:2}}>🤝</span>}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
                       {canEdit&&!extra?<span onClick={()=>openEdit(t.k,name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
                     </td>
@@ -10211,16 +10213,18 @@ window.__dataReady.then(data => {
                       const helpTargets={};
                       if(helped>0)dayRows.filter(r=>r.helper===it.name&&r.month===selDayMonth&&r.day===d).forEach(r=>{helpTargets[r.driver_name]=(helpTargets[r.driver_name]||0)+(r.trips||0);});
                       const helpText=Object.entries(helpTargets).map(([n,c])=>`ไปช่วยขับรถ${dispName(n)} ${c} เที่ยว`).join(', ');
-                      return<td key={d} onClick={clickable?()=>editDayNote(t.k,it.name,d):undefined}
-                        title={[helped>0?helpText:null,note?`ทะเบียนตัวเอง: ${note}`:clickable?'คลิกเพื่อบันทึกเหตุผลของทะเบียนตัวเอง เช่น หยุด/รถเสีย':null].filter(Boolean).join(' · ')||undefined}
-                        style={{textAlign:'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
-                        {v>0&&<span>{v}</span>}
+                      // แถว "มาช่วยขับ" ทุกเที่ยวคือเที่ยวช่วยขับ ไม่ต้องมีรูปมือ กดที่ตัวเลขเพื่อดูรายละเอียดได้เลย
+                      const extraClick=it.extra&&helped>0;
+                      return<td key={d} onClick={clickable?()=>editDayNote(t.k,it.name,d):extraClick?()=>setHelpPopup({vt:t.k,name:it.name,month:selDayMonth,day:d}):undefined}
+                        title={[helped>0?helpText+(extraClick?' (กดดูรายละเอียด)':''):null,note?`ทะเบียนตัวเอง: ${note}`:clickable?'คลิกเพื่อบันทึกเหตุผลของทะเบียนตัวเอง เช่น หยุด/รถเสีย':null].filter(Boolean).join(' · ')||undefined}
+                        style={{textAlign:'center',padding:'4px 3px',color:v?(extraClick?'#0f766e':'#334155'):note?'#dc2626':'#e2e8f0',fontWeight:extraClick?700:undefined,borderBottom:'1px solid #f1f5f9',cursor:clickable||extraClick?'pointer':'default'}}>
+                        {v>0&&<span style={extraClick?{textDecoration:'underline',textDecorationStyle:'dotted'}:undefined}>{v}</span>}
                         {v===0&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
                           {note&&<span style={{fontSize:10,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'1px 3px',whiteSpace:'nowrap',color:'#dc2626'}}>{note.length>4?note.slice(0,4):note}</span>}
                           {!note&&'·'}
                         </div>}
                         {note&&ownV===0&&v>0&&<div style={{fontSize:9,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'0 3px',color:'#dc2626',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</div>}
-                        {helped>0&&<div onClick={e=>{e.stopPropagation();setHelpPopup({vt:t.k,name:it.name,month:selDayMonth,day:d});}} style={{fontSize:9,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝{helped}</div>}
+                        {helped>0&&!it.extra&&<div onClick={e=>{e.stopPropagation();setHelpPopup({vt:t.k,name:it.name,month:selDayMonth,day:d});}} style={{fontSize:9,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝{helped}</div>}
                       </td>;
                     })}
                     <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
