@@ -9882,7 +9882,8 @@ window.__dataReady.then(data => {
         const trailer=getTypeData('เทรลเลอร์');
         const wheel=getTypeData('10ล้อ-12ล้อ');
         const NUM={'เทรลเลอร์':7,'10ล้อ-12ล้อ':2};
-        const isCompany=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง');
+        // ใช้เกณฑ์เดียวกับตารางรายเดือน: รถบริษัท = ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว
+        const isCompany=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
         const companyCol=(td)=>m=>td.items.filter(i=>isCompany(i.name)).reduce((s,it)=>s+td.cell(it.name,m),0);
         // เดือนที่มีข้อมูลจริง (จากทั้ง 2 ประเภท)
         const monthsData=[...new Set([...trailer.months,...wheel.months])].filter(m=>trailer.colTotal(m)+wheel.colTotal(m)>0).sort((a,b)=>a-b);
