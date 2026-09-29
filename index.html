@@ -9398,11 +9398,11 @@ window.__dataReady.then(data => {
     const [dayNoteModal,setDayNoteModal]=useState(null); // {vt,name,day,value}
     function editDayNote(vt,name,d){
       const cur=dayNoteOf(vt,name,d);
-      setDayNoteModal({vt,name,day:d,value:cur&&!DAY_NOTE_OPTIONS.includes(cur)?'อื่นๆ':(cur||''),customText:cur&&!DAY_NOTE_OPTIONS.includes(cur)?cur:''});
+      setDayNoteModal({vt,name,day:d,value:cur&&DAY_NOTE_OPTIONS.includes(cur)?cur:''});
     }
     async function saveDayNote(){
-      const {vt,name,day,value,customText}=dayNoteModal;
-      const finalNote=value==='อื่นๆ'?(customText||'').trim():value;
+      const {vt,name,day,value}=dayNoteModal;
+      const finalNote=(value||'').trim();
       if(!finalNote){
         await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).eq('day',day).eq('vehicle_type',vt).eq('driver_name',name);
       }else{
@@ -10269,17 +10269,12 @@ window.__dataReady.then(data => {
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:420}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>เหตุผลที่ไม่มีเที่ยว</div>
           <div style={{fontSize:13,color:'#64748b',marginBottom:16}}>{dayNoteModal.name} · วันที่ {dayNoteModal.day} {MO[selDayMonth-1]} {selYear}</div>
-          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:dayNoteModal.value==='อื่นๆ'?12:16}}>
-            {['',...DAY_NOTE_OPTIONS,'อื่นๆ'].map(opt=>
-              <label key={opt||'none'} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',border:`1.5px solid ${dayNoteModal.value===opt?'#dc2626':'#e2e8f0'}`,borderRadius:8,background:dayNoteModal.value===opt?'#fef2f2':'#fff',cursor:'pointer'}}>
-                <input type="radio" checked={dayNoteModal.value===opt} onChange={()=>setDayNoteModal(m=>({...m,value:opt}))}/>
-                <span style={{fontSize:14,color:'#1e293b'}}>{opt===''?'(ไม่มีเหตุผล / ลบ)':opt}</span>
-              </label>
-            )}
+          <div style={{marginBottom:16}}>
+            <select value={dayNoteModal.value} onChange={e=>setDayNoteModal(m=>({...m,value:e.target.value}))} style={{...inp,fontSize:15}}>
+              <option value="">(ไม่มีเหตุผล / ลบ)</option>
+              {DAY_NOTE_OPTIONS.map(opt=><option key={opt} value={opt}>{opt}</option>)}
+            </select>
           </div>
-          {dayNoteModal.value==='อื่นๆ'&&<div style={{marginBottom:16}}>
-            <input type="text" autoFocus value={dayNoteModal.customText||''} onChange={e=>setDayNoteModal(m=>({...m,customText:e.target.value}))} placeholder="ระบุเหตุผล" style={inp}/>
-          </div>}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>setDayNoteModal(null)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             <button onClick={saveDayNote} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>บันทึก</button>
