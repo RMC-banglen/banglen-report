@@ -9374,6 +9374,7 @@ window.__dataReady.then(data => {
     const [selYear,setSelYear]=useState(2569);
     const [view,setView]=useState('dashboard');
     const [selMonth,setSelMonth]=useState(new Date().getMonth()+1);
+    const [hideEmptyDay,setHideEmptyDay]=useState(false);
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({id:null,year:2569,vehicle_type:'เทรลเลอร์',driver_name:'',sort_order:0,trips:{}});
     const [saving,setSaving]=useState(false);
@@ -10116,6 +10117,10 @@ window.__dataReady.then(data => {
       })}
 
       {view==='daily'&&<div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:8}}>
+        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
+          <input type="checkbox" checked={hideEmptyDay} onChange={e=>setHideEmptyDay(e.target.checked)}/>
+          ซ่อนคันที่ยังไม่มีข้อมูลเดือนนี้
+        </label>
         <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
           {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
         </select>
@@ -10134,7 +10139,8 @@ window.__dataReady.then(data => {
       {view==='daily'&&TYPES.map(t=>{
         const {items,dayRows,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal}=getTypeData(t.k);
         const NON_CO=['รถบ่อตะกั่ว','รับเอง','รถร่วม'];
-        const dayItems=items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth));
+        const dayItems=items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth))
+          .filter(it=>!hideEmptyDay||dayRowTotal(it.name)>0);
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14}}>
             <span style={{fontSize:15}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
