@@ -9409,12 +9409,21 @@ window.__dataReady.then(data => {
     const PERSON_REASONS=['ลาหยุด'];
     // ทะเบียนอ่านจากท้ายชื่อ เช่น "ฐา / 90-4551" → "90-4551" ถ้าไม่มีทะเบียนใช้ชื่อแทน
     const plateOf=n=>{const m=String(n||'').match(/(\d{2}-\d{4})\s*$/);return m?m[1]:String(n||'').trim();};
+    // คอลัมน์ person/plate: คน = ผู้ขับจริง (ถ้ามี helper คือคนที่ไปช่วยขับ, รถสำรองไม่ระบุคน = null) · plate = ทะเบียนรถที่วิ่งเที่ยวนั้น
+    const PLATE_RE=/\s*\/\s*(\d{2}-\d{4})\s*$/;
+    const nameOnly=n=>String(n||'').replace(PLATE_RE,'').trim();
+    const withPersonPlate=r=>{
+      const credited=!!r.helper&&!r.helper.includes('บ่อตะกั่ว');
+      const m=String(r.driver_name||'').match(PLATE_RE);
+      return {...r,plate:m?m[1]:null,person:credited?nameOnly(r.helper):(String(r.driver_name||'').includes('สำรอง')?null:nameOnly(r.driver_name))};
+    };
+    const insertTrips=list=>DB.from('transport_trips').insert(list.map(withPersonPlate));
     const isCompanyName=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
     // จำนวนรถบริษัทในเดือนนั้น = ทะเบียนที่มีเที่ยววิ่ง หรือมีป้ายหยุดที่เป็นเรื่องของรถ (รถจอดซ่อมทั้งเดือนก็ยังนับ)
     function truckCount(vt,m){
       const plates=new Set();
-      yearRows.forEach(r=>{if(r.vehicle_type===vt&&r.month===m&&(r.trips||0)>0&&isCompanyName(r.driver_name))plates.add(plateOf(r.driver_name));});
-      dayNotes.forEach(n=>{if(n.year===selYear&&n.vehicle_type===vt&&n.month===m&&isCompanyName(n.driver_name)&&VEHICLE_REASONS.includes((n.note||'').trim()))plates.add(plateOf(n.driver_name));});
+      yearRows.forEach(r=>{if(r.vehicle_type===vt&&r.month===m&&(r.trips||0)>0&&isCompanyName(r.driver_name))plates.add(r.plate||plateOf(r.driver_name));});
+      dayNotes.forEach(n=>{if(n.year===selYear&&n.vehicle_type===vt&&n.month===m&&isCompanyName(n.driver_name)&&VEHICLE_REASONS.includes((n.note||'').trim()))plates.add(n.plate||plateOf(n.driver_name));});
       return plates.size;
     }
 
@@ -9432,7 +9441,7 @@ window.__dataReady.then(data => {
       if(!finalNote){
         await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).eq('day',day).eq('vehicle_type',vt).eq('driver_name',name);
       }else{
-        const {error}=await DB.from('transport_day_notes').upsert({year:selYear,month:selDayMonth,day,vehicle_type:vt,driver_name:name,note:finalNote},{onConflict:'year,month,day,vehicle_type,driver_name'});
+        const {error}=await DB.from('transport_day_notes').upsert({year:selYear,month:selDayMonth,day,vehicle_type:vt,driver_name:name,note:finalNote,plate:withPersonPlate({driver_name:name}).plate},{onConflict:'year,month,day,vehicle_type,driver_name'});
         if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
       }
       setDayNoteModal(null);
@@ -9568,9 +9577,11 @@ window.__dataReady.then(data => {
       setSavingDay(true);
       // ถ้าเปลี่ยนชื่อคนขับ -> เปลี่ยนชื่อในทุกแถวของคนขับคนนี้ (ทุกปี/เดือน) ก่อน
       if(dayForm.original_name&&dayForm.driver_name!==dayForm.original_name){
-        const {error:renameErr}=await DB.from('transport_trips').update({driver_name:dayForm.driver_name}).eq('vehicle_type',type).eq('driver_name',dayForm.original_name);
+        const np=withPersonPlate({driver_name:dayForm.driver_name,helper:null});
+        const {error:renameErr}=await DB.from('transport_trips').update({driver_name:dayForm.driver_name,plate:np.plate}).eq('vehicle_type',type).eq('driver_name',dayForm.original_name);
         if(renameErr){setSavingDay(false);alert('เปลี่ยนชื่อไม่สำเร็จ: '+renameErr.message);return;}
-        await DB.from('transport_trips').update({helper:dayForm.driver_name}).eq('helper',dayForm.original_name);
+        await DB.from('transport_trips').update({person:np.person}).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).is('helper',null);
+        await DB.from('transport_trips').update({helper:dayForm.driver_name,person:nameOnly(dayForm.driver_name)}).eq('helper',dayForm.original_name);
       }
       const {items}=getTypeData(type);
       const existingOrder=items.find(i=>i.name===dayForm.driver_name)?.order;
@@ -9588,7 +9599,7 @@ window.__dataReady.then(data => {
       const {error:delHelpErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('helper',dayForm.driver_name).not('day','is',null);
       if(delHelpErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ (ลบข้อมูลช่วยขับเก่า): '+delHelpErr.message);return;}
       if(helpIns.length){
-        const {error:helpErr}=await DB.from('transport_trips').insert(helpIns);
+        const {error:helpErr}=await insertTrips(helpIns);
         if(helpErr){setSavingDay(false);alert('บันทึกข้อมูลช่วยขับไม่สำเร็จ: '+helpErr.message);return;}
       }
       // หักเที่ยวที่ไม่ระบุคนขับของรถที่ไปช่วยขับ (แถวที่เหลือ 0 ลบทิ้ง)
@@ -9606,7 +9617,7 @@ window.__dataReady.then(data => {
       if(doRestore)for(const x of restores){
         const r=x.rows[0];
         if(r)await DB.from('transport_trips').update({trips:(r.trips||0)+x.amount}).eq('id',r.id);
-        else await DB.from('transport_trips').insert([{year:selYear,month:selDayMonth,day:x.d,vehicle_type:x.vt,driver_name:x.n,sort_order:orderOf(x.vt,x.n),trips:x.amount}]);
+        else await insertTrips([{year:selYear,month:selDayMonth,day:x.d,vehicle_type:x.vt,driver_name:x.n,sort_order:orderOf(x.vt,x.n),trips:x.amount}]);
       }
       if(ins.length===0){
         // ยังไม่มียอดเดือนนี้ -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
@@ -9614,7 +9625,7 @@ window.__dataReady.then(data => {
         if(!existsElsewhere)ins=[{year:selYear,month:selDayMonth,day:1,vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:0}];
       }
       let insErr=null;
-      if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
+      if(ins.length)({error:insErr}=await insertTrips(ins));
       setSavingDay(false);
       if(insErr){alert('บันทึกไม่สำเร็จ: '+(insErr.message||'เกิดข้อผิดพลาด'));return;}
       setShowDayForm(false);fetch();
@@ -9789,7 +9800,7 @@ window.__dataReady.then(data => {
         return {year:r.year,month:r.month,day:r.day,vehicle_type:r.vehicle_type,driver_name:r.driver_name,sort_order:sortOrder,trips:r.trips,note:r.source,helper:r.helper||null};
       });
       let insErr=null;
-      if(ins.length)({error:insErr}=await DB.from('transport_trips').insert(ins));
+      if(ins.length)({error:insErr}=await insertTrips(ins));
       setImporting(false);
       if(insErr){alert('นำเข้าไม่สำเร็จ: '+insErr.message);return;}
       setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);fetch();
@@ -9821,14 +9832,14 @@ window.__dataReady.then(data => {
           setSaving(false);
           if(updErr){alert('บันทึกไม่สำเร็จ: '+updErr.message);return;}
         } else {
-          const {error:insErr}=await DB.from('transport_trips').insert([{year:Number(form.year),month:1,vehicle_type:form.vehicle_type,driver_name:form.driver_name,sort_order:targetOrder,trips:0}]);
+          const {error:insErr}=await insertTrips([{year:Number(form.year),month:1,vehicle_type:form.vehicle_type,driver_name:form.driver_name,sort_order:targetOrder,trips:0}]);
           setSaving(false);
           if(insErr){alert('บันทึกไม่สำเร็จ: '+insErr.message);return;}
         }
         setShowForm(false);fetch();return;
       }
       const {error:delErr}=await DB.from('transport_trips').delete().eq('year',Number(form.year)).eq('vehicle_type',form.vehicle_type).eq('driver_name',form.driver_name);
-      const {error:insErr}=await DB.from('transport_trips').insert(ins);
+      const {error:insErr}=await insertTrips(ins);
       if(delErr||insErr){setSaving(false);alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
       setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
@@ -9880,7 +9891,7 @@ window.__dataReady.then(data => {
           if(!row){row={vt:t.k,plate:p,hasPlate:p!==it.name.trim(),names:[]};plateRows.push(row);}
           row.names.push(it.name);
         }));
-        const notesOfPlate=(list,row)=>list.filter(n=>n.vehicle_type===row.vt&&plateOf(n.driver_name)===row.plate);
+        const notesOfPlate=(list,row)=>list.filter(n=>n.vehicle_type===row.vt&&(n.plate||plateOf(n.driver_name))===row.plate);
         // ตารางคน: คนขับจริง (ไม่รวมรถสำรองที่ไม่มีคนขับประจำ)
         const personRows=TYPES.flatMap(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)&&!it.name.includes('สำรอง')).map(it=>({vt:t.k,name:it.name})));
         const notesOfPerson=(list,p)=>list.filter(n=>n.vehicle_type===p.vt&&n.driver_name===p.name);
