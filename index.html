@@ -9787,6 +9787,9 @@ window.__dataReady.then(data => {
         const vehicleList=Object.values(byVehicle).sort((a,b)=>b.items.length-a.items.length);
 
         // ---- ตารางสรุปแบบ Excel: แยกสาเหตุเป็นคอลัมน์ (เดือนที่เลือก + สะสมทั้งปี) ----
+        // เรียงคันตามลำดับเดียวกับหน้ารายวัน/รายเดือน (sort_order) ไม่ใช่เรียงตามจำนวนวันหยุด และแสดงทุกคันแม้ไม่มีวันหยุดเลย
+        const isCompanyName=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
+        const orderedVehicles=TYPES.flatMap(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)).map(it=>({vt:t.k,name:it.name})));
         const monthNotes=companyNotes.filter(n=>n.month===selDayMonth);
         const reasons=[...new Set(companyNotes.map(n=>n.note.trim()))].sort();
         const cnt=(list,reason)=>list.filter(n=>n.note.trim()===reason).length;
@@ -9826,7 +9829,7 @@ window.__dataReady.then(data => {
                   </tr>
                 </thead>
                 <tbody>
-                  {vehicleList.map(v=>{
+                  {orderedVehicles.map(v=>{
                     const mList=vehNotesOf(monthNotes,v.vt,v.name);
                     const yList=vehNotesOf(companyNotes,v.vt,v.name);
                     return<tr key={v.vt+'|'+v.name} style={{borderBottom:'1px solid #f1f5f9'}}>
