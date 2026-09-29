@@ -9369,6 +9369,170 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  // ===== ฐานข้อมูลหลักขนส่ง: รถ / คนขับ / จับคู่คนขับประจำรถ (มีช่วงวันที่) =====
+  function TransportMasterPanel({canEdit}){
+    const VT=['เทรลเลอร์','10ล้อ-12ล้อ'];
+    const [vehicles,setVehicles]=useState([]);
+    const [drivers,setDrivers]=useState([]);
+    const [assigns,setAssigns]=useState([]);
+    const [loading,setLoading]=useState(true);
+    const [editA,setEditA]=useState(null); // {id|null, driver_id, vehicle_id, start_date, end_date}
+    const [editV,setEditV]=useState(null);
+    const [editD,setEditD]=useState(null);
+    const inp={padding:'6px 8px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:13,fontFamily:'inherit',boxSizing:'border-box'};
+    const btn=(bg,color,border)=>({padding:'5px 12px',borderRadius:6,border:`1px solid ${border||bg}`,background:bg,color,fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'});
+    function load(){
+      setLoading(true);
+      Promise.all([
+        DB.from('transport_vehicles').select('*').order('vehicle_type').order('sort_order'),
+        DB.from('transport_drivers').select('*').order('sort_order'),
+        DB.from('transport_assignments').select('*').order('start_date'),
+      ]).then(([v,d,a])=>{setVehicles(v.data||[]);setDrivers(d.data||[]);setAssigns(a.data||[]);setLoading(false);});
+    }
+    useEffect(load,[]);
+    // วันที่เก็บเป็น ค.ศ. แสดงเป็น พ.ศ.
+    const th=iso=>{if(!iso)return'ปัจจุบัน';const [y,m,d]=iso.split('-');return `${+d}/${+m}/${+y+543}`;};
+    const vLabel=v=>v?`${v.plate}${v.label?` (${v.label})`:''}`:'?';
+    const dName=id=>drivers.find(d=>d.id===id)?.name||'?';
+    const vOf=id=>vehicles.find(v=>v.id===id);
+    async function save(table,row,after){
+      const {id,...data}=row;
+      const res=id?await DB.from(table).update(data).eq('id',id):await DB.from(table).insert([data]);
+      if(res.error){alert('บันทึกไม่สำเร็จ: '+res.error.message);return;}
+      after();load();
+    }
+    async function del(table,id,msg){
+      if(!confirm(msg))return;
+      const {error}=await DB.from(table).delete().eq('id',id);
+      if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}
+      load();
+    }
+    // ช่วงวันที่ทับกัน: รถคันเดียวกันมีคนขับประจำ 2 คน หรือคนเดียวประจำ 2 คันในวันเดียวกัน
+    const overlaps=[];
+    const endOf=a=>a.end_date||'9999-12-31';
+    assigns.forEach((a,i)=>assigns.slice(i+1).forEach(b=>{
+      if(!(a.start_date<=endOf(b)&&b.start_date<=endOf(a)))return;
+      if(a.vehicle_id===b.vehicle_id)overlaps.push(`รถ ${vLabel(vOf(a.vehicle_id))}: ${dName(a.driver_id)} กับ ${dName(b.driver_id)} ช่วงวันที่ทับกัน`);
+      else if(a.driver_id===b.driver_id)overlaps.push(`${dName(a.driver_id)}: เป็นคนขับประจำ ${vLabel(vOf(a.vehicle_id))} กับ ${vLabel(vOf(b.vehicle_id))} ช่วงวันที่ทับกัน`);
+    }));
+    const card=(title,sub,right,children)=><div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,marginBottom:20,overflow:'hidden'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc',flexWrap:'wrap'}}>
+        <div><div style={{fontSize:15,fontWeight:800,color:'#1e293b'}}>{title}</div>{sub&&<div style={{fontSize:12,color:'#64748b',marginTop:2}}>{sub}</div>}</div>{right}
+      </div>
+      <div style={{overflowX:'auto'}}>{children}</div>
+    </div>;
+    const thS={textAlign:'left',padding:'8px 10px',fontSize:12,color:'#64748b',fontWeight:700,borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'};
+    const tdS={padding:'7px 10px',fontSize:13,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'};
+    if(loading)return<div style={{textAlign:'center',padding:40,color:'#94a3b8'}}>กำลังโหลด...</div>;
+    const companyVehicles=vehicles.filter(v=>v.is_company);
+    const sortedAssigns=[...assigns].sort((a,b)=>{const va=vOf(a.vehicle_id),vb=vOf(b.vehicle_id);return (va?.vehicle_type||'').localeCompare(vb?.vehicle_type||'','th')||(va?.sort_order||0)-(vb?.sort_order||0)||a.start_date.localeCompare(b.start_date);});
+    const aRowEdit=<>
+      <td style={tdS}><select value={editA?.driver_id||''} onChange={e=>setEditA(s=>({...s,driver_id:e.target.value}))} style={inp}><option value="">-- คนขับ --</option>{drivers.filter(d=>d.active||d.id===editA?.driver_id).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></td>
+      <td style={tdS}><select value={editA?.vehicle_id||''} onChange={e=>setEditA(s=>({...s,vehicle_id:e.target.value}))} style={inp}><option value="">-- รถ --</option>{companyVehicles.map(v=><option key={v.id} value={v.id}>{vLabel(v)} · {v.vehicle_type}</option>)}</select></td>
+      <td style={tdS}><input type="date" value={editA?.start_date||''} onChange={e=>setEditA(s=>({...s,start_date:e.target.value}))} style={inp}/></td>
+      <td style={tdS}><input type="date" value={editA?.end_date||''} onChange={e=>setEditA(s=>({...s,end_date:e.target.value}))} style={inp}/> <span style={{fontSize:11,color:'#94a3b8'}}>ว่าง = ยังขับอยู่</span></td>
+      <td style={tdS}>
+        <button onClick={()=>{if(!editA.driver_id||!editA.vehicle_id||!editA.start_date){alert('เลือกคนขับ รถ และวันที่เริ่มให้ครบ');return;}if(editA.end_date&&editA.end_date<editA.start_date){alert('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม');return;}save('transport_assignments',{...editA,end_date:editA.end_date||null},()=>setEditA(null));}} style={btn('#2f5fd0','#fff')}>บันทึก</button>{' '}
+        <button onClick={()=>setEditA(null)} style={btn('#fff','#64748b','#e2e8f0')}>ยกเลิก</button>
+      </td>
+    </>;
+    return<div>
+      {card('🔗 คนขับประจำรถ','ใครขับรถคันไหน ตั้งแต่วันที่เท่าไหร่ ถึงวันที่เท่าไหร่ · ใช้ตอนนำเข้าไฟล์บิลเพื่อหาทะเบียนให้อัตโนมัติ',
+        canEdit&&!editA&&<button onClick={()=>setEditA({id:null,driver_id:'',vehicle_id:'',start_date:'',end_date:''})} style={btn('#2f5fd0','#fff')}>+ เพิ่มการจับคู่</button>,
+        <>
+          {overlaps.length>0&&<div style={{margin:'12px 18px 0',padding:'8px 12px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,fontSize:12.5,color:'#b91c1c'}}>
+            <b>⚠️ ช่วงวันที่ทับกัน {overlaps.length} รายการ</b> — แก้ "ถึงวันที่" ของคนเดิมก่อนเริ่มคนใหม่<ul style={{margin:'4px 0 0 18px',padding:0}}>{overlaps.map((o,i)=><li key={i}>{o}</li>)}</ul>
+          </div>}
+          <table style={{borderCollapse:'collapse',width:'100%'}}>
+            <thead><tr><th style={thS}>คนขับ</th><th style={thS}>รถ</th><th style={thS}>ตั้งแต่</th><th style={thS}>ถึง</th><th style={thS}></th></tr></thead>
+            <tbody>
+              {editA&&!editA.id&&<tr style={{background:'#eff6ff'}}>{aRowEdit}</tr>}
+              {sortedAssigns.map(a=>{
+                if(editA?.id===a.id)return<tr key={a.id} style={{background:'#eff6ff'}}>{aRowEdit}</tr>;
+                const v=vOf(a.vehicle_id);const ended=a.end_date&&a.end_date<new Date().toISOString().slice(0,10);
+                return<tr key={a.id} style={{color:ended?'#94a3b8':'#1e293b'}}>
+                  <td style={{...tdS,fontWeight:700}}>{dName(a.driver_id)}</td>
+                  <td style={tdS}>{v?.vehicle_type==='เทรลเลอร์'?'🚛':'🚚'} {vLabel(v)}</td>
+                  <td style={tdS}>{th(a.start_date)}</td>
+                  <td style={tdS}>{th(a.end_date)}{ended&&<span style={{fontSize:11,marginLeft:6}}>(สิ้นสุดแล้ว)</span>}</td>
+                  <td style={tdS}>{canEdit&&<>
+                    <button onClick={()=>setEditA({...a,end_date:a.end_date||''})} style={btn('#fff','#2f5fd0','#c7d2fe')}>แก้</button>{' '}
+                    <button onClick={()=>del('transport_assignments',a.id,`ลบการจับคู่ ${dName(a.driver_id)} ↔ ${vLabel(v)}?`)} style={btn('#fff','#dc2626','#fecaca')}>ลบ</button>
+                  </>}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </>)}
+
+      {card('🚛 รถ','ทะเบียน ประเภท และรถบริษัท/รถนอก · รถนอก (รถร่วม/รับเอง/บ่อตะกั่ว) ไม่นับในเที่ยวรถบริษัท',
+        canEdit&&!editV&&<button onClick={()=>setEditV({id:null,plate:'',label:'',vehicle_type:'เทรลเลอร์',is_company:true,active:true,sort_order:vehicles.length+1})} style={btn('#2f5fd0','#fff')}>+ เพิ่มรถ</button>,
+        <table style={{borderCollapse:'collapse',width:'100%'}}>
+          <thead><tr><th style={thS}>ทะเบียน / ชื่อเรียก</th><th style={thS}>ชื่อเรียกเพิ่ม</th><th style={thS}>ประเภท</th><th style={thS}>รถบริษัท</th><th style={thS}>ใช้งาน</th><th style={thS}>ลำดับ</th><th style={thS}></th></tr></thead>
+          <tbody>
+            {[...(editV&&!editV.id?[editV]:[]),...vehicles].map(v=>{
+              if(editV&&(editV.id===v.id||(!editV.id&&v===editV)))return<tr key={v.id||'new'} style={{background:'#eff6ff'}}>
+                <td style={tdS}><input value={editV.plate} onChange={e=>setEditV(s=>({...s,plate:e.target.value}))} placeholder="เช่น 89-1445" style={{...inp,width:130}}/></td>
+                <td style={tdS}><input value={editV.label||''} onChange={e=>setEditV(s=>({...s,label:e.target.value}))} placeholder="(ถ้ามี)" style={{...inp,width:130}}/></td>
+                <td style={tdS}><select value={editV.vehicle_type} onChange={e=>setEditV(s=>({...s,vehicle_type:e.target.value}))} style={inp}>{VT.map(t=><option key={t}>{t}</option>)}</select></td>
+                <td style={tdS}><input type="checkbox" checked={editV.is_company} onChange={e=>setEditV(s=>({...s,is_company:e.target.checked}))}/></td>
+                <td style={tdS}><input type="checkbox" checked={editV.active} onChange={e=>setEditV(s=>({...s,active:e.target.checked}))}/></td>
+                <td style={tdS}><input type="number" value={editV.sort_order} onChange={e=>setEditV(s=>({...s,sort_order:Number(e.target.value)||0}))} style={{...inp,width:60}}/></td>
+                <td style={tdS}>
+                  <button onClick={()=>{if(!editV.plate.trim()){alert('ใส่ทะเบียนหรือชื่อเรียก');return;}save('transport_vehicles',{...editV,plate:editV.plate.trim(),label:(editV.label||'').trim()||null},()=>setEditV(null));}} style={btn('#2f5fd0','#fff')}>บันทึก</button>{' '}
+                  <button onClick={()=>setEditV(null)} style={btn('#fff','#64748b','#e2e8f0')}>ยกเลิก</button>
+                </td>
+              </tr>;
+              return<tr key={v.id} style={{color:v.active?'#1e293b':'#94a3b8'}}>
+                <td style={{...tdS,fontWeight:700}}>{v.vehicle_type==='เทรลเลอร์'?'🚛':'🚚'} {v.plate}</td>
+                <td style={tdS}>{v.label||'–'}</td>
+                <td style={tdS}>{v.vehicle_type}</td>
+                <td style={tdS}>{v.is_company?'✓':<span style={{color:'#d97706'}}>รถนอก</span>}</td>
+                <td style={tdS}>{v.active?'✓':'เลิกใช้'}</td>
+                <td style={tdS}>{v.sort_order}</td>
+                <td style={tdS}>{canEdit&&<>
+                  <button onClick={()=>setEditV({...v})} style={btn('#fff','#2f5fd0','#c7d2fe')}>แก้</button>{' '}
+                  <button onClick={()=>del('transport_vehicles',v.id,`ลบรถ ${v.plate}? (การจับคู่ของรถคันนี้จะถูกลบด้วย · ถ้าแค่เลิกใช้ ให้กดแก้แล้วเอาติ๊ก "ใช้งาน" ออกแทน)`)} style={btn('#fff','#dc2626','#fecaca')}>ลบ</button>
+                </>}</td>
+              </tr>;
+            })}
+          </tbody>
+        </table>)}
+
+      {card('👤 คนขับ','"ชื่อในไฟล์บิล" = ชื่อที่ขึ้นในรายงานใบส่งของ ใส่ได้หลายแบบคั่นด้วยจุลภาค ใช้จับคู่ตอนนำเข้า',
+        canEdit&&!editD&&<button onClick={()=>setEditD({id:null,name:'',aliases:'',active:true,sort_order:drivers.length+1})} style={btn('#2f5fd0','#fff')}>+ เพิ่มคนขับ</button>,
+        <table style={{borderCollapse:'collapse',width:'100%'}}>
+          <thead><tr><th style={thS}>ชื่อ</th><th style={thS}>ชื่อในไฟล์บิล</th><th style={thS}>ขับรถประจำ (ปัจจุบัน)</th><th style={thS}>ใช้งาน</th><th style={thS}></th></tr></thead>
+          <tbody>
+            {[...(editD&&!editD.id?[editD]:[]),...drivers].map(d=>{
+              if(editD&&(editD.id===d.id||(!editD.id&&d===editD)))return<tr key={d.id||'new'} style={{background:'#eff6ff'}}>
+                <td style={tdS}><input value={editD.name} onChange={e=>setEditD(s=>({...s,name:e.target.value}))} placeholder="ชื่อ" style={{...inp,width:180}}/></td>
+                <td style={tdS}><input value={editD.aliases||''} onChange={e=>setEditD(s=>({...s,aliases:e.target.value}))} placeholder="เช่น ภูษิต อุ่นบาง,ภูษิต" style={{...inp,width:260}}/></td>
+                <td style={tdS}></td>
+                <td style={tdS}><input type="checkbox" checked={editD.active} onChange={e=>setEditD(s=>({...s,active:e.target.checked}))}/></td>
+                <td style={tdS}>
+                  <button onClick={()=>{if(!editD.name.trim()){alert('ใส่ชื่อคนขับ');return;}save('transport_drivers',{...editD,name:editD.name.trim(),aliases:(editD.aliases||'').trim()||null},()=>setEditD(null));}} style={btn('#2f5fd0','#fff')}>บันทึก</button>{' '}
+                  <button onClick={()=>setEditD(null)} style={btn('#fff','#64748b','#e2e8f0')}>ยกเลิก</button>
+                </td>
+              </tr>;
+              const today=new Date().toISOString().slice(0,10);
+              const cur=assigns.filter(a=>a.driver_id===d.id&&a.start_date<=today&&endOf(a)>=today).map(a=>vLabel(vOf(a.vehicle_id)));
+              return<tr key={d.id} style={{color:d.active?'#1e293b':'#94a3b8'}}>
+                <td style={{...tdS,fontWeight:700}}>{d.name}</td>
+                <td style={{...tdS,color:'#64748b'}}>{d.aliases||'–'}</td>
+                <td style={tdS}>{cur.length?cur.join(', '):<span style={{color:'#94a3b8'}}>–</span>}</td>
+                <td style={tdS}>{d.active?'✓':'เลิกใช้'}</td>
+                <td style={tdS}>{canEdit&&<>
+                  <button onClick={()=>setEditD({...d})} style={btn('#fff','#2f5fd0','#c7d2fe')}>แก้</button>{' '}
+                  <button onClick={()=>del('transport_drivers',d.id,`ลบคนขับ ${d.name}? (การจับคู่ของคนนี้จะถูกลบด้วย · ถ้าแค่ลาออก ให้ใส่ "ถึงวันที่" ในการจับคู่ แล้วเอาติ๊ก "ใช้งาน" ออกแทน)`)} style={btn('#fff','#dc2626','#fecaca')}>ลบ</button>
+                </>}</td>
+              </tr>;
+            })}
+          </tbody>
+        </table>)}
+    </div>;
+  }
+
   function TransportTripTab({canEdit}){
     const TYPES=[{k:'เทรลเลอร์',color:'#2563eb',bg:'#eff6ff'},{k:'10ล้อ-12ล้อ',color:'#15803d',bg:'#f0fdf4'}];
     const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -9924,7 +10088,9 @@ window.__dataReady.then(data => {
         <button onClick={()=>setView('dashboard')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='dashboard'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='dashboard'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📈 Dashboard</button>
         <button onClick={()=>setView('daily')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='daily'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='daily'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📆 รายวัน</button>
         <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='summary'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
+        <button onClick={()=>setView('master')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='master'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='master'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🔗 รถ / คนขับ</button>
       </div>
+      {view==='master'&&<TransportMasterPanel canEdit={canEdit}/>}
 
       {view==='stopped'&&(()=>{
         // รถบริษัทเท่านั้น (ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว)
