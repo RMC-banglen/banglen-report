@@ -10179,8 +10179,11 @@ window.__dataReady.then(data => {
                       const helped=dayHelped(it.name,d);
                       const note=ownV?null:dayNoteOf(t.k,it.name,d);
                       const clickable=!ownV&&canEdit;
+                      const helpTargets={};
+                      if(helped>0)dayRows.filter(r=>r.helper===it.name&&r.month===selDayMonth&&r.day===d).forEach(r=>{helpTargets[r.driver_name]=(helpTargets[r.driver_name]||0)+(r.trips||0);});
+                      const helpText=Object.entries(helpTargets).map(([n,c])=>`ไปช่วยขับรถ${dispName(n)} ${c} เที่ยว`).join(', ');
                       return<td key={d} onClick={clickable?()=>editDayNote(t.k,it.name,d):undefined}
-                        title={[helped>0?`ไปช่วยขับแทน ${helped} เที่ยว`:null,note?`ทะเบียนตัวเอง: ${note}`:clickable?'คลิกเพื่อบันทึกเหตุผลของทะเบียนตัวเอง เช่น หยุด/รถเสีย':null].filter(Boolean).join(' · ')||undefined}
+                        title={[helped>0?helpText:null,note?`ทะเบียนตัวเอง: ${note}`:clickable?'คลิกเพื่อบันทึกเหตุผลของทะเบียนตัวเอง เช่น หยุด/รถเสีย':null].filter(Boolean).join(' · ')||undefined}
                         style={{textAlign:'center',padding:'4px 3px',color:v?'#334155':note?'#dc2626':'#e2e8f0',borderBottom:'1px solid #f1f5f9',cursor:clickable?'pointer':'default'}}>
                         {v>0&&<span>{v}</span>}
                         {v===0&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
