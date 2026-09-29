@@ -9401,6 +9401,19 @@ window.__dataReady.then(data => {
       ]).then(([a,b,c])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setLoading(false);});
     }
     const DAY_NOTE_OPTIONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน','ลาหยุด'];
+    // สาเหตุที่เป็นเรื่องของรถ (นับตามทะเบียน) กับเรื่องของคน (นับตามคนขับ)
+    const VEHICLE_REASONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน'];
+    const PERSON_REASONS=['ลาหยุด'];
+    // ทะเบียนอ่านจากท้ายชื่อ เช่น "ฐา / 90-4551" → "90-4551" ถ้าไม่มีทะเบียนใช้ชื่อแทน
+    const plateOf=n=>{const m=String(n||'').match(/(\d{2}-\d{4})\s*$/);return m?m[1]:String(n||'').trim();};
+    const isCompanyName=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
+    // จำนวนรถบริษัทในเดือนนั้น = ทะเบียนที่มีเที่ยววิ่ง หรือมีป้ายหยุดที่เป็นเรื่องของรถ (รถจอดซ่อมทั้งเดือนก็ยังนับ)
+    function truckCount(vt,m){
+      const plates=new Set();
+      yearRows.forEach(r=>{if(r.vehicle_type===vt&&r.month===m&&(r.trips||0)>0&&isCompanyName(r.driver_name))plates.add(plateOf(r.driver_name));});
+      dayNotes.forEach(n=>{if(n.year===selYear&&n.vehicle_type===vt&&n.month===m&&isCompanyName(n.driver_name)&&VEHICLE_REASONS.includes((n.note||'').trim()))plates.add(plateOf(n.driver_name));});
+      return plates.size;
+    }
 
 
     const dayNoteOf=(vt,name,d)=>{const r=dayNotes.find(x=>x.year===selYear&&x.month===selDayMonth&&x.day===d&&x.vehicle_type===vt&&x.driver_name===name);return r?r.note:null;};
@@ -9529,8 +9542,24 @@ window.__dataReady.then(data => {
     }
     async function handleSaveDay(){
       if(!dayForm.driver_name)return;
-      setSavingDay(true);
       const type=dayForm.vehicle_type;
+      // ---- หัก/คืนเที่ยวอัตโนมัติ: เที่ยวช่วยขับที่เพิ่มขึ้น = ย้ายเที่ยวที่ไม่ระบุคนขับของรถคันนั้น (วันเดียวกัน) มานับให้คนนี้ ----
+      const oldName=dayForm.original_name||dayForm.driver_name;
+      const sameDay=(r,vt,n,d)=>r.year===selYear&&r.month===selDayMonth&&r.day===d&&r.vehicle_type===vt&&r.driver_name===n;
+      const oldHelp={},newHelp={};
+      rows.filter(r=>r.year===selYear&&r.month===selDayMonth&&r.day!=null&&r.helper===oldName).forEach(r=>{const k=r.vehicle_type+'||'+r.driver_name+'||'+r.day;oldHelp[k]=(oldHelp[k]||0)+(r.trips||0);});
+      (dayForm.helps||[]).filter(h=>h.day&&h.target&&Number(h.trips)>0).forEach(h=>{const k=h.target+'||'+Number(h.day);newHelp[k]=(newHelp[k]||0)+Number(h.trips);});
+      const deducts=[],restores=[];
+      new Set([...Object.keys(oldHelp),...Object.keys(newHelp)]).forEach(k=>{
+        const delta=(newHelp[k]||0)-(oldHelp[k]||0);if(!delta)return;
+        const [vt,n,dStr]=k.split('||');const d=Number(dStr);
+        const unassigned=rows.filter(r=>sameDay(r,vt,n,d)&&!r.helper);
+        if(delta>0){const avail=unassigned.reduce((s,r)=>s+(r.trips||0),0);const take=Math.min(delta,avail);if(take>0)deducts.push({vt,n,d,take,rows:unassigned});}
+        else restores.push({vt,n,d,amount:-delta,rows:unassigned});
+      });
+      if(deducts.length&&!confirm('ระบบจะหักเที่ยวที่ "ไม่ระบุคนขับ" ของรถที่ไปช่วยขับ แล้วย้ายมานับให้ '+dispName(dayForm.driver_name)+' (กันนับซ้ำ):\n\n'+deducts.map(x=>`• รถ${dispName(x.n)} วันที่ ${x.d}: หัก ${x.take} เที่ยว`).join('\n')+'\n\nกด "ตกลง" เพื่อบันทึก หรือ "ยกเลิก" เพื่อกลับไปแก้'))return;
+      const doRestore=restores.length&&confirm('รายการช่วยขับลดลง/ถูกลบ:\n\n'+restores.map(x=>`• รถ${dispName(x.n)} วันที่ ${x.d}: ${x.amount} เที่ยว`).join('\n')+'\n\nคืนเที่ยวเหล่านี้กลับไปเป็นเที่ยวของรถคันนั้น (ไม่ระบุคนขับ) ไหม?\n"ตกลง" = คืน · "ยกเลิก" = ไม่คืน (ลบทิ้ง)');
+      setSavingDay(true);
       // ถ้าเปลี่ยนชื่อคนขับ -> เปลี่ยนชื่อในทุกแถวของคนขับคนนี้ (ทุกปี/เดือน) ก่อน
       if(dayForm.original_name&&dayForm.driver_name!==dayForm.original_name){
         const {error:renameErr}=await DB.from('transport_trips').update({driver_name:dayForm.driver_name}).eq('vehicle_type',type).eq('driver_name',dayForm.original_name);
@@ -9555,6 +9584,23 @@ window.__dataReady.then(data => {
       if(helpIns.length){
         const {error:helpErr}=await DB.from('transport_trips').insert(helpIns);
         if(helpErr){setSavingDay(false);alert('บันทึกข้อมูลช่วยขับไม่สำเร็จ: '+helpErr.message);return;}
+      }
+      // หักเที่ยวที่ไม่ระบุคนขับของรถที่ไปช่วยขับ (แถวที่เหลือ 0 ลบทิ้ง)
+      for(const x of deducts){
+        let remain=x.take;
+        for(const r of x.rows){
+          if(remain<=0)break;
+          const cur=r.trips||0;if(!cur)continue;
+          const take=Math.min(cur,remain);remain-=take;
+          if(take===cur)await DB.from('transport_trips').delete().eq('id',r.id);
+          else await DB.from('transport_trips').update({trips:cur-take}).eq('id',r.id);
+        }
+      }
+      // คืนเที่ยวให้รถคันนั้น (เพิ่มในแถวที่ไม่ระบุคนขับของวันนั้น หรือสร้างแถวใหม่)
+      if(doRestore)for(const x of restores){
+        const r=x.rows[0];
+        if(r)await DB.from('transport_trips').update({trips:(r.trips||0)+x.amount}).eq('id',r.id);
+        else await DB.from('transport_trips').insert([{year:selYear,month:selDayMonth,day:x.d,vehicle_type:x.vt,driver_name:x.n,sort_order:orderOf(x.vt,x.n),trips:x.amount}]);
       }
       if(ins.length===0){
         // ยังไม่มียอดเดือนนี้ -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
@@ -9808,51 +9854,43 @@ window.__dataReady.then(data => {
       </div>
 
       {view==='stopped'&&(()=>{
-        const yearNotes=dayNotes.filter(n=>n.year===selYear).map(n=>({...n,vehLabel:n.vehicle_type}));
-        // แยกเป็นรถบริษัท (ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว) เพื่อไม่ให้ปนกับรถนอก
-        const companyNotes=yearNotes.filter(n=>!n.driver_name.includes('รถร่วม')&&!n.driver_name.includes('รับเอง')&&!n.driver_name.includes('บ่อตะกั่ว'));
-        const totalStopDays=companyNotes.length;
-        // สรุปตามคัน
-        const byVehicle={};
-        companyNotes.forEach(n=>{const k=n.vehicle_type+'|'+n.driver_name;if(!byVehicle[k])byVehicle[k]={vt:n.vehicle_type,name:n.driver_name,items:[]};byVehicle[k].items.push(n);});
-        const vehicleList=Object.values(byVehicle).sort((a,b)=>b.items.length-a.items.length);
-
-        // ---- ตารางสรุปแบบ Excel: แยกสาเหตุเป็นคอลัมน์ (เดือนที่เลือก + สะสมทั้งปี) ----
-        // เรียงคันตามลำดับเดียวกับหน้ารายวัน/รายเดือน (sort_order) ไม่ใช่เรียงตามจำนวนวันหยุด และแสดงทุกคันแม้ไม่มีวันหยุดเลย
-        const isCompanyName=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
-        const orderedVehicles=TYPES.flatMap(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)).map(it=>({vt:t.k,name:it.name})));
-        const monthNotes=companyNotes.filter(n=>n.month===selDayMonth);
-        const reasons=DAY_NOTE_OPTIONS.filter(r=>companyNotes.some(n=>n.note.trim()===r));
-        const cnt=(list,reason)=>list.filter(n=>n.note.trim()===reason).length;
-        const vehNotesOf=(list,vt,name)=>list.filter(n=>n.vehicle_type===vt&&n.driver_name===name);
+        // รถบริษัทเท่านั้น (ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว)
+        const companyNotes=dayNotes.filter(n=>n.year===selYear&&isCompanyName(n.driver_name));
+        const noteText=n=>(n.note||'').trim();
+        const vehNotes=companyNotes.filter(n=>VEHICLE_REASONS.includes(noteText(n)));
+        const personNotes=companyNotes.filter(n=>PERSON_REASONS.includes(noteText(n)));
+        // ป้ายที่พิมพ์เอง (อื่นๆ) ไม่นับในสถิติ แสดงไว้ให้ตรวจ/แก้
+        const otherNotes=companyNotes.filter(n=>!DAY_NOTE_OPTIONS.includes(noteText(n))).sort((a,b)=>a.month-b.month||a.day-b.day);
+        const cnt=(list,reason)=>list.filter(n=>noteText(n)===reason).length;
         const daysInMonth=new Date(selYear-543,selDayMonth,0).getDate();
 
-        return<div>
-          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
-            <div style={{flex:'1 1 200px',background:'#fef2f2',border:'2px solid #fecaca',borderRadius:14,padding:'16px 20px'}}>
-              <div style={{fontSize:13,color:'#b91c1c',fontWeight:700,marginBottom:6}}>รวมวันหยุดวิ่งทั้งปี {selYear}</div>
-              <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{totalStopDays} <span style={{fontSize:14,color:'#94a3b8'}}>วัน (รถบริษัท)</span></div>
-            </div>
-            <div style={{flex:'1 1 200px',background:'#fff',border:'2px solid #e2e8f0',borderRadius:14,padding:'16px 20px'}}>
-              <div style={{fontSize:13,color:'#64748b',fontWeight:700,marginBottom:6}}>จำนวนคันที่เคยหยุดวิ่ง</div>
-              <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{vehicleList.length} <span style={{fontSize:14,color:'#94a3b8'}}>คัน</span></div>
-            </div>
-          </div>
+        // ตารางรถ: จัดกลุ่มตามทะเบียน (คนขับหลายคนที่ใช้ทะเบียนเดียวกันรวมเป็นคันเดียว) เรียงตามลำดับหน้ารายเดือน
+        const plateRows=[];
+        TYPES.forEach(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)).forEach(it=>{
+          const p=plateOf(it.name);let row=plateRows.find(r=>r.vt===t.k&&r.plate===p);
+          if(!row){row={vt:t.k,plate:p,hasPlate:p!==it.name.trim(),names:[]};plateRows.push(row);}
+          row.names.push(it.name);
+        }));
+        const notesOfPlate=(list,row)=>list.filter(n=>n.vehicle_type===row.vt&&plateOf(n.driver_name)===row.plate);
+        // ตารางคน: คนขับจริง (ไม่รวมรถสำรองที่ไม่มีคนขับประจำ)
+        const personRows=TYPES.flatMap(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)&&!it.name.includes('สำรอง')).map(it=>({vt:t.k,name:it.name})));
+        const notesOfPerson=(list,p)=>list.filter(n=>n.vehicle_type===p.vt&&n.driver_name===p.name);
 
-          {reasons.length>0&&<div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:20}}>
-            <div style={{padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#fffbeb',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-              <div style={{fontSize:15,fontWeight:800,color:'#92400e'}}>📋 สรุปรถหยุด — แยกสาเหตุ</div>
-              <select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
-                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
-              </select>
-            </div>
+        const monthSel=<select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
+        </select>;
+        const th1={textAlign:'center',padding:'6px 10px',borderBottom:'1px solid #fde68a'};
+        const reasonTable=(title,reasons,rows,keyOf,labelOf,notesOf,list)=>{
+          const mList=list.filter(n=>n.month===selDayMonth);
+          return<div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',marginBottom:20}}>
+            <div style={{padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:'#fffbeb',fontSize:15,fontWeight:800,color:'#92400e'}}>{title}</div>
             <div style={{overflowX:'auto'}}>
               <table style={{borderCollapse:'collapse',fontSize:12,minWidth:'100%'}}>
                 <thead>
                   <tr style={{background:'#fef9c3'}}>
-                    <th rowSpan={2} style={{textAlign:'left',padding:'6px 10px',borderBottom:'1px solid #fde68a',borderRight:'1px solid #fde68a',verticalAlign:'bottom'}}>คนขับ/ทะเบียนรถ</th>
-                    <th colSpan={reasons.length} style={{textAlign:'center',padding:'6px 10px',borderBottom:'1px solid #fde68a',borderRight:'2px solid #d97706'}}>ข้อมูล ณ 1-{daysInMonth} เดือน {MO[selDayMonth-1]} {selYear}</th>
-                    <th colSpan={reasons.length} style={{textAlign:'center',padding:'6px 10px',borderBottom:'1px solid #fde68a'}}>สะสมปี {selYear}</th>
+                    <th rowSpan={2} style={{textAlign:'left',padding:'6px 10px',borderBottom:'1px solid #fde68a',borderRight:'1px solid #fde68a',verticalAlign:'bottom'}}>{title.includes('ทะเบียน')?'ทะเบียนรถ':'คนขับ'}</th>
+                    <th colSpan={reasons.length} style={{...th1,borderRight:'2px solid #d97706'}}>ข้อมูล ณ 1-{daysInMonth} เดือน {MO[selDayMonth-1]} {selYear}</th>
+                    <th colSpan={reasons.length} style={th1}>สะสมปี {selYear}</th>
                   </tr>
                   <tr style={{background:'#fffbeb'}}>
                     {reasons.map((r,i)=><th key={'m'+i} style={{textAlign:'right',padding:'5px 8px',fontWeight:700,color:'#92400e',borderRight:i===reasons.length-1?'2px solid #d97706':'none'}}>{r}</th>)}
@@ -9860,24 +9898,51 @@ window.__dataReady.then(data => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orderedVehicles.map(v=>{
-                    const mList=vehNotesOf(monthNotes,v.vt,v.name);
-                    const yList=vehNotesOf(companyNotes,v.vt,v.name);
-                    return<tr key={v.vt+'|'+v.name} style={{borderBottom:'1px solid #f1f5f9'}}>
-                      <td style={{padding:'5px 10px',fontWeight:600,color:'#334155',whiteSpace:'nowrap'}}>{v.vt==='เทรลเลอร์'?'🚛':'🚚'} {dispName(v.name)}</td>
-                      {reasons.map((r,i)=><td key={'m'+i} style={{textAlign:'right',padding:'5px 8px',color:'#475569',borderRight:i===reasons.length-1?'2px solid #fde68a':'none'}}>{cnt(mList,r)||0}</td>)}
-                      {reasons.map((r,i)=><td key={'y'+i} style={{textAlign:'right',padding:'5px 8px',fontWeight:700,color:'#b45309'}}>{cnt(yList,r)||0}</td>)}
+                  {rows.map(row=>{
+                    const mL=notesOf(mList,row),yL=notesOf(list,row);
+                    return<tr key={keyOf(row)} style={{borderBottom:'1px solid #f1f5f9'}}>
+                      <td style={{padding:'5px 10px',fontWeight:600,color:'#334155',whiteSpace:'nowrap'}}>{labelOf(row)}</td>
+                      {reasons.map((r,i)=><td key={'m'+i} style={{textAlign:'right',padding:'5px 8px',color:'#475569',borderRight:i===reasons.length-1?'2px solid #fde68a':'none'}}>{cnt(mL,r)}</td>)}
+                      {reasons.map((r,i)=><td key={'y'+i} style={{textAlign:'right',padding:'5px 8px',fontWeight:700,color:'#b45309'}}>{cnt(yL,r)}</td>)}
                     </tr>;
                   })}
                 </tbody>
                 <tfoot>
                   <tr style={{background:'#fef9c3',fontWeight:800}}>
                     <td style={{padding:'6px 10px',color:'#92400e'}}>รวม</td>
-                    {reasons.map((r,i)=><td key={'m'+i} style={{textAlign:'right',padding:'6px 8px',color:'#92400e',borderRight:i===reasons.length-1?'2px solid #d97706':'none'}}>{cnt(monthNotes,r)||0}</td>)}
-                    {reasons.map((r,i)=><td key={'y'+i} style={{textAlign:'right',padding:'6px 8px',color:'#92400e'}}>{cnt(companyNotes,r)||0}</td>)}
+                    {reasons.map((r,i)=><td key={'m'+i} style={{textAlign:'right',padding:'6px 8px',color:'#92400e',borderRight:i===reasons.length-1?'2px solid #d97706':'none'}}>{cnt(mList,r)}</td>)}
+                    {reasons.map((r,i)=><td key={'y'+i} style={{textAlign:'right',padding:'6px 8px',color:'#92400e'}}>{cnt(list,r)}</td>)}
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          </div>;
+        };
+        const card=(bg,border,color,label,value,unit,sub)=><div style={{flex:'1 1 220px',background:bg,border:`2px solid ${border}`,borderRadius:14,padding:'16px 20px'}}>
+          <div style={{fontSize:13,color,fontWeight:700,marginBottom:6}}>{label}</div>
+          <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{value} <span style={{fontSize:14,color:'#94a3b8'}}>{unit}</span></div>
+          {sub&&<div style={{fontSize:12,color:'#64748b',marginTop:4}}>{sub}</div>}
+        </div>;
+
+        return<div>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
+            {card('#fef2f2','#fecaca','#b91c1c',`รถหยุดวิ่ง ทั้งปี ${selYear}`,vehNotes.length,'คัน-วัน',VEHICLE_REASONS.map(r=>`${r} ${cnt(vehNotes,r)}`).join(' · '))}
+            {card('#fff','#e2e8f0','#64748b',`คนลาหยุด ทั้งปี ${selYear}`,personNotes.length,'คน-วัน')}
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8,marginBottom:12}}>
+            <span style={{fontSize:13,color:'#64748b',fontWeight:700}}>เดือน</span>{monthSel}
+          </div>
+          {reasonTable('🚛 รถหยุดวิ่ง — ตามทะเบียน',VEHICLE_REASONS,plateRows,r=>r.vt+'|'+r.plate,
+            r=><>{r.vt==='เทรลเลอร์'?'🚛':'🚚'} {r.hasPlate?r.plate:dispName(r.names[0])}{r.hasPlate&&<span style={{color:'#94a3b8',fontWeight:500,marginLeft:6}}>({r.names.map(n=>dispName(n.replace(/\s*\/\s*\d{2}-\d{4}\s*$/,''))).join(', ')})</span>}</>,
+            notesOfPlate,vehNotes)}
+          {reasonTable('👤 คนลาหยุด — ตามคนขับ',PERSON_REASONS,personRows,p=>p.vt+'|'+p.name,
+            p=><>{p.vt==='เทรลเลอร์'?'🚛':'🚚'} {dispName(p.name)}</>,
+            notesOfPerson,personNotes)}
+          {otherNotes.length>0&&<div style={{background:'#f8fafc',border:'1px dashed #cbd5e1',borderRadius:14,padding:'14px 18px'}}>
+            <div style={{fontSize:13,fontWeight:800,color:'#475569',marginBottom:4}}>ป้ายที่พิมพ์เอง (อื่นๆ) — ไม่นับในสถิติ {otherNotes.length} รายการ</div>
+            <div style={{fontSize:12,color:'#94a3b8',marginBottom:8}}>ถ้าเป็นวันที่ไปขับรถคันอื่น (เช่น "12ล้อ") ควรลบป้ายนี้ แล้วบันทึกเป็นเที่ยวช่วยขับในฟอร์ม "แก้" แทน</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {otherNotes.map((n,i)=><span key={i} style={{fontSize:12,padding:'3px 8px',borderRadius:6,background:'#fff',border:'1px solid #e2e8f0',color:'#475569'}}>{dispName(n.driver_name)} · {n.day} {MO[n.month-1]} · "{noteText(n)}"</span>)}
             </div>
           </div>}
         </div>;
@@ -9886,17 +9951,16 @@ window.__dataReady.then(data => {
       {view==='dashboard'&&(()=>{
         const trailer=getTypeData('เทรลเลอร์');
         const wheel=getTypeData('10ล้อ-12ล้อ');
-        const NUM={'เทรลเลอร์':7,'10ล้อ-12ล้อ':2};
-        // ใช้เกณฑ์เดียวกับตารางรายเดือน: รถบริษัท = ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว
-        const isCompany=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
-        const companyCol=(td)=>m=>td.items.filter(i=>isCompany(i.name)).reduce((s,it)=>s+td.cell(it.name,m),0);
+        // ใช้เกณฑ์เดียวกับตารางรายเดือน: รถบริษัท = ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว · จำนวนรถนับจริงรายเดือน
+        const companyCol=(td)=>m=>td.items.filter(i=>isCompanyName(i.name)).reduce((s,it)=>s+td.cell(it.name,m),0);
+        const vtOf=td=>td===trailer?'เทรลเลอร์':'10ล้อ-12ล้อ';
         // เดือนที่มีข้อมูลจริง (จากทั้ง 2 ประเภท)
         const monthsData=[...new Set([...trailer.months,...wheel.months])].filter(m=>trailer.colTotal(m)+wheel.colTotal(m)>0).sort((a,b)=>a-b);
         const cats=monthsData.map(m=>MO[m-1]);
         const lastM=monthsData.length?monthsData[monthsData.length-1]:null;
         const grandAll=trailer.typeGrand+wheel.typeGrand;
         const wdTotal=monthsData.reduce((s,m)=>s+(workdaysOf(m)||0),0);
-        const avgOf=(td,m)=>{const d=workdaysOf(m);const v=companyCol(td)(m);return d&&v?v/d/NUM[td===trailer?'เทรลเลอร์':'10ล้อ-12ล้อ']:null;};
+        const avgOf=(td,m)=>{const d=workdaysOf(m);const v=companyCol(td)(m);const n=truckCount(vtOf(td),m);return d&&v&&n?v/d/n:null;};
         const kpi=(label,value,unit,sub,color)=><div style={{flex:'1 1 200px',background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 20px'}}>
           <div style={{fontSize:12,fontWeight:700,color:'#64748b'}}>{label}</div>
           <div style={{fontSize:28,fontWeight:900,color:color||'#1e293b',marginTop:4}}>{value}<span style={{fontSize:13,fontWeight:600,color:'#94a3b8',marginLeft:4}}>{unit}</span></div>
@@ -9927,8 +9991,8 @@ window.__dataReady.then(data => {
           {/* แถว KPI */}
           <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
             {kpi('รวมเที่ยวทั้งปี '+selYear,fmt(grandAll),'เที่ยว',`เทรลเลอร์ ${fmt(trailer.typeGrand)} · 10ล้อ-12ล้อ ${fmt(wheel.typeGrand)}`,'#1e293b')}
-            {kpi('เที่ยวเทรลเลอร์'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(trailer.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(trailer,lastM)?avgOf(trailer,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (7 คัน)`:'','#2563eb')}
-            {kpi('เที่ยว 10ล้อ-12ล้อ'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(wheel.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(wheel,lastM)?avgOf(wheel,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (2 คัน)`:'','#15803d')}
+            {kpi('เที่ยวเทรลเลอร์'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(trailer.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(trailer,lastM)?avgOf(trailer,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (${truckCount('เทรลเลอร์',lastM)} คัน)`:'','#2563eb')}
+            {kpi('เที่ยว 10ล้อ-12ล้อ'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(wheel.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(wheel,lastM)?avgOf(wheel,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (${truckCount('10ล้อ-12ล้อ',lastM)} คัน)`:'','#15803d')}
             {kpi('วันทำงานสะสม',wdTotal?fmt(wdTotal):'–','วัน',lastM?`เดือนล่าสุด ${MO[lastM-1]} ${workdaysOf(lastM)||'–'} วัน`:'','#475569')}
           </div>
           {/* กราฟเที่ยวรายเดือน แยกประเภทรถ */}
@@ -9946,7 +10010,7 @@ window.__dataReady.then(data => {
                   {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>wheel.colTotal(m))},
                 ]} height={280} unit="เที่ยว"/></>:<div style={{textAlign:'center',color:'#94a3b8',padding:30}}>ยังไม่มีข้อมูล</div>)}
               {/* เฉลี่ยเที่ยว/วัน/คัน รายเดือน */}
-              {card('เฉลี่ยเที่ยว/วัน/คัน รายเดือน','เที่ยวรถบริษัท ÷ วันทำงาน ÷ จำนวนรถ (เทรลเลอร์ 7 คัน · 10ล้อ-12ล้อ 2 คัน)',
+              {card('เฉลี่ยเที่ยว/วัน/คัน รายเดือน','เที่ยวรถบริษัท ÷ วันทำงาน ÷ จำนวนรถในเดือนนั้น (นับทะเบียนที่มีเที่ยววิ่ง หรือมีป้ายซ่อม/ไม่มีงาน)',
                 monthsData.length?<>{legend}<LineChart categories={cats} series={[
                   {label:'เทรลเลอร์',color:'#2563eb',data:monthsData.map(m=>{const v=avgOf(trailer,m);return v!=null?+v.toFixed(2):null;})},
                   {label:'10ล้อ-12ล้อ',color:'#15803d',data:monthsData.map(m=>{const v=avgOf(wheel,m);return v!=null?+v.toFixed(2):null;})},
@@ -10111,12 +10175,13 @@ window.__dataReady.then(data => {
                     {canEdit&&<td style={{background:'#f1f5f9',borderTop:'2px solid #e2e8f0'}}></td>}
                   </tr>
                   {(()=>{
-                    // รถบริษัท = ไม่รวมรถร่วมและรับเอง · เทรลเลอร์ 7 คัน / 10ล้อ-12ล้อ 2 คัน · วันทำงานใช้ชุดเดียวกัน
-                    const numTrucks=t.k==='เทรลเลอร์'?7:2;
-                    const companyItems=items.filter(i=>!i.name.includes('รถร่วม')&&!i.name.includes('รับเอง')&&!i.name.includes('บ่อตะกั่ว'));
+                    // รถบริษัท = ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว · จำนวนรถนับจริงรายเดือน (truckCount) · วันทำงานใช้ชุดเดียวกันทั้ง 2 ประเภท
+                    const companyItems=items.filter(i=>isCompanyName(i.name));
                     const companyCol=m=>companyItems.reduce((s,it)=>s+cell(it.name,m),0);
                     const companyGrand=companyItems.reduce((s,it)=>s+rowTotal(it.name),0);
                     const wdTotal=allMonths.reduce((s,m)=>s+(workdaysOf(m)||0),0);
+                    // ค่าเฉลี่ยทั้งปี = เที่ยวรถบริษัททั้งปี ÷ ผลรวม (วันทำงาน × จำนวนรถ) ของแต่ละเดือน
+                    const truckDays=allMonths.reduce((s,m)=>s+(workdaysOf(m)||0)*truckCount(t.k,m),0);
                     return<>
                       <tr style={{background:'#f8fafc',fontWeight:700,fontSize:13}}>
                         <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',whiteSpace:'nowrap',borderTop:'2px solid #cbd5e1'}}>จำนวนวันทำงาน</td>
@@ -10138,10 +10203,16 @@ window.__dataReady.then(data => {
                             <td style={{textAlign:'right',padding:'9px 8px',color:c.cell1Text,background:c.cell1}}>{companyGrand?fmt(companyGrand):'–'}</td>
                             {canEdit&&<td style={{background:c.bg}}></td>}
                           </tr>
+                          <tr style={{background:c.bg,fontWeight:700,fontSize:13}}>
+                            <td style={{padding:'9px 8px',position:'sticky',left:0,background:c.bg,color:'#475569',whiteSpace:'nowrap'}} title="นับทะเบียนรถบริษัทที่มีเที่ยววิ่ง หรือมีป้ายซ่อม/ไม่มีงาน ในเดือนนั้น">จำนวนรถในเดือน (คัน)</td>
+                            {months.map(m=>{const n=truckCount(t.k,m);return<td key={m} style={{textAlign:'right',padding:'9px 24px 9px 6px',color:'#475569',whiteSpace:'nowrap'}}>{n||'–'}</td>;})}
+                            <td style={{textAlign:'right',padding:'9px 8px',color:'#475569',background:'#f1f5f9'}}></td>
+                            {canEdit&&<td style={{background:c.bg}}></td>}
+                          </tr>
                           <tr style={{background:c.bg,fontWeight:900,fontSize:15}}>
-                            <td style={{padding:'11px 8px',position:'sticky',left:0,background:c.bg,color:c.text,whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>เฉลี่ยเที่ยว/วัน (รถ {numTrucks} คัน)</td>
-                            {months.map(m=>{const v=companyCol(m),d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'11px 24px 11px 6px',color:v&&d?c.text:'#94a3b8',whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>{v&&d?(v/d/numTrucks).toFixed(2):'–'}</td>;})}
-                            <td style={{textAlign:'right',padding:'11px 8px',color:companyGrand&&wdTotal?c.cell2Text:'#94a3b8',background:c.cell2,fontSize:15,fontWeight:900,borderTop:`2px solid ${c.border}`}}>{companyGrand&&wdTotal?(companyGrand/wdTotal/numTrucks).toFixed(2):'–'}</td>
+                            <td style={{padding:'11px 8px',position:'sticky',left:0,background:c.bg,color:c.text,whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>เฉลี่ยเที่ยว/วัน/คัน</td>
+                            {months.map(m=>{const v=companyCol(m),d=workdaysOf(m),n=truckCount(t.k,m);return<td key={m} style={{textAlign:'right',padding:'11px 24px 11px 6px',color:v&&d&&n?c.text:'#94a3b8',whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>{v&&d&&n?(v/d/n).toFixed(2):'–'}</td>;})}
+                            <td style={{textAlign:'right',padding:'11px 8px',color:companyGrand&&truckDays?c.cell2Text:'#94a3b8',background:c.cell2,fontSize:15,fontWeight:900,borderTop:`2px solid ${c.border}`}}>{companyGrand&&truckDays?(companyGrand/truckDays).toFixed(2):'–'}</td>
                             {canEdit&&<td style={{background:c.bg,borderTop:`2px solid ${c.border}`}}></td>}
                           </tr>
                         </>;
@@ -10285,6 +10356,7 @@ window.__dataReady.then(data => {
                 <div style={{fontSize:13,fontWeight:700,color:'#0f766e'}}>🤝 ไปช่วยขับรถคันอื่น</div>
                 <button onClick={()=>setDayForm(f=>({...f,helps:[...(f.helps||[]),{day:'',target:'',trips:''}]}))} style={{padding:'5px 12px',borderRadius:8,border:'1px solid #99f6e4',background:'#f0fdfa',color:'#0f766e',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่ม</button>
               </div>
+              <div style={{fontSize:11.5,color:'#94a3b8',marginBottom:8}}>ตอนบันทึก ถ้ารถคันนั้นมีเที่ยวที่ไม่ระบุคนขับในวันเดียวกัน ระบบจะหักออกแล้วย้ายมานับให้คนนี้ (กันนับซ้ำ) และจะถามยืนยันก่อน</div>
               {helps.length===0&&<div style={{fontSize:12,color:'#94a3b8'}}>ไม่มี — กด "+ เพิ่ม" ถ้าวันไหนไปขับรถคันอื่นแทน</div>}
               {helps.map((h,i)=><div key={i} style={{display:'grid',gridTemplateColumns:'78px 1fr 64px 32px',gap:6,marginBottom:6,alignItems:'center'}}>
                 <select value={h.day} onChange={e=>setHelp(i,{day:e.target.value})} style={{...inp,padding:'6px',fontSize:12}}>
