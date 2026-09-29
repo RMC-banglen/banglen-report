@@ -9376,6 +9376,7 @@ window.__dataReady.then(data => {
     const [view,setView]=useState('dashboard');
     const [selMonth,setSelMonth]=useState(new Date().getMonth()+1);
     const [hideEmptyDay,setHideEmptyDay]=useState(false);
+    const [helpPopup,setHelpPopup]=useState(null); // {vt,name,month,day?}
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({id:null,year:2569,vehicle_type:'เทรลเลอร์',driver_name:'',sort_order:0,trips:{}});
     const [saving,setSaving]=useState(false);
@@ -10063,7 +10064,7 @@ window.__dataReady.then(data => {
                     const bg=extra?'#f0fdfa':idx%2?'#fcfcfd':'#fff';
                     return<tr key={name} style={{background:bg}}>
                     <td style={{padding:'5px 8px',position:'sticky',left:0,background:bg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={extra?`มาช่วยขับรถ${t.k}`:undefined}>{dispName(name)}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
-                    {months.map(m=>{const v=personOwn(name,m),h=personHelp(name,m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว`:undefined}>{total?fmt(total):'–'}{h>0&&!extra&&<span style={{fontSize:10,color:'#0f766e',fontWeight:700}}> 🤝</span>}</td>;})}
+                    {months.map(m=>{const v=personOwn(name,m),h=personHelp(name,m),total=v+h;return<td key={m} style={{textAlign:'right',padding:'5px 6px',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={()=>setHelpPopup({vt:t.k,name,month:m})} style={{fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer',marginLeft:2}}>🤝</span>}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
                       {canEdit&&!extra?<span onClick={()=>openEdit(t.k,name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
                     </td>
@@ -10191,7 +10192,7 @@ window.__dataReady.then(data => {
                           {!note&&'·'}
                         </div>}
                         {note&&ownV===0&&v>0&&<div style={{fontSize:9,fontWeight:700,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:4,padding:'0 3px',color:'#dc2626',whiteSpace:'nowrap'}}>{note.length>4?note.slice(0,4):note}</div>}
-                        {helped>0&&<div style={{fontSize:9,color:'#0f766e',fontWeight:700}}>🤝{helped}</div>}
+                        {helped>0&&<div onClick={e=>{e.stopPropagation();setHelpPopup({vt:t.k,name:it.name,month:selDayMonth,day:d});}} style={{fontSize:9,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝{helped}</div>}
                       </td>;
                     })}
                     <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
@@ -10241,6 +10242,39 @@ window.__dataReady.then(data => {
           </div>
         </div>
       </div>}
+
+      {helpPopup&&(()=>{
+        const {vt,name,month,day}=helpPopup;
+        const list=yearRows.filter(r=>r.vehicle_type===vt&&r.helper===name&&r.month===month&&(day==null||r.day===day));
+        const byDay={};
+        list.forEach(r=>{const k=r.day==null?0:r.day;(byDay[k]=byDay[k]||{});byDay[k][r.driver_name]=(byDay[k][r.driver_name]||0)+(r.trips||0);});
+        const days=Object.keys(byDay).map(Number).sort((a,b)=>a-b);
+        const total=list.reduce((s,r)=>s+(r.trips||0),0);
+        const byTarget={};
+        list.forEach(r=>{byTarget[r.driver_name]=(byTarget[r.driver_name]||0)+(r.trips||0);});
+        const vehLabel=n=>{const p=(String(n).match(/(\d{2}-\d{4})\s*$/)||[])[1];return `รถ${dispName(n)}${p?` · ทะเบียน ${p}`:''}`;};
+        return<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setHelpPopup(null)}>
+          <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:420,maxHeight:'80vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>🤝 {dispName(name)} ไปช่วยขับ</div>
+            <div style={{fontSize:13,color:'#64748b',marginBottom:14}}>{vt} · {day!=null?`วันที่ ${day} `:''}{MO[month-1]} {selYear} · รวม {fmt(total)} เที่ยว</div>
+            <div style={{background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'10px 14px',marginBottom:14}}>
+              {Object.entries(byTarget).sort((a,b)=>b[1]-a[1]).map(([n,c])=><div key={n} style={{display:'flex',justifyContent:'space-between',fontSize:14,fontWeight:700,color:'#0f766e',padding:'2px 0'}}>
+                <span>{vehLabel(n)}</span><span>{fmt(c)} เที่ยว</span>
+              </div>)}
+            </div>
+            {day==null&&days.length>0&&<div>
+              <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:6}}>รายวัน</div>
+              {days.map(d=>Object.entries(byDay[d]).map(([n,c])=><div key={d+'|'+n} style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'#334155',padding:'5px 0',borderBottom:'1px solid #f1f5f9'}}>
+                <span>{d===0?'(ยอดทั้งเดือน)':`${d} ${MO[month-1]}`} → {vehLabel(n)}</span><span style={{fontWeight:700}}>{fmt(c)} เที่ยว</span>
+              </div>))}
+            </div>}
+            {list.length===0&&<div style={{fontSize:13,color:'#94a3b8',textAlign:'center',padding:10}}>ไม่พบข้อมูล</div>}
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:16}}>
+              <button onClick={()=>setHelpPopup(null)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ปิด</button>
+            </div>
+          </div>
+        </div>;
+      })()}
 
       {dayNoteModal&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setDayNoteModal(null);}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:420}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
