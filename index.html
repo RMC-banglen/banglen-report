@@ -9501,25 +9501,17 @@ window.__dataReady.then(data => {
       const persons=[...items.map(i=>i.name),...new Set(typeRows.filter(r=>credited(r)&&!items.some(i=>i.name===r.helper)).map(r=>r.helper))];
       const isExtraPerson=name=>!items.some(i=>i.name===name);
       const monthItems=persons.map(name=>{const h=personHelp(name,selMonth);return{name,trips:personOwn(name,selMonth)+h,helped:h};}).filter(it=>it.trips>0).sort((a,b)=>b.trips-a.trips);
-      // รถที่ไม่มีคนขับประจำ (สำรอง/บ่อตะกั่ว) ให้โชว์ยอดจริงเสมอ ไม่หักออก เพราะทุกเที่ยวจะถูกติด helper ไว้หมด ถ้าหักจะทำให้ยอดหายไปทั้งคัน
-      // ส่วนคนขับที่มีทะเบียนของตัวเอง (เช่น สมนึก, ฐา) ถ้าถูกคนอื่นยืมไปขับ ให้หักออกจากทะเบียนต้นทาง แล้วไปนับที่คนขับที่ไปช่วยแทน
-      const isSpareVeh=n=>n.includes('สำรอง')||n.includes('บ่อตะกั่ว');
-      // dayOwn = เที่ยวของทะเบียนตัวเองล้วนๆ (ไม่รวมที่ได้รับเครดิตจากการช่วยขับ) ใช้เช็คว่า "รถคันตัวเอง" ว่างไหม เพื่อให้บันทึกเหตุผลได้แม้จะมี dayCell>0 จากการไปช่วยขับที่อื่น
-      const dayOwn=(name,d)=>dayRows.filter(r=>r.driver_name===name&&(isSpareVeh(name)||!r.helper)&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-      const dayCell=(name,d)=>{
-        const own=dayOwn(name,d);
-        return own+dayRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-      };
-      const dayRowTotal=name=>{
-        const own=dayRows.filter(r=>r.driver_name===name&&(isSpareVeh(name)||!r.helper)&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-        return own+dayRows.filter(r=>r.helper===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-      };
-      // เที่ยวที่คนขับคนนี้ไปช่วยขับรถคันอื่นแทน (ใช้แสดงป้าย 🤝 เฉยๆ ค่าถูกรวมอยู่ใน dayCell/dayRowTotal แล้ว)
-      const dayHelped=(name,d)=>dayRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
-      const dayHelpedTotal=name=>dayRows.filter(r=>r.helper===name&&r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
+      // รายวันนับรายคนเหมือนรายเดือน: dayOwn = เที่ยวที่ขับรถตัวเอง (ไม่รวมเที่ยวที่มีคนอื่นมาขับ) ใช้เช็คว่ารถคันตัวเองว่างไหมด้วย
+      const dayOwn=(name,d)=>sumTrips(dayRows.filter(r=>r.driver_name===name&&!credited(r)&&r.month===selDayMonth&&r.day===d));
+      const dayHelped=(name,d)=>sumTrips(dayRows.filter(r=>credited(r)&&r.helper===name&&r.month===selDayMonth&&r.day===d));
+      const dayCell=(name,d)=>dayOwn(name,d)+dayHelped(name,d);
+      const dayHelpedTotal=name=>sumTrips(dayRows.filter(r=>credited(r)&&r.helper===name&&r.month===selDayMonth));
+      const dayRowTotal=name=>sumTrips(dayRows.filter(r=>r.driver_name===name&&!credited(r)&&r.month===selDayMonth))+dayHelpedTotal(name);
+      // คนจากอีกประเภทที่มาช่วยขับรถประเภทนี้ในเดือนที่เลือก
+      const dayExtraPersons=[...new Set(dayRows.filter(r=>credited(r)&&r.month===selDayMonth&&!items.some(i=>i.name===r.helper)).map(r=>r.helper))];
       const dayColTotal=d=>dayRows.filter(r=>r.month===selDayMonth&&r.day===d).reduce((s,r)=>s+(r.trips||0),0);
       const dayGrand=dayRows.filter(r=>r.month===selDayMonth).reduce((s,r)=>s+(r.trips||0),0);
-      return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal,persons,personOwn,personHelp,isExtraPerson};
+      return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal,dayExtraPersons,persons,personOwn,personHelp,isExtraPerson};
     }
 
     function openDayForm(type,name){
@@ -10167,10 +10159,13 @@ window.__dataReady.then(data => {
       </div>}
 
       {view==='daily'&&TYPES.map(t=>{
-        const {items,dayRows,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal}=getTypeData(t.k);
+        const {items,dayRows,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal,dayExtraPersons}=getTypeData(t.k);
         const NON_CO=['รถบ่อตะกั่ว','รับเอง','รถร่วม'];
-        const dayItems=items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth))
+        const dayItems=[...items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth)),
+          ...dayExtraPersons.map(n=>({name:n,extra:true}))]
           .filter(it=>!hideEmptyDay||dayRowTotal(it.name)>0);
+        // ประเภทรถประจำของคนที่มาช่วยขับ ใช้เปิดฟอร์มแก้ของคนนั้น
+        const homeVtOf=n=>TYPES.find(t2=>t2.k!==t.k&&getTypeData(t2.k).items.some(i=>i.name===n))?.k;
         return<div key={t.k} style={{marginBottom:32}}>
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14}}>
             <span style={{fontSize:15}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
@@ -10199,15 +10194,15 @@ window.__dataReady.then(data => {
                 </thead>
                 <tbody>
                   {dayItems.length===0&&<tr><td colSpan={dayList.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-                  {dayItems.map((it,idx)=><tr key={it.name} style={{background:idx%2?'#fcfcfd':'#fff'}}>
-                    <td style={{padding:'4px 8px',position:'sticky',left:0,background:idx%2?'#fcfcfd':'#fff',fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={it.name}>{dispName(it.name)}</td>
+                  {dayItems.map((it,idx)=>{const rowBg=it.extra?'#f0fdfa':idx%2?'#fcfcfd':'#fff';return<tr key={it.name} style={{background:rowBg}}>
+                    <td style={{padding:'4px 8px',position:'sticky',left:0,background:rowBg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={it.extra?`${it.name} — มาช่วยขับรถ${t.k}`:it.name}>{dispName(it.name)}{it.extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
                     {dayList.map(d=>{
                       // v = ยอดที่แสดง (ของตัวเอง + ที่ได้รับเครดิตจากการช่วยขับ) · ownV = ของทะเบียนตัวเองล้วนๆ ใช้เช็คว่ารถคันนี้ว่างไหม (บันทึกเหตุผลได้แม้ v>0 จากการไปช่วยขับที่อื่น)
                       const v=dayCell(it.name,d);
                       const ownV=dayOwn(it.name,d);
                       const helped=dayHelped(it.name,d);
-                      const note=ownV?null:dayNoteOf(t.k,it.name,d);
-                      const clickable=!ownV&&canEdit;
+                      const note=ownV||it.extra?null:dayNoteOf(t.k,it.name,d);
+                      const clickable=!ownV&&!it.extra&&canEdit;
                       const helpTargets={};
                       if(helped>0)dayRows.filter(r=>r.helper===it.name&&r.month===selDayMonth&&r.day===d).forEach(r=>{helpTargets[r.driver_name]=(helpTargets[r.driver_name]||0)+(r.trips||0);});
                       const helpText=Object.entries(helpTargets).map(([n,c])=>`ไปช่วยขับรถ${dispName(n)} ${c} เที่ยว`).join(', ');
@@ -10225,11 +10220,14 @@ window.__dataReady.then(data => {
                     })}
                     <td style={{textAlign:'right',padding:'4px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>{fmt(dayRowTotal(it.name))}</td>
                     {canEdit&&<td style={{padding:'2px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
-                      <button onClick={()=>moveDriver(t.k,it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
-                      <button onClick={()=>moveDriver(t.k,it.name,1)} disabled={idx===dayItems.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===dayItems.length-1?'default':'pointer',fontSize:10,color:idx===dayItems.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
-                      <button onClick={()=>openDayForm(t.k,it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0'}}>แก้</button>
+                      {!it.extra&&<>
+                        <button onClick={()=>moveDriver(t.k,it.name,-1)} disabled={idx===0} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===0?'default':'pointer',fontSize:10,color:idx===0?'#cbd5e1':'#475569',marginRight:2}}>▲</button>
+                        <button onClick={()=>moveDriver(t.k,it.name,1)} disabled={idx===dayItems.length-1} style={{padding:'1px 5px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:idx===dayItems.length-1?'default':'pointer',fontSize:10,color:idx===dayItems.length-1?'#cbd5e1':'#475569',marginRight:2}}>▼</button>
+                        <button onClick={()=>openDayForm(t.k,it.name)} style={{padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#2f5fd0'}}>แก้</button>
+                      </>}
+                      {it.extra&&homeVtOf(it.name)&&<button onClick={()=>openDayForm(homeVtOf(it.name),it.name)} title={`เปิดฟอร์มของคนนี้ (${homeVtOf(it.name)})`} style={{padding:'1px 6px',border:'1px solid #99f6e4',borderRadius:5,background:'#f0fdfa',cursor:'pointer',fontSize:10,color:'#0f766e'}}>แก้</button>}
                     </td>}
-                  </tr>)}
+                  </tr>;})}
                 </tbody>
                 <tfoot>
                   <tr style={{background:'#f1f5f9',fontWeight:800}}>
