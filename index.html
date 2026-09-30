@@ -106,6 +106,10 @@ var APP_VERSION='2026-09-24c';
   /* ตารางขนส่ง: จอแคบเลื่อนซ้าย-ขวาได้ · จอกว้างไม่ตัดกรอบ เพื่อให้หัวตาราง sticky ค้างตอนเลื่อนทั้งหน้า */
   .tt-scroll-m, .tt-scroll-d { overflow-x: auto; }
   @media (min-width: 760px) { .tt-scroll-m { overflow: visible; } }
+  /* รายเดือน: ติ๊ก "เดือนล่าสุด" -> คอลัมน์น้อย ขยายตัวหนังสือให้อ่านง่าย */
+  .tt-big th, .tt-big td { font-size: 18px !important; padding-top: 10px !important; padding-bottom: 10px !important; }
+  .tt-big thead th { font-size: 16px !important; }
+  .tt-big tfoot tr:last-child td { font-size: 22px !important; padding-top: 14px !important; padding-bottom: 14px !important; }
   @media (min-width: 1260px) { .tt-scroll-d { overflow: visible; } }
   .tabs { display: flex; gap: 2px; border-bottom: 1.5px solid var(--line); margin-bottom: 24px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
   .tabs__btn { border: 0; background: transparent; font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--muted-text); padding: 12px 14px; cursor: pointer; position: relative; transition: color .15s; white-space: nowrap; flex-shrink: 0; }
@@ -10645,7 +10649,7 @@ window.__dataReady.then(data => {
               </div>
             </div>
             <div className="tt-scroll-m">
-              <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
+              <table className={latestMonthOnly?'tt-big':undefined} style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
                 <thead>
                   <tr style={{background:'#f8fafc'}}>
                     <th style={{textAlign:'left',padding:'7px 8px',position:'sticky',left:0,top:0,zIndex:3,background:'#f8fafc',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e8f0'}}>คนขับ/ทะเบียนรถ</th>
