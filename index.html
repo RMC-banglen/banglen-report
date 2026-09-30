@@ -9381,8 +9381,8 @@ window.__dataReady.then(data => {
     const [editD,setEditD]=useState(null);
     const inp={padding:'6px 8px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:13,fontFamily:'inherit',boxSizing:'border-box'};
     const btn=(bg,color,border)=>({padding:'5px 12px',borderRadius:6,border:`1px solid ${border||bg}`,background:bg,color,fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'});
+    // โหลดใหม่หลังบันทึกแบบเงียบ (ไม่ซ่อนตาราง) กันหน้าเด้งขึ้นบนสุด · ขึ้น "กำลังโหลด" เฉพาะครั้งแรก
     function load(){
-      setLoading(true);
       Promise.all([
         DB.from('transport_vehicles').select('*').order('vehicle_type').order('sort_order'),
         DB.from('transport_drivers').select('*').order('sort_order'),
@@ -9557,8 +9557,8 @@ window.__dataReady.then(data => {
     const [workdays,setWorkdays]=useState([]); // transport_workdays: {year,month,days}
     const [dayNotes,setDayNotes]=useState([]); // transport_day_notes: เหตุผลวันว่าง เช่น หยุด/รถเสีย
     useEffect(()=>{fetch();},[]);
+    // หลังบันทึกโหลดใหม่แบบเงียบ ไม่ขึ้น "กำลังโหลด" (กันหน้ากระพริบ/เลื่อน) · state loading เริ่มต้น true อยู่แล้วสำหรับครั้งแรก
     function fetch(){
-      setLoading(true);
       Promise.all([
         DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name'),
         DB.from('transport_workdays').select('*'),
@@ -9679,10 +9679,12 @@ window.__dataReady.then(data => {
 
     // ===== รายวัน (shared calendar helpers) =====
     const [selDayMonth,setSelDayMonth]=useState(new Date().getMonth()+1);
-    // เมื่อโหลดข้อมูล/เปลี่ยนปี ให้เด้งไปเดือนล่าสุดที่มีข้อมูลเสมอ
+    // เด้งไปเดือนล่าสุดที่มีข้อมูล เฉพาะตอนเปิดหน้าครั้งแรก/เปลี่ยนปี · หลังบันทึกแล้วโหลดใหม่ ให้อยู่เดือนเดิม
+    const autoMonthYear=React.useRef(null);
     useEffect(()=>{
+      if(autoMonthYear.current===selYear)return;
       const ms=yearRows.filter(r=>(r.trips||0)>0).map(r=>r.month);
-      if(ms.length){const latest=Math.max(...ms);setSelMonth(latest);setSelDayMonth(latest);}
+      if(ms.length){const latest=Math.max(...ms);setSelMonth(latest);setSelDayMonth(latest);autoMonthYear.current=selYear;}
     },[rows,selYear]);
     const [dayForm,setDayForm]=useState({vehicle_type:'เทรลเลอร์',driver_name:'',original_name:'',days:{}});
     const [showDayForm,setShowDayForm]=useState(false);
