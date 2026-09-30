@@ -10635,7 +10635,7 @@ window.__dataReady.then(data => {
                 </thead>
                 <tbody>
                   {persons.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-                  {groupPersons(persons).map(({key,names},idx)=>{
+                  {groupPersons(persons).filter(({names})=>names.some(n=>[1,2,3,4,5,6,7,8,9,10,11,12].some(m=>personOwn(n,m)+personHelp(n,m)>0))).map(({key,names},idx)=>{
                     const name=names[0];
                     const extra=names.every(isExtraPerson);
                     const ownNames=names.filter(n=>!isExtraPerson(n));
@@ -11157,7 +11157,7 @@ window.__dataReady.then(data => {
         return<div key={t.k} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
           <div style={{fontSize:15,fontWeight:800,color:t.color,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><span>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>สรุปทั้งปี {selYear} · {t.k}</div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {groupPersons(persons).map(({key,names})=>({key,extra:names.every(isExtraPerson),tot:names.reduce((s,name)=>s+ALLM.reduce((ss,m)=>ss+personOwn(name,m)+personHelp(name,m),0),0)})).filter(p=>p.tot>0||!p.extra).map(({key,extra,tot})=>{
+            {groupPersons(persons).map(({key,names})=>({key,extra:names.every(isExtraPerson),tot:names.reduce((s,name)=>s+ALLM.reduce((ss,m)=>ss+personOwn(name,m)+personHelp(name,m),0),0)})).filter(p=>p.tot>0).map(({key,extra,tot})=>{
               const pct=typeGrand>0?(tot/typeGrand*100):0;
               return<div key={key}>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
