@@ -9370,7 +9370,7 @@ window.__dataReady.then(data => {
   }
 
   // ===== ฐานข้อมูลหลักขนส่ง: รถ / คนขับ / จับคู่คนขับประจำรถ (มีช่วงวันที่) =====
-  function TransportMasterPanel({canEdit}){
+  function TransportMasterPanel({canEdit,onDataChanged}){
     const VT=['เทรลเลอร์','10ล้อ-12ล้อ'];
     const [vehicles,setVehicles]=useState([]);
     const [drivers,setDrivers]=useState([]);
@@ -9395,17 +9395,105 @@ window.__dataReady.then(data => {
     const vLabel=v=>v?`${v.plate}${v.label?` (${v.label})`:''}`:'?';
     const dName=id=>drivers.find(d=>d.id===id)?.name||'?';
     const vOf=id=>vehicles.find(v=>v.id===id);
+    // ---- จัดเที่ยวเข้าแถวรถตามคนขับประจำ ณ วันที่ของเที่ยว ----
+    // ข้อเท็จจริง (person = ใครขับ, plate = ทะเบียน) ไม่เปลี่ยน เปลี่ยนแค่ชื่อแถว/คนช่วยขับ ยอดรวมจึงเท่าเดิม และแก้การจับคู่กลับได้เสมอ
+    const [relabeling,setRelabeling]=useState(false);
+    async function relabelTrips(){
+      setRelabeling(true);
+      try{
+        const [t,v,d,a]=await Promise.all([
+          DB.from('transport_trips').select('id,year,month,day,vehicle_type,driver_name,helper,person,plate,sort_order,trips').range(0,9999),
+          DB.from('transport_vehicles').select('*'),DB.from('transport_drivers').select('*'),DB.from('transport_assignments').select('*'),
+        ]);
+        const TR=t.data||[],V=v.data||[],D=d.data||[],A=a.data||[];
+        const pad=n=>String(n).padStart(2,'0');
+        const isoOf=r=>`${r.year-543}-${pad(r.month)}-${pad(r.day||15)}`;
+        const cover=(x,dt)=>x.start_date<=dt&&(!x.end_date||x.end_date>=dt);
+        const regOf=(plate,dt)=>{const vv=V.find(x=>x.plate===plate);const aa=vv&&A.find(x=>x.vehicle_id===vv.id&&cover(x,dt));return aa?D.find(x=>x.id===aa.driver_id)?.name:null;};
+        const homeOf=(person,dt)=>{const dd=D.find(x=>x.name===person);if(!dd)return undefined;const aa=A.find(x=>x.driver_id===dd.id&&cover(x,dt));return aa?V.find(x=>x.id===aa.vehicle_id)?.plate||null:null;};
+        const spareName=(plate,vt)=>{const lg=TR.find(r=>r.plate===plate&&r.vehicle_type===vt&&r.driver_name.includes('สำรอง'));const vv=V.find(x=>x.plate===plate);return lg?lg.driver_name:`${vv&&vv.label?vv.label:'รถสำรอง'} / ${plate}`;};
+        const groups={};
+        for(const r of TR){
+          if(!r.person||!r.plate||!(r.trips>0))continue; // รถนอก / รถสำรองไม่ระบุคนขับ / แถวตั้งต้น 0 เที่ยว
+          const dt=isoOf(r),home=homeOf(r.person,dt);
+          if(home===undefined)continue; // คนนี้ไม่มีในแท็บ รถ/คนขับ
+          let dn,hp=null;
+          if(home===r.plate)dn=`${r.person} / ${r.plate}`;
+          else{const reg=regOf(r.plate,dt);dn=reg?`${reg} / ${r.plate}`:spareName(r.plate,r.vehicle_type);hp=home?`${r.person} / ${home}`:r.person;}
+          if(dn===r.driver_name&&hp===(r.helper||null))continue;
+          const k=r.vehicle_type+'\u0001'+dn+'\u0001'+(hp||'');
+          (groups[k]=groups[k]||{vt:r.vehicle_type,dn,hp,ids:[]}).ids.push(r.id);
+        }
+        let n=0;
+        for(const g of Object.values(groups)){
+          const so=TR.find(r=>r.vehicle_type===g.vt&&r.driver_name===g.dn)?.sort_order??V.find(x=>x.plate===(g.dn.match(/(\d{2}-\d{4})\s*$/)||[])[1])?.sort_order??20;
+          for(let i=0;i<g.ids.length;i+=100){
+            const {error}=await DB.from('transport_trips').update({driver_name:g.dn,helper:g.hp,sort_order:so}).in('id',g.ids.slice(i,i+100));
+            if(error)throw error;
+          }
+          n+=g.ids.length;
+        }
+        // แถวตั้งต้น 0 เที่ยว (ไว้โชว์แถวให้กรอก) ที่ไม่ตรงกับรถประจำแล้ว -> ลบ
+        const stale=TR.filter(r=>!(r.trips>0)&&!r.helper&&r.person&&r.plate&&(()=>{const h=homeOf(r.person,isoOf(r));return h!==undefined&&h!==r.plate;})()).map(r=>r.id);
+        for(let i=0;i<stale.length;i+=100)await DB.from('transport_trips').delete().in('id',stale.slice(i,i+100));
+        n+=stale.length;
+        // ป้ายหยุด: เรื่องคน (ลาหยุด) อยู่แถวรถประจำของคนนั้น · เรื่องรถ (ซ่อม/ไม่มีงาน/อื่นๆ) อยู่แถวของรถคันนั้น ณ วันนั้น
+        const {data:NT}=await DB.from('transport_day_notes').select('*').range(0,9999);
+        const PR=/\s*\/\s*(\d{2}-\d{4})\s*$/;
+        const taken=new Set((NT||[]).map(x=>[x.year,x.month,x.day,x.vehicle_type,x.driver_name].join('|')));
+        for(const x of NT||[]){
+          const plate=x.plate||(x.driver_name.match(PR)||[])[1];if(!plate)continue;
+          const dt=`${x.year-543}-${pad(x.month)}-${pad(x.day)}`;
+          let target;
+          if((x.note||'').trim()==='ลาหยุด'){const p=x.driver_name.replace(PR,'').trim();const h=homeOf(p,dt);if(!h)continue;target=`${p} / ${h}`;}
+          else{const reg=regOf(plate,dt);target=reg?`${reg} / ${plate}`:spareName(plate,x.vehicle_type);}
+          if(target===x.driver_name)continue;
+          const key=[x.year,x.month,x.day,x.vehicle_type,target].join('|');
+          if(taken.has(key))continue; // แถวปลายทางมีป้ายวันนั้นอยู่แล้ว
+          const {error}=await DB.from('transport_day_notes').update({driver_name:target,plate:(target.match(PR)||[])[1]||plate}).eq('id',x.id);
+          if(!error){taken.add(key);n++;}
+        }
+        if(n)onDataChanged&&onDataChanged();
+        return n;
+      }catch(e){alert('จัดเที่ยวตามช่วงเวลาไม่สำเร็จ: '+(e.message||e));return 0;}
+      finally{setRelabeling(false);}
+    }
     async function save(table,row,after){
       const {id,...data}=row;
       const res=id?await DB.from(table).update(data).eq('id',id):await DB.from(table).insert([data]);
       if(res.error){alert('บันทึกไม่สำเร็จ: '+res.error.message);return;}
       after();load();
+      if(table==='transport_assignments')await relabelTrips();
+    }
+    // เปลี่ยนชื่อคนขับ -> เปลี่ยนตามในเที่ยว (ชื่อแถว/คนช่วยขับ/person) และป้ายหยุดทั้งหมด · เก็บชื่อเดิมไว้ใน "ชื่อในไฟล์บิล" ให้นำเข้ายังจับคู่ได้
+    async function saveDriver(d){
+      const orig=d.id?drivers.find(x=>x.id===d.id):null;
+      const newName=d.name.trim();
+      const renamed=orig&&orig.name!==newName;
+      let al=(d.aliases||'').split(',').map(s=>s.trim()).filter(Boolean);
+      if(renamed&&!al.includes(orig.name))al.push(orig.name);
+      const {id,...data}={...d,name:newName,aliases:al.join(',')||null};
+      const res=id?await DB.from('transport_drivers').update(data).eq('id',id):await DB.from('transport_drivers').insert([data]);
+      if(res.error){alert('บันทึกไม่สำเร็จ: '+res.error.message);return;}
+      if(renamed){
+        const PR=/\s*\/\s*(\d{2}-\d{4})\s*$/;const only=n=>String(n||'').replace(PR,'').trim();
+        const re=n=>newName+String(n).slice(String(n).indexOf(orig.name)+orig.name.length);
+        const {data:tr}=await DB.from('transport_trips').select('driver_name,helper').range(0,9999);
+        const {data:nt}=await DB.from('transport_day_notes').select('driver_name').range(0,9999);
+        for(const n of new Set((tr||[]).map(r=>r.driver_name).filter(n=>only(n)===orig.name)))await DB.from('transport_trips').update({driver_name:re(n)}).eq('driver_name',n);
+        for(const n of new Set((tr||[]).map(r=>r.helper).filter(n=>n&&only(n)===orig.name)))await DB.from('transport_trips').update({helper:re(n)}).eq('helper',n);
+        await DB.from('transport_trips').update({person:newName}).eq('person',orig.name);
+        for(const n of new Set((nt||[]).map(r=>r.driver_name).filter(n=>only(n)===orig.name)))await DB.from('transport_day_notes').update({driver_name:re(n)}).eq('driver_name',n);
+        onDataChanged&&onDataChanged();
+      }
+      setEditD(null);load();
     }
     async function del(table,id,msg){
       if(!confirm(msg))return;
       const {error}=await DB.from(table).delete().eq('id',id);
       if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}
       load();
+      await relabelTrips(); // ลบการจับคู่/รถ/คนขับ มีผลกับคนขับประจำ
     }
     // ช่วงวันที่ทับกัน: รถคันเดียวกันมีคนขับประจำ 2 คน หรือคนเดียวประจำ 2 คันในวันเดียวกัน
     const overlaps=[];
@@ -9438,7 +9526,10 @@ window.__dataReady.then(data => {
     </>;
     return<div>
       {card('🔗 คนขับประจำรถ','ใครขับรถคันไหน ตั้งแต่วันที่เท่าไหร่ ถึงวันที่เท่าไหร่ · ใช้ตอนนำเข้าไฟล์บิลเพื่อหาทะเบียนให้อัตโนมัติ',
-        canEdit&&!editA&&<button onClick={()=>setEditA({id:null,driver_id:'',vehicle_id:'',start_date:'',end_date:''})} style={btn('#2f5fd0','#fff')}>+ เพิ่มการจับคู่</button>,
+        canEdit&&<div style={{display:'flex',gap:8}}>
+          <button disabled={relabeling} onClick={async()=>{const n=await relabelTrips();alert(n?`จัดเที่ยวเข้าแถวรถใหม่ ${n} แถว`:'ข้อมูลตรงกับการจับคู่แล้ว ไม่มีอะไรต้องเปลี่ยน');}} title="จัดเที่ยวเดิมทั้งหมดเข้าแถวรถตามคนขับประจำ ณ วันที่ของเที่ยว (ทำให้อัตโนมัติอยู่แล้วหลังบันทึกการจับคู่)" style={{...btn('#fff','#0f766e','#99f6e4'),opacity:relabeling?0.6:1}}>{relabeling?'กำลังจัด...':'🔄 จัดเที่ยวตามช่วงเวลา'}</button>
+          {!editA&&<button onClick={()=>setEditA({id:null,driver_id:'',vehicle_id:'',start_date:'',end_date:''})} style={btn('#2f5fd0','#fff')}>+ เพิ่มการจับคู่</button>}
+        </div>,
         <>
           {overlaps.length>0&&<div style={{margin:'12px 18px 0',padding:'8px 12px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,fontSize:12.5,color:'#b91c1c'}}>
             <b>⚠️ ช่วงวันที่ทับกัน {overlaps.length} รายการ</b> — แก้ "ถึงวันที่" ของคนเดิมก่อนเริ่มคนใหม่<ul style={{margin:'4px 0 0 18px',padding:0}}>{overlaps.map((o,i)=><li key={i}>{o}</li>)}</ul>
@@ -9511,7 +9602,7 @@ window.__dataReady.then(data => {
                 <td style={tdS}></td>
                 <td style={tdS}><input type="checkbox" checked={editD.active} onChange={e=>setEditD(s=>({...s,active:e.target.checked}))}/></td>
                 <td style={tdS}>
-                  <button onClick={()=>{if(!editD.name.trim()){alert('ใส่ชื่อคนขับ');return;}save('transport_drivers',{...editD,name:editD.name.trim(),aliases:(editD.aliases||'').trim()||null},()=>setEditD(null));}} style={btn('#2f5fd0','#fff')}>บันทึก</button>{' '}
+                  <button onClick={()=>{if(!editD.name.trim()){alert('ใส่ชื่อคนขับ');return;}saveDriver(editD);}} style={btn('#2f5fd0','#fff')}>บันทึก</button>{' '}
                   <button onClick={()=>setEditD(null)} style={btn('#fff','#64748b','#e2e8f0')}>ยกเลิก</button>
                 </td>
               </tr>;
@@ -10179,7 +10270,7 @@ window.__dataReady.then(data => {
         <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='summary'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
         <button onClick={()=>setView('master')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='master'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='master'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🔗 รถ / คนขับ</button>
       </div>
-      {view==='master'&&<TransportMasterPanel canEdit={canEdit}/>}
+      {view==='master'&&<TransportMasterPanel canEdit={canEdit} onDataChanged={fetch}/>}
 
       {view==='stopped'&&(()=>{
         // รถบริษัทเท่านั้น (ไม่รวมรถร่วม/รับเอง/บ่อตะกั่ว)
