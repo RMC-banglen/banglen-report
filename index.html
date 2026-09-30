@@ -9648,6 +9648,12 @@ window.__dataReady.then(data => {
     const [workdays,setWorkdays]=useState([]); // transport_workdays: {year,month,days}
     const [dayNotes,setDayNotes]=useState([]); // transport_day_notes: เหตุผลวันว่าง เช่น หยุด/รถเสีย
     useEffect(()=>{fetch();},[]);
+    // กลับมาที่หน้าต่างนี้ (สลับแท็บ/แอป) -> โหลดข้อมูลล่าสุด กันหน้าเปิดค้างเห็นข้อมูลเก่า
+    useEffect(()=>{
+      const onVis=()=>{if(document.visibilityState==='visible')fetch();};
+      document.addEventListener('visibilitychange',onVis);window.addEventListener('focus',onVis);
+      return()=>{document.removeEventListener('visibilitychange',onVis);window.removeEventListener('focus',onVis);};
+    },[]);
     // หลังบันทึกโหลดใหม่แบบเงียบ ไม่ขึ้น "กำลังโหลด" (กันหน้ากระพริบ/เลื่อน) · state loading เริ่มต้น true อยู่แล้วสำหรับครั้งแรก
     function fetch(){
       Promise.all([
@@ -9883,11 +9889,14 @@ window.__dataReady.then(data => {
       return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal,dayExtraPersons,persons,personOwn,personHelp,isExtraPerson};
     }
 
-    function openDayForm(type,name){
-      const {dayRows}=getTypeData(type);
+    async function openDayForm(type,name){
+      // ดึงข้อมูลล่าสุดจากระบบก่อนเปิดฟอร์มเสมอ กันหน้าที่เปิดค้างไว้บันทึกข้อมูลเก่าทับ (เคยทำให้เที่ยวซ้ำ)
+      const {data:fresh}=await DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name').range(0,9999);
+      const all=fresh||rows;if(fresh)setRows(fresh);
+      const mRows=all.filter(r=>r.year===selYear&&r.month===selDayMonth&&r.day!=null);
       // เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ (มี helper) ไม่แสดงในฟอร์ม และจะไม่ถูกลบตอนบันทึก
-      const days={};dayList.forEach(d=>{const matched=dayRows.filter(r=>r.driver_name===name&&!r.helper&&r.month===selDayMonth&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
-      const helps=yearRows.filter(r=>r.helper===name&&r.month===selDayMonth&&r.day!=null).sort((a,b)=>a.day-b.day).map(r=>({day:String(r.day),target:r.vehicle_type+'||'+r.driver_name,trips:String(r.trips||'')}));
+      const days={};dayList.forEach(d=>{const matched=mRows.filter(r=>r.vehicle_type===type&&r.driver_name===name&&!r.helper&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
+      const helps=mRows.filter(r=>r.helper===name).sort((a,b)=>a.day-b.day).map(r=>({day:String(r.day),target:r.vehicle_type+'||'+r.driver_name,trips:String(r.trips||'')}));
       setDayForm({vehicle_type:type,driver_name:name,original_name:name,days,helps});
       setShowDayForm(true);
     }
