@@ -10883,10 +10883,13 @@ window.__dataReady.then(data => {
           <div style={{fontSize:12,color:'#64748b',marginBottom:12}}>{dayForm.vehicle_type} · {MO[selDayMonth-1]} {selYear}</div>
           <div style={{fontSize:13,fontWeight:700,color:'#334155',marginBottom:6}}>เที่ยวที่ขับรถตัวเอง</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:8,marginBottom:16}}>
-            {dayList.map(d=><div key={d}>
-              <div style={{fontSize:11,color:'#94a3b8',marginBottom:2}}>วันที่ {d}</div>
-              <input type="number" value={dayForm.days[d]!=null?dayForm.days[d]:''} onChange={e=>setDayForm(f=>({...f,days:{...f.days,[d]:e.target.value}}))} placeholder="0" style={{...inp,padding:'6px 6px',fontSize:12}}/>
-            </div>)}
+            {dayList.map(d=>{
+              // วันที่มีเที่ยว = ตัวแดงหนา · 0 = เทาจาง ให้เห็นวันที่มีข้อมูลได้ทันที
+              const v=dayForm.days[d],has=Number(v)>0,zero=v!=null&&v!==''&&!has;
+              return<div key={d}>
+              <div style={{fontSize:11,color:has?'#dc2626':'#94a3b8',fontWeight:has?700:400,marginBottom:2}}>วันที่ {d}</div>
+              <input type="number" value={v!=null?v:''} onChange={e=>setDayForm(f=>({...f,days:{...f.days,[d]:e.target.value}}))} placeholder="0" style={{...inp,padding:'6px 6px',fontSize:has?14:12,...(has?{color:'#dc2626',fontWeight:800,background:'#fef2f2',borderColor:'#fca5a5'}:zero?{color:'#cbd5e1'}:{})}}/>
+            </div>;})}
           </div>
           {(()=>{
             const helps=dayForm.helps||[];
