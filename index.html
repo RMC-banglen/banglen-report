@@ -10401,8 +10401,15 @@ window.__dataReady.then(data => {
         }));
         const notesOfPlate=(list,row)=>list.filter(n=>n.vehicle_type===row.vt&&(n.plate||plateOf(n.driver_name))===row.plate);
         // ตารางคน: คนขับจริง (ไม่รวมรถสำรองที่ไม่มีคนขับประจำ)
-        const personRows=TYPES.flatMap(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)&&!it.name.includes('สำรอง')).map(it=>({vt:t.k,name:it.name})));
-        const notesOfPerson=(list,p)=>list.filter(n=>n.vehicle_type===p.vt&&n.driver_name===p.name);
+        // ลาหยุดเป็นเรื่องของคน: คนเดียวกันที่ย้ายรถระหว่างปี (ชื่อแถวต่างกันแค่ทะเบียน) รวมเป็นแถวเดียว · คนที่เลิกขับไว้ท้าย
+        const personRows=[];
+        TYPES.forEach(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)&&!it.name.includes('สำรอง')).forEach(it=>{
+          const person=nameOnly(it.name);let p=personRows.find(x=>x.vt===t.k&&x.person===person);
+          if(!p){p={vt:t.k,person,names:[]};personRows.push(p);}p.names.push(it.name);
+        }));
+        personRows.forEach((p,i)=>{p.i=i;p.former=p.names.every(isFormerDriver);});
+        personRows.sort((a,b)=>(a.vt===b.vt?0:a.vt==='เทรลเลอร์'?-1:1)||(a.former-b.former)||a.i-b.i);
+        const notesOfPerson=(list,p)=>list.filter(n=>n.vehicle_type===p.vt&&p.names.includes(n.driver_name));
 
         const monthSel=<select value={selDayMonth} onChange={e=>setSelDayMonth(Number(e.target.value))} style={{fontSize:13,padding:'6px 12px',border:'1px solid #e2e8f0',borderRadius:8,fontWeight:700,color:'#475569'}}>
           {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{MO[m-1]}</option>)}
@@ -10464,8 +10471,8 @@ window.__dataReady.then(data => {
           {reasonTable('🚛 รถหยุดวิ่ง — ตามทะเบียน',VEHICLE_REASONS,plateRows,r=>r.vt+'|'+r.plate,
             r=><>{r.vt==='เทรลเลอร์'?'🚛':'🚚'} {r.hasPlate?r.plate:dispName(r.names[0])}{r.hasPlate&&<span style={{color:'#94a3b8',fontWeight:500,marginLeft:6}}>({r.names.map(n=>dispName(n.replace(/\s*\/\s*\d{2}-\d{4}\s*$/,''))).join(', ')})</span>}</>,
             notesOfPlate,vehNotes)}
-          {reasonTable('👤 คนลาหยุด — ตามคนขับ',PERSON_REASONS,personRows,p=>p.vt+'|'+p.name,
-            p=><>{p.vt==='เทรลเลอร์'?'🚛':'🚚'} {dispName(p.name)}</>,
+          {reasonTable('👤 คนลาหยุด — ตามคนขับ',PERSON_REASONS,personRows,p=>p.vt+'|'+p.person,
+            p=><>{p.vt==='เทรลเลอร์'?'🚛':'🚚'} <span style={p.former?{color:'#94a3b8'}:undefined}>{showPlate?p.names.join(', '):p.person}</span>{p.former&&<span style={{fontSize:10,color:'#94a3b8',fontWeight:700,marginLeft:6,padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:10}}>เลิกขับแล้ว</span>}</>,
             notesOfPerson,personNotes)}
           {otherNotes.length>0&&<div style={{background:'#f8fafc',border:'1px dashed #cbd5e1',borderRadius:14,padding:'14px 18px'}}>
             <div style={{fontSize:13,fontWeight:800,color:'#475569',marginBottom:4}}>ป้ายที่พิมพ์เอง (อื่นๆ) — ไม่นับในสถิติ {otherNotes.length} รายการ</div>
@@ -10662,7 +10669,7 @@ window.__dataReady.then(data => {
                   แสดงทะเบียน
                 </label>
                 {allMonths.length>1&&<label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
-                  <input type="checkbox" checked={latestMonthOnly} onChange={e=>setLatestMonthOnly(e.target.checked)}/>
+                  <input type="checkbox" checked={latestMonthOnly} onChange={e=>{setLatestMonthOnly(e.target.checked);if(e.target.checked&&allMonths.length)setSelMonth(allMonths[allMonths.length-1]);}}/>
                   เดือนล่าสุด ({MO[allMonths[allMonths.length-1]-1]})
                 </label>}
               </div>
