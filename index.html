@@ -9620,7 +9620,24 @@ window.__dataReady.then(data => {
     const insertTrips=list=>DB.from('transport_trips').insert(list.map(withPersonPlate));
     const isCompanyName=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
     // จำนวนรถบริษัทในเดือนนั้น = ทะเบียนที่มีเที่ยววิ่ง หรือมีป้ายหยุดที่เป็นเรื่องของรถ (รถจอดซ่อมทั้งเดือนก็ยังนับ)
-    function truckCount(vt,m){
+    // จำนวนรถที่แก้เอง (เก็บในตารางวันทำงาน) ถ้าว่างใช้ค่าอัตโนมัติ
+    const truckField=vt=>vt==='เทรลเลอร์'?'trucks_trailer':'trucks_wheel';
+    const truckOverride=(vt,m)=>{const r=workdays.find(x=>x.year===selYear&&x.month===m);const v=r?r[truckField(vt)]:null;return v==null?null:Number(v);};
+    function truckCount(vt,m){const o=truckOverride(vt,m);return o!=null?o:truckCountAuto(vt,m);}
+    async function editTrucks(vt,m){
+      const auto=truckCountAuto(vt,m),cur=truckOverride(vt,m);
+      const v=window.prompt(`จำนวนรถ${vt} ${MO[m-1]} ${selYear} (คัน)\nค่าอัตโนมัติ = ${auto} คัน · เว้นว่างเพื่อกลับไปนับอัตโนมัติ`,cur!=null?cur:'');
+      if(v==null)return;
+      const val=v.trim()===''?null:Math.max(0,Math.round(Number(v)));
+      if(val!=null&&!Number.isFinite(val)){alert('กรุณาใส่ตัวเลข');return;}
+      const exists=workdays.some(x=>x.year===selYear&&x.month===m);
+      const res=exists
+        ?await DB.from('transport_workdays').update({[truckField(vt)]:val}).eq('year',selYear).eq('month',m)
+        :await DB.from('transport_workdays').insert([{year:selYear,month:m,days:0,[truckField(vt)]:val}]);
+      if(res.error){alert('บันทึกไม่สำเร็จ: '+res.error.message+(res.error.message.includes('column')?'\n(ต้องรัน SQL เพิ่มช่อง trucks_trailer / trucks_wheel ใน Supabase ก่อน)':''));return;}
+      fetch();
+    }
+    function truckCountAuto(vt,m){
       const plates=new Set();
       yearRows.forEach(r=>{if(r.vehicle_type===vt&&r.month===m&&(r.trips||0)>0&&isCompanyName(r.driver_name))plates.add(r.plate||plateOf(r.driver_name));});
       dayNotes.forEach(n=>{if(n.year===selYear&&n.vehicle_type===vt&&n.month===m&&isCompanyName(n.driver_name)&&VEHICLE_REASONS.includes((n.note||'').trim()))plates.add(n.plate||plateOf(n.driver_name));});
@@ -10514,7 +10531,10 @@ window.__dataReady.then(data => {
                           </tr>
                           <tr style={{background:c.bg,fontWeight:700,fontSize:13}}>
                             <td style={{padding:'9px 8px',position:'sticky',left:0,background:c.bg,color:'#475569',whiteSpace:'nowrap'}} title="นับทะเบียนรถบริษัทที่มีเที่ยววิ่ง หรือมีป้ายซ่อม/ไม่มีงาน ในเดือนนั้น">จำนวนรถในเดือน (คัน)</td>
-                            {months.map(m=>{const n=truckCount(t.k,m);return<td key={m} style={{textAlign:'right',padding:'9px 24px 9px 6px',color:'#475569',whiteSpace:'nowrap'}}>{n||'–'}</td>;})}
+                            {months.map(m=>{const n=truckCount(t.k,m),ov=truckOverride(t.k,m)!=null;return<td key={m} style={{textAlign:'right',padding:'9px 24px 9px 6px',color:'#475569',whiteSpace:'nowrap',position:'relative'}} title={ov?`แก้เองแล้ว (อัตโนมัติ = ${truckCountAuto(t.k,m)} คัน)`:'นับอัตโนมัติ'}>
+                              {canEdit?<span onClick={()=>editTrucks(t.k,m)} style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{n||'–'}</span>:(n||'–')}
+                              {ov&&<span style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)',fontSize:11,color:'#d97706'}}>✎</span>}
+                            </td>;})}
                             <td style={{textAlign:'right',padding:'9px 8px',color:'#475569',background:'#f1f5f9'}}></td>
                             {canEdit&&<td style={{background:c.bg}}></td>}
                           </tr>
