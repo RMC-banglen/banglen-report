@@ -10308,7 +10308,9 @@ window.__dataReady.then(data => {
       if(delErr||insErr){setSaving(false);alert('บันทึกไม่สำเร็จ: '+((insErr||delErr).message||'เกิดข้อผิดพลาด'));return;}
       setSaving(false);setShowForm(false);setSelYear(Number(form.year));fetch();
     }
-    async function handleDelete(type,name){await DB.from('transport_trips').delete().eq('year',selYear).eq('vehicle_type',type).eq('driver_name',name);setConfirmDel(null);fetch();}
+    async function handleDelete(type,name,names){for(const n of (names||[name]))await DB.from('transport_trips').delete().eq('year',selYear).eq('vehicle_type',type).eq('driver_name',n);setConfirmDel(null);fetch();}
+    // คนเดียวกันที่เปลี่ยนรถระหว่างปี (ชื่อแถวต่างกันแค่ทะเบียน) รวมเป็นแถวเดียวเมื่อซ่อนทะเบียน
+    const groupPersons=list=>{const gs=[];list.forEach(n=>{const k=dispName(n);let g=gs.find(x=>x.key===k);if(!g){g={key:k,names:[]};gs.push(g);}g.names.push(n);});return gs;};
 
     return<div style={{padding:'24px 0'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
@@ -10462,13 +10464,12 @@ window.__dataReady.then(data => {
         // อันดับคนขับ (ทั้งปี รวม 2 ประเภท ทุกทะเบียน รวมรถร่วม/รับเอง/บ่อตะกั่วด้วย)
         // นับรายคน: เที่ยวที่ไปช่วยขับนับให้คนขับ แยกตามประเภทรถที่ไปขับ
         const personYear=(td,n)=>[1,2,3,4,5,6,7,8,9,10,11,12].reduce((s,m)=>s+td.personOwn(n,m)+td.personHelp(n,m),0);
-        const rank=[...trailer.persons.map(n=>({label:'🚛 '+dispName(n),value:personYear(trailer,n)})),
-                    ...wheel.persons.map(n=>({label:'🚚 '+dispName(n),value:personYear(wheel,n)}))]
+        const rankOf=val=>[...groupPersons(trailer.persons).map(g=>({label:'🚛 '+g.key,value:g.names.reduce((s,n)=>s+val(trailer,n),0)})),
+                    ...groupPersons(wheel.persons).map(g=>({label:'🚚 '+g.key,value:g.names.reduce((s,n)=>s+val(wheel,n),0)}))]
                     .filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
+        const rank=rankOf(personYear);
         // อันดับคนขับของเดือนล่าสุดที่มีข้อมูล
-        const rankMonth=lastM?[...trailer.persons.map(n=>({label:'🚛 '+dispName(n),value:trailer.personOwn(n,lastM)+trailer.personHelp(n,lastM)})),
-                    ...wheel.persons.map(n=>({label:'🚚 '+dispName(n),value:wheel.personOwn(n,lastM)+wheel.personHelp(n,lastM)}))]
-                    .filter(i=>i.value>0).sort((a,b)=>b.value-a.value):[];
+        const rankMonth=lastM?rankOf((td,n)=>td.personOwn(n,lastM)+td.personHelp(n,lastM)):[];
         const card=(title,sub,children)=><div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
           <div style={{fontSize:15,fontWeight:800,color:'#1e293b'}}>{title}</div>
           {sub&&<div style={{fontSize:12,color:'#94a3b8',marginBottom:10}}>{sub}</div>}
@@ -10634,23 +10635,30 @@ window.__dataReady.then(data => {
                 </thead>
                 <tbody>
                   {persons.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-                  {persons.map((name,idx)=>{
-                    const extra=isExtraPerson(name);
+                  {groupPersons(persons).map(({key,names},idx)=>{
+                    const name=names[0];
+                    const extra=names.every(isExtraPerson);
+                    const ownNames=names.filter(n=>!isExtraPerson(n));
                     const ALLM=[1,2,3,4,5,6,7,8,9,10,11,12];
-                    const ownTotal=ALLM.reduce((s,m)=>s+personOwn(name,m),0);
-                    const helperTotal=ALLM.reduce((s,m)=>s+personHelp(name,m),0);
+                    const pOwn=m=>names.reduce((s,n)=>s+personOwn(n,m),0);
+                    const pHelp=m=>names.reduce((s,n)=>s+personHelp(n,m),0);
+                    const ownTotal=ALLM.reduce((s,m)=>s+pOwn(m),0);
+                    const helperTotal=ALLM.reduce((s,m)=>s+pHelp(m),0);
+                    // แก้ยอด: เปิดแถวที่มีข้อมูลเดือนล่าสุด (ถ้าคนนี้มีหลายทะเบียน กด "แสดงทะเบียน" เพื่อแก้แยกคัน)
+                    const editName=[...ownNames].sort((a,b)=>Math.max(0,...ALLM.filter(m=>personOwn(b,m)>0))-Math.max(0,...ALLM.filter(m=>personOwn(a,m)>0)))[0];
                     const bg=extra?'#f0fdfa':idx%2?'#fcfcfd':'#fff';
-                    return<tr key={name} style={{background:bg}}>
-                    <td style={{padding:'5px 8px',position:'sticky',left:0,background:bg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={extra?`มาช่วยขับรถ${t.k}`:undefined}>{dispName(name)}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
-                    {months.map(m=>{const v=personOwn(name,m),h=personHelp(name,m),total=v+h;
+                    const plates=names.length>1?names.map(n=>(String(n).match(/(\d{2}-\d{4})\s*$/)||[])[1]).filter(Boolean):[];
+                    return<tr key={key} style={{background:bg}}>
+                    <td style={{padding:'5px 8px',position:'sticky',left:0,background:bg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={extra?`มาช่วยขับรถ${t.k}`:plates.length?`ขับหลายคัน: ${plates.join(', ')}`:undefined}>{key}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
+                    {months.map(m=>{const v=pOwn(m),h=pHelp(m),total=v+h;
                       // เว้นที่ขวา 24px ทุกช่อง ให้ตัวเลขชิดขวาตรงกัน รูปมือวางลอยในช่องว่างนั้น ไม่ดันตัวเลข
-                      if(extra)return<td key={m} onClick={h>0?()=>setHelpPopup({vt:t.k,name,month:m}):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',color:total?'#0f766e':'#cbd5e1',fontWeight:total?700:undefined,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:h>0?'pointer':'default'}} title={h>0?'กดดูรายละเอียด':undefined}>{total?<span style={{textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(total)}</span>:'–'}</td>;
-                      return<td key={m} style={{textAlign:'right',padding:'5px 24px 5px 6px',position:'relative',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={()=>setHelpPopup({vt:t.k,name,month:m})} style={{position:'absolute',right:3,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝</span>}</td>;})}
+                      if(extra)return<td key={m} onClick={h>0?()=>setHelpPopup({vt:t.k,name,names,month:m}):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',color:total?'#0f766e':'#cbd5e1',fontWeight:total?700:undefined,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:h>0?'pointer':'default'}} title={h>0?'กดดูรายละเอียด':undefined}>{total?<span style={{textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(total)}</span>:'–'}</td>;
+                      return<td key={m} style={{textAlign:'right',padding:'5px 24px 5px 6px',position:'relative',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={()=>setHelpPopup({vt:t.k,name,names,month:m})} style={{position:'absolute',right:3,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝</span>}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
-                      {canEdit&&!extra?<span onClick={()=>openEdit(t.k,name)} title="แก้ไข" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
+                      {canEdit&&editName?<span onClick={()=>openEdit(t.k,editName)} title={ownNames.length>1?`แก้ไข (${editName}) — กด "แสดงทะเบียน" เพื่อแก้แยกคัน`:'แก้ไข'} style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
                     </td>
                     {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
-                      {!extra&&<button onClick={()=>setConfirmDel({type:t.k,name})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>}
+                      {ownNames.length>0&&<button onClick={()=>setConfirmDel({type:t.k,name:key,names:ownNames})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>}
                     </td>}
                   </tr>;})}
                 </tbody>
@@ -10881,8 +10889,8 @@ window.__dataReady.then(data => {
       </div>}
 
       {helpPopup&&(()=>{
-        const {vt,name,month,day}=helpPopup;
-        const list=yearRows.filter(r=>r.vehicle_type===vt&&r.helper===name&&r.month===month&&(day==null||r.day===day));
+        const {vt,name,month,day}=helpPopup;const names=helpPopup.names||[name];
+        const list=yearRows.filter(r=>r.vehicle_type===vt&&names.includes(r.helper)&&r.month===month&&(day==null||r.day===day));
         const byDay={};
         list.forEach(r=>{const k=r.day==null?0:r.day;(byDay[k]=byDay[k]||{});byDay[k][r.driver_name]=(byDay[k][r.driver_name]||0)+(r.trips||0);});
         const days=Object.keys(byDay).map(Number).sort((a,b)=>a-b);
@@ -11149,11 +11157,11 @@ window.__dataReady.then(data => {
         return<div key={t.k} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'18px 20px',marginBottom:20}}>
           <div style={{fontSize:15,fontWeight:800,color:t.color,marginBottom:14,display:'flex',alignItems:'center',gap:6}}><span>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>สรุปทั้งปี {selYear} · {t.k}</div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {persons.map(name=>({name,tot:ALLM.reduce((s,m)=>s+personOwn(name,m)+personHelp(name,m),0)})).filter(p=>p.tot>0||!isExtraPerson(p.name)).map(({name,tot})=>{
+            {groupPersons(persons).map(({key,names})=>({key,extra:names.every(isExtraPerson),tot:names.reduce((s,name)=>s+ALLM.reduce((ss,m)=>ss+personOwn(name,m)+personHelp(name,m),0),0)})).filter(p=>p.tot>0||!p.extra).map(({key,extra,tot})=>{
               const pct=typeGrand>0?(tot/typeGrand*100):0;
-              return<div key={name}>
+              return<div key={key}>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}>
-                  <span style={{fontWeight:600,color:'#334155'}}>{dispName(name)}{isExtraPerson(name)&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</span>
+                  <span style={{fontWeight:600,color:'#334155'}}>{key}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</span>
                   <span style={{fontWeight:800,color:t.color}}>{fmt(tot)} เที่ยว <span style={{color:'#94a3b8',fontWeight:600}}>({pct.toFixed(1)}%)</span></span>
                 </div>
                 <div style={{height:8,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
@@ -11199,7 +11207,7 @@ window.__dataReady.then(data => {
           <div style={{fontSize:14,color:'#64748b',marginBottom:20}}>ต้องการลบ "<b style={{color:'#1e293b'}}>{confirmDel&&confirmDel.name}</b>" ({confirmDel&&confirmDel.type} ปี {selYear}) ใช่หรือไม่? ข้อมูลทุกเดือนของรายการนี้จะถูกลบทั้งหมด</div>
           <div style={{display:'flex',gap:10,justifyContent:'center'}}>
             <button onClick={()=>setConfirmDel(null)} style={{padding:'9px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={()=>handleDelete(confirmDel.type,confirmDel.name)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
+            <button onClick={()=>handleDelete(confirmDel.type,confirmDel.name,confirmDel.names)} style={{padding:'9px 20px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>ลบรายการ</button>
           </div>
         </div>
       </div>}
