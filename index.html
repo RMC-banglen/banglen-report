@@ -9659,6 +9659,11 @@ window.__dataReady.then(data => {
     const [selMonth,setSelMonth]=useState(new Date().getMonth()+1);
     const [hideEmptyDay,setHideEmptyDay]=useState(false);
     const [latestMonthOnly,setLatestMonthOnly]=useState(false);
+    // ปุ่มลัด รายเดือน -> หยุดวิ่ง แล้วกดกลับมาที่เดิม (ตำแหน่งเลื่อนเดิม)
+    const [backView,setBackView]=useState(null); // {view,y}
+    useEffect(()=>{if(view!=='stopped')setBackView(null);},[view]);
+    const goStopped=m=>{setBackView({view,y:window.scrollY});if(m)setSelDayMonth(m);setView('stopped');window.scrollTo(0,0);};
+    const goBack=()=>{const b=backView;if(!b)return;setView(b.view);setTimeout(()=>window.scrollTo(0,b.y),60);};
     const [showCalc,setShowCalc]=useState(false); // แถว วันทำงาน/เที่ยวรถบริษัท/จำนวนรถ ซ่อนไว้ก่อน กดที่ "เฉลี่ยเที่ยว/วัน/คัน" เพื่อดู
     const [helpPopup,setHelpPopup]=useState(null); // {vt,name,month,day?}
     const [showForm,setShowForm]=useState(false);
@@ -10435,6 +10440,7 @@ window.__dataReady.then(data => {
         </div>;
 
         return<div>
+          {backView&&<div style={{marginBottom:14}}><button onClick={goBack} style={{padding:'8px 16px',borderRadius:8,border:'1px solid #bfdbfe',background:'#eff6ff',color:'#1d4ed8',fontSize:14,fontWeight:700,cursor:'pointer'}}>← กลับไปรายเดือน</button></div>}
           <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
             {card('#fef2f2','#fecaca','#b91c1c',`รถหยุดวิ่ง ทั้งปี ${selYear}`,vehNotes.length,'คัน-วัน',VEHICLE_REASONS.map(r=>`${r} ${cnt(vehNotes,r)}`).join(' · '))}
             {card('#fff','#e2e8f0','#64748b',`คนลาหยุด ทั้งปี ${selYear}`,personNotes.length,'คน-วัน')}
@@ -10637,6 +10643,7 @@ window.__dataReady.then(data => {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · ปี {selYear}</div>
               <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <button onClick={()=>goStopped(latestMonthOnly&&allMonths.length?allMonths[allMonths.length-1]:null)} title="ดูสถิติรถหยุด/คนลาหยุด แล้วกดกลับมาหน้านี้ได้" style={{padding:'6px 12px',borderRadius:8,border:'1px solid #fecaca',background:'#fff',color:'#b91c1c',fontSize:12,fontWeight:700,cursor:'pointer'}}>🛑 ดูหยุดวิ่ง</button>
                 <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
                   <input type="checkbox" checked={showPlate} onChange={e=>setShowPlate(e.target.checked)}/>
                   แสดงทะเบียน
