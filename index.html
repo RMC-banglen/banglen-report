@@ -10656,7 +10656,7 @@ window.__dataReady.then(data => {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · ปี {selYear}</div>
               <div style={{display:'flex',alignItems:'center',gap:12}}>
-                <button onClick={()=>goStopped(latestMonthOnly&&allMonths.length?allMonths[allMonths.length-1]:null)} title="ดูสถิติรถหยุด/คนลาหยุด แล้วกดกลับมาหน้านี้ได้" style={{padding:'6px 12px',borderRadius:8,border:'1px solid #fecaca',background:'#fff',color:'#b91c1c',fontSize:12,fontWeight:700,cursor:'pointer'}}>🛑 ดูหยุดวิ่ง</button>
+                <button onClick={()=>goStopped(latestMonthOnly&&allMonths.length?allMonths[allMonths.length-1]:selMonth)} title="ดูสถิติรถหยุด/คนลาหยุด แล้วกดกลับมาหน้านี้ได้" style={{padding:'6px 12px',borderRadius:8,border:'1px solid #fecaca',background:'#fff',color:'#b91c1c',fontSize:12,fontWeight:700,cursor:'pointer'}}>🛑 ดูหยุดวิ่ง ({MO[(latestMonthOnly&&allMonths.length?allMonths[allMonths.length-1]:selMonth)-1]})</button>
                 <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
                   <input type="checkbox" checked={showPlate} onChange={e=>setShowPlate(e.target.checked)}/>
                   แสดงทะเบียน
