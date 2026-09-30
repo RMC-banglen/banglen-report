@@ -9702,7 +9702,36 @@ window.__dataReady.then(data => {
         DB.from('transport_vehicles').select('*'),
         DB.from('transport_drivers').select('*'),
         DB.from('transport_assignments').select('*'),
-      ]).then(([a,b,c,v,d,as])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setMaster({vehicles:v.data||[],drivers:d.data||[],assigns:as.data||[]});setLoading(false);});
+        DB.from('transport_kpi').select('*'),
+      ]).then(([a,b,c,v,d,as,k])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setMaster({vehicles:v.data||[],drivers:d.data||[],assigns:as.data||[]});setKpiRows(k.error?null:(k.data||[]));setLoading(false);});
+    }
+    // ---- KPI การซ่อม: เป้าต่อปี (ตาราง transport_kpi · ถ้ายังไม่สร้างตารางใช้ค่าตัวอย่าง) ----
+    const [kpiRows,setKpiRows]=useState([]); // null = ยังไม่มีตาราง
+    const KPI_DEFAULT={avail_target:95,crane_target:2,repair_target:1};
+    const kpiTarget=(()=>{const r=(kpiRows||[]).find(x=>x.year===selYear);return r?{avail_target:Number(r.avail_target),crane_target:Number(r.crane_target),repair_target:Number(r.repair_target),saved:true}:{...KPI_DEFAULT,saved:false};})();
+    const [kpiEdit,setKpiEdit]=useState(null);
+    async function saveKpi(){
+      const v={year:selYear,avail_target:Number(kpiEdit.avail_target)||0,crane_target:Number(kpiEdit.crane_target)||0,repair_target:Number(kpiEdit.repair_target)||0,updated_at:new Date().toISOString()};
+      const {error}=await DB.from('transport_kpi').upsert(v,{onConflict:'year'});
+      if(error){alert('บันทึกเป้าไม่สำเร็จ: '+netErrMsg(error)+(/transport_kpi|relation|schema cache/i.test(error.message)?'\n(ต้องรัน SQL สร้างตาราง transport_kpi ใน Supabase ก่อน — ไฟล์ supabase-transport-kpi.sql)':''));return;}
+      setKpiEdit(null);fetch();
+    }
+    // สถิติซ่อมรถบริษัท (ทั้ง 2 ประเภท) รายเดือน: คัน-วัน = วันทำงาน × จำนวนรถในเดือน · ป้ายซ่อม 1 ป้าย = 1 คัน-วัน
+    function repairStats(){
+      const notes=dayNotes.filter(n=>n.year===selYear&&isCompanyName(n.driver_name));
+      const nt=n=>(n.note||'').trim();
+      const ms=[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{
+        const wd=workdaysOf(m)||0,trucks=truckCount('เทรลเลอร์',m)+truckCount('10ล้อ-12ล้อ',m);
+        const crane=notes.filter(n=>n.month===m&&nt(n)==='ซ่อมเครน').length,repair=notes.filter(n=>n.month===m&&nt(n)==='ซ่อมรถ').length;
+        const td=wd*trucks;
+        return{m,wd,trucks,td,crane,repair,avail:td?(1-(crane+repair)/td)*100:null,cranePer:trucks?crane/trucks:null,repairPer:trucks?repair/trucks:null};
+      }).filter(x=>x.td>0);
+      const sum=k=>ms.reduce((s,x)=>s+x[k],0);
+      const td=sum('td'),crane=sum('crane'),repair=sum('repair'),truckMonths=sum('trucks');
+      // คันที่ซ่อมบ่อย (ซ่อมรถ+ซ่อมเครน ทั้งปี) นับตามทะเบียน
+      const byPlate={};notes.filter(n=>nt(n)==='ซ่อมเครน'||nt(n)==='ซ่อมรถ').forEach(n=>{const p=n.plate||plateOf(n.driver_name);const o=(byPlate[p]=byPlate[p]||{plate:p,vt:n.vehicle_type,crane:0,repair:0});o[nt(n)==='ซ่อมเครน'?'crane':'repair']++;});
+      const top=Object.values(byPlate).map(x=>({...x,total:x.crane+x.repair})).sort((a,b)=>b.total-a.total||b.crane-a.crane);
+      return{months:ms,td,crane,repair,avail:td?(1-(crane+repair)/td)*100:null,cranePer:truckMonths?crane/truckMonths:null,repairPer:truckMonths?repair/truckMonths:null,top};
     }
     const [master,setMaster]=useState({vehicles:[],drivers:[],assigns:[]});
     // ---- ใช้ฐานข้อมูลหลัก: หาคนขับจากชื่อในไฟล์ แล้วหารถประจำ ณ วันที่ของบิล ----
@@ -10470,6 +10499,73 @@ window.__dataReady.then(data => {
             {card('#fef2f2','#fecaca','#b91c1c',`รถหยุดวิ่ง ทั้งปี ${selYear}`,vehNotes.length,'คัน-วัน',VEHICLE_REASONS.map(r=>`${r} ${cnt(vehNotes,r)}`).join(' · '))}
             {card('#fff','#e2e8f0','#64748b',`คนลาหยุด ทั้งปี ${selYear}`,personNotes.length,'คน-วัน')}
           </div>
+          {(()=>{
+            // ---- KPI การซ่อม เทียบเป้า ----
+            const st=repairStats(),T=kpiTarget;
+            const f1=n=>n==null?'–':n.toFixed(1),f2=n=>n==null?'–':n.toFixed(2);
+            const okAvail=v=>v==null?null:v>=T.avail_target,okCrane=v=>v==null?null:v<=T.crane_target,okRepair=v=>v==null?null:v<=T.repair_target;
+            const col=ok=>ok==null?'#94a3b8':ok?'#15803d':'#dc2626';
+            const tile=(label,value,unit,ok,target,sub)=><div style={{flex:'1 1 220px',background:ok==null?'#fff':ok?'#f0fdf4':'#fef2f2',border:`2px solid ${ok==null?'#e2e8f0':ok?'#bbf7d0':'#fecaca'}`,borderRadius:14,padding:'14px 18px'}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#475569',marginBottom:4}}>{label}</div>
+              <div style={{fontSize:28,fontWeight:900,color:col(ok)}}>{value} <span style={{fontSize:13,color:'#94a3b8',fontWeight:700}}>{unit}</span></div>
+              <div style={{fontSize:12,color:'#64748b',marginTop:2}}>เป้า {target} {ok==null?'':ok?'· ✓ ผ่าน':'· ✗ ไม่ผ่าน'}</div>
+              {sub&&<div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{sub}</div>}
+            </div>;
+            const cellS=ok=>({textAlign:'right',padding:'6px 10px',fontWeight:700,color:col(ok),background:ok===false?'#fef2f2':undefined,whiteSpace:'nowrap'});
+            return<div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,padding:'16px 18px',marginBottom:20}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:12}}>
+                <div style={{fontSize:15,fontWeight:800,color:'#1e293b'}}>🎯 KPI การซ่อมรถบริษัท ปี {selYear}</div>
+                {canEdit&&!kpiEdit&&<button onClick={()=>setKpiEdit({avail_target:T.avail_target,crane_target:T.crane_target,repair_target:T.repair_target})} style={{padding:'6px 12px',borderRadius:8,border:'1px solid #e2e8f0',background:'#fff',color:'#475569',fontSize:12,fontWeight:700,cursor:'pointer'}}>✎ ตั้งเป้า{!T.saved?' (ตอนนี้ใช้ค่าตัวอย่าง)':''}</button>}
+              </div>
+              {kpiEdit&&<div style={{display:'flex',flexWrap:'wrap',gap:12,alignItems:'flex-end',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:10,padding:12,marginBottom:12}}>
+                {[['avail_target','รถพร้อมใช้ ขั้นต่ำ (%)'],['crane_target','ซ่อมเครน ไม่เกิน (วัน/คัน/เดือน)'],['repair_target','ซ่อมรถ ไม่เกิน (วัน/คัน/เดือน)']].map(([k,l])=><label key={k} style={{fontSize:12,color:'#475569',fontWeight:700}}>{l}<br/>
+                  <input type="number" step="0.1" value={kpiEdit[k]} onChange={e=>setKpiEdit(s=>({...s,[k]:e.target.value}))} style={{...inp,width:170,marginTop:4}}/></label>)}
+                <button onClick={saveKpi} style={{padding:'8px 16px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>บันทึก</button>
+                <button onClick={()=>setKpiEdit(null)} style={{padding:'8px 16px',borderRadius:8,border:'1px solid #e2e8f0',background:'#fff',color:'#64748b',fontSize:13,cursor:'pointer'}}>ยกเลิก</button>
+              </div>}
+              {st.months.length===0?<div style={{fontSize:13,color:'#94a3b8'}}>ยังคำนวณไม่ได้ — ต้องมีจำนวนวันทำงานและจำนวนรถในหน้ารายเดือนก่อน</div>:<>
+                <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:14}}>
+                  {tile('รถพร้อมใช้งาน (ทั้งปี)',f1(st.avail),'%',okAvail(st.avail),`≥ ${T.avail_target}%`,`ซ่อม ${st.crane+st.repair} คัน-วัน จาก ${st.td.toLocaleString('th-TH')} คัน-วัน`)}
+                  {tile('ซ่อมเครน เฉลี่ย',f2(st.cranePer),'วัน/คัน/เดือน',okCrane(st.cranePer),`≤ ${T.crane_target}`,`รวม ${st.crane} คัน-วัน`)}
+                  {tile('ซ่อมรถ เฉลี่ย',f2(st.repairPer),'วัน/คัน/เดือน',okRepair(st.repairPer),`≤ ${T.repair_target}`,`รวม ${st.repair} คัน-วัน`)}
+                </div>
+                <div style={{overflowX:'auto'}}>
+                  <table style={{borderCollapse:'collapse',fontSize:13,minWidth:'100%'}}>
+                    <thead><tr style={{background:'#f8fafc',color:'#475569'}}>
+                      <th style={{textAlign:'left',padding:'6px 10px',whiteSpace:'nowrap'}}>รายเดือน</th>
+                      {st.months.map(x=><th key={x.m} style={{textAlign:'right',padding:'6px 10px'}}>{MO[x.m-1]}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>รถพร้อมใช้ (%)</td>{st.months.map(x=><td key={x.m} style={cellS(okAvail(x.avail))}>{f1(x.avail)}</td>)}</tr>
+                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>ซ่อมเครน (วัน/คัน)</td>{st.months.map(x=><td key={x.m} style={cellS(okCrane(x.cranePer))} title={`${x.crane} คัน-วัน ÷ ${x.trucks} คัน`}>{f2(x.cranePer)}</td>)}</tr>
+                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>ซ่อมรถ (วัน/คัน)</td>{st.months.map(x=><td key={x.m} style={cellS(okRepair(x.repairPer))} title={`${x.repair} คัน-วัน ÷ ${x.trucks} คัน`}>{f2(x.repairPer)}</td>)}</tr>
+                    </tbody>
+                  </table>
+                </div>
+                {st.top.length>0&&<div style={{marginTop:14}}>
+                  <div style={{fontSize:14,fontWeight:800,color:'#1e293b',marginBottom:6}}>🔧 คันที่ซ่อมบ่อยที่สุด ปี {selYear} (มากไปน้อย)</div>
+                  <table style={{borderCollapse:'collapse',fontSize:13,width:'100%',maxWidth:560}}>
+                    <thead><tr style={{background:'#f8fafc',color:'#475569'}}>
+                      <th style={{textAlign:'left',padding:'6px 10px',width:40}}>#</th>
+                      <th style={{textAlign:'left',padding:'6px 10px'}}>ทะเบียน</th>
+                      <th style={{textAlign:'right',padding:'6px 10px'}}>ซ่อมเครน</th>
+                      <th style={{textAlign:'right',padding:'6px 10px'}}>ซ่อมรถ</th>
+                      <th style={{textAlign:'right',padding:'6px 10px'}}>รวม (วัน)</th>
+                    </tr></thead>
+                    <tbody>{st.top.map((x,i)=>{const max=st.top[0].total||1;return<tr key={x.plate} style={{borderTop:'1px solid #f1f5f9'}}>
+                      <td style={{padding:'6px 10px',color:'#94a3b8',fontWeight:700}}>{['🥇','🥈','🥉'][i]||i+1}</td>
+                      <td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>{x.vt==='เทรลเลอร์'?'🚛':'🚚'} {x.plate}</td>
+                      <td style={{textAlign:'right',padding:'6px 10px',color:x.crane?'#b45309':'#cbd5e1',fontWeight:x.crane?700:400}}>{x.crane}</td>
+                      <td style={{textAlign:'right',padding:'6px 10px',color:x.repair?'#b45309':'#cbd5e1',fontWeight:x.repair?700:400}}>{x.repair}</td>
+                      <td style={{textAlign:'right',padding:'6px 10px',fontWeight:800,color:'#dc2626',whiteSpace:'nowrap'}}>
+                        <span style={{display:'inline-block',verticalAlign:'middle',height:6,width:Math.round(x.total/max*80),background:'#fecaca',borderRadius:3,marginRight:8}}/>{x.total}
+                      </td>
+                    </tr>;})}</tbody>
+                  </table>
+                </div>}
+              </>}
+            </div>;
+          })()}
           <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8,marginBottom:12}}>
             <span style={{fontSize:13,color:'#64748b',fontWeight:700}}>เดือน</span>{monthSel}
           </div>
@@ -10534,6 +10630,8 @@ window.__dataReady.then(data => {
             {kpi('เที่ยวเทรลเลอร์'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(trailer.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(trailer,lastM)?avgOf(trailer,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (${truckCount('เทรลเลอร์',lastM)} คัน)`:'','#2563eb')}
             {kpi('เที่ยว 10ล้อ-12ล้อ'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(wheel.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(wheel,lastM)?avgOf(wheel,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (${truckCount('10ล้อ-12ล้อ',lastM)} คัน)`:'','#15803d')}
             {kpi('วันทำงานสะสม',wdTotal?fmt(wdTotal):'–','วัน',lastM?`เดือนล่าสุด ${MO[lastM-1]} ${workdaysOf(lastM)||'–'} วัน`:'','#475569')}
+            {(()=>{const st=repairStats();const ok=st.avail==null?null:st.avail>=kpiTarget.avail_target;
+              return<div onClick={()=>goStopped(null)} style={{cursor:'pointer',flex:'1 1 200px'}} title="กดดูรายละเอียดในหน้าหยุดวิ่ง">{kpi('รถพร้อมใช้งาน (ทั้งปี)',st.avail==null?'–':st.avail.toFixed(1),'%',`เป้า ≥ ${kpiTarget.avail_target}% ${ok==null?'':ok?'✓ ผ่าน':'✗ ไม่ผ่าน'} · ซ่อมเครน ${st.crane} · ซ่อมรถ ${st.repair} คัน-วัน`,ok==null?'#94a3b8':ok?'#15803d':'#dc2626')}</div>;})()}
           </div>
           {/* กราฟเที่ยวรายเดือน แยกประเภทรถ */}
           {(()=>{
