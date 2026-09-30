@@ -9648,6 +9648,7 @@ window.__dataReady.then(data => {
     const [selMonth,setSelMonth]=useState(new Date().getMonth()+1);
     const [hideEmptyDay,setHideEmptyDay]=useState(false);
     const [latestMonthOnly,setLatestMonthOnly]=useState(false);
+    const [showCalc,setShowCalc]=useState(false); // แถว วันทำงาน/เที่ยวรถบริษัท/จำนวนรถ ซ่อนไว้ก่อน กดที่ "เฉลี่ยเที่ยว/วัน/คัน" เพื่อดู
     const [helpPopup,setHelpPopup]=useState(null); // {vt,name,month,day?}
     const [showForm,setShowForm]=useState(false);
     const [form,setForm]=useState({id:null,year:2569,vehicle_type:'เทรลเลอร์',driver_name:'',sort_order:0,trips:{}});
@@ -10328,10 +10329,10 @@ window.__dataReady.then(data => {
           <div style={{fontSize:13,color:'#64748b',marginTop:2}}>ติดตามจำนวนเที่ยววิ่งของรถแต่ละคัน/คนขับ รายเดือน (ดึงจาก Supabase)</div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer',marginRight:4}}>
+          {view!=='monthly'&&<label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer',marginRight:4}}>
             <input type="checkbox" checked={showPlate} onChange={e=>setShowPlate(e.target.checked)}/>
             แสดงทะเบียน
-          </label>
+          </label>}
           {(years.length?years:[2569]).map(y=><button key={y} onClick={()=>setSelYear(y)} style={{padding:'6px 16px',border:'none',borderRadius:8,background:selYear===y?'#2f5fd0':'#f1f5f9',color:selYear===y?'#fff':'#475569',fontWeight:700,cursor:'pointer',fontSize:13}}>ปี {y}</button>)}
           {canEdit&&<>
             <button onClick={()=>{setAddDriverType('เทรลเลอร์');setAddDriverName('');setShowAddDriver(true);}} style={{padding:'6px 14px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มคนขับ/ทะเบียนรถ</button>
@@ -10625,6 +10626,10 @@ window.__dataReady.then(data => {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · ปี {selYear}</div>
               <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
+                  <input type="checkbox" checked={showPlate} onChange={e=>setShowPlate(e.target.checked)}/>
+                  แสดงทะเบียน
+                </label>
                 {allMonths.length>1&&<label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
                   <input type="checkbox" checked={latestMonthOnly} onChange={e=>setLatestMonthOnly(e.target.checked)}/>
                   เดือนล่าสุด ({MO[allMonths[allMonths.length-1]-1]})
@@ -10691,20 +10696,22 @@ window.__dataReady.then(data => {
                     // ค่าเฉลี่ยทั้งปี = เที่ยวรถบริษัททั้งปี ÷ ผลรวม (วันทำงาน × จำนวนรถ) ของแต่ละเดือน
                     const truckDays=allMonths.reduce((s,m)=>s+(workdaysOf(m)||0)*truckCount(t.k,m),0);
                     return<>
-                      <tr style={{background:'#f8fafc',fontWeight:700,fontSize:13}}>
+                      {showCalc&&<tr style={{background:'#f8fafc',fontWeight:700,fontSize:13}}>
                         <td style={{padding:'9px 8px',position:'sticky',left:0,background:'#f8fafc',color:'#475569',whiteSpace:'nowrap',borderTop:'2px solid #cbd5e1'}}>จำนวนวันทำงาน</td>
                         {months.map(m=>{const d=workdaysOf(m);return<td key={m} style={{textAlign:'right',padding:'9px 24px 9px 6px',color:'#475569',whiteSpace:'nowrap',borderTop:'2px solid #cbd5e1'}}>
                           {canEdit?<span onClick={()=>editWorkdays(m)} title="แก้ไขจำนวนวันทำงาน" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{d!=null?d:'–'}</span>:(d!=null?d:'–')}
                         </td>;})}
                         <td style={{textAlign:'right',padding:'9px 8px',color:'#475569',background:'#f1f5f9',borderTop:'2px solid #cbd5e1'}}>{wdTotal||'–'}</td>
                         {canEdit&&<td style={{background:'#f8fafc',borderTop:'2px solid #cbd5e1'}}></td>}
-                      </tr>
+                      </tr>}
                       {(()=>{
                         const isTrailer=t.k==='เทรลเลอร์';
                         const c=isTrailer
                           ?{bg:'#eff6ff',border:'#bfdbfe',text:'#1e293b',cell1:'#2f5fd0',cell1Text:'#fff',cell2:'#1e3a8a',cell2Text:'#fff'}
                           :{bg:'#f0fdf4',border:'#bbf7d0',text:'#1e293b',cell1:'#15803d',cell1Text:'#fff',cell2:'#166534',cell2Text:'#fff'};
+                        const topBd=showCalc?`2px solid ${c.border}`:'2px solid #cbd5e1';
                         return<>
+                          {showCalc&&<>
                           <tr style={{background:c.bg,fontWeight:800,fontSize:14}}>
                             <td style={{padding:'9px 8px',position:'sticky',left:0,background:c.bg,color:c.text,whiteSpace:'nowrap'}}>จำนวนเที่ยวรถบริษัท</td>
                             {months.map(m=>{const v=companyCol(m);return<td key={m} style={{textAlign:'right',padding:'9px 24px 9px 6px',color:c.text,whiteSpace:'nowrap'}}>{v?fmt(v):'–'}</td>;})}
@@ -10720,11 +10727,12 @@ window.__dataReady.then(data => {
                             <td style={{textAlign:'right',padding:'9px 8px',color:'#475569',background:'#f1f5f9'}}></td>
                             {canEdit&&<td style={{background:c.bg}}></td>}
                           </tr>
+                          </>}
                           <tr style={{background:c.bg,fontWeight:900,fontSize:15}}>
-                            <td style={{padding:'11px 8px',position:'sticky',left:0,background:c.bg,color:c.text,whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>เฉลี่ยเที่ยว/วัน/คัน</td>
-                            {months.map(m=>{const v=companyCol(m),d=workdaysOf(m),n=truckCount(t.k,m);return<td key={m} style={{textAlign:'right',padding:'11px 24px 11px 6px',color:v&&d&&n?c.text:'#94a3b8',whiteSpace:'nowrap',borderTop:`2px solid ${c.border}`}}>{v&&d&&n?(v/d/n).toFixed(2):'–'}</td>;})}
-                            <td style={{textAlign:'right',padding:'11px 8px',color:companyGrand&&truckDays?c.cell2Text:'#94a3b8',background:c.cell2,fontSize:15,fontWeight:900,borderTop:`2px solid ${c.border}`}}>{companyGrand&&truckDays?(companyGrand/truckDays).toFixed(2):'–'}</td>
-                            {canEdit&&<td style={{background:c.bg,borderTop:`2px solid ${c.border}`}}></td>}
+                            <td onClick={()=>setShowCalc(v=>!v)} title={showCalc?'ซ่อนรายละเอียดการคำนวณ':'กดดู วันทำงาน / เที่ยวรถบริษัท / จำนวนรถ'} style={{padding:'11px 8px',position:'sticky',left:0,background:c.bg,color:c.text,whiteSpace:'nowrap',borderTop:topBd,cursor:'pointer',userSelect:'none'}}><span style={{display:'inline-block',width:16,fontSize:11,color:'#64748b'}}>{showCalc?'▾':'▸'}</span>เฉลี่ยเที่ยว/วัน/คัน{!showCalc&&<span style={{fontSize:11,fontWeight:600,color:'#64748b',marginLeft:6}}>(กดดูที่มา)</span>}</td>
+                            {months.map(m=>{const v=companyCol(m),d=workdaysOf(m),n=truckCount(t.k,m);return<td key={m} style={{textAlign:'right',padding:'11px 24px 11px 6px',color:v&&d&&n?c.text:'#94a3b8',whiteSpace:'nowrap',borderTop:topBd}}>{v&&d&&n?(v/d/n).toFixed(2):'–'}</td>;})}
+                            <td style={{textAlign:'right',padding:'11px 8px',color:companyGrand&&truckDays?c.cell2Text:'#94a3b8',background:c.cell2,fontSize:15,fontWeight:900,borderTop:topBd}}>{companyGrand&&truckDays?(companyGrand/truckDays).toFixed(2):'–'}</td>
+                            {canEdit&&<td style={{background:c.bg,borderTop:topBd}}></td>}
                           </tr>
                         </>;
                       })()}
