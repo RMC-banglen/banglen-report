@@ -9424,6 +9424,13 @@ window.__dataReady.then(data => {
         const spareName=(plate,vt)=>{const lg=TR.find(r=>r.plate===plate&&r.vehicle_type===vt&&r.driver_name.includes('สำรอง'));const vv=V.find(x=>x.plate===plate);return lg?lg.driver_name:`${vv&&vv.label?vv.label:'รถสำรอง'} / ${plate}`;};
         const groups={};
         for(const r of TR){
+          // เที่ยวรถสำรองที่ไม่ระบุคนขับ แต่ตอนนี้ตั้งคนขับประจำช่วงนั้นแล้ว -> ย้ายไปเป็นเที่ยวของคนนั้น
+          if(!r.person&&!r.helper&&r.plate&&/^\d{2}-\d{4}$/.test(r.plate)&&r.trips>0&&String(r.driver_name).includes('สำรอง')){
+            const reg=regOf(r.plate,isoOf(r));if(!reg)continue;
+            const dn=`${reg} / ${r.plate}`,k=r.vehicle_type+'\u0001'+dn+'\u0001\u0001'+reg;
+            (groups[k]=groups[k]||{vt:r.vehicle_type,dn,hp:null,ps:reg,ids:[]}).ids.push(r.id);
+            continue;
+          }
           if(!r.person||!r.plate||!(r.trips>0))continue; // รถนอก / รถสำรองไม่ระบุคนขับ / แถวตั้งต้น 0 เที่ยว
           const dt=isoOf(r),home=homeOf(r.person,dt);
           if(home===undefined)continue; // คนนี้ไม่มีในแท็บ รถ/คนขับ
@@ -9438,7 +9445,7 @@ window.__dataReady.then(data => {
         for(const g of Object.values(groups)){
           const so=TR.find(r=>r.vehicle_type===g.vt&&r.driver_name===g.dn)?.sort_order??V.find(x=>x.plate===(g.dn.match(/(\d{2}-\d{4})\s*$/)||[])[1])?.sort_order??20;
           for(let i=0;i<g.ids.length;i+=100){
-            const {error}=await DB.from('transport_trips').update({driver_name:g.dn,helper:g.hp,sort_order:so}).in('id',g.ids.slice(i,i+100));
+            const {error}=await DB.from('transport_trips').update({driver_name:g.dn,helper:g.hp,sort_order:so,...(g.ps?{person:g.ps}:{})}).in('id',g.ids.slice(i,i+100));
             if(error)throw error;
           }
           n+=g.ids.length;
