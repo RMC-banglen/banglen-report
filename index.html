@@ -10288,7 +10288,6 @@ window.__dataReady.then(data => {
       setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);fetch();
     }
 
-    function openAdd(type){const {items}=getTypeData(type);setForm({id:null,year:selYear,vehicle_type:type,driver_name:'',sort_order:(items.length+1),trips:{}});setShowForm(true);}
     function openEdit(type,name){
       const {typeRows,items}=getTypeData(type);
       const trips={};[1,2,3,4,5,6,7,8,9,10,11,12].forEach(m=>{const matched=typeRows.filter(r=>r.driver_name===name&&r.month===m);if(matched.length)trips[m]=matched.reduce((s,r)=>s+(r.trips||0),0);});
@@ -10652,7 +10651,6 @@ window.__dataReady.then(data => {
                   <input type="checkbox" checked={latestMonthOnly} onChange={e=>setLatestMonthOnly(e.target.checked)}/>
                   เดือนล่าสุด ({MO[allMonths[allMonths.length-1]-1]})
                 </label>}
-                {canEdit&&<button onClick={()=>openAdd(t.k)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:t.color,color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ เพิ่มรายการ</button>}
               </div>
             </div>
             <div className="tt-scroll-m">
