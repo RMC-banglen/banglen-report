@@ -284,7 +284,17 @@ var APP_VERSION='2026-09-24c';
 <script>
 const SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
-const DB = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// เน็ตสะดุดชั่วขณะ ("Failed to fetch") -> ลองส่งซ้ำอัตโนมัติ เฉพาะคำสั่งที่ส่งซ้ำแล้วผลเหมือนเดิม (อ่าน/ลบ/แก้) ไม่ส่งซ้ำการเพิ่มแถว กันข้อมูลซ้ำ
+const retryFetch = async (url, opts = {}) => {
+  const method = String(opts.method || 'GET').toUpperCase();
+  const tries = method === 'POST' ? 1 : 4;
+  for (let i = 1; ; i++) {
+    try { return await fetch(url, opts); }
+    catch (e) { if (i >= tries || !(e instanceof TypeError)) throw e; await new Promise(r => setTimeout(r, 600 * i)); }
+  }
+};
+const DB = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: retryFetch } });
+const netErrMsg = e => /Failed to fetch|NetworkError|Load failed/i.test(String(e && e.message || e)) ? 'เชื่อมต่อระบบไม่ได้ (เน็ตสะดุด) — ตรวจอินเทอร์เน็ตแล้วกดบันทึกอีกครั้ง' : String(e && e.message || e);
 
 // ============================================================
 // Fallback data (ใช้เมื่อยังไม่ได้ตั้งค่า Supabase)
@@ -9958,7 +9968,7 @@ window.__dataReady.then(data => {
       let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
       // ลบเฉพาะเที่ยวที่ขับรถตัวเอง (helper ว่าง) เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ต้องเก็บไว้
       const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).not('day','is',null).is('helper',null);
-      if(delErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ (ลบข้อมูลเก่า): '+delErr.message);return;}
+      if(delErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ ข้อมูลยังไม่ถูกแก้ไข\n'+netErrMsg(delErr));return;}
       // เที่ยวที่คนนี้ไปช่วยขับรถคันอื่น: ลบของเดือนนี้ทั้งหมดแล้วบันทึกใหม่ตามฟอร์ม
       const orderOf=(vt,n)=>getTypeData(vt).items.find(i=>i.name===n)?.order??0;
       const helpIns=(dayForm.helps||[]).filter(h=>h.day&&h.target&&Number(h.trips)>0).map(h=>{
