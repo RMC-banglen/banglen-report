@@ -9766,7 +9766,21 @@ window.__dataReady.then(data => {
       const toDay=Math.max(day,Number(dayNoteModal.toDay)||day);
       const range=Array.from({length:toDay-day+1},(_,i)=>day+i);
       const finalNote=value==='อื่นๆ'?(customText||'').trim():(value||'').trim();
-      if(!finalNote){
+      if(finalNote&&isHolidayNote(finalNote)&&dayNoteModal.allPeople){
+        // วันหยุดเทศกาล: ใส่ให้คนขับประจำทุกคัน (ทั้งเทรลเลอร์และ 10ล้อ-12ล้อ) ตามการจับคู่ของแต่ละวัน · แถวที่วันนั้นมีเที่ยวข้าม
+        const list=[];
+        range.forEach(d=>{
+          const iso=isoOf(selYear,selDayMonth,d);
+          const targets=master.assigns.length
+            ?master.assigns.filter(a=>a.start_date<=iso&&(!a.end_date||a.end_date>=iso)).map(a=>{const v=master.vehicles.find(x=>x.id===a.vehicle_id),drv=master.drivers.find(x=>x.id===a.driver_id);return v&&drv&&v.is_company?{vt:v.vehicle_type,name:rowNameFor(drv,v)}:null;}).filter(Boolean)
+            :TYPES.flatMap(t=>getTypeData(t.k).items.filter(it=>isCompanyName(it.name)&&!it.name.includes('สำรอง')).map(it=>({vt:t.k,name:it.name})));
+          targets.forEach(t=>{if(!dayHasTrips(t.vt,t.name,d))list.push({year:selYear,month:selDayMonth,day:d,vehicle_type:t.vt,driver_name:t.name,note:finalNote,plate:withPersonPlate({driver_name:t.name}).plate});});
+        });
+        if(!list.length){alert('ทุกคนมีเที่ยววิ่งในช่วงนี้ ไม่มีวันให้ใส่ป้าย');return;}
+        if(!confirm(`ใส่ "${finalNote}" วันที่ ${day}${toDay>day?'–'+toDay:''} ${MO[selDayMonth-1]} ให้ ${new Set(list.map(x=>x.driver_name)).size} คน รวม ${list.length} ช่อง\n(วันที่คนนั้นมีเที่ยววิ่งจะข้าม)`))return;
+        const {error}=await DB.from('transport_day_notes').upsert(list,{onConflict:'year,month,day,vehicle_type,driver_name'});
+        if(error){alert('บันทึกไม่สำเร็จ: '+netErrMsg(error));return;}
+      }else if(!finalNote){
         const {error}=await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).gte('day',day).lte('day',toDay).eq('vehicle_type',vt).eq('driver_name',name);
         if(error){alert('ลบไม่สำเร็จ: '+netErrMsg(error));return;}
       }else{
@@ -10917,6 +10931,10 @@ window.__dataReady.then(data => {
             </select>
             {dayNoteModal.toDay>dayNoteModal.day&&<span style={{fontSize:12,color:'#94a3b8'}}>({dayNoteModal.toDay-dayNoteModal.day+1} วัน · วันที่มีเที่ยวจะข้าม)</span>}
           </div>
+          {isHolidayNote(dayNoteModal.value)&&<label style={{display:'flex',alignItems:'center',gap:8,marginBottom:16,padding:'10px 12px',borderRadius:10,background:'#f1f5f9',fontSize:14,color:'#334155',cursor:'pointer'}}>
+            <input type="checkbox" checked={!!dayNoteModal.allPeople} onChange={e=>setDayNoteModal(m=>({...m,allPeople:e.target.checked}))} style={{width:18,height:18}}/>
+            <span>ใส่ให้<b>ทุกคน</b> (คนขับประจำทุกคัน ทั้งเทรลเลอร์และ 10ล้อ-12ล้อ)</span>
+          </label>}
           {dayNoteModal.value==='อื่นๆ'&&<div style={{marginBottom:16}}>
             <input type="text" autoFocus value={dayNoteModal.customText||''} onChange={e=>setDayNoteModal(m=>({...m,customText:e.target.value}))} placeholder="ระบุเหตุผล" style={inp}/>
             <div style={{fontSize:12,color:'#94a3b8',marginTop:6}}>หมายเหตุ: รายการ "อื่นๆ" จะไม่ถูกนับรวมในตารางสรุปรถหยุด</div>
