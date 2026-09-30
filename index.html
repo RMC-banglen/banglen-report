@@ -9757,16 +9757,27 @@ window.__dataReady.then(data => {
     function editDayNote(vt,name,d){
       const cur=dayNoteOf(vt,name,d);
       const curStd=isHolidayNote(cur)?'วันหยุดเทศกาล':cur;
-      setDayNoteModal({vt,name,day:d,value:curStd&&!DAY_NOTE_OPTIONS.includes(curStd)?'อื่นๆ':(curStd||''),customText:curStd&&!DAY_NOTE_OPTIONS.includes(curStd)?curStd:''});
+      setDayNoteModal({vt,name,day:d,toDay:d,value:curStd&&!DAY_NOTE_OPTIONS.includes(curStd)?'อื่นๆ':(curStd||''),customText:curStd&&!DAY_NOTE_OPTIONS.includes(curStd)?curStd:''});
     }
+    // วันที่แถวนี้มีเที่ยว (ไม่ใส่ป้าย "ไม่มีเที่ยว" ทับ)
+    const dayHasTrips=(vt,name,d)=>rows.some(r=>r.year===selYear&&r.month===selDayMonth&&r.day===d&&r.vehicle_type===vt&&r.driver_name===name&&(r.trips||0)>0);
     async function saveDayNote(){
       const {vt,name,day,value,customText}=dayNoteModal;
+      const toDay=Math.max(day,Number(dayNoteModal.toDay)||day);
+      const range=Array.from({length:toDay-day+1},(_,i)=>day+i);
       const finalNote=value==='อื่นๆ'?(customText||'').trim():(value||'').trim();
       if(!finalNote){
-        await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).eq('day',day).eq('vehicle_type',vt).eq('driver_name',name);
+        const {error}=await DB.from('transport_day_notes').delete().eq('year',selYear).eq('month',selDayMonth).gte('day',day).lte('day',toDay).eq('vehicle_type',vt).eq('driver_name',name);
+        if(error){alert('ลบไม่สำเร็จ: '+netErrMsg(error));return;}
       }else{
-        const {error}=await DB.from('transport_day_notes').upsert({year:selYear,month:selDayMonth,day,vehicle_type:vt,driver_name:name,note:finalNote,plate:withPersonPlate({driver_name:name}).plate},{onConflict:'year,month,day,vehicle_type,driver_name'});
-        if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
+        const days=range.length>1?range.filter(d=>!dayHasTrips(vt,name,d)):range;
+        const skipped=range.filter(d=>!days.includes(d));
+        if(skipped.length&&!confirm(`วันที่ ${skipped.join(', ')} มีเที่ยววิ่งอยู่ จะข้ามไม่ใส่ป้าย\nใส่ "${finalNote}" ให้วันที่ ${days.join(', ')||'-'} ?`))return;
+        if(days.length){
+          const plate=withPersonPlate({driver_name:name}).plate;
+          const {error}=await DB.from('transport_day_notes').upsert(days.map(d=>({year:selYear,month:selDayMonth,day:d,vehicle_type:vt,driver_name:name,note:finalNote,plate})),{onConflict:'year,month,day,vehicle_type,driver_name'});
+          if(error){alert('บันทึกไม่สำเร็จ: '+netErrMsg(error));return;}
+        }
       }
       setDayNoteModal(null);
       fetch();
@@ -10898,6 +10909,13 @@ window.__dataReady.then(data => {
               {DAY_NOTE_OPTIONS.map(opt=><option key={opt} value={opt}>{opt}{isHolidayNote(opt)?' (วันหยุดตามปฏิทิน · ไม่นับในสถิติ)':''}</option>)}
               <option value="อื่นๆ">อื่นๆ</option>
             </select>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16,fontSize:14,color:'#475569'}}>
+            <span>ตั้งแต่วันที่ <b>{dayNoteModal.day}</b> ถึงวันที่</span>
+            <select value={dayNoteModal.toDay} onChange={e=>setDayNoteModal(m=>({...m,toDay:Number(e.target.value)}))} style={{...inp,width:'auto',flex:'0 0 auto',fontSize:15,padding:'6px 10px'}}>
+              {dayList.filter(d=>d>=dayNoteModal.day).map(d=><option key={d} value={d}>{d}</option>)}
+            </select>
+            {dayNoteModal.toDay>dayNoteModal.day&&<span style={{fontSize:12,color:'#94a3b8'}}>({dayNoteModal.toDay-dayNoteModal.day+1} วัน · วันที่มีเที่ยวจะข้าม)</span>}
           </div>
           {dayNoteModal.value==='อื่นๆ'&&<div style={{marginBottom:16}}>
             <input type="text" autoFocus value={dayNoteModal.customText||''} onChange={e=>setDayNoteModal(m=>({...m,customText:e.target.value}))} placeholder="ระบุเหตุผล" style={inp}/>
