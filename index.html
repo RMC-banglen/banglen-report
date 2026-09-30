@@ -9693,9 +9693,9 @@ window.__dataReady.then(data => {
       const drv=a&&master.drivers.find(x=>x.id===a.driver_id);
       if(drv)return{vt:v.vehicle_type,name:rowNameFor(drv,v)};
       if(!/^\d{2}-\d{4}$/.test(v.plate))return{vt:v.vehicle_type,name:v.plate}; // รถนอก (รถร่วม/รับเอง/บ่อตะกั่ว)
-      // ไม่มีคนขับประจำวันนั้น (เช่น รถสำรอง) ใช้ชื่อแถวเดิมของทะเบียนนี้
-      const legacy=[...new Set(rows.filter(r=>r.vehicle_type===v.vehicle_type&&!r.helper&&(r.plate===v.plate||(String(r.driver_name).match(/(\d{2}-\d{4})\s*$/)||[])[1]===v.plate)).map(r=>r.driver_name))];
-      return{vt:v.vehicle_type,name:(v.label&&`${v.label} / ${v.plate}`)||legacy.find(n=>n.includes('สำรอง'))||legacy[0]||v.plate};
+      // ไม่มีคนขับประจำวันนั้น -> แถวรถสำรองของทะเบียนนี้ (กฎเดียวกับ "จัดเที่ยวตามช่วงเวลา") ห้ามไปลงชื่อคนขับช่วงอื่น
+      const lg=rows.find(r=>r.vehicle_type===v.vehicle_type&&String(r.driver_name).includes('สำรอง')&&(r.plate===v.plate||(String(r.driver_name).match(/(\d{2}-\d{4})\s*$/)||[])[1]===v.plate));
+      return{vt:v.vehicle_type,name:lg?lg.driver_name:`${v.label||'รถสำรอง'} / ${v.plate}`};
     }
     const DAY_NOTE_OPTIONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน','ลาหยุด','วันหยุดเทศกาล'];
     // วันหยุดตามปฏิทิน: แสดงป้ายได้แต่ไม่นับในสถิติหยุด (วันทำงานของเดือนหักวันเหล่านี้อยู่แล้ว) · รวมข้อความเดิมที่เคยพิมพ์เอง
@@ -9889,6 +9889,30 @@ window.__dataReady.then(data => {
       return {typeRows,items,monthRows,dayRows,monthValue,months,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal,dayExtraPersons,persons,personOwn,personHelp,isExtraPerson};
     }
 
+    // ช่อง "ไปช่วยขับรถคันไหน" ในฟอร์ม: เลือกเป็นทะเบียน (veh:<id>) ระบบหาแถวของคนขับประจำตามวันที่เอง · แถวเก่าที่หาทะเบียนไม่เจอยังใช้ "ประเภท||ชื่อแถว"
+    const helpTargetValue=r=>{
+      const p=r.plate||(String(r.driver_name).match(/(\d{2}-\d{4})\s*$/)||[])[1]||r.driver_name;
+      const v=master.vehicles.find(x=>x.plate===p&&x.vehicle_type===r.vehicle_type)||master.vehicles.find(x=>x.plate===p);
+      return v?'veh:'+v.id:r.vehicle_type+'||'+r.driver_name;
+    };
+    const resolveHelpTarget=h=>{
+      if(String(h.target).startsWith('veh:'))return vehicleTargetOn(h.target.slice(4),selYear,selDayMonth,Number(h.day)||15);
+      const [vt,n]=String(h.target).split('||');return n?{vt,name:n}:null;
+    };
+    // รายการทะเบียนจัดกลุ่ม เทรลเลอร์ / 10ล้อ-12ล้อ / รถนอก พร้อมคนขับประจำช่วงวันที่
+    function vehicleOptionGroups(ownPlate,fromIso,toIso){
+      const regulars=v=>[...new Set(master.assigns.filter(a=>a.vehicle_id===v.id&&a.start_date<=toIso&&(!a.end_date||a.end_date>=fromIso)).map(a=>master.drivers.find(x=>x.id===a.driver_id)?.name).filter(Boolean))];
+      const list=[...master.vehicles].filter(v=>v.active&&v.plate!==ownPlate).sort((a,b)=>a.sort_order-b.sort_order);
+      return [
+        {label:'🚛 เทรลเลอร์',items:list.filter(v=>v.is_company&&v.vehicle_type==='เทรลเลอร์')},
+        {label:'🚚 10ล้อ-12ล้อ',items:list.filter(v=>v.is_company&&v.vehicle_type==='10ล้อ-12ล้อ')},
+        {label:'รถนอก',items:list.filter(v=>!v.is_company).sort((a,b)=>(a.vehicle_type==='เทรลเลอร์'?0:1)-(b.vehicle_type==='เทรลเลอร์'?0:1)||a.sort_order-b.sort_order)},
+      ].filter(g=>g.items.length).map(g=><optgroup key={g.label} label={g.label}>{g.items.map(v=>{
+        const rg=regulars(v);const txt=`${v.plate}${v.label?` ${v.label}`:''}`;
+        const info=!v.is_company?(txt.includes(v.vehicle_type)?'':v.vehicle_type):rg.length?`ประจำ: ${rg.join(' / ')}`:'ไม่มีคนขับประจำ';
+        return<option key={v.id} value={'veh:'+v.id}>{txt}{info?` (${info})`:''}</option>;
+      })}</optgroup>);
+    }
     async function openDayForm(type,name){
       // ดึงข้อมูลล่าสุดจากระบบก่อนเปิดฟอร์มเสมอ กันหน้าที่เปิดค้างไว้บันทึกข้อมูลเก่าทับ (เคยทำให้เที่ยวซ้ำ)
       const {data:fresh}=await DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name').range(0,9999);
@@ -9896,7 +9920,7 @@ window.__dataReady.then(data => {
       const mRows=all.filter(r=>r.year===selYear&&r.month===selDayMonth&&r.day!=null);
       // เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ (มี helper) ไม่แสดงในฟอร์ม และจะไม่ถูกลบตอนบันทึก
       const days={};dayList.forEach(d=>{const matched=mRows.filter(r=>r.vehicle_type===type&&r.driver_name===name&&!r.helper&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
-      const helps=mRows.filter(r=>r.helper===name).sort((a,b)=>a.day-b.day).map(r=>({day:String(r.day),target:r.vehicle_type+'||'+r.driver_name,trips:String(r.trips||'')}));
+      const helps=mRows.filter(r=>r.helper===name).sort((a,b)=>a.day-b.day).map(r=>({day:String(r.day),target:helpTargetValue(r),trips:String(r.trips||'')}));
       setDayForm({vehicle_type:type,driver_name:name,original_name:name,days,helps});
       setShowDayForm(true);
     }
@@ -9908,7 +9932,7 @@ window.__dataReady.then(data => {
       const sameDay=(r,vt,n,d)=>r.year===selYear&&r.month===selDayMonth&&r.day===d&&r.vehicle_type===vt&&r.driver_name===n;
       const oldHelp={},newHelp={};
       rows.filter(r=>r.year===selYear&&r.month===selDayMonth&&r.day!=null&&r.helper===oldName).forEach(r=>{const k=r.vehicle_type+'||'+r.driver_name+'||'+r.day;oldHelp[k]=(oldHelp[k]||0)+(r.trips||0);});
-      (dayForm.helps||[]).filter(h=>h.day&&h.target&&Number(h.trips)>0).forEach(h=>{const k=h.target+'||'+Number(h.day);newHelp[k]=(newHelp[k]||0)+Number(h.trips);});
+      (dayForm.helps||[]).filter(h=>h.day&&h.target&&Number(h.trips)>0).forEach(h=>{const tg=resolveHelpTarget(h);if(!tg)return;const k=tg.vt+'||'+tg.name+'||'+Number(h.day);newHelp[k]=(newHelp[k]||0)+Number(h.trips);});
       const deducts=[],restores=[];
       new Set([...Object.keys(oldHelp),...Object.keys(newHelp)]).forEach(k=>{
         const delta=(newHelp[k]||0)-(oldHelp[k]||0);if(!delta)return;
@@ -9938,9 +9962,9 @@ window.__dataReady.then(data => {
       // เที่ยวที่คนนี้ไปช่วยขับรถคันอื่น: ลบของเดือนนี้ทั้งหมดแล้วบันทึกใหม่ตามฟอร์ม
       const orderOf=(vt,n)=>getTypeData(vt).items.find(i=>i.name===n)?.order??0;
       const helpIns=(dayForm.helps||[]).filter(h=>h.day&&h.target&&Number(h.trips)>0).map(h=>{
-        const [vt,n]=h.target.split('||');
-        return {year:selYear,month:selDayMonth,day:Number(h.day),vehicle_type:vt,driver_name:n,sort_order:orderOf(vt,n),trips:Number(h.trips),helper:dayForm.driver_name};
-      });
+        const tg=resolveHelpTarget(h);if(!tg)return null;
+        return {year:selYear,month:selDayMonth,day:Number(h.day),vehicle_type:tg.vt,driver_name:tg.name,sort_order:orderOf(tg.vt,tg.name),trips:Number(h.trips),helper:dayForm.driver_name};
+      }).filter(Boolean);
       const {error:delHelpErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('helper',dayForm.driver_name).not('day','is',null);
       if(delHelpErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ (ลบข้อมูลช่วยขับเก่า): '+delHelpErr.message);return;}
       if(helpIns.length){
@@ -10783,6 +10807,8 @@ window.__dataReady.then(data => {
           {(()=>{
             const helps=dayForm.helps||[];
             const targets=TYPES.flatMap(t=>getTypeData(t.k).items.map(i=>({vt:t.k,name:i.name}))).filter(o=>!(o.vt===dayForm.vehicle_type&&o.name===dayForm.driver_name));
+            const ownPlate=(String(dayForm.driver_name).match(/(\d{2}-\d{4})\s*$/)||[])[1];
+            const monthFrom=isoOf(selYear,selDayMonth,1),monthTo=isoOf(selYear,selDayMonth,new Date(selYear-543,selDayMonth,0).getDate());
             const setHelp=(i,patch)=>setDayForm(f=>({...f,helps:(f.helps||[]).map((h,j)=>j===i?{...h,...patch}:h)}));
             return<div style={{borderTop:'1px dashed #cbd5e1',paddingTop:12,marginBottom:16}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -10798,7 +10824,8 @@ window.__dataReady.then(data => {
                 </select>
                 <select value={h.target} onChange={e=>setHelp(i,{target:e.target.value})} style={{...inp,padding:'6px',fontSize:12}}>
                   <option value="">-- เลือกรถที่ไปขับ --</option>
-                  {targets.map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
+                  {master.vehicles.length?vehicleOptionGroups(ownPlate,monthFrom,monthTo):targets.map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
+                  {h.target&&!String(h.target).startsWith('veh:')&&master.vehicles.length>0&&<option value={h.target}>{String(h.target).split('||')[1]} (เดิม)</option>}
                 </select>
                 <input type="number" value={h.trips} onChange={e=>setHelp(i,{trips:e.target.value})} placeholder="เที่ยว" style={{...inp,padding:'6px',fontSize:12}}/>
                 <button onClick={()=>setDayForm(f=>({...f,helps:(f.helps||[]).filter((_,j)=>j!==i)}))} title="ลบรายการนี้" style={{padding:'4px',border:'1px solid #fecaca',borderRadius:6,background:'#fff',color:'#dc2626',cursor:'pointer',fontSize:12}}>✕</button>
