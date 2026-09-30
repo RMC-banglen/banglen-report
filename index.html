@@ -10310,6 +10310,15 @@ window.__dataReady.then(data => {
     }
     async function handleDelete(type,name,names){for(const n of (names||[name]))await DB.from('transport_trips').delete().eq('year',selYear).eq('vehicle_type',type).eq('driver_name',n);setConfirmDel(null);fetch();}
     // คนเดียวกันที่เปลี่ยนรถระหว่างปี (ชื่อแถวต่างกันแค่ทะเบียน) รวมเป็นแถวเดียวเมื่อซ่อนทะเบียน
+    // คนขับที่เลิกขับแล้ว/ลาออก: ปิดใช้งานในหน้า "รถ / คนขับ" หรือช่วงขับรถทุกช่วงสิ้นสุดแล้ว
+    const todayIso=new Date().toISOString().slice(0,10);
+    const isFormerDriver=name=>{
+      if(String(name).includes('สำรอง')||!isCompanyName(String(name)))return false;
+      const d=findMasterDriver(nameOnly(name));if(!d)return false;
+      if(d.active===false)return true;
+      const as=master.assigns.filter(a=>a.driver_id===d.id);
+      return as.length>0&&!as.some(a=>!a.end_date||a.end_date>=todayIso);
+    };
     const groupPersons=list=>{const gs=[];list.forEach(n=>{const k=dispName(n);let g=gs.find(x=>x.key===k);if(!g){g={key:k,names:[]};gs.push(g);}g.names.push(n);});return gs;};
 
     return<div style={{padding:'24px 0'}}>
@@ -10635,7 +10644,11 @@ window.__dataReady.then(data => {
                 </thead>
                 <tbody>
                   {persons.length===0&&<tr><td colSpan={months.length+2+(canEdit?1:0)} style={{padding:16,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล</td></tr>}
-                  {groupPersons(persons).filter(({names})=>names.some(n=>[1,2,3,4,5,6,7,8,9,10,11,12].some(m=>personOwn(n,m)+personHelp(n,m)>0))).map(({key,names},idx)=>{
+                  {groupPersons(persons).filter(({names})=>names.some(n=>[1,2,3,4,5,6,7,8,9,10,11,12].some(m=>personOwn(n,m)+personHelp(n,m)>0)))
+                    // เรียง: คนขับปัจจุบัน → คนที่เลิกขับ/ลาออก (ท้ายกลุ่มคนขับ) → รถนอก → มาช่วยขับ
+                    .map((g,i)=>({...g,i,former:g.names.every(isFormerDriver),rk:g.names.every(isExtraPerson)?3:!isCompanyName(g.key)?2:g.names.every(isFormerDriver)?1:0}))
+                    .sort((a,b)=>a.rk-b.rk||a.i-b.i)
+                    .map(({key,names,former},idx)=>{
                     const name=names[0];
                     const extra=names.every(isExtraPerson);
                     const ownNames=names.filter(n=>!isExtraPerson(n));
@@ -10649,7 +10662,7 @@ window.__dataReady.then(data => {
                     const bg=extra?'#f0fdfa':idx%2?'#fcfcfd':'#fff';
                     const plates=names.length>1?names.map(n=>(String(n).match(/(\d{2}-\d{4})\s*$/)||[])[1]).filter(Boolean):[];
                     return<tr key={key} style={{background:bg}}>
-                    <td style={{padding:'5px 8px',position:'sticky',left:0,background:bg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={extra?`มาช่วยขับรถ${t.k}`:plates.length?`ขับหลายคัน: ${plates.join(', ')}`:undefined}>{key}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
+                    <td style={{padding:'5px 8px',position:'sticky',left:0,background:bg,fontWeight:600,color:'#1e293b',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={extra?`มาช่วยขับรถ${t.k}`:plates.length?`ขับหลายคัน: ${plates.join(', ')}`:undefined}><span style={former?{color:'#94a3b8'}:undefined}>{key}</span>{former&&!extra&&<span title="ปิดใช้งาน หรือหมดช่วงขับรถแล้ว (ตั้งในหน้า รถ / คนขับ)" style={{fontSize:10,color:'#94a3b8',fontWeight:700,marginLeft:6,padding:'1px 6px',border:'1px solid #e2e8f0',borderRadius:10}}>เลิกขับแล้ว</span>}{extra&&<span style={{fontSize:11,color:'#0f766e',fontWeight:700,marginLeft:4}}>🤝 มาช่วยขับ</span>}</td>
                     {months.map(m=>{const v=pOwn(m),h=pHelp(m),total=v+h;
                       // เว้นที่ขวา 24px ทุกช่อง ให้ตัวเลขชิดขวาตรงกัน รูปมือวางลอยในช่องว่างนั้น ไม่ดันตัวเลข
                       if(extra)return<td key={m} onClick={h>0?()=>setHelpPopup({vt:t.k,name,names,month:m}):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',color:total?'#0f766e':'#cbd5e1',fontWeight:total?700:undefined,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:h>0?'pointer':'default'}} title={h>0?'กดดูรายละเอียด':undefined}>{total?<span style={{textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(total)}</span>:'–'}</td>;
