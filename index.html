@@ -10021,6 +10021,7 @@ window.__dataReady.then(data => {
         return<option key={v.id} value={'veh:'+v.id}>{txt}{info?` (${info})`:''}</option>;
       })}</optgroup>);
     }
+    const isOwnRow=r=>!r.helper||String(r.helper).includes('บ่อตะกั่ว');
     async function openDayForm(type,name,month){
       // month: เปิดจากหน้าอื่น (เช่น กดยอดรวมในรายเดือน) -> สลับเดือนของฟอร์มเป็นเดือนนั้น
       const mo=month||selDayMonth;if(month&&month!==selDayMonth)setSelDayMonth(month);
@@ -10029,10 +10030,11 @@ window.__dataReady.then(data => {
       const all=fresh||rows;if(fresh)setRows(fresh);
       const mRows=all.filter(r=>r.year===selYear&&r.month===mo&&r.day!=null);
       const moDays=Array.from({length:new Date(selYear-543,mo,0).getDate()},(_,i)=>i+1);
-      // เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ (มี helper) ไม่แสดงในฟอร์ม และจะไม่ถูกลบตอนบันทึก
-      const days={};moDays.forEach(d=>{const matched=mRows.filter(r=>r.vehicle_type===type&&r.driver_name===name&&!r.helper&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
+      // เที่ยวของรถคันนี้เอง = ไม่มีคนช่วยขับ หรือ "รถบ่อตะกั่ว" มาช่วย (ไม่นับให้คน) — ตรงกับที่ตารางนับ
+      // เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ (นับให้คนนั้น) ไม่แสดงในฟอร์ม และจะไม่ถูกลบตอนบันทึก
+      const days={};moDays.forEach(d=>{const matched=mRows.filter(r=>r.vehicle_type===type&&r.driver_name===name&&isOwnRow(r)&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
       const helps=mRows.filter(r=>r.helper===name).sort((a,b)=>a.day-b.day).map(r=>({day:String(r.day),target:helpTargetValue(r),trips:String(r.trips||'')}));
-      setDayForm({vehicle_type:type,driver_name:name,original_name:name,days,helps});
+      setDayForm({vehicle_type:type,driver_name:name,original_name:name,days,origDays:{...days},helps});
       setShowDayForm(true);
     }
     async function handleSaveDay(){
@@ -10066,10 +10068,16 @@ window.__dataReady.then(data => {
       const {items}=getTypeData(type);
       const existingOrder=items.find(i=>i.name===dayForm.driver_name)?.order;
       const dayOrder=existingOrder!=null?existingOrder:(items.length+1);
-      let ins=Object.entries(dayForm.days).filter(([d,v])=>v!==''&&v!=null).map(([d,v])=>({year:selYear,month:selDayMonth,day:Number(d),vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:Number(v)||0}));
-      // ลบเฉพาะเที่ยวที่ขับรถตัวเอง (helper ว่าง) เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ต้องเก็บไว้
-      const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).not('day','is',null).is('helper',null);
-      if(delErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ ข้อมูลยังไม่ถูกแก้ไข\n'+netErrMsg(delErr));return;}
+      // แก้เฉพาะวันที่ตัวเลขเปลี่ยนจริง: วันที่ไม่ได้แตะเก็บแถวเดิมไว้ (ที่มาจากไฟล์บิล/Excel ไม่หาย)
+      const norm=v=>v===''||v==null?null:Number(v)||0;
+      const orig=dayForm.origDays||{};
+      const changed=[...new Set([...Object.keys(dayForm.days),...Object.keys(orig)])].filter(d=>norm(dayForm.days[d])!==norm(orig[d])).map(Number);
+      let ins=changed.filter(d=>norm(dayForm.days[d])!=null).map(d=>({year:selYear,month:selDayMonth,day:d,vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:norm(dayForm.days[d])}));
+      // ลบเฉพาะเที่ยวของรถคันนี้เอง (ไม่มีคนช่วย / รถบ่อตะกั่วมาช่วย) ของวันที่เปลี่ยน · เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ต้องเก็บไว้
+      if(changed.length){
+        const {error:delErr}=await DB.from('transport_trips').delete().eq('year',selYear).eq('month',selDayMonth).eq('vehicle_type',type).eq('driver_name',dayForm.driver_name).in('day',changed).or('helper.is.null,helper.like.*บ่อตะกั่ว*');
+        if(delErr){setSavingDay(false);alert('บันทึกไม่สำเร็จ ข้อมูลยังไม่ถูกแก้ไข\n'+netErrMsg(delErr));return;}
+      }
       // เที่ยวที่คนนี้ไปช่วยขับรถคันอื่น: ลบของเดือนนี้ทั้งหมดแล้วบันทึกใหม่ตามฟอร์ม
       const orderOf=(vt,n)=>getTypeData(vt).items.find(i=>i.name===n)?.order??0;
       const helpIns=(dayForm.helps||[]).filter(h=>h.day&&h.target&&Number(h.trips)>0).map(h=>{
@@ -10099,8 +10107,8 @@ window.__dataReady.then(data => {
         if(r)await DB.from('transport_trips').update({trips:(r.trips||0)+x.amount}).eq('id',r.id);
         else await insertTrips([{year:selYear,month:selDayMonth,day:x.d,vehicle_type:x.vt,driver_name:x.n,sort_order:orderOf(x.vt,x.n),trips:x.amount}]);
       }
-      if(ins.length===0){
-        // ยังไม่มียอดเดือนนี้ -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
+      if(changed.length&&!Object.values(dayForm.days).some(v=>norm(v)!=null)){
+        // ลบยอดเดือนนี้หมดแล้ว -> เช็คว่าคนขับคนนี้มีข้อมูลอยู่เดือน/ปีอื่นไหม (ไม่นับเดือน/ปีที่กำลังลบอยู่ตอนนี้) ถ้าไม่มีเลยให้สร้างแถวตั้งต้น 0 เที่ยวไว้กันชื่อหาย
         const existsElsewhere=rows.some(r=>r.vehicle_type===type&&r.driver_name===dayForm.driver_name&&!(r.year===selYear&&r.month===selDayMonth));
         if(!existsElsewhere)ins=[{year:selYear,month:selDayMonth,day:1,vehicle_type:type,driver_name:dayForm.driver_name,sort_order:dayOrder,trips:0}];
       }
