@@ -9562,8 +9562,31 @@ window.__dataReady.then(data => {
         DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name'),
         DB.from('transport_workdays').select('*'),
         DB.from('transport_day_notes').select('*'),
-      ]).then(([a,b,c])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setLoading(false);});
+        DB.from('transport_vehicles').select('*'),
+        DB.from('transport_drivers').select('*'),
+        DB.from('transport_assignments').select('*'),
+      ]).then(([a,b,c,v,d,as])=>{setRows(a.data||[]);setWorkdays(b.data||[]);setDayNotes(c.data||[]);setMaster({vehicles:v.data||[],drivers:d.data||[],assigns:as.data||[]});setLoading(false);});
     }
+    const [master,setMaster]=useState({vehicles:[],drivers:[],assigns:[]});
+    // ---- ใช้ฐานข้อมูลหลัก: หาคนขับจากชื่อในไฟล์ แล้วหารถประจำ ณ วันที่ของบิล ----
+    const normName=s=>String(s||'').replace(/\s+/g,' ').trim();
+    function findMasterDriver(raw){
+      const r=normName(raw);
+      const cands=d=>[d.name,...String(d.aliases||'').split(',')].map(normName).filter(Boolean);
+      const exact=master.drivers.find(d=>cands(d).includes(r));
+      if(exact)return exact;
+      // ชื่อในไฟล์อาจเป็น "ชื่อ นามสกุล" ให้เทียบคำแรก (ต้องเจอคนเดียวเท่านั้น กันจับผิดคน)
+      const fw=r.split(' ')[0];
+      const byFirst=master.drivers.filter(d=>cands(d).some(c=>c.split(' ')[0]===fw));
+      return byFirst.length===1?byFirst[0]:null;
+    }
+    const isoOf=(y,m,d)=>`${y-543}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    function vehicleOnDate(driverId,iso){
+      const a=master.assigns.find(x=>x.driver_id===driverId&&x.start_date<=iso&&(!x.end_date||x.end_date>=iso));
+      return a?master.vehicles.find(v=>v.id===a.vehicle_id):null;
+    }
+    // ชื่อแถวในระบบเดิม = "ชื่อ / ทะเบียน" (รถบริษัท) ใช้ต่อได้กับทุกหน้า
+    const rowNameFor=(driver,vehicle)=>vehicle&&vehicle.is_company&&/^\d{2}-\d{4}$/.test(vehicle.plate)?`${driver.name} / ${vehicle.plate}`:driver.name;
     const DAY_NOTE_OPTIONS=['ไม่มีงาน','ซ่อมรถ','ซ่อมเครน','ลาหยุด','วันหยุดเทศกาล'];
     // วันหยุดตามปฏิทิน: แสดงป้ายได้แต่ไม่นับในสถิติหยุด (วันทำงานของเดือนหักวันเหล่านี้อยู่แล้ว) · รวมข้อความเดิมที่เคยพิมพ์เอง
     const HOLIDAY_NOTES=['วันหยุดเทศกาล','เทศกาล','เทสกาล'];
@@ -9647,6 +9670,31 @@ window.__dataReady.then(data => {
     const [importDropped,setImportDropped]=useState(null); // {trips,days,months} ข้อมูลวันที่ 16+ ที่ถูกตัดตอนนำเข้าครึ่งเดือน
     const UNKNOWN_PREFIX='❓';
     const [importDelManual,setImportDelManual]=useState(true); // ลบเที่ยวที่กรอกเองของคน/เดือนที่อยู่ในไฟล์ กันซ้ำ
+    const [newDriverForm,setNewDriverForm]=useState(null); // {key,raw,vehicle_id,start,end} เพิ่มคนขับใหม่จากหน้านำเข้า
+    async function createDriverFromImport(){
+      const f=newDriverForm;
+      if(!f.vehicle_id||!f.start){alert('เลือกรถประจำและวันที่เริ่ม');return;}
+      if(f.end&&f.end<f.start){alert('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม');return;}
+      let driver=master.drivers.find(d=>normName(d.name)===normName(f.raw));
+      if(!driver){
+        const {data,error}=await DB.from('transport_drivers').insert([{name:f.raw,aliases:f.raw,sort_order:master.drivers.length+1}]).select();
+        if(error){alert('เพิ่มคนขับไม่สำเร็จ: '+error.message);return;}
+        driver=data[0];
+      }
+      const {data:aData,error:aErr}=await DB.from('transport_assignments').insert([{driver_id:driver.id,vehicle_id:f.vehicle_id,start_date:f.start,end_date:f.end||null}]).select();
+      if(aErr){alert('บันทึกรถประจำไม่สำเร็จ: '+aErr.message);return;}
+      const vehicle=master.vehicles.find(v=>v.id===f.vehicle_id);
+      setMaster(m=>({...m,drivers:m.drivers.some(d=>d.id===driver.id)?m.drivers:[...m.drivers,driver],assigns:[...m.assigns,aData[0]]}));
+      // แถวในไฟล์ที่อยู่ในช่วงวันที่ -> คนขับใหม่ + รถประจำ · นอกช่วงยังเป็นชื่อไม่รู้จัก ให้เลือกต่อ
+      const [uvt,uname]=f.key.split('|');
+      setImportRows(list=>list.map(r=>{
+        if(!(r.vehicle_type===uvt&&r.driver_name===uname))return r;
+        const iso=isoOf(r.year,r.month,r.day);
+        if(iso<f.start||(f.end&&iso>f.end))return r;
+        return {...r,vehicle_type:vehicle.vehicle_type,driver_name:rowNameFor(driver,vehicle)};
+      }));
+      setNewDriverForm(null);
+    }
     const [importing,setImporting]=useState(false);
     const [importType,setImportType]=useState('เทรลเลอร์');
     const [spareAssign,setSpareAssign]=useState({}); // key: vt+'|'+driver -> จำนวนเที่ยวที่ไปขับรถคันอื่นแทน (หักจากคนขับ ไปเข้ารถปลายทางที่เลือก)
@@ -9836,7 +9884,7 @@ window.__dataReady.then(data => {
           // ทุกชื่อ+ประเภทรถที่มีอยู่แล้วในระบบ (ทั้ง 2 ประเภท) ไว้จับคู่ชื่อจากไฟล์
           const existingList=[...new Map(rows.map(r=>[r.vehicle_type+'||'+r.driver_name,{name:r.driver_name,vt:r.vehicle_type}])).values()];
           const aliasOf=n=>n.split('/')[0].trim();
-          function resolveTarget(rawName){
+          function resolveTarget(rawName,dt){
             if(rawName==='ไม่ระบุโครงการ'||rawName.startsWith('รับเอง')){
               const found=existingList.find(e=>e.name==='รับเอง'||aliasOf(e.name)==='รับเอง');
               return found?{name:found.name,vt:found.vt}:{name:'รับเอง',vt:importType};
@@ -9845,6 +9893,9 @@ window.__dataReady.then(data => {
               const found=existingList.find(e=>e.name==='รถร่วม'||aliasOf(e.name)==='รถร่วม');
               return found?{name:found.name,vt:found.vt}:{name:'รถร่วม',vt:importType};
             }
+            // ฐานข้อมูลหลัก: คนขับ + รถประจำ ณ วันที่ของบิล (คนที่ย้ายรถกลางเดือนจะได้ทะเบียนถูกตามวัน)
+            const md=findMasterDriver(rawName);
+            if(md&&dt){const v=vehicleOnDate(md.id,isoOf(dt.y,dt.m,dt.d));if(v)return{name:rowNameFor(md,v),vt:v.vehicle_type};}
             const exact=existingList.find(e=>e.name===rawName);
             if(exact)return{name:exact.name,vt:exact.vt};
             const byAlias=existingList.find(e=>aliasOf(e.name)===rawName);
@@ -9859,7 +9910,7 @@ window.__dataReady.then(data => {
           const counts={}; // key: vt|driver|y|m|d|prefix -> จำนวนเที่ยว(บิล)ของวันนั้น แยกตามชุดเลขที่บิล (เช่น BLV, BLF)
           let currentGroup=null,lastDt=null; // lastDt = วันที่ล่าสุดในบล็อกเดียวกัน ใช้แทนแถวบิลที่อ่านวันที่ไม่ออก
           const countBill=(dt,billNo)=>{
-            const {name,vt}=resolveTarget(currentGroup);
+            const {name,vt}=resolveTarget(currentGroup,dt);
             const prefix=(billNo.match(/^[A-Za-zก-๙]+/)||['อื่นๆ'])[0];
             const key=vt+'|'+name+'|'+dt.y+'|'+dt.m+'|'+dt.d+'|'+prefix;
             counts[key]=(counts[key]||0)+1;
@@ -10718,17 +10769,38 @@ window.__dataReady.then(data => {
                 if(!unknowns.length)return null;
                 return<div style={{background:'#fff7ed',border:'2px solid #fdba74',borderRadius:10,padding:'10px 14px',marginBottom:14}}>
                   <div style={{fontSize:13,fontWeight:800,color:'#9a3412',marginBottom:4}}>❓ พบชื่อที่ไม่มีในระบบ {unknowns.length} ชื่อ — เลือกว่าเป็นใครก่อนนำเข้า</div>
-                  <div style={{fontSize:11.5,color:'#9a3412',marginBottom:8}}>ถ้าเป็นคนขับใหม่ ให้กด "+ เพิ่มคนขับ/ทะเบียนรถ" ในหน้าหลักก่อน แล้วนำเข้าใหม่</div>
+                  <div style={{fontSize:11.5,color:'#9a3412',marginBottom:8}}>เป็นคนที่มีอยู่แล้ว → เลือกจากรายการ · เป็นคนขับใหม่ → กด "+ คนขับใหม่" แล้วเลือกรถประจำ (ระบบจะเพิ่มในแท็บ รถ / คนขับ ให้)</div>
                   {unknowns.map(k=>{
                     const [uvt,uname]=k.split('|');
                     const raw=uname.slice(UNKNOWN_PREFIX.length);
-                    const trips=importRows.filter(r=>r.vehicle_type===uvt&&r.driver_name===uname).reduce((s,r)=>s+r.trips,0);
-                    return<div key={k} style={{display:'grid',gridTemplateColumns:'1fr 1.3fr',gap:8,alignItems:'center',marginBottom:6}}>
-                      <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>"{raw}" <span style={{fontWeight:500,color:'#94a3b8'}}>· {trips} เที่ยว</span></div>
-                      <select value="" onChange={e=>{const v=e.target.value;if(!v)return;const [tvt,tname]=v.split('||');setImportRows(list=>list.map(r=>r.vehicle_type===uvt&&r.driver_name===uname?{...r,vehicle_type:tvt,driver_name:tname}:r));}} style={{padding:'5px 8px',border:'1px solid #fdba74',borderRadius:6,fontSize:12}}>
-                        <option value="">-- เลือกว่าเป็นใคร --</option>
-                        {allDrivers.map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
-                      </select>
+                    const uRows=importRows.filter(r=>r.vehicle_type===uvt&&r.driver_name===uname);
+                    const trips=uRows.reduce((s,r)=>s+r.trips,0);
+                    const firstIso=uRows.map(r=>isoOf(r.year,r.month,r.day)).sort()[0];
+                    const f=newDriverForm&&newDriverForm.key===k?newDriverForm:null;
+                    // รถคันที่เลือกมีคนขับประจำคนอื่นในช่วงนี้อยู่แล้วไหม
+                    const clash=f&&f.vehicle_id&&f.start?master.assigns.filter(a=>a.vehicle_id===f.vehicle_id&&a.start_date<=(f.end||'9999-12-31')&&(!a.end_date||a.end_date>=f.start)).map(a=>master.drivers.find(d=>d.id===a.driver_id)?.name).filter(Boolean):[];
+                    return<div key={k} style={{marginBottom:8}}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1.3fr auto',gap:8,alignItems:'center'}}>
+                        <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>"{raw}" <span style={{fontWeight:500,color:'#94a3b8'}}>· {trips} เที่ยว</span></div>
+                        <select value="" onChange={e=>{const v=e.target.value;if(!v)return;const [tvt,tname]=v.split('||');setImportRows(list=>list.map(r=>r.vehicle_type===uvt&&r.driver_name===uname?{...r,vehicle_type:tvt,driver_name:tname}:r));}} style={{padding:'5px 8px',border:'1px solid #fdba74',borderRadius:6,fontSize:12}}>
+                          <option value="">-- เลือกว่าเป็นใคร --</option>
+                          {allDrivers.map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
+                        </select>
+                        {canEdit&&!f&&<button onClick={()=>setNewDriverForm({key:k,raw,vehicle_id:'',start:firstIso,end:''})} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #fdba74',background:'#fff',color:'#9a3412',fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>+ คนขับใหม่</button>}
+                      </div>
+                      {f&&<div style={{marginTop:6,padding:'8px 10px',background:'#fff',border:'1px solid #fdba74',borderRadius:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',fontSize:12}}>
+                        <span style={{fontWeight:700}}>รถประจำ</span>
+                        <select value={f.vehicle_id} onChange={e=>setNewDriverForm(s=>({...s,vehicle_id:e.target.value}))} style={{padding:'4px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:12}}>
+                          <option value="">-- เลือกรถ --</option>
+                          {master.vehicles.filter(v=>v.is_company&&v.active).map(v=><option key={v.id} value={v.id}>{v.plate}{v.label?` (${v.label})`:''} · {v.vehicle_type}</option>)}
+                        </select>
+                        <span>ตั้งแต่</span><input type="date" value={f.start} onChange={e=>setNewDriverForm(s=>({...s,start:e.target.value}))} style={{padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:12}}/>
+                        <span>ถึง</span><input type="date" value={f.end} onChange={e=>setNewDriverForm(s=>({...s,end:e.target.value}))} style={{padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:12}}/>
+                        <span style={{color:'#94a3b8'}}>(ว่าง = ยังขับอยู่)</span>
+                        <button onClick={createDriverFromImport} style={{padding:'4px 12px',borderRadius:6,border:'none',background:'#ea580c',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>บันทึก</button>
+                        <button onClick={()=>setNewDriverForm(null)} style={{padding:'4px 10px',borderRadius:6,border:'1px solid #e2e8f0',background:'#fff',color:'#64748b',fontSize:12,cursor:'pointer'}}>ยกเลิก</button>
+                        {clash.length>0&&<div style={{width:'100%',color:'#b91c1c'}}>⚠️ รถคันนี้มีคนขับประจำ {clash.join(', ')} ในช่วงนี้อยู่แล้ว ถ้าเป็นการขับแทนชั่วคราว ให้ใส่ "ถึงวันที่" ให้สั้นเฉพาะช่วงที่ขับ</div>}
+                      </div>}
                     </div>;
                   })}
                 </div>;
@@ -10761,6 +10833,7 @@ window.__dataReady.then(data => {
                   <thead><tr style={{background:'#f8fafc'}}>
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ประเภทรถ</th>
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>คนขับ</th>
+                    <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ทะเบียน</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>รวมเที่ยว</th>
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนวันที่มีข้อมูล</th>
                     <th style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>ไปขับรถของ (ถ้ามี)</th>
@@ -10772,7 +10845,8 @@ window.__dataReady.then(data => {
                       const choice=spareTargetChoice[key]||'';
                       return<tr key={key} style={{background:i%2?'#fcfcfd':'#fff'}}>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
-                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{dispName(d.name)}</td>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name.startsWith(UNKNOWN_PREFIX)?d.name:nameOnly(d.name)}</td>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',color:(d.name.match(PLATE_RE)||[])[1]?'#1e293b':'#94a3b8'}}>{(d.name.match(PLATE_RE)||[])[1]||'–'}</td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
@@ -10804,7 +10878,7 @@ window.__dataReady.then(data => {
                       const dayMap=spareDayAssign[key]||{};
                       const sum=Object.values(dayMap).reduce((s,v)=>s+(Number(v)||0),0);
                       return<tr>
-                        <td colSpan={6} style={{padding:'10px 14px',background:'#eef2ff',borderBottom:'1px solid #e0e7ff'}}>
+                        <td colSpan={7} style={{padding:'10px 14px',background:'#eef2ff',borderBottom:'1px solid #e0e7ff'}}>
                           <div style={{fontSize:11,fontWeight:700,color:'#3730a3',marginBottom:8}}>ระบุวันที่และจำนวนเที่ยวที่ไปขับแทน — {dname}</div>
                           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
                             {dayRows.map(r=><div key={r.day} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
