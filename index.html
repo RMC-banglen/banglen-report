@@ -298,6 +298,17 @@ const retryFetch = async (url, opts = {}) => {
   }
 };
 const DB = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: retryFetch } });
+// ดึงข้อมูลทั้งหมดแบบทีละชุด (ระบบจำกัดจำนวนแถวต่อครั้ง ถ้าดึงทีเดียวข้อมูลเกินจะขาดโดยไม่เตือน)
+// build = ฟังก์ชันสร้าง query ใหม่ทุกครั้ง ควรมี .order(...) ให้ลำดับคงที่ · ต่อท้ายด้วย id กันแถวซ้ำ/หล่นระหว่างชุด
+const fetchAll = async (build, page = 1000) => {
+  let all = [];
+  for (let from = 0; ; from += page) {
+    const { data, error } = await build().order('id').range(from, from + page - 1);
+    if (error) return { data: all.length ? all : null, error };
+    all = all.concat(data || []);
+    if (!data || data.length < page) return { data: all, error: null };
+  }
+};
 const netErrMsg = e => /Failed to fetch|NetworkError|Load failed/i.test(String(e && e.message || e)) ? 'เชื่อมต่อระบบไม่ได้ (เน็ตสะดุด) — ตรวจอินเทอร์เน็ตแล้วกดบันทึกอีกครั้ง' : String(e && e.message || e);
 
 // ============================================================
@@ -9416,7 +9427,7 @@ window.__dataReady.then(data => {
       setRelabeling(true);
       try{
         const [t,v,d,a]=await Promise.all([
-          DB.from('transport_trips').select('id,year,month,day,vehicle_type,driver_name,helper,person,plate,sort_order,trips').range(0,9999),
+          fetchAll(()=>DB.from('transport_trips').select('id,year,month,day,vehicle_type,driver_name,helper,person,plate,sort_order,trips')),
           DB.from('transport_vehicles').select('*'),DB.from('transport_drivers').select('*'),DB.from('transport_assignments').select('*'),
         ]);
         const TR=t.data||[],V=v.data||[],D=d.data||[],A=a.data||[];
@@ -9459,7 +9470,7 @@ window.__dataReady.then(data => {
         for(let i=0;i<stale.length;i+=100)await DB.from('transport_trips').delete().in('id',stale.slice(i,i+100));
         n+=stale.length;
         // ป้ายหยุด: เรื่องคน (ลาหยุด) อยู่แถวรถประจำของคนนั้น · เรื่องรถ (ซ่อม/ไม่มีงาน/อื่นๆ) อยู่แถวของรถคันนั้น ณ วันนั้น
-        const {data:NT}=await DB.from('transport_day_notes').select('*').range(0,9999);
+        const {data:NT}=await fetchAll(()=>DB.from('transport_day_notes').select('*'));
         const PR=/\s*\/\s*(\d{2}-\d{4})\s*$/;
         const taken=new Set((NT||[]).map(x=>[x.year,x.month,x.day,x.vehicle_type,x.driver_name].join('|')));
         for(const x of NT||[]){
@@ -9499,8 +9510,8 @@ window.__dataReady.then(data => {
       if(renamed){
         const PR=/\s*\/\s*(\d{2}-\d{4})\s*$/;const only=n=>String(n||'').replace(PR,'').trim();
         const re=n=>newName+String(n).slice(String(n).indexOf(orig.name)+orig.name.length);
-        const {data:tr}=await DB.from('transport_trips').select('driver_name,helper').range(0,9999);
-        const {data:nt}=await DB.from('transport_day_notes').select('driver_name').range(0,9999);
+        const {data:tr}=await fetchAll(()=>DB.from('transport_trips').select('driver_name,helper'));
+        const {data:nt}=await fetchAll(()=>DB.from('transport_day_notes').select('driver_name'));
         for(const n of new Set((tr||[]).map(r=>r.driver_name).filter(n=>only(n)===orig.name)))await DB.from('transport_trips').update({driver_name:re(n)}).eq('driver_name',n);
         for(const n of new Set((tr||[]).map(r=>r.helper).filter(n=>n&&only(n)===orig.name)))await DB.from('transport_trips').update({helper:re(n)}).eq('helper',n);
         await DB.from('transport_trips').update({person:newName}).eq('person',orig.name);
@@ -9684,9 +9695,9 @@ window.__dataReady.then(data => {
     // หลังบันทึกโหลดใหม่แบบเงียบ ไม่ขึ้น "กำลังโหลด" (กันหน้ากระพริบ/เลื่อน) · state loading เริ่มต้น true อยู่แล้วสำหรับครั้งแรก
     function fetch(){
       Promise.all([
-        DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name'),
+        fetchAll(()=>DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name')),
         DB.from('transport_workdays').select('*'),
-        DB.from('transport_day_notes').select('*'),
+        fetchAll(()=>DB.from('transport_day_notes').select('*')),
         DB.from('transport_vehicles').select('*'),
         DB.from('transport_drivers').select('*'),
         DB.from('transport_assignments').select('*'),
@@ -9965,13 +9976,16 @@ window.__dataReady.then(data => {
         return<option key={v.id} value={'veh:'+v.id}>{txt}{info?` (${info})`:''}</option>;
       })}</optgroup>);
     }
-    async function openDayForm(type,name){
+    async function openDayForm(type,name,month){
+      // month: เปิดจากหน้าอื่น (เช่น กดยอดรวมในรายเดือน) -> สลับเดือนของฟอร์มเป็นเดือนนั้น
+      const mo=month||selDayMonth;if(month&&month!==selDayMonth)setSelDayMonth(month);
       // ดึงข้อมูลล่าสุดจากระบบก่อนเปิดฟอร์มเสมอ กันหน้าที่เปิดค้างไว้บันทึกข้อมูลเก่าทับ (เคยทำให้เที่ยวซ้ำ)
-      const {data:fresh}=await DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name').range(0,9999);
+      const {data:fresh}=await fetchAll(()=>DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name'));
       const all=fresh||rows;if(fresh)setRows(fresh);
-      const mRows=all.filter(r=>r.year===selYear&&r.month===selDayMonth&&r.day!=null);
+      const mRows=all.filter(r=>r.year===selYear&&r.month===mo&&r.day!=null);
+      const moDays=Array.from({length:new Date(selYear-543,mo,0).getDate()},(_,i)=>i+1);
       // เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ (มี helper) ไม่แสดงในฟอร์ม และจะไม่ถูกลบตอนบันทึก
-      const days={};dayList.forEach(d=>{const matched=mRows.filter(r=>r.vehicle_type===type&&r.driver_name===name&&!r.helper&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
+      const days={};moDays.forEach(d=>{const matched=mRows.filter(r=>r.vehicle_type===type&&r.driver_name===name&&!r.helper&&r.day===d);if(matched.length)days[d]=matched.reduce((s,r)=>s+(r.trips||0),0);});
       const helps=mRows.filter(r=>r.helper===name).sort((a,b)=>a.day-b.day).map(r=>({day:String(r.day),target:helpTargetValue(r),trips:String(r.trips||'')}));
       setDayForm({vehicle_type:type,driver_name:name,original_name:name,days,helps});
       setShowDayForm(true);
@@ -10687,9 +10701,11 @@ window.__dataReady.then(data => {
                     {months.map(m=>{const v=pOwn(m),h=pHelp(m),total=v+h;
                       // เว้นที่ขวา 24px ทุกช่อง ให้ตัวเลขชิดขวาตรงกัน รูปมือวางลอยในช่องว่างนั้น ไม่ดันตัวเลข
                       if(extra)return<td key={m} onClick={h>0?()=>setHelpPopup({vt:t.k,name,names,month:m}):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',color:total?'#0f766e':'#cbd5e1',fontWeight:total?700:undefined,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:h>0?'pointer':'default'}} title={h>0?'กดดูรายละเอียด':undefined}>{total?<span style={{textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(total)}</span>:'–'}</td>;
-                      return<td key={m} style={{textAlign:'right',padding:'5px 24px 5px 6px',position:'relative',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={()=>setHelpPopup({vt:t.k,name,names,month:m})} style={{position:'absolute',right:3,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝</span>}</td>;})}
+                      // กดตัวเลข = แก้ไขรายวันของเดือนนั้น (แถวทะเบียนที่มีเที่ยวเดือนนั้น)
+                      const mName=ownNames.find(n=>personOwn(n,m)>0)||editName;
+                      return<td key={m} onClick={canEdit&&mName?()=>openDayForm(t.k,mName,m):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',position:'relative',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:canEdit&&mName?'pointer':'default'}} title={(h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:'')+(canEdit&&mName?`${h>0?'\n':''}กดเพื่อแก้ไขรายวัน ${MO[m-1]}`:'')||undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={e=>{e.stopPropagation();setHelpPopup({vt:t.k,name,names,month:m});}} style={{position:'absolute',right:3,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝</span>}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
-                      {canEdit&&editName?<span onClick={()=>openEdit(t.k,editName)} title={ownNames.length>1?`แก้ไข (${editName}) — กด "แสดงทะเบียน" เพื่อแก้แยกคัน`:'แก้ไข'} style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
+                      {canEdit&&editName?<span onClick={()=>{const lm=Math.max(0,...ALLM.filter(m=>personOwn(editName,m)>0))||(allMonths.length?allMonths[allMonths.length-1]:1);openDayForm(t.k,editName,latestMonthOnly&&allMonths.length?allMonths[allMonths.length-1]:lm);}} title="แก้ไขรายวัน (เดือนล่าสุดที่มีข้อมูล) · กดตัวเลขเดือนไหนก็ได้เพื่อแก้เดือนนั้น" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
                     </td>
                     {canEdit&&<td style={{padding:'4px 6px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'}}>
                       {ownNames.length>0&&<button onClick={()=>setConfirmDel({type:t.k,name:key,names:ownNames})} style={{padding:'1px 6px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:10,color:'#dc2626'}}>ลบ</button>}
