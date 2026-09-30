@@ -10437,8 +10437,9 @@ window.__dataReady.then(data => {
                     const mL=notesOf(mList,row),yL=notesOf(list,row);
                     return<tr key={keyOf(row)} style={{borderBottom:'1px solid #f1f5f9'}}>
                       <td style={{padding:'5px 10px',fontWeight:600,color:'#334155',whiteSpace:'nowrap'}}>{labelOf(row)}</td>
-                      {reasons.map((r,i)=><td key={'m'+i} style={{textAlign:'right',padding:'5px 8px',color:'#475569',borderRight:i===reasons.length-1?'2px solid #fde68a':'none'}}>{cnt(mL,r)}</td>)}
-                      {reasons.map((r,i)=><td key={'y'+i} style={{textAlign:'right',padding:'5px 8px',fontWeight:700,color:'#b45309'}}>{cnt(yL,r)}</td>)}
+                      {/* มีค่า = สีเข้มหนา (เดือนนี้แดง · สะสมส้ม) · 0 = เทาจาง ให้เห็นตัวที่มีได้ทันที */}
+                      {reasons.map((r,i)=>{const v=cnt(mL,r);return<td key={'m'+i} style={{textAlign:'right',padding:'5px 8px',color:v?'#dc2626':'#cbd5e1',fontWeight:v?800:400,fontSize:v?14:undefined,background:v?'#fef2f2':undefined,borderRight:i===reasons.length-1?'2px solid #fde68a':'none'}}>{v}</td>;})}
+                      {reasons.map((r,i)=>{const v=cnt(yL,r);return<td key={'y'+i} style={{textAlign:'right',padding:'5px 8px',fontWeight:v?800:400,fontSize:v?14:undefined,color:v?'#b45309':'#cbd5e1'}}>{v}</td>;})}
                     </tr>;
                   })}
                 </tbody>
