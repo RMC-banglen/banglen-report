@@ -10336,7 +10336,7 @@ window.__dataReady.then(data => {
           <div style={{fontSize:13,color:'#64748b',marginTop:2}}>ติดตามจำนวนเที่ยววิ่งของรถแต่ละคัน/คนขับ รายเดือน (ดึงจาก Supabase)</div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          {view!=='monthly'&&<label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer',marginRight:4}}>
+          {view!=='monthly'&&view!=='daily'&&<label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer',marginRight:4}}>
             <input type="checkbox" checked={showPlate} onChange={e=>setShowPlate(e.target.checked)}/>
             แสดงทะเบียน
           </label>}
@@ -10753,6 +10753,10 @@ window.__dataReady.then(data => {
       })}
 
       {view==='daily'&&<div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:8}}>
+        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer',marginRight:8}}>
+          <input type="checkbox" checked={showPlate} onChange={e=>setShowPlate(e.target.checked)}/>
+          แสดงทะเบียน
+        </label>
         <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
           <input type="checkbox" checked={hideEmptyDay} onChange={e=>setHideEmptyDay(e.target.checked)}/>
           ซ่อนคันที่ยังไม่มีข้อมูลเดือนนี้
