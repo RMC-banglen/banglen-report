@@ -9675,6 +9675,7 @@ window.__dataReady.then(data => {
     useEffect(()=>{if(view!=='stopped')setBackView(null);},[view]);
     const goStopped=m=>{setBackView({view,y:window.scrollY});if(m)setSelDayMonth(m);setView('stopped');window.scrollTo(0,0);};
     const goBack=()=>{const b=backView;if(!b)return;setView(b.view);setTimeout(()=>window.scrollTo(0,b.y),60);};
+    const [notePopup,setNotePopup]=useState(null); // {title,sub,list} — กดตัวเลขในหน้าหยุดวิ่ง ดูว่าวันไหนบ้าง
     const [showCalc,setShowCalc]=useState(false); // แถว วันทำงาน/เที่ยวรถบริษัท/จำนวนรถ ซ่อนไว้ก่อน กดที่ "เฉลี่ยเที่ยว/วัน/คัน" เพื่อดู
     const [helpPopup,setHelpPopup]=useState(null); // {vt,name,month,day?}
     const [showForm,setShowForm]=useState(false);
@@ -10435,19 +10436,22 @@ window.__dataReady.then(data => {
                 <tbody>
                   {rows.map(row=>{
                     const mL=notesOf(mList,row),yL=notesOf(list,row);
+                    const rowText=row.plate&&row.hasPlate?row.plate:row.person||dispName(row.names?row.names[0]:row.name);
+                    // กดตัวเลขที่มีค่า -> หน้าต่างบอกว่าวันไหนบ้าง
+                    const open=(r,src,scope)=>setNotePopup({title:`${r} · ${rowText}`,sub:scope,list:src.filter(n=>noteText(n)===r)});
                     return<tr key={keyOf(row)} style={{borderBottom:'1px solid #f1f5f9'}}>
                       <td style={{padding:'5px 10px',fontWeight:600,color:'#334155',whiteSpace:'nowrap'}}>{labelOf(row)}</td>
                       {/* มีค่า = สีเข้มหนา (เดือนนี้แดง · สะสมส้ม) · 0 = เทาจาง ให้เห็นตัวที่มีได้ทันที */}
-                      {reasons.map((r,i)=>{const v=cnt(mL,r);return<td key={'m'+i} style={{textAlign:'right',padding:'5px 8px',color:v?'#dc2626':'#cbd5e1',fontWeight:v?800:400,fontSize:v?14:undefined,background:v?'#fef2f2':undefined,borderRight:i===reasons.length-1?'2px solid #fde68a':'none'}}>{v}</td>;})}
-                      {reasons.map((r,i)=>{const v=cnt(yL,r);return<td key={'y'+i} style={{textAlign:'right',padding:'5px 8px',fontWeight:v?800:400,fontSize:v?14:undefined,color:v?'#b45309':'#cbd5e1'}}>{v}</td>;})}
+                      {reasons.map((r,i)=>{const v=cnt(mL,r);return<td key={'m'+i} onClick={v?()=>open(r,mL,`${MO[selDayMonth-1]} ${selYear}`):undefined} title={v?'กดดูว่าวันไหนบ้าง':undefined} style={{textAlign:'right',padding:'5px 8px',color:v?'#dc2626':'#cbd5e1',fontWeight:v?800:400,fontSize:v?14:undefined,background:v?'#fef2f2':undefined,cursor:v?'pointer':'default',textDecoration:v?'underline dotted':undefined,borderRight:i===reasons.length-1?'2px solid #fde68a':'none'}}>{v}</td>;})}
+                      {reasons.map((r,i)=>{const v=cnt(yL,r);return<td key={'y'+i} onClick={v?()=>open(r,yL,`สะสมทั้งปี ${selYear}`):undefined} title={v?'กดดูว่าวันไหนบ้าง':undefined} style={{textAlign:'right',padding:'5px 8px',fontWeight:v?800:400,fontSize:v?14:undefined,color:v?'#b45309':'#cbd5e1',cursor:v?'pointer':'default',textDecoration:v?'underline dotted':undefined}}>{v}</td>;})}
                     </tr>;
                   })}
                 </tbody>
                 <tfoot>
                   <tr style={{background:'#fef9c3',fontWeight:800}}>
                     <td style={{padding:'6px 10px',color:'#92400e'}}>รวม</td>
-                    {reasons.map((r,i)=><td key={'m'+i} style={{textAlign:'right',padding:'6px 8px',color:'#92400e',borderRight:i===reasons.length-1?'2px solid #d97706':'none'}}>{cnt(mList,r)}</td>)}
-                    {reasons.map((r,i)=><td key={'y'+i} style={{textAlign:'right',padding:'6px 8px',color:'#92400e'}}>{cnt(list,r)}</td>)}
+                    {reasons.map((r,i)=>{const v=cnt(mList,r);return<td key={'m'+i} onClick={v?()=>setNotePopup({title:`${r} · ทุกคัน`,sub:`${MO[selDayMonth-1]} ${selYear}`,list:mList.filter(n=>noteText(n)===r&&rows.some(row=>notesOf([n],row).length))}):undefined} style={{textAlign:'right',padding:'6px 8px',color:'#92400e',cursor:v?'pointer':'default',textDecoration:v?'underline dotted':undefined,borderRight:i===reasons.length-1?'2px solid #d97706':'none'}}>{v}</td>;})}
+                    {reasons.map((r,i)=>{const v=cnt(list,r);return<td key={'y'+i} onClick={v?()=>setNotePopup({title:`${r} · ทุกคัน`,sub:`สะสมทั้งปี ${selYear}`,list:list.filter(n=>noteText(n)===r&&rows.some(row=>notesOf([n],row).length))}):undefined} style={{textAlign:'right',padding:'6px 8px',color:'#92400e',cursor:v?'pointer':'default',textDecoration:v?'underline dotted':undefined}}>{v}</td>;})}
                   </tr>
                 </tfoot>
               </table>
@@ -10984,6 +10988,28 @@ window.__dataReady.then(data => {
             {list.length===0&&<div style={{fontSize:13,color:'#94a3b8',textAlign:'center',padding:10}}>ไม่พบข้อมูล</div>}
             <div style={{display:'flex',justifyContent:'flex-end',marginTop:16}}>
               <button onClick={()=>setHelpPopup(null)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ปิด</button>
+            </div>
+          </div>
+        </div>;
+      })()}
+
+      {notePopup&&(()=>{
+        const list=[...notePopup.list].sort((a,b)=>a.month-b.month||a.day-b.day||String(a.driver_name).localeCompare(String(b.driver_name),'th'));
+        const months=[...new Set(list.map(n=>n.month))];
+        return<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>setNotePopup(null)}>
+          <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:440,maxHeight:'80vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>🛑 {notePopup.title}</div>
+            <div style={{fontSize:13,color:'#64748b',marginBottom:14}}>{notePopup.sub} · รวม {list.length} วัน</div>
+            {months.map(m=>{const ms=list.filter(n=>n.month===m);return<div key={m} style={{marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:800,color:'#92400e',background:'#fffbeb',borderRadius:6,padding:'4px 10px',marginBottom:4,display:'flex',justifyContent:'space-between'}}><span>{MO[m-1]} {selYear}</span><span>{ms.length} วัน</span></div>
+              {ms.map(n=><div key={n.id||(n.day+'|'+n.driver_name)} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:14,color:'#334155',padding:'5px 10px',borderBottom:'1px solid #f1f5f9'}}>
+                <span style={{fontWeight:700}}>วันที่ {n.day}</span>
+                <span style={{color:'#64748b',textAlign:'right'}}>{dispName(n.driver_name)}{n.plate&&!String(dispName(n.driver_name)).includes(n.plate)?` · ${n.plate}`:''}</span>
+              </div>)}
+            </div>;})}
+            {list.length===0&&<div style={{fontSize:13,color:'#94a3b8',textAlign:'center',padding:10}}>ไม่พบข้อมูล</div>}
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}>
+              <button onClick={()=>setNotePopup(null)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ปิด</button>
             </div>
           </div>
         </div>;
