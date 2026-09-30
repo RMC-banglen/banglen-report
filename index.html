@@ -10879,11 +10879,20 @@ window.__dataReady.then(data => {
                               const isos=importRows.map(r=>isoOf(r.year,r.month,r.day)).sort();
                               const from=isos[0],to=isos[isos.length-1];
                               const regulars=v=>[...new Set(master.assigns.filter(a=>a.vehicle_id===v.id&&a.start_date<=to&&(!a.end_date||a.end_date>=from)).map(a=>master.drivers.find(x=>x.id===a.driver_id)?.name).filter(Boolean))];
-                              return [...master.vehicles].filter(v=>v.active&&v.plate!==ownPlate).sort((a,b)=>a.vehicle_type.localeCompare(b.vehicle_type,'th')||a.sort_order-b.sort_order).map(v=>{
-                                const rg=regulars(v);
-                                const info=!v.is_company?'รถนอก':rg.length?`ประจำ: ${rg.join(' / ')}`:'ไม่มีคนขับประจำ';
-                                return<option key={v.id} value={'veh:'+v.id}>{v.plate}{v.label?` ${v.label}`:''} · {v.vehicle_type} ({info})</option>;
-                              });
+                              // จัดกลุ่ม: เทรลเลอร์ → 10ล้อ-12ล้อ → รถนอก
+                              const list=[...master.vehicles].filter(v=>v.active&&v.plate!==ownPlate).sort((a,b)=>a.sort_order-b.sort_order);
+                              const groups=[
+                                {label:'🚛 เทรลเลอร์',items:list.filter(v=>v.is_company&&v.vehicle_type==='เทรลเลอร์')},
+                                {label:'🚚 10ล้อ-12ล้อ',items:list.filter(v=>v.is_company&&v.vehicle_type==='10ล้อ-12ล้อ')},
+                                {label:'รถนอก',items:list.filter(v=>!v.is_company).sort((a,b)=>(a.vehicle_type==='เทรลเลอร์'?0:1)-(b.vehicle_type==='เทรลเลอร์'?0:1)||a.sort_order-b.sort_order)},
+                              ].filter(g=>g.items.length);
+                              return groups.map(g=><optgroup key={g.label} label={g.label}>
+                                {g.items.map(v=>{
+                                  const rg=regulars(v);
+                                  const info=!v.is_company?v.vehicle_type:rg.length?`ประจำ: ${rg.join(' / ')}`:'ไม่มีคนขับประจำ';
+                                  return<option key={v.id} value={'veh:'+v.id}>{v.plate}{v.label?` ${v.label}`:''} ({info})</option>;
+                                })}
+                              </optgroup>);
                             })():allDrivers.filter(o=>!(o.vt===d.vt&&o.name===d.name)).map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
                           </select>
                         </td>
