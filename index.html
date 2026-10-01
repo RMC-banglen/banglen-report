@@ -1321,6 +1321,12 @@ window.__dataReady.then(data => {
   const pct2    = (a,b) => b>0 ? (a/b*100).toFixed(3)+'%' : '–';
 
   // กลุ่มสาเหตุความเสียหาย สำหรับ ตารางสรุป
+  // สีทึบที่เท่ากับ hex + ความโปร่งใส ทับบนพื้นขาว — ใช้กับคอลัมน์ที่ล็อก (sticky) ไม่ให้ตัวเลขที่เลื่อนผ่านโผล่ทะลุ
+  const solidTint = (hex, alphaHex) => {
+    const a = parseInt(alphaHex, 16) / 255, h = hex.replace('#', '');
+    const ch = i => Math.round(255 - (255 - parseInt(h.substr(i, 2), 16)) * a).toString(16).padStart(2, '0');
+    return '#' + ch(0) + ch(2) + ch(4);
+  };
   const DAMAGE_GROUPS = [
     { key:'factory', label:'เสียหายในโรงงาน', bg:'#fce5cd', hd:'#b45f06',
       rows:[
@@ -3807,10 +3813,10 @@ window.__dataReady.then(data => {
               {/* กลุ่ม */}
               {DAMAGE_GROUPS.map(grp=><React.Fragment key={grp.key}>
                 {/* header กลุ่ม */}
-                <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:SZ.grp,padding:SZ.row,position:'sticky',left:0}}>{grp.label}</td></tr>
+                <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:SZ.grp,padding:SZ.row,textAlign:'left'}}><span style={{position:'sticky',left:8,display:'inline-block'}}>{grp.label}</span></td></tr>
                 {/* แถวรายการ */}
                 {grp.rows.map((row,ri)=><tr key={ri} style={{background: ri%2===0?'#fff':grp.bg+'55'}}>
-                  <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':grp.bg+'55',zIndex:1,padding:SZ.row,paddingLeft:nCols<=3?28:20,fontSize:SZ.label}}>{row.label}</td>
+                  <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':solidTint(grp.bg,'55'),zIndex:1,padding:SZ.row,paddingLeft:nCols<=3?28:20,fontSize:SZ.label}}>{row.label}</td>
                   {cols.map((c,ci)=>{const v=colAmt(row.fn,c),s=colSales(c);
                     return <React.Fragment key={ci}>{canDrillSummary ? tdNumClick(v,s,ri%2===0?'':grp.bg+'33',()=>drillSummary(row,c)) : tdNum(v,s,false,ri%2===0?'':grp.bg+'33')}</React.Fragment>;})}
                 </tr>)}
@@ -7577,9 +7583,9 @@ window.__dataReady.then(data => {
           </tr>
 
           {DAMAGE_GROUPS.map(grp=><React.Fragment key={grp.key}>
-            <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:SZ.grp,padding:SZ.row,position:'sticky',left:0}}>{grp.label}</td></tr>
+            <tr><td colSpan={1+cols.length*2} style={{background:grp.hd,color:'#fff',fontWeight:700,fontSize:SZ.grp,padding:SZ.row,textAlign:'left'}}><span style={{position:'sticky',left:8,display:'inline-block'}}>{grp.label}</span></td></tr>
             {grp.rows.map((row,ri)=><tr key={ri} style={{background: ri%2===0?'#fff':grp.bg+'55'}}>
-              <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':grp.bg+'55',zIndex:1,padding:SZ.row,paddingLeft:nCols<=3?28:20,fontSize:SZ.label}}>{row.label}</td>
+              <td className="ta-l" style={{position:'sticky',left:0,background:ri%2===0?'#fff':solidTint(grp.bg,'55'),zIndex:1,padding:SZ.row,paddingLeft:nCols<=3?28:20,fontSize:SZ.label}}>{row.label}</td>
               {cols.map((c,ci)=>{const v=colAmt(row.fn,c),s=colSales(c);
                 return <React.Fragment key={ci}>{canDrill ? tdNumClick(v,s,ri%2===0?'':grp.bg+'33',()=>drill(row,c)) : tdNum(v,s,false,ri%2===0?'':grp.bg+'33')}</React.Fragment>;})}
             </tr>)}
