@@ -9798,7 +9798,14 @@ window.__dataReady.then(data => {
       return {...r,plate:m?m[1]:null,person:credited?nameOnly(r.helper):(String(r.driver_name||'').includes('สำรอง')?null:nameOnly(r.driver_name))};
     };
     const insertTrips=list=>DB.from('transport_trips').insert(list.map(withPersonPlate));
-    const isCompanyName=n=>!n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
+    // รถบริษัท: ถ้าแถวมีทะเบียนที่อยู่ในหน้า "รถ / คนขับ" ยึดช่อง "รถบริษัท" ที่ติ๊กไว้ (เช่น รถสำรองชื่อมี "บ่อตะกั่ว" แต่เป็นรถบริษัท)
+    // ไม่มีทะเบียน/ไม่อยู่ในรายการ -> ดูจากชื่อ (รถร่วม / รับเอง / บ่อตะกั่ว = รถนอก)
+    const isCompanyName=n=>{
+      const p=(String(n||'').match(/(\d{2}-\d{4})\s*$/)||[])[1];
+      const v=p&&master.vehicles.find(x=>x.plate===p);
+      if(v)return !!v.is_company;
+      return !n.includes('รถร่วม')&&!n.includes('รับเอง')&&!n.includes('บ่อตะกั่ว');
+    };
     // จำนวนรถบริษัทในเดือนนั้น = ทะเบียนที่มีเที่ยววิ่ง หรือมีป้ายหยุดที่เป็นเรื่องของรถ (รถจอดซ่อมทั้งเดือนก็ยังนับ)
     // จำนวนรถที่แก้เอง (เก็บในตารางวันทำงาน) ถ้าว่างใช้ค่าอัตโนมัติ
     const truckField=vt=>vt==='เทรลเลอร์'?'trucks_trailer':'trucks_wheel';
