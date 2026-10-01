@@ -10749,16 +10749,18 @@ window.__dataReady.then(data => {
         </div>;
       })()}
 
-      {view==='monthly'&&TYPES.map(t=>{
+      {/* รายเดือน: ตารางเทรลเลอร์ + 12ล้อ อยู่บน · การ์ดสรุป (รวมทั้งปี / ดูสรุปเดือน) อยู่ล่าง */}
+      {view==='monthly'&&['table','cards'].flatMap(part=>TYPES.map(t=>{
         const {items,months:allMonths,cell,rowTotal,colTotal,typeGrand,monthGrand,monthItems,dayRows,typeRows,persons,personOwn,personHelp,isExtraPerson}=getTypeData(t.k);
         // ติ๊ก "เดือนล่าสุด" = โชว์เฉพาะคอลัมน์เดือนล่าสุด ส่วนคอลัมน์รวมยังเป็นยอดทั้งปี
         const months=latestMonthOnly&&allMonths.length?[allMonths[allMonths.length-1]]:allMonths;
-        return<div key={t.k} style={{marginBottom:32}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+        return<div key={part+'-'+t.k} style={{marginBottom:part==='table'?24:32}}>
+          {part==='cards'&&t.k===TYPES[0].k&&<div style={{fontSize:16,fontWeight:800,color:'#1e293b',margin:'8px 0 12px'}}>📊 สรุป</div>}
+          {part==='cards'&&<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
             <span style={{fontSize:18}}>{t.k==='เทรลเลอร์'?'🚛':'🚚'}</span>
             <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k}</div>
-          </div>
-          <div style={{display:'flex',gap:14,marginBottom:20,flexWrap:'wrap'}}>
+          </div>}
+          {part==='cards'&&<div style={{display:'flex',gap:14,marginBottom:20,flexWrap:'wrap'}}>
             <div style={{flex:1,minWidth:180,background:t.bg,border:`2px solid ${t.color}30`,borderRadius:14,padding:'16px 20px'}}>
               <div style={{fontSize:13,color:t.color,fontWeight:700,marginBottom:6}}>รวมทั้งปี {selYear} · {t.k}</div>
               <div style={{fontSize:30,fontWeight:900,color:'#1e293b'}}>{fmt(typeGrand)} <span style={{fontSize:14,color:'#94a3b8'}}>เที่ยว</span></div>
@@ -10811,9 +10813,9 @@ window.__dataReady.then(data => {
                 </div>;
               })():<div style={{fontSize:13,color:'#94a3b8'}}>ยังไม่มีข้อมูลเดือนนี้</div>}
             </div>
-          </div>
+          </div>}
 
-          <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'clip',marginBottom:8}}>
+          {part==='table'&&<div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:14,overflow:'clip',marginBottom:8}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid #e2e8f0',background:`${t.color}0a`}}>
               <div style={{fontSize:16,fontWeight:800,color:t.color}}>{t.k} · ปี {selYear}</div>
               <div style={{display:'flex',alignItems:'center',gap:12}}>
@@ -10862,9 +10864,9 @@ window.__dataReady.then(data => {
                     {months.map(m=>{const v=pOwn(m),h=pHelp(m),total=v+h;
                       // เว้นที่ขวา 24px ทุกช่อง ให้ตัวเลขชิดขวาตรงกัน รูปมือวางลอยในช่องว่างนั้น ไม่ดันตัวเลข
                       if(extra)return<td key={m} onClick={h>0?()=>setHelpPopup({vt:t.k,name,names,month:m}):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',color:total?'#0f766e':'#cbd5e1',fontWeight:total?700:undefined,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:h>0?'pointer':'default'}} title={h>0?'กดดูรายละเอียด':undefined}>{total?<span style={{textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(total)}</span>:'–'}</td>;
-                      // กดตัวเลข = แก้ไขรายวันของเดือนนั้น (แถวทะเบียนที่มีเที่ยวเดือนนั้น)
+                      // มีเที่ยวช่วยขับ = ตัวเลขสีเขียวขีดเส้นใต้ กดดูหน้าต่างช่วยขับ (ในหน้าต่างมีปุ่มแก้ไขรายวัน) · ไม่มี = กดเปิดแก้ไขรายวันของเดือนนั้น
                       const mName=ownNames.find(n=>personOwn(n,m)>0)||editName;
-                      return<td key={m} onClick={canEdit&&mName?()=>openDayForm(t.k,mName,m):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',position:'relative',color:total?'#334155':'#cbd5e1',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:canEdit&&mName?'pointer':'default'}} title={(h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว (กด 🤝 ดูรายละเอียด)`:'')+(canEdit&&mName?`${h>0?'\n':''}กดเพื่อแก้ไขรายวัน ${MO[m-1]}`:'')||undefined}>{total?fmt(total):'–'}{h>0&&<span onClick={e=>{e.stopPropagation();setHelpPopup({vt:t.k,name,names,month:m});}} style={{position:'absolute',right:3,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'#0f766e',fontWeight:700,cursor:'pointer'}}>🤝</span>}</td>;})}
+                      return<td key={m} onClick={h>0?()=>setHelpPopup({vt:t.k,name,names,month:m,editVt:t.k,editName:canEdit?mName:null}):canEdit&&mName?()=>openDayForm(t.k,mName,m):undefined} style={{textAlign:'right',padding:'5px 24px 5px 6px',color:h>0?'#0f766e':total?'#334155':'#cbd5e1',fontWeight:h>0?700:undefined,borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',cursor:h>0||(canEdit&&mName)?'pointer':'default'}} title={h>0?`ขับเอง ${fmt(v)} + ไปช่วยขับ ${fmt(h)} เที่ยว · กดดูรายละเอียด`:canEdit&&mName?`กดเพื่อแก้ไขรายวัน ${MO[m-1]}`:undefined}>{total?(h>0?<span style={{textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(total)}</span>:fmt(total)):'–'}</td>;})}
                     <td style={{textAlign:'right',padding:'5px 8px',fontWeight:800,color:t.color,borderBottom:'1px solid #f1f5f9',background:'#fafbfc',whiteSpace:'nowrap'}}>
                       {canEdit&&editName?<span onClick={()=>{const lm=Math.max(0,...ALLM.filter(m=>personOwn(editName,m)>0))||(allMonths.length?allMonths[allMonths.length-1]:1);openDayForm(t.k,editName,latestMonthOnly&&allMonths.length?allMonths[allMonths.length-1]:lm);}} title="แก้ไขรายวัน (เดือนล่าสุดที่มีข้อมูล) · กดตัวเลขเดือนไหนก็ได้เพื่อแก้เดือนนั้น" style={{cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>{fmt(ownTotal+helperTotal)}</span>:fmt(ownTotal+helperTotal)}
                     </td>
@@ -10934,9 +10936,9 @@ window.__dataReady.then(data => {
                 </tfoot>
               </table>
             </div>
-          </div>
+          </div>}
         </div>;
-      })}
+      }))}
 
       {view==='daily'&&<div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:8}}>
         <label style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer',marginRight:8}}>
@@ -11135,7 +11137,8 @@ window.__dataReady.then(data => {
               </div>))}
             </div>}
             {list.length===0&&<div style={{fontSize:13,color:'#94a3b8',textAlign:'center',padding:10}}>ไม่พบข้อมูล</div>}
-            <div style={{display:'flex',justifyContent:'flex-end',marginTop:16}}>
+            <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:16}}>
+              {helpPopup.editName&&<button onClick={()=>{const hp=helpPopup;setHelpPopup(null);openDayForm(hp.editVt,hp.editName,hp.month);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #bfdbfe',background:'#eff6ff',color:'#1d4ed8',fontSize:14,fontWeight:700,cursor:'pointer'}}>✎ แก้ไขรายวัน {MO[month-1]}</button>}
               <button onClick={()=>setHelpPopup(null)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ปิด</button>
             </div>
           </div>
