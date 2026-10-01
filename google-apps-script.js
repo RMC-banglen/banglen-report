@@ -22,13 +22,15 @@ function syncAll() {
     try { SpreadsheetApp.getUi().alert('⏳ มีการ sync กำลังทำงานอยู่ — รอสักครู่แล้วลองใหม่'); } catch (e) {}
     return;
   }
-  try { SpreadsheetApp.getUi().alert('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว'); } catch (e) {
-    Logger.log('✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว');
+  const msg = '✅ Sync สำเร็จ! ข้อมูลอัปเดตแล้ว' + (SYNC_WARNINGS.length ? '\n\n' + SYNC_WARNINGS.join('\n') : '');
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) {
+    Logger.log(msg);
   }
 }
 
 function syncAllCore() {
   const ss = SpreadsheetApp.openById(SS_MAIN_ID);
+  SYNC_WARNINGS = [];
 
   writeComputedColumns(ss);
   syncMonthly(ss);
@@ -432,8 +434,29 @@ function insertInBatches(table, records, batchSize) {
 // ============================================================
 // Helper: upsert records ไปยัง Supabase
 // ============================================================
+// แถวที่คีย์ซ้ำกันในชุดเดียว (เช่น ปี+เดือน ซ้ำ 2 แถวในชีท) ทำให้ Supabase ปฏิเสธทั้งชุด (error 21000)
+// และเพราะลบข้อมูลปีนั้นไปก่อนแล้ว ตารางบนเว็บจะว่างเปล่า -> รวมแถวซ้ำ (ใช้แถวล่างสุด) แล้วแจ้งเตือนว่าซ้ำที่ไหน
+var SYNC_WARNINGS = [];
+function dedupeByKeys(table, records, onConflict) {
+  const keys = onConflict.split(',');
+  const map = {}, order = [], dups = {};
+  records.forEach(r => {
+    const k = keys.map(c => r[c]).join('/');
+    if (map[k] !== undefined) dups[k] = (dups[k] || 1) + 1; else order.push(k);
+    map[k] = r;
+  });
+  const dupKeys = Object.keys(dups);
+  if (dupKeys.length) {
+    const msg = `⚠️ ${table}: แถวซ้ำ (${keys.join('+')}) = ${dupKeys.map(k => k + ' ×' + dups[k]).join(', ')} — ใช้แถวล่างสุด ควรลบแถวซ้ำในชีท`;
+    Logger.log(msg);
+    SYNC_WARNINGS.push(msg);
+  }
+  return order.map(k => map[k]);
+}
+
 function upsertToSupabase(table, records, onConflict) {
   if (!records || records.length === 0) return;
+  records = dedupeByKeys(table, records, onConflict);
 
   const url = `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`;
 
@@ -478,12 +501,14 @@ function onEdit(e) {
 function syncAll_silent() {
   try {
     const ss = SpreadsheetApp.openById(SS_MAIN_ID);
+    SYNC_WARNINGS = [];
     syncMonthly(ss);
     syncDecades(ss);
     syncCauses(ss);
     syncDamageItems(ss);
     syncDamageSales(ss);
     Logger.log('✅ Auto-sync สำเร็จ');
+    if (SYNC_WARNINGS.length) { try { ss.toast(SYNC_WARNINGS.join('\n'), '⚠️ Sync: พบแถวซ้ำ', 15); } catch (e) {} }
   } catch(e) {
     Logger.log('❌ Auto-sync error: ' + e.message);
   }
