@@ -10319,10 +10319,13 @@ window.__dataReady.then(data => {
       return out.filter(r=>r.trips>0);
     }
     // เที่ยวที่กรอกเองในฟอร์ม (ไม่มีเลขบิล) ของคน/เดือนที่อยู่ในไฟล์ -> ถ้าเก็บไว้จะซ้ำกับข้อมูลจากไฟล์
-    function manualRowsInScope(list){
+    // + เที่ยวที่กรอกเองของ "รถที่มีคนในไฟล์ไปช่วยขับ" วันเดียวกัน (เช่น รถสำรองที่ไม่มีชื่อในบิล แต่บิลออกในชื่อคนที่ไปขับ) -> ไม่งั้นนับซ้ำ
+    function manualRowsInScope(list,adjusted){
       const {months}=importScope(list);
       const people=new Set(list.filter(r=>!r.helper).map(r=>r.vehicle_type+'|'+r.driver_name));
-      return rows.filter(r=>r.day!=null&&isManualSrc(r.note)&&!r.helper&&(r.trips||0)>0&&months.includes(r.year+'|'+r.month)&&people.has(r.vehicle_type+'|'+r.driver_name));
+      const helpDays=new Set((adjusted||list).filter(r=>r.helper).map(r=>[r.vehicle_type,r.driver_name,r.year,r.month,r.day].join('|')));
+      return rows.filter(r=>r.day!=null&&isManualSrc(r.note)&&!r.helper&&(r.trips||0)>0&&months.includes(r.year+'|'+r.month)&&
+        (people.has(r.vehicle_type+'|'+r.driver_name)||helpDays.has([r.vehicle_type,r.driver_name,r.year,r.month,r.day].join('|'))));
     }
     async function confirmImport(){
       if(importRows.some(r=>r.driver_name.startsWith(UNKNOWN_PREFIX))){alert('ยังมีชื่อที่ไม่มีในระบบ กรุณาเลือกว่าเป็นใครก่อนนำเข้า');return;}
@@ -10339,7 +10342,7 @@ window.__dataReady.then(data => {
       const helpIds=rows.filter(r=>helpRowReplaced(r,sc)).map(r=>r.id);
       for(let i=0;i<helpIds.length;i+=100)await DB.from('transport_trips').delete().in('id',helpIds.slice(i,i+100));
       if(importDelManual){
-        const ids=manualRowsInScope(baseRows).map(r=>r.id);
+        const ids=manualRowsInScope(baseRows,adjustedRows).map(r=>r.id);
         for(let i=0;i<ids.length;i+=100)await DB.from('transport_trips').delete().in('id',ids.slice(i,i+100));
       }
       const ins=adjustedRows.map((r,idx)=>{
@@ -11270,7 +11273,7 @@ window.__dataReady.then(data => {
               {(()=>{
                 const base=buildAdjustedImportRows();
                 const rem=rememberedAssignments(base);
-                const manual=manualRowsInScope(base);
+                const manual=manualRowsInScope(base,applyRemembered(base,rem));
                 const manualTrips=manual.reduce((s,r)=>s+(r.trips||0),0);
                 return<>
                   {rem.length>0&&<div style={{background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'10px 14px',marginBottom:14}}>
@@ -11282,7 +11285,11 @@ window.__dataReady.then(data => {
                     </div>
                   </div>}
                   {manual.length>0&&<div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'10px 14px',marginBottom:14}}>
-                    <div style={{fontSize:13,fontWeight:800,color:'#92400e',marginBottom:4}}>⚠️ เดือนนี้มีเที่ยวที่กรอกเองในฟอร์ม {manual.length} แถว รวม {manualTrips} เที่ยว (ของคนขับที่อยู่ในไฟล์)</div>
+                    <div style={{fontSize:13,fontWeight:800,color:'#92400e',marginBottom:4}}>⚠️ เดือนนี้มีเที่ยวที่กรอกเองในฟอร์ม {manual.length} แถว รวม {manualTrips} เที่ยว (ของคนขับในไฟล์ / รถที่คนในไฟล์ไปช่วยขับวันเดียวกัน)</div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:6}}>
+                      {[...manual].sort((a,b)=>a.month-b.month||a.day-b.day).slice(0,40).map(r=><span key={r.id} style={{fontSize:11.5,padding:'2px 8px',borderRadius:6,background:'#fff',border:'1px solid #fde68a',color:'#334155'}}>{dispName(r.driver_name)} · {r.day} {MO[r.month-1]} · {r.trips} เที่ยว</span>)}
+                      {manual.length>40&&<span style={{fontSize:11.5,color:'#64748b'}}>และอีก {manual.length-40} แถว</span>}
+                    </div>
                     <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#92400e',cursor:'pointer'}}>
                       <input type="checkbox" checked={importDelManual} onChange={e=>setImportDelManual(e.target.checked)}/>
                       ลบเที่ยวที่กรอกเองเหล่านี้ แล้วใช้ข้อมูลจากไฟล์แทน (แนะนำ ถ้าไม่ลบจะนับซ้ำ)
