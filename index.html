@@ -9721,10 +9721,11 @@ window.__dataReady.then(data => {
     // ปุ่มลัด รายเดือน -> หยุดวิ่ง แล้วกดกลับมาที่เดิม (ตำแหน่งเลื่อนเดิม)
     const [backView,setBackView]=useState(null); // {view,y}
     useEffect(()=>{if(view!=='stopped')setBackView(null);},[view]);
-    const goStopped=m=>{setBackView({view,y:window.scrollY});if(m)setSelDayMonth(m);setView('stopped');window.scrollTo(0,0);};
+    // ปุ่มลัด "ดูหยุดวิ่ง" เปิดแท็บรถหยุด (ตามทะเบียน) ก่อนเสมอ
+    const goStopped=m=>{setBackView({view,y:window.scrollY});if(m)setSelDayMonth(m);setStopTab('plate');setView('stopped');window.scrollTo(0,0);};
     const goBack=()=>{const b=backView;if(!b)return;setView(b.view);setTimeout(()=>window.scrollTo(0,b.y),60);};
-    // แท็บย่อยในหน้าหยุดวิ่ง (จำไว้ในเครื่อง): plate=รถหยุดตามทะเบียน · person=คนลาหยุด · kpiCar=KPI รายคัน · kpiMonth=KPI รายเดือน
-    const [stopTab,setStopTabS]=useState(()=>{try{return localStorage.getItem('tt_stop_tab')||'plate';}catch{return'plate';}});
+    // แท็บย่อยในหน้าหยุดวิ่ง (จำไว้ในเครื่อง): plate=รถหยุดตามทะเบียน · person=คนลาหยุด
+    const [stopTab,setStopTabS]=useState(()=>{try{const v=localStorage.getItem('tt_stop_tab');return v==='person'?'person':'plate';}catch{return'plate';}});
     const setStopTab=v=>{setStopTabS(v);try{localStorage.setItem('tt_stop_tab',v);}catch{}};
     const [notePopup,setNotePopup]=useState(null); // {title,sub,list} — กดตัวเลขในหน้าหยุดวิ่ง ดูว่าวันไหนบ้าง
     const [showCalc,setShowCalc]=useState(false); // แถว วันทำงาน/เที่ยวรถบริษัท/จำนวนรถ ซ่อนไว้ก่อน กดที่ "เฉลี่ยเที่ยว/วัน/คัน" เพื่อดู
@@ -10574,7 +10575,7 @@ window.__dataReady.then(data => {
           {sub&&<div style={{fontSize:12,color:'#64748b',marginTop:4}}>{sub}</div>}
         </div>;
 
-        const STOP_TABS=[['plate','🚛 รถหยุด (ตามทะเบียน)'],['person','👤 คนลาหยุด'],['kpiCar','🎯 KPI รายคัน'],['kpiMonth','📅 KPI รายเดือน']];
+        const STOP_TABS=[['plate','🚛 รถหยุด (ตามทะเบียน)'],['person','👤 คนลาหยุด']];
         const tabBar=<div style={{display:'flex',gap:6,flexWrap:'wrap',borderTop:'1px solid #f1f5f9',paddingTop:12,marginTop:4}}>
           {STOP_TABS.map(([k,l])=><button key={k} onClick={()=>setStopTab(k)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${stopTab===k?'#2f5fd0':'#e2e8f0'}`,background:stopTab===k?'#2f5fd0':'#fff',color:stopTab===k?'#fff':'#475569',fontSize:13,fontWeight:700,cursor:'pointer'}}>{l}</button>)}
         </div>;
@@ -10609,59 +10610,6 @@ window.__dataReady.then(data => {
                   {tile('ซ่อมรถ',st.repair,'วัน',`เฉลี่ย ${f2(st.repairPer)} วัน/คัน/เดือน`,'#475569')}
                 </div>
                 {tabBar}
-                {stopTab==='kpiCar'&&st.top.length>0&&<div style={{marginTop:14}}>
-                  <div style={{fontSize:14,fontWeight:800,color:'#1e293b',marginBottom:2}}>🚛 KPI รายคัน ปี {selYear} <span style={{fontSize:12,fontWeight:600,color:'#94a3b8'}}>(เรียงตามอัตราเสียมากไปน้อย)</span></div>
-                  <div style={{fontSize:12,color:'#94a3b8',marginBottom:8}}>อัตราเสีย = วันซ่อม ÷ เที่ยววิ่ง × 100 · <span style={{color:'#dc2626',fontWeight:700}}>แดง</span> = แย่กว่าค่าเฉลี่ยทุกคัน ({f1(st.rate)}%) · <span style={{color:'#15803d',fontWeight:700}}>เขียว</span> = ดีกว่า · คนขับ = คนขับประจำตามการจับคู่ ณ วันที่เสีย</div>
-                  <div style={{overflowX:'auto'}}>
-                  <table style={{borderCollapse:'collapse',fontSize:13,minWidth:'100%'}}>
-                    <thead><tr style={{background:'#f8fafc',color:'#475569'}}>
-                      {['#','ทะเบียน','คนขับช่วงที่เสีย','เที่ยววิ่ง','ซ่อมเครน','ซ่อมรถ','รวมซ่อม (วัน)','อัตราเสีย','รถพร้อมใช้','เที่ยว/วันที่พร้อม'].map((h,i)=><th key={h} style={{textAlign:i<3?'left':'right',padding:'6px 10px',whiteSpace:'nowrap'}}>{h}</th>)}
-                    </tr></thead>
-                    <tbody>{st.top.map((x,i)=><tr key={x.plate} style={{borderTop:'1px solid #f1f5f9'}}>
-                      <td style={{padding:'6px 10px',color:'#94a3b8',fontWeight:700}}>{x.total?(['🥇','🥈','🥉'][i]||i+1):i+1}</td>
-                      <td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>{x.vt==='เทรลเลอร์'?'🚛':'🚚'} {x.plate}{x.label&&<span style={{fontSize:11,color:'#94a3b8',fontWeight:500,marginLeft:4}}>{x.label}</span>}</td>
-                      <td style={{padding:'6px 10px',fontSize:12,color:'#475569'}}>{x.drivers.length?x.drivers.map(([n,c])=><div key={n} style={{whiteSpace:'nowrap'}}>{n} <span style={{color:'#b45309',fontWeight:700}}>{c} วัน</span></div>):<span style={{color:'#cbd5e1'}}>–</span>}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px',color:'#334155',fontWeight:700}} title={`วันทำงาน ${x.wd} วัน (${x.months} เดือนที่ใช้งาน)`}>{x.trips.toLocaleString('th-TH')}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px',color:'#b45309',fontWeight:700}}>{x.crane||zero}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px',color:'#b45309',fontWeight:700}}>{x.repair||zero}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px',fontWeight:800,color:x.total?'#dc2626':'#cbd5e1'}}>{x.total}</td>
-                      <td style={{...cellS(vsRate(x.rate)),fontSize:15}}>{f1(x.rate)}%</td>
-                      <td style={{textAlign:'right',padding:'6px 10px',color:'#475569'}} title={`(วันทำงาน ${x.wd} − ซ่อม ${x.total}) ÷ ${x.wd}`}>{f1(x.avail)}%</td>
-                      <td style={{textAlign:'right',padding:'6px 10px',color:'#475569'}}>{f2(x.tripsPerDay)}</td>
-                    </tr>)}</tbody>
-                    <tfoot><tr style={{background:'#f8fafc',fontWeight:800,color:'#334155'}}>
-                      <td colSpan={3} style={{padding:'6px 10px'}}>รวมทุกคัน / ค่าเฉลี่ย</td>
-                      <td style={{textAlign:'right',padding:'6px 10px'}}>{st.trips.toLocaleString('th-TH')}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px'}}>{st.crane}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px'}}>{st.repair}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px'}}>{st.crane+st.repair}</td>
-                      <td style={{textAlign:'right',padding:'6px 10px',color:'#b45309',fontSize:15}}>{f1(st.rate)}%</td>
-                      <td style={{textAlign:'right',padding:'6px 10px'}}>{f1(st.avail)}%</td>
-                      <td></td>
-                    </tr></tfoot>
-                  </table>
-                  </div>
-                </div>}
-                {stopTab==='kpiMonth'&&<div style={{marginTop:14}}>
-                <div style={{fontSize:14,fontWeight:800,color:'#1e293b',marginBottom:2}}>📅 KPI ภาพรวมทุกคัน รายเดือน</div>
-                <div style={{fontSize:12,color:'#94a3b8',marginBottom:8}}><span style={{color:'#dc2626',fontWeight:700}}>แดง</span> = เดือนที่แย่กว่าค่าเฉลี่ยทั้งปี · <span style={{color:'#15803d',fontWeight:700}}>เขียว</span> = ดีกว่า</div>
-                <div style={{overflowX:'auto'}}>
-                  <table style={{borderCollapse:'collapse',fontSize:13,minWidth:'100%'}}>
-                    <thead><tr style={{background:'#f8fafc',color:'#475569'}}>
-                      <th style={{textAlign:'left',padding:'6px 10px',whiteSpace:'nowrap'}}>รายเดือน</th>
-                      {st.months.map(x=><th key={x.m} style={{textAlign:'right',padding:'6px 10px'}}>{MO[x.m-1]}</th>)}
-                      <th style={{textAlign:'right',padding:'6px 10px',background:'#f1f5f9'}}>ทั้งปี</th>
-                    </tr></thead>
-                    <tbody>
-                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>อัตราเสีย (%)</td>{st.months.map(x=><td key={x.m} style={cellS(vsRate(x.rate))} title={`ซ่อม ${x.crane+x.repair} วัน ÷ ${x.trips} เที่ยว`}>{f1(x.rate)}</td>)}<td style={{textAlign:'right',padding:'6px 10px',fontWeight:800,color:'#b45309',background:'#f8fafc'}}>{f1(st.rate)}</td></tr>
-                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>รถพร้อมใช้ (%)</td>{st.months.map(x=><td key={x.m} style={cellS(vsAvail(x.avail))}>{f1(x.avail)}</td>)}<td style={{textAlign:'right',padding:'6px 10px',fontWeight:800,background:'#f8fafc'}}>{f1(st.avail)}</td></tr>
-                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>เที่ยววิ่ง</td>{st.months.map(x=><td key={x.m} style={{textAlign:'right',padding:'6px 10px',color:'#475569'}}>{x.trips.toLocaleString('th-TH')}</td>)}<td style={{textAlign:'right',padding:'6px 10px',fontWeight:800,background:'#f8fafc'}}>{st.trips.toLocaleString('th-TH')}</td></tr>
-                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>ซ่อมเครน (วัน)</td>{st.months.map(x=><td key={x.m} style={{textAlign:'right',padding:'6px 10px',color:x.crane?'#b45309':'#cbd5e1',fontWeight:x.crane?700:400}}>{x.crane}</td>)}<td style={{textAlign:'right',padding:'6px 10px',fontWeight:800,background:'#f8fafc'}}>{st.crane}</td></tr>
-                      <tr style={{borderTop:'1px solid #f1f5f9'}}><td style={{padding:'6px 10px',fontWeight:700,color:'#334155',whiteSpace:'nowrap'}}>ซ่อมรถ (วัน)</td>{st.months.map(x=><td key={x.m} style={{textAlign:'right',padding:'6px 10px',color:x.repair?'#b45309':'#cbd5e1',fontWeight:x.repair?700:400}}>{x.repair}</td>)}<td style={{textAlign:'right',padding:'6px 10px',fontWeight:800,background:'#f8fafc'}}>{st.repair}</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-                </div>}
               </>}
             </div>;
           })()}
@@ -10730,7 +10678,7 @@ window.__dataReady.then(data => {
             {kpi('เที่ยว 10ล้อ-12ล้อ'+(lastM?` · ${MO[lastM-1]}`:''),lastM?fmt(wheel.colTotal(lastM)):'–','เที่ยว',lastM?`เฉลี่ย ${avgOf(wheel,lastM)?avgOf(wheel,lastM).toFixed(2):'–'} เที่ยว/วัน/คัน (${truckCount('10ล้อ-12ล้อ',lastM)} คัน)`:'','#15803d')}
             {kpi('วันทำงานสะสม',wdTotal?fmt(wdTotal):'–','วัน',lastM?`เดือนล่าสุด ${MO[lastM-1]} ${workdaysOf(lastM)||'–'} วัน`:'','#475569')}
             {(()=>{const st=repairStats();
-              return<div onClick={()=>{setStopTab('kpiCar');goStopped(null);}} style={{cursor:'pointer',flex:'1 1 200px',display:'flex'}} title="กดดู KPI รายคันในหน้าหยุดวิ่ง">{kpi('อัตราเสีย (ทั้งปี)',st.rate==null?'–':st.rate.toFixed(1),'%',`ซ่อม ${st.crane+st.repair} วัน ÷ วิ่ง ${st.trips.toLocaleString('th-TH')} เที่ยว · รถพร้อมใช้ ${st.avail==null?'–':st.avail.toFixed(1)}%`,'#b45309')}</div>;})()}
+              return<div onClick={()=>goStopped(null)} style={{cursor:'pointer',flex:'1 1 200px',display:'flex'}} title="กดดูรายละเอียดในหน้าหยุดวิ่ง">{kpi('อัตราเสีย (ทั้งปี)',st.rate==null?'–':st.rate.toFixed(1),'%',`ซ่อม ${st.crane+st.repair} วัน ÷ วิ่ง ${st.trips.toLocaleString('th-TH')} เที่ยว · รถพร้อมใช้ ${st.avail==null?'–':st.avail.toFixed(1)}%`,'#b45309')}</div>;})()}
           </div>
           {/* กราฟเที่ยวรายเดือน แยกประเภทรถ */}
           {(()=>{
