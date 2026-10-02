@@ -20,3 +20,6 @@ alter table pour_daily enable row level security;
 
 drop policy if exists "pour_daily_all" on pour_daily;
 create policy "pour_daily_all" on pour_daily for all using (true) with check (true);
+
+-- สาเหตุแพค้าง/ยกเลิกของวันนั้น (ลำดับ 0–9 ตรงกับชีท "สาเหตุค้าง": 0 แพล้นเสีย … 9 ฝ่ายผลิตยกเลิกเอง)
+alter table pour_daily add column if not exists cancel_cause smallint;

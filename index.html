@@ -410,7 +410,7 @@ window.__dataReady = (async function loadData() {
       db.from('cancel_causes').select('*').order('year').order('month').order('cause_index'),
       db.from('mix_targets').select('*'),
       db.from('capacity_config').select('*').limit(1).single(),
-      db.from('pour_daily').select('d,raft_order,raft_produced,raft_cancel'),
+      db.from('pour_daily').select('*'),
     ]);
     // ยอดแพรายเดือนจากหน้า "รายงานการผลิต–เวลาเทเสร็จ" (กรอกรายวัน) — เดือนไหนมีข้อมูลรายวัน ใช้ยอดรวมรายวันแทนตัวเลขที่พิมพ์ในชีท Google
     const pourMonth = {};
@@ -419,6 +419,11 @@ window.__dataReady = (async function loadData() {
       const k = (gy + 543) + '-' + gm;
       const o = pourMonth[k] || (pourMonth[k] = { order:0, produced:0, cancel:0 });
       o.order += Number(r.raft_order) || 0; o.produced += Number(r.raft_produced) || 0; o.cancel += Number(r.raft_cancel) || 0;
+      // สาเหตุที่เลือกรายวัน: นับตามจำนวนแพค้างของวันนั้น
+      const c = Number(r.raft_cancel) || 0;
+      if (c > 0 && r.cancel_cause != null && r.cancel_cause !== '') {
+        (o.causes || (o.causes = new Array(10).fill(0)))[Number(r.cancel_cause)] += c;
+      }
     });
 
     if (mRes.error) throw mRes.error;
@@ -450,6 +455,14 @@ window.__dataReady = (async function loadData() {
       if (!yearGroups[y].causes) yearGroups[y].causes = {};
       if (!yearGroups[y].causes[r.month]) yearGroups[y].causes[r.month] = new Array(10).fill(0);
       yearGroups[y].causes[r.month][r.cause_index] = r.count;
+    });
+    // เดือนที่เลือกสาเหตุในรายงานรายวันแล้ว ใช้สาเหตุจากรายวันแทนชีท "สาเหตุค้าง"
+    Object.entries(pourMonth).forEach(([k, o]) => {
+      if (!o.causes) return;
+      const [y, m] = k.split('-').map(Number);
+      if (!yearGroups[y]) return;
+      if (!yearGroups[y].causes) yearGroups[y].causes = {};
+      yearGroups[y].causes[m] = o.causes;
     });
 
     // decades
@@ -890,6 +903,8 @@ window.__dataReady.then(data => {
   }
 
   // ── รายงานการผลิต–เวลาเทเสร็จ (รายวัน) กรอกในตารางได้เลยทีละช่อง
+  // สาเหตุแพค้าง ลำดับตรงกับชีท "สาเหตุค้าง" (cause_index 0–9)
+  const POUR_CAUSES=['แพล้นเสีย','ที่ดึงหินทรายเสีย','เครนเสีย','รถไฟขนเสาเข็มเสีย','รถไฟขนคอนกรีตเสีย','รถขนส่งเข้าเยอะ','ผู้รับเหมาผลิตไม่ได้','สต็อคเต็ม','ซ่อมแพผลิต','ฝ่ายผลิตยกเลิกเอง'];
   function PourDailySection({year,canEdit,avgQueuePerDay,avgQueueDays,avgQueueMonthNum}){
     const db=DB;
     const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -971,21 +986,29 @@ window.__dataReady.then(data => {
     const cancelOf=k=>{const o=Number(val(k,'raft_order'))||0,p=Number(val(k,'raft_produced'))||0;return o-p;};
     const sumCancel=monthRows.reduce((a,r)=>a+((Number(r.raft_order)||0)-(Number(r.raft_produced)||0)),0);
 
+    // มีคอลัมน์สาเหตุในฐานข้อมูลแล้วหรือยัง (ต้องรัน SQL เพิ่ม cancel_cause) — ยังไม่มีก็บันทึกช่องอื่นได้ตามปกติ
+    const hasCauseCol=rows.some(r=>'cancel_cause' in r);
     const save=()=>{
       const recs=Object.keys(draft).map(k=>{
         const cur=byDate[k]||{};
         const g=f=>{const v=draft[k][f]!==undefined?draft[k][f]:cur[f];return v;};
         const num=f=>{const v=g(f);const n=Number(v);return v===''||v==null||!isFinite(n)?0:n;};
-        return {d:k,raft_order:num('raft_order'),raft_produced:num('raft_produced'),
+        const rec={d:k,raft_order:num('raft_order'),raft_produced:num('raft_produced'),
                 raft_cancel:num('raft_order')-num('raft_produced'),
                 finish_time:String(g('finish_time')||''),note:String(g('note')||''),
                 updated_at:new Date().toISOString()};
+        // สาเหตุแพค้าง: เก็บเฉพาะวันที่มีแพค้าง (ไม่มีค้าง = ล้างสาเหตุทิ้ง)
+        if(hasCauseCol||draft[k].cancel_cause!==undefined){
+          const c=g('cancel_cause');
+          rec.cancel_cause=rec.raft_cancel>0&&c!==''&&c!=null?Number(c):null;
+        }
+        return rec;
       });
       if(!recs.length) return;
       setSaving(true);setMsg('');
       db.from('pour_daily').upsert(recs,{onConflict:'d'}).then(({error})=>{
         setSaving(false);
-        if(error){setMsg('❌ '+error.message);return;}
+        if(error){setMsg('❌ '+error.message+(/cancel_cause/.test(error.message)?' — ต้องรัน SQL เพิ่มคอลัมน์สาเหตุก่อน: alter table pour_daily add column if not exists cancel_cause smallint;':''));return;}
         setDraft({});setMsg('✅ บันทึกแล้ว '+recs.length+' วัน');load();
         setTimeout(()=>setMsg(''),4000);
       }).catch(e=>{setSaving(false);setMsg('❌ '+(e.message||e));});
@@ -1087,6 +1110,15 @@ window.__dataReady.then(data => {
                 {/* ยกเลิก/ค้างเท = แพสั่งผลิต - แพผลิต คำนวณให้อัตโนมัติ ไม่ต้องพิมพ์เอง — เป็น 0 ไม่ต้องขึ้นแดง */}
                 <td style={{padding:'4px 6px',textAlign:'center',fontSize:13.5,fontWeight:cancel?700:400,color:cancel?'#c0392b':'inherit'}}>
                   {has||edited?fmtN(cancel):'–'}
+                  {/* มีแพค้าง -> เลือกสาเหตุ (นับเข้ากราฟ "สาเหตุจำนวนแพ ค้าง-ยกเลิก" บนแดชบอร์ดให้เอง) */}
+                  {cancel>0&&(canEdit
+                    ?<select value={val(k,'cancel_cause')} onChange={e=>setVal(k,'cancel_cause',e.target.value)}
+                        style={{display:'block',margin:'4px auto 0',padding:'3px 6px',borderRadius:6,fontSize:12.5,fontFamily:'inherit',maxWidth:170,
+                          border:`1px solid ${val(k,'cancel_cause')===''?'#f5b7b1':'#d6d8e0'}`,color:val(k,'cancel_cause')===''?'#c0392b':'#334155',background:'#fff'}}>
+                        <option value="">— เลือกสาเหตุ —</option>
+                        {POUR_CAUSES.map((l,i)=><option key={i} value={String(i)}>{l}</option>)}
+                      </select>
+                    :val(k,'cancel_cause')!==''&&<div style={{fontSize:12,fontWeight:500,color:'#475569',marginTop:2}}>{POUR_CAUSES[Number(val(k,'cancel_cause'))]}</div>)}
                 </td>
                 <td style={{padding:'4px 6px',textAlign:'center'}}>
                   <input type="text" inputMode="numeric" placeholder="1659" value={val(k,'finish_time')} disabled={!canEdit}
