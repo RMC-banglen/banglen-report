@@ -404,13 +404,22 @@ window.__dataReady = (async function loadData() {
     document.getElementById('loading-text').textContent = 'กำลังเชื่อมต่อ Supabase...';
     const db = DB;
 
-    const [mRes, dRes, cRes, tRes, capRes] = await Promise.all([
+    const [mRes, dRes, cRes, tRes, capRes, pRes] = await Promise.all([
       db.from('production_monthly').select('*').order('year').order('month'),
       db.from('quality_decade').select('*').order('year').order('sort_order'),
       db.from('cancel_causes').select('*').order('year').order('month').order('cause_index'),
       db.from('mix_targets').select('*'),
       db.from('capacity_config').select('*').limit(1).single(),
+      db.from('pour_daily').select('d,raft_order,raft_produced,raft_cancel'),
     ]);
+    // ยอดแพรายเดือนจากหน้า "รายงานการผลิต–เวลาเทเสร็จ" (กรอกรายวัน) — เดือนไหนมีข้อมูลรายวัน ใช้ยอดรวมรายวันแทนตัวเลขที่พิมพ์ในชีท Google
+    const pourMonth = {};
+    (pRes && !pRes.error ? pRes.data || [] : []).forEach(r => {
+      const [gy, gm] = String(r.d).split('-').map(Number); if (!gy || !gm) return;
+      const k = (gy + 543) + '-' + gm;
+      const o = pourMonth[k] || (pourMonth[k] = { order:0, produced:0, cancel:0 });
+      o.order += Number(r.raft_order) || 0; o.produced += Number(r.raft_produced) || 0; o.cancel += Number(r.raft_cancel) || 0;
+    });
 
     if (mRes.error) throw mRes.error;
 
@@ -425,11 +434,12 @@ window.__dataReady = (async function loadData() {
     monthly.forEach(r => {
       const y = r.year;
       if (!yearGroups[y]) yearGroups[y] = { months:[], real:!r.is_sample, causes:null, decades:null };
+      const pd = pourMonth[y + '-' + r.month];
       yearGroups[y].months.push({
         m:r.month, order:+r.order_qty, produced:+r.produced, cancel:+r.cancel,
         days:r.days, perDay:+r.per_day, transport:+r.transport, stock:+r.stock,
-        raftOrder:+r.raft_order, raftProduced:+r.raft_produced, raftCancel:+r.raft_cancel,
-
+        raftOrder:pd ? pd.order : +r.raft_order, raftProduced:pd ? pd.produced : +r.raft_produced, raftCancel:pd ? pd.cancel : +r.raft_cancel,
+        raftFromDaily: !!pd,
       });
     });
 
