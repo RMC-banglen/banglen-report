@@ -411,6 +411,7 @@ function onOpen() {
   ui.createMenu('🚨 แจ้งเตือนผลลูกปูน')
     .addItem('หาไอดีกลุ่ม Telegram', 'findChatIds')
     .addItem('ทดสอบส่ง Telegram', 'testTelegramAlert')
+    .addItem('ทดสอบเตือนกรณีพิเศษ (≤314 / เพิ่ม-ลดสูตร)', 'testSpecialAlerts')
     .addItem('ตรวจย้อนหลังทั้งชีท', 'checkAllConcreteResults')
     .addItem('ทดสอบเตือน QC แพค้างตรวจ', 'qcTestAlertNow')
     .addToUi();
@@ -727,6 +728,23 @@ function specialMessage(formula, ev, testDate) {
     + fmtThaiDate(p.date) + ' = <b>' + p.ksc + ' ksc</b> (≥ ' + SPECIAL_OK + ')\n'
     + '🔻 <b>ให้ปรับลดสูตรคอนกรีตกลับ 1 Step</b>\n'
     + (ev.steps > 0 ? 'ยังเพิ่มจากสูตรปกติอยู่อีก ' + ev.steps + ' Step — ระบบติดตามต่อ' : 'กลับเป็นสูตรปกติแล้ว ระบบจบการติดตามรอบนี้');
+}
+
+// กดจากเมนู — ส่งตัวอย่างข้อความกรณีพิเศษทั้ง 4 แบบเข้ากลุ่ม QC (ตัวเลขสมมติ ไม่ได้อ่านจากชีท)
+function testSpecialAlerts() {
+  var f = 'ตัวอย่างสูตร', tag = '🧪 <b>[ข้อความทดสอบ — ไม่ใช่ผลจริง]</b>\n\n';
+  var d1 = '2026-10-01', d2 = '2026-10-02', d3 = '2026-10-03', d4 = '2026-10-05';
+  var samples = [
+    { type: 'urgent', steps: 0, point: { date: d1, ksc: 310 } },
+    { type: 'raise',  steps: 1, point: { date: d2, ksc: 308 }, prev: { date: d1, ksc: 310 } },
+    { type: 'keep',   steps: 1, point: { date: d3, ksc: 352 } },
+    { type: 'lower',  steps: 0, point: { date: d4, ksc: 390 } }
+  ];
+  samples.forEach(function (ev) {
+    sendTelegram(tag + specialMessage(f, ev, null), tgChatQC());
+    Utilities.sleep(800);
+  });
+  try { SpreadsheetApp.getUi().alert('ส่งตัวอย่างข้อความกรณีพิเศษ 4 แบบไป Telegram แล้ว — ลองเช็คในกลุ่ม QC'); } catch (e) {}
 }
 
 // คืน true = ส่งแจ้งเตือนพิเศษแล้ว (ไม่ต้องส่งแบบปกติซ้ำ)
