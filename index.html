@@ -4653,7 +4653,7 @@ window.__dataReady.then(data => {
 
     // series = formula × age แยกกัน ไม่รวมกัน
     const isNP280=f=>f.toUpperCase().includes('280');
-    const TARGET_NORMAL={1:340,3:400,5:420,7:450};
+    const TARGET_NORMAL={1:350,3:415,5:435,7:450};
     const TARGET_NP280={1:340,7:420};
 
     const c1Series=[];
@@ -6054,7 +6054,7 @@ window.__dataReady.then(data => {
   }
 
   function ConcreteStatsSection({rows}){
-    const TN={1:340,3:400,5:420,7:450}, T280={1:340,7:420};
+    const TN={1:350,3:415,5:435,7:450}, T280={1:340,7:420};
     const sd=r=>String(r.sample_date||'').slice(0,10);
     const ks=r=>Number(r.avg_ksc)||0;
     const fm_=r=>String(r.formula_name||'').trim();

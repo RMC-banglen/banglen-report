@@ -181,7 +181,7 @@ async function postToGas(url,body){
 
 // เกณกำลังอัดตามอายุ (ตรงกับ index.html)
 function strengthTarget(formula,age){
-  const TARGET_NORMAL={1:340,3:400,5:420,7:450};
+  const TARGET_NORMAL={1:350,3:415,5:435,7:450};
   const TARGET_NP280={1:340,7:420};
   const tbl=(formula||'').toUpperCase().includes('280')?TARGET_NP280:TARGET_NORMAL;
   return tbl[Number(age)]??null;
