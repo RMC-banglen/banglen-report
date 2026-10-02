@@ -4539,7 +4539,7 @@ window.__dataReady.then(data => {
     const QSUBS=[
       {k:'strength',label:'กำลังอัด'},
       {k:'aci',     label:'ความสม่ำเสมอ'},
-      {k:'mix',     label:'ส่วนผสม · น้ำต่อปูน'},
+      {k:'mix',     label:'ส่วนผสม'},
       {k:'mat',     label:'วัตถุดิบ'},
     ];
     const [sub,setSub]=useState(()=>{
@@ -4898,10 +4898,7 @@ window.__dataReady.then(data => {
       {sub==='aci'&&<ConcreteStatsSection rows={rows}/>}
 
       {sub==='mix'&&<>
-      {/* น้ำต่อปูนอยู่บนสุด เพราะเป็นตัวเดียวในแท็บนี้ที่ต้องดูทุกวันแล้วทำอะไรต่อทันที
-          ส่วนกราฟใช้ปูน/หิน-ทราย เป็นภาพรวมราย 10 วัน ดูเดือนละครั้งก็พอ */}
-      <WaterControlSection/>
-
+      {/* ความชื้นทราย / นน.คอนกรีต (WaterControlSection) เอาออกแล้ว — ไม่ได้ใช้ */}
       {/* ปูน + หิน-ทราย จาก sheet วัตถุดิบ */}
       {matDKeys.length>0&&(()=>{
         const T=D.mixTarget||{};
@@ -4929,7 +4926,7 @@ window.__dataReady.then(data => {
       {sub==='mat'&&<>
       <SandFMSection canEdit={canEdit}/>
       <SandSiltSection canEdit={canEdit}/>
-      <SandOrganicSection canEdit={canEdit}/>
+      {/* สารอินทรีย์ในทราย (SandOrganicSection) เอาออกแล้ว — ไม่ได้ใช้ */}
       <StoneGradationSection canEdit={canEdit}/>
       </>}
     </div>;

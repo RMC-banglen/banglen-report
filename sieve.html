@@ -1122,9 +1122,6 @@ function UnitWeightForm(){
 const TABS=[
   {k:'sand', icon:'🏖', label:'FM'},
   {k:'silt', icon:'💧', label:'ฝุ่น'},
-  {k:'org',  icon:'🧪', label:'สารอินทรีย์'},
-  {k:'moist',icon:'💦', label:'ความชื้น'},
-  {k:'uw',   icon:'⚖️', label:'นน.คอนกรีต'},
   {k:'stone',icon:'🪨', label:'หิน'},
 ];
 function App(){
@@ -1135,10 +1132,10 @@ function App(){
         <a href="qc.html" style={{color:'#fff',fontSize:22,textDecoration:'none',padding:'4px 8px 4px 0',lineHeight:1}}>‹</a>
         <div style={{flex:1}}>
           <h1>บันทึกผลทดสอบวัตถุดิบ</h1>
-          <p>บางเลน — ทราย · หิน · คอนกรีตสด</p>
+          <p>บางเลน — ทราย · หิน</p>
         </div>
       </div>
-      {/* 6 แท็บใส่แถวเดียวบนมือถือแล้วตัวหนังสือเบียดกัน จึงให้ตกบรรทัดเป็น 3 ต่อแถว */}
+      {/* เหลือ 3 แท็บ (FM / ฝุ่น / หิน) — เอาสารอินทรีย์ ความชื้น นน.คอนกรีต ออกแล้ว ไม่ได้ใช้ */}
       <div className="tabs" style={{flexWrap:'wrap'}}>
         {TABS.map(t=>(
           <button key={t.k} className={`tab${tab===t.k?' active':''}`} onClick={()=>setTab(t.k)}
@@ -1147,9 +1144,6 @@ function App(){
       </div>
       {tab==='sand'?<SandForm/>
         :tab==='silt'?<SiltForm/>
-        :tab==='org'?<OrganicForm/>
-        :tab==='moist'?<MoistureForm/>
-        :tab==='uw'?<UnitWeightForm/>
         :<StoneForm/>}
     </div>
   );
