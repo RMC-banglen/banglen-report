@@ -638,10 +638,120 @@ function targetFor(formula, age) {
   return spec[a] != null ? spec[a] : null;   // อายุที่ไม่มีเกณฑ์ = ไม่ต้องตัดสิน
 }
 
+// ============================================================
+// แจ้งเตือนกรณีพิเศษ — อายุ 1 วัน สูตรทั่วไป (ไม่ใช้กับ NP280)
+//   ≤ 314           ครั้งแรก  → 🚨 ด่วน รีบเข้าไปดู
+//   ≤ 314 2 วันติด           → 🚨 เพิ่มสูตร 1 Step (หลังเพิ่มแล้วต่ำอีก 2 วันติด → เพิ่มอีก 1 Step)
+//   หลังเพิ่มสูตร 315–385    → ⚠️ ใช้สูตรที่ปรับแล้วต่อไป (เตือนทุกวันจนกว่าจะถึง 386)
+//   หลังเพิ่มสูตร ≥ 386      → ✅ ปรับลดสูตร 1 Step
+// "วัน" = วันที่เก็บตัวอย่างของสูตรนั้นที่มีผลอายุ 1 วัน (ข้ามวันที่ไม่มีผล) · หลายแถววันเดียวกันใช้ค่าเฉลี่ย
+// สถานะ (เพิ่มไปกี่ Step) คำนวณใหม่จากประวัติในชีททุกครั้ง ไม่ต้องจำไว้ที่ไหน
+// ============================================================
+var SPECIAL_LOW = 314;   // ต่ำกว่าหรือเท่านี้ = อันตราย
+var SPECIAL_OK  = 386;   // ถึงเท่านี้ = ปรับลดสูตรได้
+
+function isNP280Formula(f) { return String(f || '').toUpperCase().indexOf('280') >= 0; }
+
+function day1History(formula) {
+  var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  var rows = sh.getDataRange().getValues();
+  var headers = rows[0].map(function (x) { return String(x).trim(); });
+  var ci = {}; headers.forEach(function (n, i) { ci[n] = i; });
+  var iAge  = ci['อายุ(วัน)'] !== undefined ? ci['อายุ(วัน)'] : (ci['อายุ (วัน)'] !== undefined ? ci['อายุ (วัน)'] : 2);
+  var iForm = ci['ชื่อสูตร'] !== undefined ? ci['ชื่อสูตร'] : 3;
+  var iKsc  = ci['เฉลี่ย KSC'] !== undefined ? ci['เฉลี่ย KSC'] : 10;
+  var key = String(formula || '').trim().toUpperCase();
+  var byDate = {};
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (Number(r[iAge]) !== 1) continue;
+    if (String(r[iForm] || '').trim().toUpperCase() !== key) continue;
+    var v = Number(r[iKsc]), d = fmtDate(r[0]);
+    if (!d || !isFinite(v) || v <= 0) continue;
+    (byDate[d] = byDate[d] || []).push(v);
+  }
+  return Object.keys(byDate).sort().map(function (d) {
+    var a = byDate[d];
+    return { date: d, ksc: Math.round(a.reduce(function (s, x) { return s + x; }, 0) / a.length) };
+  });
+}
+
+// เดินตามประวัติแล้วคืนเหตุการณ์ของวันที่ต้องการ: urgent / raise / keep / lower / null
+function specialEventFor(formula, dateKey) {
+  var hist = day1History(formula);
+  var steps = 0, prevLow = null, out = null;
+  hist.forEach(function (p) {
+    var ev = null;
+    if (p.ksc <= SPECIAL_LOW) {
+      if (prevLow) { steps++; ev = { type: 'raise', steps: steps, prev: prevLow }; prevLow = null; }
+      else { ev = { type: 'urgent', steps: steps }; prevLow = p; }
+    } else {
+      prevLow = null;
+      if (steps > 0) {
+        if (p.ksc >= SPECIAL_OK) { steps--; ev = { type: 'lower', steps: steps }; }
+        else ev = { type: 'keep', steps: steps };
+      }
+    }
+    if (p.date === dateKey && ev) { ev.point = p; out = ev; }
+  });
+  return out;
+}
+
+function specialMessage(formula, ev, testDate) {
+  var p = ev.point, head = '<b>สูตร:</b> ' + esc(formula) + ' · อายุ 1 วัน\n';
+  var day = 'เก็บตัวอย่าง ' + fmtThaiDate(p.date) + (testDate ? ' · ทดสอบ ' + fmtThaiDate(testDate) : '');
+  if (ev.type === 'urgent') {
+    return '🚨🚨 <b>ด่วนมาก! ผลลูกปูนต่ำผิดปกติ</b> 🚨🚨\n\n' + head
+      + '<b>ผลเฉลี่ย:</b> ' + p.ksc + ' ksc (เกณฑ์ ' + TARGET_NORMAL[1] + ' · ต่ำกว่าเกณฑ์อันตราย ' + SPECIAL_LOW + ')\n'
+      + day + '\n\n'
+      + '⛔ <b>กรุณาเข้าไปตรวจสอบหน้างานทันที</b>\n'
+      + 'ตรวจ: วัตถุดิบ / ปูนซีเมนต์ / น้ำ / การชั่ง / การบ่ม\n'
+      + '⚠️ ถ้าวันถัดไปยังต่ำกว่า ' + SPECIAL_LOW + ' อีก ระบบจะแจ้งให้เพิ่มสูตร'
+      + (ev.steps > 0 ? '\n(ตอนนี้เพิ่มสูตรไปแล้ว ' + ev.steps + ' Step)' : '');
+  }
+  if (ev.type === 'raise') {
+    return '🚨🚨🚨 <b>ผลต่ำต่อเนื่อง 2 วัน — ต้องเพิ่มสูตรทันที</b> 🚨🚨🚨\n\n' + head
+      + fmtThaiDate(ev.prev.date) + ' = ' + ev.prev.ksc + ' ksc · ' + fmtThaiDate(p.date) + ' = ' + p.ksc + ' ksc\n\n'
+      + '🔺 <b>ให้ปรับสูตรคอนกรีตเพิ่มขึ้น 1 Step ตั้งแต่การผลิตรอบถัดไป</b>'
+      + (ev.steps > 1 ? '\n(รวมเพิ่มจากสูตรปกติแล้ว ' + ev.steps + ' Step)' : '') + '\n'
+      + 'ระบบจะติดตามผลต่อจนกว่าจะกลับมาถึง ' + SPECIAL_OK + ' ksc';
+  }
+  if (ev.type === 'keep') {
+    return '⚠️ <b>ติดตามหลังเพิ่มสูตร</b>\n\n' + head
+      + fmtThaiDate(p.date) + ' = <b>' + p.ksc + ' ksc</b>\n'
+      + 'ยังไม่ถึง ' + SPECIAL_OK + ' ksc → <b>ให้ใช้สูตรที่ปรับเพิ่มแล้วต่อไป ห้ามลดสูตร</b>\n'
+      + '(ตอนนี้เพิ่มจากสูตรปกติ ' + ev.steps + ' Step)';
+  }
+  // lower
+  return '✅ <b>ผลกลับมาดีแล้ว — ปรับลดสูตรได้</b>\n\n' + head
+    + fmtThaiDate(p.date) + ' = <b>' + p.ksc + ' ksc</b> (≥ ' + SPECIAL_OK + ')\n'
+    + '🔻 <b>ให้ปรับลดสูตรคอนกรีตกลับ 1 Step</b>\n'
+    + (ev.steps > 0 ? 'ยังเพิ่มจากสูตรปกติอยู่อีก ' + ev.steps + ' Step — ระบบติดตามต่อ' : 'กลับเป็นสูตรปกติแล้ว ระบบจบการติดตามรอบนี้');
+}
+
+// คืน true = ส่งแจ้งเตือนพิเศษแล้ว (ไม่ต้องส่งแบบปกติซ้ำ)
+function notifySpecialIfNeeded(r) {
+  if (r.backfill) return false;                                   // ตรวจย้อนหลัง ไม่ยิงข้อความพิเศษของอดีต
+  if (Number(r.age) !== 1 || isNP280Formula(r.formula)) return false;
+  var dateKey = fmtDate(r.sampleDate);
+  if (!dateKey) return false;
+  var ev = specialEventFor(r.formula, dateKey);
+  if (!ev) return false;
+  // กันส่งซ้ำระดับวัน (วันเดียวกันมีหลายแถว / แก้แถวซ้ำ) — ค่าเฉลี่ยเปลี่ยนถึงจะส่งใหม่
+  var props = PropertiesService.getScriptProperties();
+  var stamp = 'SP|' + String(r.formula).trim().toUpperCase() + '|' + dateKey;
+  var val = ev.type + '|' + ev.point.ksc;
+  if (props.getProperty(stamp) === val) return true;
+  props.setProperty(stamp, val);
+  sendTelegram(specialMessage(r.formula, ev, r.testDate), tgChatQC());
+  return true;
+}
+
 function notifyIfBelowTarget(r) {
   try {
     var ksc = Number(r.ksc);
     if (!isFinite(ksc) || ksc <= 0) return;
+    try { if (notifySpecialIfNeeded(r)) return; } catch (spErr) { Logger.log('special alert error: ' + spErr.message); }
     var target = targetFor(r.formula, r.age);
     if (target == null) return;
     if (ksc >= target) return;                       // ผ่านเกณฑ์ ไม่ต้องแจ้ง
@@ -799,7 +909,7 @@ function checkAllConcreteResults() {
     if (Number(r[iKsc]) >= target) continue;
     fail++;
     notifyIfBelowTarget({ sampleDate: r[0], testDate: r[1], age: r[iAge],
-                          formula: r[iForm], ksc: Number(r[iKsc]), row: i + 1 });
+                          formula: r[iForm], ksc: Number(r[iKsc]), row: i + 1, backfill: true });
   }
   SpreadsheetApp.getUi().alert('ตรวจย้อนหลังเสร็จ — พบผลไม่ผ่านเกณฑ์ ' + fail + ' แถว (แจ้งเฉพาะแถวที่ยังไม่เคยแจ้ง)');
 }
