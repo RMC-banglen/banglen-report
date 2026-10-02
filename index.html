@@ -8022,7 +8022,8 @@ window.__dataReady.then(data => {
       const refetchTasks=()=>{ db.from('worktrack_tasks').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setTasks(data); }); };
       const onVisible=()=>{ if(document.visibilityState==='visible') refetchTasks(); };
       document.addEventListener('visibilitychange',onVisible);
-      const poll=setInterval(refetchTasks,30000);
+      // มี realtime อัปเดตทันทีอยู่แล้ว poll ไว้กันหลุดเท่านั้น — ทุก 2 นาทีพอ (เดิม 30 วิ เปิดค้างทั้งวันกินโควต้า Egress)
+      const poll=setInterval(refetchTasks,120000);
       return ()=>{ db.removeChannel(channel); document.removeEventListener('visibilitychange',onVisible); clearInterval(poll); };
     },[]);
 
@@ -9740,13 +9741,16 @@ window.__dataReady.then(data => {
     const [dayNotes,setDayNotes]=useState([]); // transport_day_notes: เหตุผลวันว่าง เช่น หยุด/รถเสีย
     useEffect(()=>{fetch();},[]);
     // กลับมาที่หน้าต่างนี้ (สลับแท็บ/แอป) -> โหลดข้อมูลล่าสุด กันหน้าเปิดค้างเห็นข้อมูลเก่า
+    // สลับแท็บไปมาบ่อยๆ ไม่ต้องโหลดทั้งหมดใหม่ทุกครั้ง (visibilitychange + focus ยิงคู่กัน) — เว้นอย่างน้อย 60 วินาที ประหยัดโควต้า Egress
+    const lastFetchAt=useRef(0);
     useEffect(()=>{
-      const onVis=()=>{if(document.visibilityState==='visible')fetch();};
+      const onVis=()=>{if(document.visibilityState==='visible'&&Date.now()-lastFetchAt.current>60000)fetch();};
       document.addEventListener('visibilitychange',onVis);window.addEventListener('focus',onVis);
       return()=>{document.removeEventListener('visibilitychange',onVis);window.removeEventListener('focus',onVis);};
     },[]);
     // หลังบันทึกโหลดใหม่แบบเงียบ ไม่ขึ้น "กำลังโหลด" (กันหน้ากระพริบ/เลื่อน) · state loading เริ่มต้น true อยู่แล้วสำหรับครั้งแรก
     function fetch(){
+      lastFetchAt.current=Date.now();
       Promise.all([
         fetchAll(()=>DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name')),
         DB.from('transport_workdays').select('*'),
@@ -10082,9 +10086,10 @@ window.__dataReady.then(data => {
       // month: เปิดจากหน้าอื่น (เช่น กดยอดรวมในรายเดือน) -> สลับเดือนของฟอร์มเป็นเดือนนั้น
       const mo=month||selDayMonth;if(month&&month!==selDayMonth)setSelDayMonth(month);
       // ดึงข้อมูลล่าสุดจากระบบก่อนเปิดฟอร์มเสมอ กันหน้าที่เปิดค้างไว้บันทึกข้อมูลเก่าทับ (เคยทำให้เที่ยวซ้ำ)
-      const {data:fresh}=await fetchAll(()=>DB.from('transport_trips').select('*').order('year').order('vehicle_type').order('sort_order').order('driver_name'));
-      const all=fresh||rows;if(fresh)setRows(fresh);
-      const mRows=all.filter(r=>r.year===selYear&&r.month===mo&&r.day!=null);
+      // ดึงเฉพาะเดือนที่จะแก้ (เดิมดึงทั้งตาราง ~800 KB ทุกครั้งที่กด "แก้") แล้วแทนที่เดือนนั้นในข้อมูลที่มีอยู่
+      const {data:fresh}=await fetchAll(()=>DB.from('transport_trips').select('*').eq('year',selYear).eq('month',mo).order('vehicle_type').order('sort_order').order('driver_name'));
+      if(fresh)setRows(prev=>[...prev.filter(r=>!(r.year===selYear&&r.month===mo)),...fresh]);
+      const mRows=(fresh||rows.filter(r=>r.year===selYear&&r.month===mo)).filter(r=>r.day!=null);
       const moDays=Array.from({length:new Date(selYear-543,mo,0).getDate()},(_,i)=>i+1);
       // เที่ยวของรถคันนี้เอง = ไม่มีคนช่วยขับ หรือ "รถบ่อตะกั่ว" มาช่วย (ไม่นับให้คน) — ตรงกับที่ตารางนับ
       // เที่ยวที่คนอื่นมาช่วยขับรถคันนี้ (นับให้คนนั้น) ไม่แสดงในฟอร์ม และจะไม่ถูกลบตอนบันทึก
