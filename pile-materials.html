@@ -1191,15 +1191,55 @@ class App extends React.Component {
   async handleFile(e) {
     if (READONLY) return;
     const file = e.target.files[0]; if (!file) return;
-    this.setState({ loading: true, error: '', fileName: file.name });
+    const clearInput = () => { if (this.fileInputRef && this.fileInputRef.current) this.fileInputRef.current.value = ''; };
+
+    // งวดที่ปิดแล้วห้ามอัปโหลดทับ — เดิมเช็คแค่สิทธิ์แก้ไข ไม่ได้ดูล็อกของงวด
+    // ทั้งที่หน้าจอขึ้นว่า "ใช้อ้างอิงเท่านั้น" เลยเผลออัปโหลดไฟล์เดือนใหม่ทับงวดเก่าได้
+    const cur = this.state.periodLabel;
+    if (cur && (this.state.periodLocked || {})[cur]) {
+      alert('งวด "' + cur + '" ปิดแล้ว จึงอัปโหลดไฟล์ทับไม่ได้\n\n' +
+            'ถ้าจะลงข้อมูลเดือนใหม่ ให้สลับไปงวดนั้นก่อน\n' +
+            'ถ้าตั้งใจจะแก้งวดนี้จริง ให้กดปลดล็อกก่อน');
+      clearInput();
+      return;
+    }
+
+    this.setState({ loading: true, error: '' });
     try {
       const mod = this._mod || await waitForPileCalc(); this._mod = mod;
       const rows = await mod.readPileListXlsx(file);
       if (!rows.length) throw new Error('ไม่พบข้อมูลรายการเสาในไฟล์ (ตรวจสอบหัวคอลัมน์ รหัสสินค้า/จำนวน)');
+
+      // งวดนี้มีไฟล์อยู่แล้ว ต้องถามก่อนทับ และบอกให้เห็นว่ากำลังจะเปลี่ยนจากอะไรเป็นอะไร
+      const oldRows = this.state.rawRows || [];
+      if (oldRows.length) {
+        const qty = rs => rs.reduce((s, r) => s + (Number(r['จำนวน']) || Number(r.qty) || 0), 0);
+        const ok = confirm(
+          'งวด "' + (cur || 'ปัจจุบัน') + '" มีข้อมูลอยู่แล้ว ต้องการแทนที่ไหม?\n\n' +
+          'ของเดิม : ' + (this.state.fileName || '-') + '  (' + oldRows.length + ' แถว / ' + qty(oldRows).toLocaleString() + ' ต้น)\n' +
+          'ของใหม่ : ' + file.name + '  (' + rows.length + ' แถว / ' + qty(rows).toLocaleString() + ' ต้น)\n\n' +
+          'ถ้าไฟล์ใหม่เป็นของอีกเดือน ให้กดยกเลิก แล้วสลับงวดก่อน');
+        if (!ok) { this.setState({ loading: false }); clearInput(); return; }
+        this.saveBackupBeforeReplace();   // มีจุดย้อนกลับไว้ก่อนเสมอ
+      }
+
       const result = mod.calcPileList(rows, this.currentConfig());
-      this.setState({ loading: false, result, actual: {}, rawRows: rows });
+      this.setState({ loading: false, fileName: file.name, result, actual: {}, rawRows: rows });
       if (!this.state.periodLabel) this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add', periodPickerRequired: true });
     } catch (err) { this.setState({ loading: false, error: 'เกิดข้อผิดพลาด: ' + err.message }); }
+  }
+
+  // สำรองเงียบ ๆ ก่อนเขียนทับข้อมูลที่มีอยู่ ไม่เด้ง alert เพราะกำลังอยู่กลางขั้นตอนอื่น
+  saveBackupBeforeReplace() {
+    try {
+      const out = {};
+      this.persistKeys.forEach(k => { out[k] = this.state[k]; });
+      this._lastBackupAt = Date.now();
+      DB.from('pile_materials_state')
+        .insert({ id: 'backup-' + new Date().toISOString(), data: out, updated_at: new Date().toISOString() })
+        .then(({ error }) => { if (!error) this.pruneOldBackups(); })
+        .catch(err => console.warn('สำรองก่อนเขียนทับไม่สำเร็จ', err));
+    } catch (err) { console.warn('saveBackupBeforeReplace error', err); }
   }
   cancelFirstFileLoad() {
     // ยกเลิกตอนเลือกไฟล์ผิด (ตอนยังไม่เคยตั้งงวดมาก่อน) — เคลียร์ไฟล์/ผลลัพธ์ที่เพิ่งโหลด ให้เลือกไฟล์ใหม่ได้ทันที
