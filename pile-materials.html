@@ -824,9 +824,10 @@ class App extends React.Component {
       .filter(k => k.startsWith('main:rebar:'))
       .map(k => k.slice('main:rebar:'.length))
       .filter(spec => spec && !inCalc.has(spec))
+      // เอาเฉพาะที่มีของจริง ถ้าทุกช่องเป็น 0 หรือว่าง ไม่ต้องขึ้น จะได้ไม่รกตาราง
       .filter(spec => {
         const s = this.state.stock['main:rebar:' + spec] || {};
-        return [s.opening, s.received, s.closing].some(v => v != null && v !== '');
+        return [s.opening, s.received, s.closing].some(v => v != null && v !== '' && Number(v) !== 0);
       })
       .map(spec => {
         const row = this.buildRow('main:rebar:' + spec, spec, 0, { unit: 'เส้น', notExtra: true });
