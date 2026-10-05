@@ -815,6 +815,25 @@ class App extends React.Component {
     const wireMmMap = this.state.stirrupWireMm || {}, thickMap = this.state.plateThicknessMm || {}, specMap = this.state.whiskerSpecs || {};
     const dl = this._mod ? this._mod.diamLabel : (x => x);
     const baseRebarRowsM = r.rebar.map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true }));
+
+    // ขนาดที่เดือนนี้ไม่ได้ผลิต แต่ยังมีสต็อกค้างอยู่ ต้องขึ้นให้เห็นด้วย
+    // ไม่งั้นของหายไปจากตารางทั้งที่ยังอยู่ในโกดัง (เคยเจอ DB12x4.00 ค้าง 1,021 เส้น แล้วไม่โผล่เลย)
+    // แถวพวกนี้ไม่มีสูตรคำนวณให้เทียบ เลยซ่อน ส่วนต่าง/% หาย เหมือนแถวที่เพิ่มเอง
+    const inCalc = new Set(r.rebar.map(x => x.spec));
+    const stockOnlyRowsM = Object.keys(this.state.stock || {})
+      .filter(k => k.startsWith('main:rebar:'))
+      .map(k => k.slice('main:rebar:'.length))
+      .filter(spec => spec && !inCalc.has(spec))
+      .filter(spec => {
+        const s = this.state.stock['main:rebar:' + spec] || {};
+        return [s.opening, s.received, s.closing].some(v => v != null && v !== '');
+      })
+      .map(spec => {
+        const row = this.buildRow('main:rebar:' + spec, spec, 0, { unit: 'เส้น', notExtra: true });
+        const realDiffColor = row.realDiffFmt.startsWith('+') ? '#3f7d2b'
+          : (row.realDiffFmt !== '-' && row.realDiffFmt.startsWith('-')) ? '#c0392b' : 'inherit';
+        return { ...row, isStockOnly: true, diffFmt: '-', diffColor: 'inherit', pctLostFmt: '-', rowBg: 'transparent', realDiffColor };
+      });
     const extraRebarRowsM = this.state.extraRebarItems.map(item => {
       const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
       // แถวนี้ไม่มีสูตรคำนวณให้เทียบ (คำนวณ = 0 เสมอ) เอา "ส่วนต่างจริง" ไปหาร % หาย เลยเพี้ยนได้ง่าย (ฐานติดลบพลิกเครื่องหมายมั่ว)
@@ -824,7 +843,7 @@ class App extends React.Component {
         diffFmt: '-', diffColor: 'inherit', pctLostFmt: '-', rowBg: 'transparent', realDiffColor };
     });
     // เรียงรายการเหล็กค้าง/ไม่อยู่ในสูตรปนไปกับแถวคำนวณตามขนาด แทนที่จะโยนไปกองท้ายตารางเหมือนเดิม
-    const rebarRowsM = markRebarGroups(sortRebarBySpec([...baseRebarRowsM, ...extraRebarRowsM], row => row.label));
+    const rebarRowsM = markRebarGroups(sortRebarBySpec([...baseRebarRowsM, ...stockOnlyRowsM, ...extraRebarRowsM], row => row.label));
     const pcBuckets = { 4: 0, 5: 0, 7: 0 };
     r.pc.forEach(x => { pcBuckets[4] += x.pc4Kg; pcBuckets[5] += x.pc5Kg; pcBuckets[7] += x.pc7Kg; });
     const pcRowsM = Object.entries(pcBuckets).filter(([, v]) => v > 0).map(([mm, v]) => this.buildRow('main:pc:' + mm, 'PC.wire' + mm + 'มม.', v, { unit: 'กก.' }));
