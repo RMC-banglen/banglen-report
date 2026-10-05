@@ -1307,7 +1307,9 @@ class App extends React.Component {
       const periodHistory = { ...s.periodHistory, [oldLabel]: snapshot };
       const periods = [...new Set([...(s.periods || []), oldLabel, finalLabel])];
       const periodSummaries = { ...s.periodSummaries, [oldLabel]: this.computePeriodSummary(s) };
-      const emptyNext = { stock: newStock, plateStockDiam: newPlateStockDiam, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, cutInEntries: {}, extraRebarItems: [], generalUseOpen: {} };
+      // เหล็กค้าง/ไม่อยู่ในสูตรที่เพิ่มเอง ต้องยกข้ามงวดไปด้วย ของพวกนี้ไม่ได้หายไปไหนตอนขึ้นเดือนใหม่
+      // เดิมล้างทิ้งทุกครั้ง ต้องมานั่งเพิ่มใหม่ทุกเดือน แถวหายแต่ตัวเลขสต็อกยังค้างอยู่ในข้อมูลโดยไม่มีใครเห็น
+      const emptyNext = { stock: newStock, plateStockDiam: newPlateStockDiam, actual: {}, generalUseEntries: {}, plateGeneralUseEntries: {}, cutInEntries: {}, extraRebarItems: s.extraRebarItems || [], generalUseOpen: {} };
       return { ...emptyNext, result: null, rawRows: null, fileName: '',
         periodLabel: finalLabel, periodHistory, periods, periodSummaries, periodLocked: { ...s.periodLocked, [oldLabel]: true },
         periodPickerOpen: false, periodPickerPurpose: null, undoStack, redoStack: [] };
