@@ -1160,12 +1160,21 @@ function MoistureRoastForm(){
       .then(({data})=>setMixes(data||[]));
   },[]);
 
+  // ความชื้นที่เอาไปคิดสูตร: ใช้ของที่กำลังคั่วอยู่ก่อน ถ้ายังไม่ได้กรอกก็ใช้ผลล่าสุดที่บันทึกไว้วันนั้น
+  // คนแพล้นท์จะได้เปิดแอปมาดูตัวเลขของวันนี้ได้เลย ไม่ต้องคั่วใหม่
+  const savedMoist=dayRows.length?Number(dayRows[dayRows.length-1].total_pct):null;
+  const useMoist=res?res.moist:savedMoist;
+  const fromSaved=!res&&savedMoist!=null;
+
   // น้ำที่เติมจริงของแต่ละสูตร = น้ำในสูตร − น้ำที่ทรายพามาเกินจากความชื้นปกติ
-  // ทุกสูตรใช้ทรายเท่ากัน น้ำส่วนเกินจึงเท่ากันหมด ต่างกันแค่น้ำตั้งต้น
-  const mixRows=(!res||!mixes.length)?[]:mixes.map(m=>{
+  // คิดจากทรายของสูตรนั้นเอง เผื่อวันหลังมีสูตรที่ใช้ทรายไม่เท่ากัน
+  const mixRows=(useMoist==null||!mixes.length)?[]:mixes.map(m=>{
+    const sandSpec=Number(m.sand_kg)||MOIST_SAND;
+    const sandDry=sandSpec/(1+MOIST_BASE/100);
+    const over=sandDry*(useMoist-MOIST_BASE)/100;      // น้ำที่ทรายพามาเกินค่าปกติ
     const base=Number(m.water_add_l)||0;
-    const adj=base-res.water;
-    return{...m,base,adj,low:adj<=0};
+    const adj=base-over;
+    return{...m,base,adj,low:adj<=0,wetSand:sandDry*(1+useMoist/100)};
   });
 
   const save=async()=>{
@@ -1262,27 +1271,37 @@ function MoistureRoastForm(){
             </div>
           </div>
 
+        </div>}
           {/* ตัวเลขสุดท้ายรายสูตร — คนหน้าแพล้นท์จะได้ไม่ต้องเอาไปลบเองทีละสูตร ซึ่งพลาดง่าย */}
           {mixRows.length>0&&<div style={{marginTop:14,paddingTop:12,borderTop:'1.5px solid #e6e8ee'}}>
-            <div style={{fontSize:13.5,fontWeight:700,color:'#42465a',marginBottom:2}}>ตั้งน้ำที่แพล้นท์ตามนี้</div>
-            <div style={{fontSize:12,color:'#8b91a1',marginBottom:8}}>
-              ทุกสูตรชั่งทราย <b>{r1(res.wetSand)} กก.</b> เท่ากัน ต่างกันแค่น้ำ
+            <div style={{fontSize:13.5,fontWeight:700,color:'#42465a',marginBottom:2}}>ตั้งเครื่องที่แพล้นท์ตามนี้</div>
+            <div style={{fontSize:12,color:fromSaved?'#b45309':'#8b91a1',marginBottom:8}}>
+              {fromSaved
+                ? <>ใช้ผลล่าสุดของวันนี้ <b>{useMoist.toFixed(2)}%</b> (ยังไม่ได้คั่วรอบใหม่)</>
+                : <>จากความชื้น <b>{useMoist.toFixed(2)}%</b> ที่เพิ่งคั่ว</>}
+              {' '}· ช่องตัวหนา = เลขที่ต้องใช้จริง
             </div>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
               <thead><tr style={{background:'#f4f6fa'}}>
-                <th style={{textAlign:'left',padding:'7px 8px',fontSize:12.5,color:'#5f6470'}}>สูตร</th>
-                <th style={{textAlign:'right',padding:'7px 8px',fontSize:12.5,color:'#5f6470'}}>น้ำในสูตร</th>
-                <th style={{textAlign:'right',padding:'7px 8px',fontSize:12.5,color:'#5f6470'}}>เติมจริงวันนี้</th>
-                <th style={{textAlign:'right',padding:'7px 8px',fontSize:12.5,color:'#5f6470'}}>น้ำยา</th>
+                <th style={{textAlign:'left',padding:'7px 6px',fontSize:12,color:'#5f6470'}}>สูตร</th>
+                <th style={{textAlign:'right',padding:'7px 6px',fontSize:12,color:'#5f6470'}}>ชั่งทราย</th>
+                <th style={{textAlign:'right',padding:'7px 6px',fontSize:12,color:'#5f6470'}}>เติมน้ำ</th>
+                <th style={{textAlign:'right',padding:'7px 6px',fontSize:12,color:'#5f6470'}}>น้ำยา</th>
               </tr></thead>
               <tbody>
                 {mixRows.map(m=>(
                   <tr key={m.formula} style={{borderBottom:'1px solid #f0f2f7'}}>
-                    <td style={{padding:'8px',fontWeight:700,color:'#22252e'}}>{m.formula}</td>
-                    <td style={{padding:'8px',textAlign:'right',color:'#8b91a1'}}>{r1(m.base)}</td>
-                    <td style={{padding:'8px',textAlign:'right',fontWeight:800,fontSize:17,
-                      color:m.low?'#c0392b':'#1a56db'}}>{r1(m.adj)}</td>
-                    <td style={{padding:'8px',textAlign:'right',color:'#5f6470'}}>{m.np_cc!=null?Number(m.np_cc).toLocaleString('th-TH'):'–'}</td>
+                    <td style={{padding:'8px 6px',fontWeight:700,color:'#22252e'}}>{m.formula}</td>
+                    <td style={{padding:'8px 6px',textAlign:'right',fontWeight:800,fontSize:16,color:'#1a56db'}}>
+                      {r1(m.wetSand)}
+                      <div style={{fontSize:11,fontWeight:400,color:'#8b91a1'}}>สูตร {r1(m.sand_kg)}</div>
+                    </td>
+                    <td style={{padding:'8px 6px',textAlign:'right',fontWeight:800,fontSize:16,
+                      color:m.low?'#c0392b':'#1a56db'}}>
+                      {r1(m.adj)}
+                      <div style={{fontSize:11,fontWeight:400,color:'#8b91a1'}}>สูตร {r1(m.base)}</div>
+                    </td>
+                    <td style={{padding:'8px 6px',textAlign:'right',color:'#5f6470'}}>{m.np_cc!=null?Number(m.np_cc).toLocaleString('th-TH'):'–'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1296,7 +1315,6 @@ function MoistureRoastForm(){
               เทียบจากสูตรที่ทรายความชื้น {MOIST_BASE}% · ตัวเลขเป็นลิตรต่อคอนกรีต 1 ม³ · แก้สูตรได้ที่ตาราง concrete_mix_design
             </div>
           </div>}
-        </div>}
       </div>
 
       <div className="card">
