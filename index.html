@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06a';
+var APP_VERSION='2026-10-06b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5022,12 +5022,100 @@ window.__dataReady.then(data => {
       </>}
 
       {sub==='mat'&&<>
+      <SandMoistureTable/>
       <SandFMSection canEdit={canEdit}/>
       <SandSiltSection canEdit={canEdit}/>
       {/* สารอินทรีย์ในทราย (SandOrganicSection) เอาออกแล้ว — ไม่ได้ใช้ */}
       <StoneGradationSection canEdit={canEdit}/>
       </>}
     </div>;
+  }
+
+  // ============================================================
+  // ตารางความชื้นทราย → น้ำหนักทรายที่ต้องชั่ง / น้ำที่ต้องลด / อัตราส่วนน้ำต่อซีเมนต์
+  // ตั้งต้น: ทราย 822 กก. ชั่งตอนความชื้นปกติ 7% → ทรายแห้งจริง = 822 ÷ 1.07
+  // ความชื้นมากขึ้น = ทรายที่ชั่งมีน้ำปนมากขึ้น ต้องชั่งทรายเพิ่มให้ได้เนื้อทรายเท่าเดิม และลดน้ำที่เติมลงเท่าน้ำส่วนเกิน
+  // ============================================================
+  function SandMoistureTable(){
+    const LS='sand_moist_calc';
+    const init=(()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}');}catch(e){return {};}})();
+    const [sand,setSand]=useState(init.sand??(D.mixTarget&&D.mixTarget.sand)??822);
+    const [base,setBase]=useState(init.base??7);
+    const [cement,setCement]=useState(init.cement??375);
+    const [water,setWater]=useState(init.water??160);
+    const [cur,setCur]=useState(init.cur??'');
+    useEffect(()=>{if(init.cement==null)DB.from('cement_config').select('baseline_kg_m3').eq('id',1).limit(1).then(({data})=>{const v=data&&data[0]&&Number(data[0].baseline_kg_m3);if(v)setCement(v);});},[]);
+    useEffect(()=>{try{localStorage.setItem(LS,JSON.stringify({sand,base,cement,water,cur}));}catch(e){}},[sand,base,cement,water,cur]);
+    const S=Number(sand)||0,B=(Number(base)||0)/100,C=Number(cement)||0,W=Number(water)||0;
+    const dry=S/(1+B);                 // เนื้อทรายแห้งที่สูตรต้องการ
+    const calc=m=>{const M=m/100;
+      const wet=dry*(1+M);             // ต้องชั่งทรายเปียกเท่านี้ ถึงได้เนื้อทรายเท่าเดิม
+      const extra=dry*(M-B);           // น้ำที่ทรายพามาเกินจากปกติ (ติดลบ = ทรายแห้งกว่าปกติ ต้องเติมน้ำเพิ่ม)
+      const addW=W-extra;              // น้ำที่ต้องเติมจริง ให้ w/c เท่าเดิม
+      // ถ้ายังชั่งทราย 822 เท่าเดิม ไม่ปรับน้ำ: เนื้อทรายขาด และน้ำเกิน → w/c สูงขึ้น
+      const dry822=S/(1+M),extra822=(S-dry822)-(S-dry);
+      return{m,wet,diffSand:wet-S,extra,addW,wcKeep:C?W/C:null,wcNoAdj:C?(W+extra822)/C:null,sandShort:dry-dry822};};
+    const levels=[3,4,5,6,7,8,9,10,11,12,13,14,15];
+    const rowsT=levels.map(calc);
+    const curN=Number(cur);const curRow=cur!==''&&isFinite(curN)?calc(curN):null;
+    const f0=n=>n==null?'–':Math.round(n).toLocaleString('th-TH');
+    const f1=n=>n==null?'–':(Math.round(n*10)/10).toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1});
+    const sg=n=>n>0.05?'+'+f1(n):n<-0.05?f1(n):'0.0';
+    const inp={width:90,padding:'6px 8px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:14,textAlign:'right',fontFamily:'inherit'};
+    const lab=(t,v,s,u)=><label style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>{t}
+      <span style={{display:'flex',alignItems:'center',gap:5}}><input type="number" step="any" value={v} onChange={e=>s(e.target.value)} style={inp}/><span style={{fontWeight:400,color:'#94a3b8'}}>{u}</span></span></label>;
+    const th={padding:'8px 10px',textAlign:'right',whiteSpace:'nowrap',color:'#475569',fontWeight:700,borderBottom:'2px solid #e2e5ee',background:'#f4f6fa'};
+    const td={padding:'7px 10px',textAlign:'right',whiteSpace:'nowrap',borderBottom:'1px solid #f1f3f7'};
+    const Row=({x,hl,cur})=>{const isBase=Math.abs(x.m-Number(base))<1e-9;
+      return<tr style={{background:cur?'#eff6ff':isBase?'#f0fdf4':undefined,fontWeight:cur||isBase?700:400}}>
+        <td style={{...td,textAlign:'left'}}>{f1(x.m)}%{isBase&&<span style={{marginLeft:6,fontSize:11,color:'#15803d'}}>ปกติ</span>}{cur&&<span style={{marginLeft:6,fontSize:11,color:'#1d4ed8'}}>วันนี้</span>}</td>
+        <td style={{...td,color:'#1d4ed8',fontWeight:800}}>{f1(x.wet)}</td>
+        <td style={{...td,color:x.diffSand>0.05?'#b45309':x.diffSand<-0.05?'#0f766e':'#64748b'}}>{sg(x.diffSand)}</td>
+        <td style={{...td,color:x.extra>0.05?'#b91c1c':x.extra<-0.05?'#0f766e':'#64748b'}}>{sg(-x.extra)}</td>
+        <td style={{...td,fontWeight:800}}>{f1(x.addW)}</td>
+        <td style={td}>{x.wcKeep!=null?x.wcKeep.toFixed(3):'–'}</td>
+        <td style={{...td,color:x.wcNoAdj!=null&&x.wcNoAdj>x.wcKeep+0.005?'#b91c1c':'#64748b'}}>{x.wcNoAdj!=null?x.wcNoAdj.toFixed(3):'–'}</td>
+        <td style={{...td,color:x.sandShort>0.05?'#b45309':'#64748b'}}>{x.sandShort>0.05?'ขาด '+f1(x.sandShort):x.sandShort<-0.05?'เกิน '+f1(-x.sandShort):'–'}</td>
+      </tr>;};
+    return<ChartCard span="full" title="ความชื้นทราย → ชั่งทราย / ปรับน้ำ / น้ำต่อซีเมนต์"
+      subtitle={`ทราย ${f0(S)} กก. ชั่งตอนความชื้น ${f1(Number(base))}% (ปกติ) = เนื้อทรายแห้ง ${f1(dry)} กก. + น้ำในทราย ${f1(S-dry)} กก. · ต่อคอนกรีต 1 ม³`}>
+      <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-end',marginBottom:14}}>
+        {lab('ทรายตามสูตร',sand,setSand,'กก.')}
+        {lab('ความชื้นปกติ',base,setBase,'%')}
+        {lab('ปูนซีเมนต์',cement,setCement,'กก.')}
+        {lab('น้ำตามสูตร',water,setWater,'กก. (ลิตร)')}
+        <div style={{borderLeft:'2px solid #e2e8f0',paddingLeft:16}}>{lab('ความชื้นทรายวันนี้',cur,setCur,'%')}</div>
+      </div>
+      {curRow&&<div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:14.5,lineHeight:1.8}}>
+        ความชื้นวันนี้ <b>{f1(curRow.m)}%</b> → <b style={{color:'#1d4ed8'}}>ชั่งทราย {f1(curRow.wet)} กก.</b> ({sg(curRow.diffSand)} กก. จาก {f0(S)})
+        · <b>{curRow.extra>=0?'ลดน้ำ ':'เติมน้ำเพิ่ม '}{f1(Math.abs(curRow.extra))} ลิตร</b> → เติมน้ำจริง <b>{f1(curRow.addW)} ลิตร</b> · w/c คงที่ {curRow.wcKeep!=null?curRow.wcKeep.toFixed(3):'–'}
+        {curRow.wcNoAdj!=null&&curRow.extra>0.05&&<div style={{color:'#b91c1c',fontSize:13.5}}>⚠️ ถ้าชั่ง {f0(S)} กก. เท่าเดิมและไม่ลดน้ำ w/c จะขึ้นเป็น {curRow.wcNoAdj.toFixed(3)} และเนื้อทรายขาด {f1(curRow.sandShort)} กก. → กำลังอัดมีโอกาสตก</div>}
+      </div>}
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:13.5}}>
+          <thead><tr>
+            <th style={{...th,textAlign:'left'}}>ความชื้นทราย</th>
+            <th style={th}>ชั่งทราย (กก.)</th>
+            <th style={th}>ทรายเพิ่ม/ลด</th>
+            <th style={th}>ปรับน้ำ (ลิตร)</th>
+            <th style={th}>เติมน้ำจริง (ลิตร)</th>
+            <th style={th}>w/c (ปรับแล้ว)</th>
+            <th style={th}>w/c ถ้าไม่ปรับ</th>
+            <th style={th}>เนื้อทราย ถ้าชั่ง {f0(S)} เท่าเดิม</th>
+          </tr></thead>
+          <tbody>
+            {curRow&&!levels.includes(curRow.m)&&<Row x={curRow} cur/>}
+            {rowsT.map(x=><Row key={x.m} x={x} cur={curRow&&Math.abs(curRow.m-x.m)<1e-9}/>)}
+          </tbody>
+        </table>
+      </div>
+      <div style={{fontSize:12.5,color:'#64748b',marginTop:10,lineHeight:1.8}}>
+        <b>ชั่งทราย</b> = เนื้อทรายแห้ง × (1 + ความชื้น) — ให้ได้เนื้อทรายเท่าสูตร ·
+        <b> ปรับน้ำ</b> = น้ำที่ทรายพามาเกิน/ขาดจากความชื้นปกติ (ลบ = ต้องลดน้ำที่เติม) ·
+        <b> w/c ถ้าไม่ปรับ</b> = ชั่งทรายเท่าเดิมและเติมน้ำเท่าเดิม น้ำส่วนเกินจากทรายไปเพิ่ม w/c ·
+        ค่าที่กรอกจำไว้ในเครื่องนี้
+      </div>
+    </ChartCard>;
   }
 
   // ============================================================
