@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06g';
+var APP_VERSION='2026-10-06h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5052,6 +5052,12 @@ window.__dataReady.then(data => {
     const _stable=_l3.length===3&&Math.max(..._l3)-Math.min(..._l3)<0.05;
     const _moist=_stable&&pa!==''&&pb!==''&&_C-Number(pa)>0?Math.round((Number(pb)-_C)/(_C-Number(pa))*10000)/100:null;
     useEffect(()=>{if(_moist!=null)setCur(String(_moist));},[_moist]);
+    // ผลความชื้นที่บันทึกจากแอปมือถือ QC (แท็บ 💦 ความชื้น) — ผลของวันนี้ใส่ให้เองถ้าช่องยังว่าง
+    const [hist,setHist]=useState([]);
+    useEffect(()=>{DB.from('sand_moisture_tests').select('id,test_date,total_pct,water_adj_l,sand_source,created_at').order('test_date',{ascending:false}).order('id',{ascending:false}).limit(10)
+      .then(({data})=>{const d=data||[];setHist(d);
+        const today=new Date().toISOString().slice(0,10);
+        if(d[0]&&String(d[0].test_date).slice(0,10)===today)setCur(c=>c===''?String(Number(d[0].total_pct)):c);});},[]);
     const S=Number(sand)||0,B=(Number(base)||0)/100;
     const dry=S/(1+B);                 // เนื้อทรายแห้งที่สูตรต้องการ
     const calc=m=>{const M=m/100;
@@ -5088,6 +5094,14 @@ window.__dataReady.then(data => {
         {lab('ความชื้นปกติ',base,setBase,'%')}
         <div style={{borderLeft:'2px solid #e2e8f0',paddingLeft:16}}>{lab('ความชื้นทรายวันนี้',cur,setCur,'%')}</div>
       </div>
+      {hist.length>0&&<div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:12,fontSize:12.5,color:'#475569'}}>
+        <b>📱 ผลจากแอป QC:</b>
+        {hist.map((h,i)=>{const d=String(h.test_date).slice(0,10),v=Number(h.total_pct);
+          return<button key={h.id} onClick={()=>setCur(String(v))} title={(h.sand_source?h.sand_source+' · ':'')+'กดเพื่อใช้ค่านี้'}
+            style={{padding:'3px 9px',borderRadius:999,border:`1px solid ${i===0?'#93c5fd':'#e2e8f0'}`,background:i===0?'#eff6ff':'#fff',color:i===0?'#1d4ed8':'#475569',fontSize:12.5,cursor:'pointer',fontWeight:i===0?700:400}}>
+            {d.slice(8)+'/'+d.slice(5,7)} · {v.toFixed(2)}%</button>;})}
+        <span style={{color:'#94a3b8'}}>กดเพื่อใช้ค่านั้น · บันทึกเพิ่มได้ที่แอปบันทึกผลทดสอบวัตถุดิบ แท็บ 💦 ความชื้น</span>
+      </div>}
       {(()=>{
         // ── คำนวณความชื้นจากการคั่ว ──
         const A=Number(pa),Bw=Number(pb);

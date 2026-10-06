@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-02a';
+var APP_VERSION='2026-10-06b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -1118,10 +1118,146 @@ function UnitWeightForm(){
   );
 }
 
+// ความชื้นทรายแบบคั่วในกระทะ (ASTM C566)
+// A = กระทะเปล่า · B = ทรายเปียก+กระทะ (ทรายเกิน 500 ก.) · C = ทรายแห้ง+กระทะ คั่วต่อทีละ 1 นาทีจนชั่งได้เท่าเดิม 3 ครั้ง
+// ความชื้น % = (B − C) ÷ (C − A) × 100 · เทียบกับความชื้นปกติ 7% ของทราย 822 กก. → ชั่งทรายเท่าไหร่ / ลด-เติมน้ำกี่ลิตร
+const MOIST_BASE=7, MOIST_SAND=822;
+function MoistureRoastForm(){
+  const LS='moist_roast_draft';
+  const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||'null');}catch(e){return null;}};
+  const blank={test_date:todayISO(),sand_source:'',a:'',b:'',cs:[''],note:''};
+  const[f,setF]=useState(()=>load()||blank);
+  const[saving,setSaving]=useState(false);
+  const[done,setDone]=useState(null);
+  const[err,setErr]=useState('');
+  // จำค่าที่กรอกไว้ระหว่างคั่ว — ปิดจอ/สลับแอปแล้วกลับมาไม่หาย
+  useEffect(()=>{try{localStorage.setItem(LS,JSON.stringify(f));}catch(e){}},[f]);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const setC=(i,v)=>setF(p=>({...p,cs:p.cs.map((x,j)=>j===i?v:x)}));
+
+  const A=Number(f.a),B=Number(f.b);
+  const cs=f.cs.map(Number).filter(v=>v>0);
+  const C=cs.length?cs[cs.length-1]:null;
+  const wet=f.a!==''&&f.b!==''?B-A:null;
+  const dry=C!=null&&f.a!==''?C-A:null;
+  const moist=wet!=null&&dry>0&&B>=C?(B-C)/dry*100:null;
+  let same=cs.length?1:0;for(let i=cs.length-1;i>0&&Math.abs(cs[i]-cs[i-1])<0.05;i--)same++;
+  const stable=same>=3;
+  const dryMix=MOIST_SAND/(1+MOIST_BASE/100);                 // เนื้อทรายแห้งในสูตร
+  const res=moist==null?null:(()=>{const M=moist/100;
+    return{moist:Math.round(moist*100)/100,wetSand:dryMix*(1+M),water:dryMix*(M-MOIST_BASE/100)};})();
+  const r1=n=>(Math.round(n*10)/10).toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1});
+
+  const save=async()=>{
+    if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
+    if(!res){setErr('กรุณากรอก A, B และ C อย่างน้อย 1 ครั้ง');return;}
+    if(!stable&&!window.confirm('ค่า C ยังไม่นิ่ง (ต้องได้เท่าเดิม 3 ครั้ง) — ทรายอาจยังไม่แห้งสนิท ความชื้นจะต่ำกว่าจริง\nต้องการบันทึกเลยไหม?'))return;
+    if(wet<500&&!window.confirm('ทรายเปียกหนัก '+wet+' กรัม น้อยกว่า 500 กรัม ค่าอาจคลาดเคลื่อน บันทึกต่อไหม?'))return;
+    setErr('');setSaving(true);
+    const{error}=await SB.from('sand_moisture_tests').insert([{
+      test_date:f.test_date,sand_source:f.sand_source||'',
+      w_wet:Math.round(wet*100)/100,w_dry:Math.round(dry*100)/100,
+      total_pct:res.moist,free_pct:Math.round((res.moist-MOIST_BASE)*100)/100,   // free = ต่างจากความชื้นปกติ 7%
+      water_adj_l:Math.round(res.water*10)/10,                                   // + = ต้องลดน้ำ · − = ต้องเติมน้ำ
+      note:('คั่ว A='+f.a+' B='+f.b+' C='+cs.join('→')+(f.note?' · '+f.note:'')).slice(0,500)}]);
+    setSaving(false);
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    setDone(res);try{localStorage.removeItem(LS);}catch(e){}
+  };
+
+  const big={fontSize:20,padding:'12px 10px'};
+  if(done)return(
+    <div className="card success">
+      <div className="icon">✅</div>
+      <h2>บันทึกแล้ว!</h2>
+      <p>ความชื้นทราย <b>{done.moist}%</b><br/>
+      ชั่งทราย <b>{r1(done.wetSand)} กก.</b> · {done.water>0.05?<>ลดน้ำ <b>{r1(done.water)} ลิตร</b></>:done.water<-0.05?<>เติมน้ำ <b>{r1(-done.water)} ลิตร</b></>:'ไม่ต้องปรับน้ำ'} ต่อคอนกรีต 1 ม³</p>
+      <button className="bigbtn green" onClick={()=>{setF(blank);setDone(null);}}>+ ทดสอบใหม่</button>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="card">
+        <div className="field">
+          <label>วันที่ทดสอบ</label>
+          <input type="date" value={f.test_date} onChange={e=>set('test_date',e.target.value)}/>
+        </div>
+        <div className="field" style={{marginBottom:0}}>
+          <label>แหล่งทราย (ถ้ามี)</label>
+          <input type="text" value={f.sand_source} onChange={e=>set('sand_source',e.target.value)} placeholder="เช่น วันวิสาข์"/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:4}}>🍳 คั่วทรายในกระทะ</div>
+        <div style={{fontSize:12.5,color:'#8b91a1',marginBottom:12}}>ความชื้น % = (B − C) ÷ (C − A) × 100</div>
+        <div className="field">
+          <label>A = กระทะเปล่า (กรัม)</label>
+          <input type="number" inputMode="decimal" value={f.a} onChange={e=>set('a',e.target.value)} placeholder="0" style={big}/>
+        </div>
+        <div className="field">
+          <label>B = ทรายเปียก + กระทะ (กรัม)</label>
+          <input type="number" inputMode="decimal" value={f.b} onChange={e=>set('b',e.target.value)} placeholder="0" style={big}/>
+          {wet!=null&&<div style={{fontSize:13,marginTop:5,color:wet<500?'#b91c1c':'#059669',fontWeight:600}}>ทรายเปียก {r1(wet)} กรัม {wet<500?'— ควรเกิน 500 กรัม':'✓'}</div>}
+        </div>
+        <div style={{fontSize:13.5,fontWeight:700,color:'#42465a',margin:'6px 0 4px'}}>C = ทรายแห้ง + กระทะ (กรัม)</div>
+        <div style={{fontSize:12.5,color:'#8b91a1',marginBottom:8,lineHeight:1.7}}>คั่วให้แห้ง <b>ปิดฝา</b> (ทรายกระเด็นแบบป๊อปคอร์น) แล้วชั่ง → คั่วต่อปิดฝา 1 นาที แล้วชั่งใหม่ · ได้ค่าเท่าเดิม 3 ครั้งก็หยุด</div>
+        {f.cs.map((v,i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+            <span style={{flex:'0 0 auto',minWidth:66,fontSize:13,color:'#5f6470',fontWeight:600,whiteSpace:'nowrap'}}>ครั้งที่ {i+1}</span>
+            <input type="number" inputMode="decimal" value={v} onChange={e=>setC(i,e.target.value)} placeholder="0"
+              style={{flex:1,padding:'12px 10px',fontSize:20,border:'1.5px solid #d6d8e0',borderRadius:10,fontFamily:'inherit',textAlign:'right'}}/>
+            {f.cs.length>1&&i===f.cs.length-1&&<button onClick={()=>setF(p=>({...p,cs:p.cs.slice(0,-1)}))}
+              style={{border:'none',background:'none',color:'#c0392b',fontSize:20,cursor:'pointer',padding:'0 4px'}}>✕</button>}
+          </div>
+        ))}
+        {!stable&&<button className="ghost" style={{marginTop:2}} onClick={()=>setF(p=>({...p,cs:[...p.cs,'']}))}>+ คั่วต่อ 1 นาที แล้วชั่งอีกครั้ง</button>}
+        {cs.length>0&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:10,fontSize:14,fontWeight:700,
+          background:stable?'#ecfdf5':'#fffbeb',color:stable?'#059669':'#b45309',border:`1px solid ${stable?'#a7f3d0':'#fde68a'}`}}>
+          {stable?'✓ ได้ค่าเท่าเดิมครบ 3 ครั้ง — แห้งสนิท หยุดคั่วได้':'ยังไม่นิ่ง — ได้ค่าเท่าเดิม '+same+'/3 ครั้ง คั่วต่ออีก 1 นาที'}
+        </div>}
+
+        {res&&<div style={{marginTop:14,padding:'16px 18px',borderRadius:12,background:'#f7faff',border:'1.5px solid #cbd9f0'}}>
+          <div className="result-row"><span>น้ำที่ระเหย (B − C)</span><b>{r1(B-C)} ก.</b></div>
+          <div className="result-row"><span>ทรายแห้ง (C − A)</span><b>{r1(dry)} ก.</b></div>
+          <div className="result-row"><span><b>ความชื้นทราย</b></span><b style={{fontSize:22,color:stable?'#1a56db':'#9aa0ad'}}>{res.moist}%</b></div>
+          <div style={{marginTop:12,paddingTop:12,borderTop:'1.5px solid #e6e8ee'}}>
+            <div style={{fontSize:12.5,color:'#5f6470',textAlign:'center',marginBottom:8}}>เทียบความชื้นปกติ {MOIST_BASE}% · ทราย {MOIST_SAND} กก. · ต่อคอนกรีต 1 ม³ (ใช้ได้ทุกสูตร)</div>
+            <div style={{display:'flex',gap:10}}>
+              <div style={{flex:1,textAlign:'center',background:'#fff',borderRadius:10,padding:'10px 6px',border:'1px solid #e6e8ee'}}>
+                <div style={{fontSize:12.5,color:'#5f6470'}}>ชั่งทราย</div>
+                <div style={{fontSize:24,fontWeight:800,color:'#1a56db'}}>{r1(res.wetSand)}</div>
+                <div style={{fontSize:12,color:'#8b91a1'}}>กก. ({res.wetSand-MOIST_SAND>=0?'+':''}{r1(res.wetSand-MOIST_SAND)})</div>
+              </div>
+              <div style={{flex:1,textAlign:'center',background:'#fff',borderRadius:10,padding:'10px 6px',border:'1px solid #e6e8ee'}}>
+                <div style={{fontSize:12.5,color:'#5f6470'}}>{res.water>0.05?'ลดน้ำ':res.water<-0.05?'เติมน้ำ':'น้ำ'}</div>
+                <div style={{fontSize:24,fontWeight:800,color:res.water>0.05?'#c0392b':res.water<-0.05?'#0f766e':'#5f6470'}}>{Math.abs(res.water)>0.05?r1(Math.abs(res.water)):'0'}</div>
+                <div style={{fontSize:12,color:'#8b91a1'}}>{Math.abs(res.water)>0.05?'ลิตร':'ไม่ต้องปรับ'}</div>
+              </div>
+            </div>
+          </div>
+        </div>}
+      </div>
+
+      <div className="card">
+        <div className="field" style={{marginBottom:0}}>
+          <label>หมายเหตุ (ถ้ามี)</label>
+          <input type="text" value={f.note} onChange={e=>set('note',e.target.value)} placeholder="เช่น ฝนตกเมื่อคืน"/>
+        </div>
+        {err&&<div style={{color:'#c0392b',fontSize:14,marginTop:10}}>{err}</div>}
+        <button className="bigbtn blue" disabled={saving} onClick={save} style={{marginTop:12}}>{saving?'กำลังบันทึก…':'💾 บันทึกผล'}</button>
+        <button className="ghost" onClick={()=>{if(window.confirm('ล้างค่าที่กรอกทั้งหมด?'))setF(blank);}}>เริ่มใหม่</button>
+      </div>
+    </div>
+  );
+}
+
 // ---- App ----
 const TABS=[
   {k:'sand', icon:'🏖', label:'FM'},
   {k:'silt', icon:'💧', label:'ฝุ่น'},
+  {k:'moist',icon:'💦', label:'ความชื้น'},
   {k:'stone',icon:'🪨', label:'หิน'},
 ];
 function App(){
@@ -1132,18 +1268,19 @@ function App(){
         <a href="qc.html" style={{color:'#fff',fontSize:22,textDecoration:'none',padding:'4px 8px 4px 0',lineHeight:1}}>‹</a>
         <div style={{flex:1}}>
           <h1>บันทึกผลทดสอบวัตถุดิบ</h1>
-          <p>บางเลน — ทราย · หิน</p>
+          <p>บางเลน — ทราย · หิน · ความชื้นทราย</p>
         </div>
       </div>
-      {/* เหลือ 3 แท็บ (FM / ฝุ่น / หิน) — เอาสารอินทรีย์ ความชื้น นน.คอนกรีต ออกแล้ว ไม่ได้ใช้ */}
+      {/* 4 แท็บ: FM / ฝุ่น / ความชื้น (คั่วกระทะ) / หิน — สารอินทรีย์ นน.คอนกรีต เอาออกแล้ว */}
       <div className="tabs" style={{flexWrap:'wrap'}}>
         {TABS.map(t=>(
           <button key={t.k} className={`tab${tab===t.k?' active':''}`} onClick={()=>setTab(t.k)}
-            style={{flex:'1 0 33.33%',fontSize:13.5,padding:'11px 2px'}}>{t.icon} {t.label}</button>
+            style={{flex:'1 0 25%',fontSize:13.5,padding:'11px 2px'}}>{t.icon} {t.label}</button>
         ))}
       </div>
       {tab==='sand'?<SandForm/>
         :tab==='silt'?<SiltForm/>
+        :tab==='moist'?<MoistureRoastForm/>
         :<StoneForm/>}
     </div>
   );
