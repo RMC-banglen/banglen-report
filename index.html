@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06h';
+var APP_VERSION='2026-10-06i';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5097,9 +5097,13 @@ window.__dataReady.then(data => {
       {hist.length>0&&<div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:12,fontSize:12.5,color:'#475569'}}>
         <b>📱 ผลจากแอป QC:</b>
         {hist.map((h,i)=>{const d=String(h.test_date).slice(0,10),v=Number(h.total_pct);
-          return<button key={h.id} onClick={()=>setCur(String(v))} title={(h.sand_source?h.sand_source+' · ':'')+'กดเพื่อใช้ค่านี้'}
+          // วันเดียวทดสอบหลายรอบ → บอกรอบที่ + เวลาบันทึก (รอบ 1 = เช้าสุด)
+          const sameDay=hist.filter(x=>String(x.test_date).slice(0,10)===d);
+          const round=sameDay.length>1?sameDay.length-sameDay.findIndex(x=>x.id===h.id):null;
+          const tm=h.created_at?new Date(h.created_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'}):'';
+          return<button key={h.id} onClick={()=>setCur(String(v))} title={(h.sand_source?h.sand_source+' · ':'')+(tm?'บันทึก '+tm+' น. · ':'')+'กดเพื่อใช้ค่านี้'}
             style={{padding:'3px 9px',borderRadius:999,border:`1px solid ${i===0?'#93c5fd':'#e2e8f0'}`,background:i===0?'#eff6ff':'#fff',color:i===0?'#1d4ed8':'#475569',fontSize:12.5,cursor:'pointer',fontWeight:i===0?700:400}}>
-            {d.slice(8)+'/'+d.slice(5,7)} · {v.toFixed(2)}%</button>;})}
+            {d.slice(8)+'/'+d.slice(5,7)}{round?' รอบ '+round:''}{round&&tm?' ('+tm+')':''} · {v.toFixed(2)}%{i===0?' ล่าสุด':''}</button>;})}
         <span style={{color:'#94a3b8'}}>กดเพื่อใช้ค่านั้น · บันทึกเพิ่มได้ที่แอปบันทึกผลทดสอบวัตถุดิบ แท็บ 💦 ความชื้น</span>
       </div>}
       {(()=>{
