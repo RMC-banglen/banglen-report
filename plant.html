@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06a';
+var APP_VERSION='2026-10-06b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -87,9 +87,9 @@ const hhmm=t=>t?new Date(t).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2
 const thDate=iso=>{const [y,m,d]=String(iso).split('-');return Number(d)+'/'+Number(m)+'/'+(Number(y)+543);};
 
 async function getGeminiKey(force){
-  if(!force){const local=localStorage.getItem('gemini_key');if(local)return local;}
+  if(!force){let local=null;try{local=localStorage.getItem('gemini_key');}catch(e){}if(local)return local;}
   try{const r=await fetch(GAS_URL+'?mode=key');const j=await r.json();
-    if(j&&j.key){localStorage.setItem('gemini_key',j.key);return j.key;}}catch(e){}
+    if(j&&j.key){try{localStorage.setItem('gemini_key',j.key);}catch(e){}return j.key;}}catch(e){}
   return '';
 }
 function resizeBase64(src,maxPx){
@@ -131,7 +131,7 @@ function App(){
   const[amp,setAmp]=useState('');
   const[sure,setSure]=useState(null);
   const[others,setOthers]=useState([]);
-  const[formula,setFormula]=useState(()=>localStorage.getItem('plant_formula')||'');
+  const[formula,setFormula]=useState(()=>{try{return localStorage.getItem('plant_formula')||'';}catch(e){return '';}});
   const[water,setWater]=useState('');
   const[time,setTime]=useState(nowHHMM());
   const[note,setNote]=useState('');
@@ -158,9 +158,9 @@ function App(){
       setImg(ev.target.result);setErr('');setMsg('');setAmp('');setSure(null);setOthers([]);setTime(nowHHMM());
       setReading(true);
       try{const res=await readAmp(ev.target.result);
-        if(res.amp==null)setErr('อ่านตัวเลขไม่ได้ — ถ่ายใหม่ให้ตรงและชัด หรือพิมพ์ค่าเอง');
+        if(res.amp==null)setErr('อ่านตัวเลขไม่ได้ — ถ่ายใหม่ให้ตรงและชัด ไม่มีแสงสะท้อน');
         else{setAmp(String(res.amp));setSure(res.sure!==false);setOthers((res.all||[]).filter(v=>v!==res.amp));}
-      }catch(ex){setErr('อ่านรูปไม่สำเร็จ: '+ex.message+' — พิมพ์ค่าเองได้');}
+      }catch(ex){setErr('อ่านรูปไม่สำเร็จ: '+ex.message+' — ลองถ่ายใหม่ (ถ้าเน็ตหลุด รอสักครู่)');}
       finally{setReading(false);}
     };
     r.readAsDataURL(f);e.target.value='';
@@ -171,17 +171,19 @@ function App(){
   const outLow=amp!==''&&lo!=null&&ampN<lo,outHigh=amp!==''&&hi!=null&&ampN>hi;
 
   const save=async()=>{
-    if(amp===''||!isFinite(ampN)||ampN<=0){setErr('กรุณาใส่ค่าแอมป์');return;}
+    if(!img||amp===''||!isFinite(ampN)||ampN<=0){setErr('กรุณาถ่ายรูปมิเตอร์ให้ระบบอ่านค่าแอมป์ก่อน');return;}
     if(!formula){setErr('กรุณาเลือกสูตรคอนกรีต');return;}
     setErr('');setSaving(true);
     const [hh,mm]=String(time||nowHHMM()).split(':');
     const at=new Date();at.setHours(Number(hh)||0,Number(mm)||0,0,0);
+    // อ่านไม่ชัด → ติดป้ายในหมายเหตุ ให้ QC รู้ว่าค่านี้ควรตรวจซ้ำ
+    const tag=sure===false?'[รูปไม่ชัด] ':'';
     const rec={d,read_at:at.toISOString(),formula,amp:ampN,water_l:water!==''?Number(water):null,
-      sand_moisture_pct:moist,note:note||null};
+      sand_moisture_pct:moist,note:(tag+(note||'')).trim()||null};
     const{error}=await SB.from('plant_amp_readings').insert([rec]);
     setSaving(false);
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
-    localStorage.setItem('plant_formula',formula);
+    try{localStorage.setItem('plant_formula',formula);}catch(e){}
     const round=today.length+1;
     // นอกช่วงปกติ → ให้ GAS ส่ง Telegram เข้ากลุ่ม QC (หน้านี้ไม่มีโทเคน)
     if(outLow||outHigh){
@@ -222,10 +224,12 @@ function App(){
 
       <div className="card">
         <div className="card-title">2. ค่าแอมป์ (A)</div>
-        <input className="amp-big" type="number" inputMode="decimal" value={amp} onChange={e=>{setAmp(e.target.value);setSure(null);}} placeholder="0"/>
-        {sure===false&&<div style={{marginTop:8,fontSize:13.5,color:'#b45309',fontWeight:700}}>⚠️ รูปไม่ค่อยชัด — ตรวจตัวเลขกับมิเตอร์อีกครั้งก่อนบันทึก</div>}
-        {sure===true&&<div style={{marginTop:8,fontSize:13.5,color:'#047857'}}>อ่านจากรูปแล้ว — ถ้าไม่ตรงกับมิเตอร์ แก้ตัวเลขได้เลย</div>}
-        {others.length>0&&<div style={{marginTop:6,fontSize:13,color:'#5b6b69'}}>ตัวเลขอื่นบนจอ: {others.map((v,i)=><button key={i} className="chip" style={{padding:'4px 10px',fontSize:13,marginLeft:6}} onClick={()=>setAmp(String(v))}>{v}</button>)}</div>}
+        {/* ค่าแอมป์มาจากรูปเท่านั้น พิมพ์เองไม่ได้ — กันการกรอกตัวเลขแต่งเอง */}
+        <div className="amp-big" style={{background:'#f3faf9',color:amp?'#0f766e':'#b6c6c4'}}>{amp||'—'}</div>
+        {!amp&&!reading&&<div style={{marginTop:8,fontSize:13,color:'#7a8a88'}}>ค่าแอมป์อ่านจากรูปอัตโนมัติ (พิมพ์เองไม่ได้)</div>}
+        {sure===false&&<div style={{marginTop:8,fontSize:13.5,color:'#b45309',fontWeight:700}}>⚠️ รูปไม่ค่อยชัด — ถ้าตัวเลขไม่ตรงกับมิเตอร์ ให้ถ่ายใหม่</div>}
+        {sure===true&&<div style={{marginTop:8,fontSize:13.5,color:'#047857'}}>อ่านจากรูปแล้ว — ถ้าไม่ตรงกับมิเตอร์ ให้กด "ถ่ายใหม่"</div>}
+        {others.length>0&&<div style={{marginTop:6,fontSize:13,color:'#5b6b69'}}>ระบบเห็นตัวเลขอื่นบนจอด้วย: {others.join(', ')} — ถ้าค่าแอมป์จริงเป็นตัวอื่น ให้ถ่ายใหม่ให้เห็นจอแอมป์จอเดียว</div>}
         {(outLow||outHigh)&&<div className="err" style={{marginTop:10,marginBottom:0}}>{outLow?'แอมป์ต่ำกว่าปกติ (ต่ำสุด '+lo+' A) — คอนกรีตอาจเหลว/น้ำเยอะ':'แอมป์สูงกว่าปกติ (สูงสุด '+hi+' A) — คอนกรีตอาจแห้ง/ฝืด'} · บันทึกแล้วจะแจ้ง QC</div>}
       </div>
 
@@ -242,8 +246,8 @@ function App(){
         <div className="card-title">4. ข้อมูลประกอบ</div>
         <div style={{display:'flex',gap:10}}>
           <div className="field" style={{flex:1}}>
-            <label>เวลาโม่</label>
-            <input type="time" value={time} onChange={e=>setTime(e.target.value)}/>
+            <label>เวลาโม่ <span style={{fontWeight:400,color:'#8a9997'}}>(ตอนถ่ายรูป)</span></label>
+            <input type="text" value={img?time:'—'} readOnly style={{background:'#f3f6f6',color:'#4b5a59'}}/>
           </div>
           <div className="field" style={{flex:1}}>
             <label>น้ำที่เติม (ลิตร) <span style={{fontWeight:400,color:'#8a9997'}}>ถ้ามี</span></label>
