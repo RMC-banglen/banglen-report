@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06b';
+var APP_VERSION='2026-10-06c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5037,14 +5037,13 @@ window.__dataReady.then(data => {
   // ความชื้นมากขึ้น = ทรายที่ชั่งมีน้ำปนมากขึ้น ต้องชั่งทรายเพิ่มให้ได้เนื้อทรายเท่าเดิม และลดน้ำที่เติมลงเท่าน้ำส่วนเกิน
   // ============================================================
   function SandMoistureTable(){
-    const LS='sand_moist_calc';
+    const LS='sand_moist_calc_v2';   // v2: ปูนตั้งต้นเปลี่ยนเป็น 325 (ค่าที่เครื่องเคยจำไว้ 375 จะไม่ถูกใช้)
     const init=(()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}');}catch(e){return {};}})();
     const [sand,setSand]=useState(init.sand??(D.mixTarget&&D.mixTarget.sand)??822);
     const [base,setBase]=useState(init.base??7);
-    const [cement,setCement]=useState(init.cement??375);
+    const [cement,setCement]=useState(init.cement??325);
     const [water,setWater]=useState(init.water??160);
     const [cur,setCur]=useState(init.cur??'');
-    useEffect(()=>{if(init.cement==null)DB.from('cement_config').select('baseline_kg_m3').eq('id',1).limit(1).then(({data})=>{const v=data&&data[0]&&Number(data[0].baseline_kg_m3);if(v)setCement(v);});},[]);
     useEffect(()=>{try{localStorage.setItem(LS,JSON.stringify({sand,base,cement,water,cur}));}catch(e){}},[sand,base,cement,water,cur]);
     const S=Number(sand)||0,B=(Number(base)||0)/100,C=Number(cement)||0,W=Number(water)||0;
     const dry=S/(1+B);                 // เนื้อทรายแห้งที่สูตรต้องการ
