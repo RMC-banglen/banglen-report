@@ -914,6 +914,23 @@ function notifyMaterialFail(d) {
       if (isWash) L.push('ก่อนล้าง ' + d.w_before + ' g · หลังล้าง ' + d.w_after + ' g');
       else L.push('ชั้นทราย ' + d.sand_mm + ' มม. · ชั้นฝุ่น ' + d.silt_mm + ' มม.');
       if (!isWash) L.push('<i>วิธีเขย่าขวดเป็นการคัดกรอง ควรยืนยันด้วยวิธีล้างก่อนตัดสิน</i>');
+    } else if (d.test === 'sand_moisture') {
+      // ไม่ใช่การแจ้งว่าไม่ผ่าน แต่เป็นตัวเลขที่ต้องเอาไปตั้งเครื่อง จึงไม่ใช้ไอคอนเตือน
+      var low = (d.rows || []).filter(function (r) { return Number(r.w) <= 0; });
+      L.push('💦 <b>ความชื้นทราย ' + d.moist + '%</b>' + (d.round > 1 ? '  (รอบที่ ' + d.round + ')' : ''));
+      if (!Number(d.stable)) L.push('<i>ค่ายังไม่นิ่งตอนบันทึก อาจต่ำกว่าจริง</i>');
+      L.push('');
+      L.push('<b>ตั้งเครื่องตามนี้</b> (ต่อ 1 ม³)');
+      L.push('<pre>' + padCol('สูตร', 7) + padCol('ทราย', 8) + padCol('น้ำ', 7) + 'น้ำยา');
+      (d.rows || []).forEach(function (r) {
+        L.push(padCol(r.f, 7) + padCol(String(r.s), 8) + padCol(String(r.w), 7) + (r.np != null ? r.np : '-'));
+      });
+      L.push('</pre>');
+      if (low.length) {
+        L.push('⚠️ <b>' + low.map(function (r) { return r.f; }).join(', ') +
+               ' เติมน้ำไม่ได้แล้ว</b> — ทรายชื้นเกินกว่าสูตรรับไหว');
+        L.push('ต่อให้ไม่เติมน้ำเลยก็ยังเหลวเกิน ควรรอให้ทรายสะเด็ดน้ำก่อน');
+      }
     } else if (d.test === 'unit_weight') {
       L.push('⚠️ <b>หน่วยน้ำหนักคอนกรีตสด ต่ำกว่าค่าอ้างอิง</b>');
       L.push('สูตร: <b>' + esc(d.formula || '-') + '</b>');
@@ -957,6 +974,13 @@ function notifyAmpAlert(d) {
   } catch (err) {
     Logger.log('notifyAmpAlert error: ' + err.message);
   }
+}
+
+// จัดคอลัมน์ให้ตรงกันในบล็อก <pre> ของ Telegram (ฟอนต์ความกว้างเท่ากันทุกตัว)
+function padCol(s, n) {
+  var t = String(s == null ? '' : s);
+  while (t.length < n) t += ' ';
+  return t;
 }
 
 function esc(s) {

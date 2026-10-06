@@ -1191,6 +1191,15 @@ function MoistureRoastForm(){
       note:('คั่ว A='+f.a+' B='+f.b+' C='+cs.join('→')+(f.note?' · '+f.note:'')).slice(0,500)}]);
     setSaving(false);
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+
+    // ส่งตัวเลขที่ต้องตั้งเครื่องเข้ากลุ่มเลย คนตั้งเครื่องจะได้ไม่ต้องเปิดแอปเอง
+    // วันละ 1-2 ครั้งเท่านั้น ไม่ถี่จนน่ารำคาญ
+    if(mixRows.length) alertFail({test:'sand_moisture',
+      test_date:f.test_date, source:f.sand_source||'', moist:res.moist,
+      round:dayRows.length+1, stable:stable?1:0,
+      rows:mixRows.map(m=>({f:m.formula,
+        s:Math.round(m.wetSand*10)/10, w:Math.round(m.adj*10)/10, np:m.np_cc}))});
+
     setDone({...res,round:dayRows.length+1});try{localStorage.removeItem(LS);}catch(e){}
   };
 
