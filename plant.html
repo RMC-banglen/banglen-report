@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>บันทึกแอมป์โม่ — แพล้นปูน</title>
+<script>
+// iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
+// จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
+var APP_VERSION='2026-10-06a';
+(function(){
+  var check=function(){
+    fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
+      .then(function(r){return r.text();})
+      .then(function(t){
+        var m=t.match(/APP_VERSION='([^']+)'/);
+        if(m&&m[1]!==APP_VERSION) location.replace(location.pathname+'?v='+m[1]);
+      }).catch(function(){});
+  };
+  check();
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
+})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="แอมป์โม่"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0f766e"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:#eef3f2;min-height:100vh;color:#1f2a2a;}
+.wrap{max-width:480px;margin:0 auto;padding:0 0 60px;}
+.topbar{background:#0f766e;color:#fff;padding:16px 18px;}
+.topbar h1{font-size:18px;font-weight:800;line-height:1.2;}
+.topbar p{font-size:12.5px;opacity:.8;margin-top:2px;}
+.card{background:#fff;border-radius:14px;padding:18px 16px;margin:14px 14px 0;box-shadow:0 1px 6px rgba(0,0,0,.07);}
+.card-title{font-size:15px;font-weight:800;margin-bottom:12px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:13px;font-weight:700;color:#4b5a59;margin-bottom:6px;}
+.field input{-webkit-appearance:none;appearance:none;width:100%;padding:12px 13px;border:1.5px solid #d3dcdb;border-radius:10px;font-size:17px;font-family:inherit;outline:none;background:#fff;color:#1f2a2a;}
+.field input:focus{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.14);}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{padding:10px 14px;border-radius:999px;border:1.5px solid #d3dcdb;background:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:#33413f;}
+.chip.on{background:#0f766e;border-color:#0f766e;color:#fff;}
+.photo-box{border:2px dashed #7fb7b0;border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;background:#f3faf9;}
+.photo-box img{max-width:100%;max-height:260px;border-radius:10px;object-fit:contain;}
+.photo-box .ph-icon{font-size:48px;display:block;margin-bottom:8px;}
+.photo-box .ph-label{font-size:17px;font-weight:800;color:#0f766e;}
+.photo-box .ph-sub{font-size:12.5px;color:#7a8a88;margin-top:4px;}
+.amp-big{width:100%;padding:14px;border:2px solid #0f766e;border-radius:12px;font-size:40px;font-weight:800;text-align:center;font-family:inherit;color:#0f766e;outline:none;}
+.bigbtn{width:100%;padding:16px;border-radius:12px;border:none;font-size:18px;font-weight:800;font-family:inherit;cursor:pointer;background:#0f766e;color:#fff;}
+.bigbtn:disabled{opacity:.45;cursor:not-allowed;}
+.ghost{width:100%;padding:13px;border-radius:12px;border:1.5px solid #d3dcdb;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;background:#fff;color:#33413f;margin-top:10px;}
+.err{color:#c0392b;font-size:14px;font-weight:600;padding:10px 13px;background:#fdf0ee;border-radius:10px;margin-bottom:12px;}
+.ok{color:#047857;font-size:14px;font-weight:700;padding:10px 13px;background:#ecfdf5;border-radius:10px;margin-bottom:12px;}
+.spinner{display:inline-block;width:36px;height:36px;border:4px solid #dfe7e6;border-top-color:#0f766e;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eef2f1;font-size:15px;}
+.row:last-child{border-bottom:none;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script type="text/babel">
+// ============================================================
+// หน้าสำหรับคนแพล้นปูนอย่างเดียว (ลิงก์เฉพาะ ไม่มีเมนูไปหน้าอื่น)
+// ถ่ายรูปมิเตอร์แอมป์ดิจิตอลของเครื่องโม่ → Gemini อ่านตัวเลข → ยืนยัน/แก้ → บันทึก
+// วันละหลายรอบได้ · ความชื้นทรายดึงจากผล QC ล่าสุดของวันมาเก็บคู่ให้เอง
+// ============================================================
+const {useState,useEffect,useRef}=React;
+const SB=supabase.createClient(
+  'https://npxzerdirspwunuckcqr.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI'
+);
+// Gemini key กับการแจ้งเตือน Telegram อยู่ใน Google Apps Script ตัวเดียวกับแอปผลลูกปูน (หน้านี้ไม่เก็บความลับ)
+const GAS_URL='https://script.google.com/macros/s/AKfycbzyu-ZNgAu9Rxof-PP-JVG6wmKfw1nSnbr75novSi3VbThXxwBfUvZjKrs1OuuW3617/exec';
+const FORMULAS=['NP280','NP315','NP325','NP335','NP345','NP355'];
+
+const pad=n=>String(n).padStart(2,'0');
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function nowHHMM(){const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes());}
+const hhmm=t=>t?new Date(t).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'}):'';
+const thDate=iso=>{const [y,m,d]=String(iso).split('-');return Number(d)+'/'+Number(m)+'/'+(Number(y)+543);};
+
+async function getGeminiKey(force){
+  if(!force){const local=localStorage.getItem('gemini_key');if(local)return local;}
+  try{const r=await fetch(GAS_URL+'?mode=key');const j=await r.json();
+    if(j&&j.key){localStorage.setItem('gemini_key',j.key);return j.key;}}catch(e){}
+  return '';
+}
+function resizeBase64(src,maxPx){
+  return new Promise(res=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;
+    if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
+    const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+    res(c.toDataURL('image/jpeg',0.85).split(',')[1]);};img.src=src;});
+}
+// อ่านตัวเลขบนมิเตอร์แอมป์ดิจิตอล
+async function readAmp(dataUrl){
+  let key=await getGeminiKey();
+  if(!key)throw new Error('ยังไม่มี Gemini key — แจ้งผู้ดูแลระบบ');
+  const base64=await resizeBase64(dataUrl,1400);
+  const ask=k=>fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${k}`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[
+      {inline_data:{mime_type:'image/jpeg',data:base64}},
+      {text:`รูปนี้คือมิเตอร์วัดกระแสไฟฟ้า (แอมป์) แบบตัวเลขดิจิตอล ของเครื่องโม่ผสมคอนกรีต
+อ่านตัวเลขที่มิเตอร์แสดง แล้วตอบ JSON เท่านั้น ไม่ต้องอธิบาย:
+{"amp":123.4,"all":[123.4],"sure":true}
+- amp = ค่าแอมป์หลักที่แสดง (ตัวเลข ทศนิยมได้ ไม่ต้องใส่หน่วย)
+- all = ตัวเลขทุกตัวที่เห็นบนหน้าจอ (ถ้ามีหลายจอ/หลายเฟส)
+- sure = false ถ้าตัวเลขไม่ชัด/มีแสงสะท้อน/อ่านไม่ออกบางหลัก
+- ถ้าไม่เห็นตัวเลขเลย ให้ amp เป็น null`}
+    ]}]})});
+  let resp=await ask(key);
+  if(resp.status===400||resp.status===401||resp.status===403){const fresh=await getGeminiKey(true);if(fresh&&fresh!==key)resp=await ask(fresh);}
+  const j=await resp.json();
+  if(!resp.ok)throw new Error(j.error?.message||('Gemini error '+resp.status));
+  const text=(j.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'');
+  const m=text.match(/\{[\s\S]*\}/);if(!m)throw new Error('อ่านตัวเลขในรูปไม่ได้');
+  return JSON.parse(m[0]);
+}
+
+function App(){
+  const fileRef=useRef();
+  const[img,setImg]=useState(null);
+  const[reading,setReading]=useState(false);
+  const[amp,setAmp]=useState('');
+  const[sure,setSure]=useState(null);
+  const[others,setOthers]=useState([]);
+  const[formula,setFormula]=useState(()=>localStorage.getItem('plant_formula')||'');
+  const[water,setWater]=useState('');
+  const[time,setTime]=useState(nowHHMM());
+  const[note,setNote]=useState('');
+  const[moist,setMoist]=useState(null);       // ผลความชื้นทรายล่าสุดวันนี้จาก QC
+  const[spec,setSpec]=useState({});
+  const[today,setToday]=useState([]);
+  const[saving,setSaving]=useState(false);
+  const[err,setErr]=useState('');
+  const[msg,setMsg]=useState('');
+  const d=todayISO();
+
+  const loadToday=()=>SB.from('plant_amp_readings').select('*').eq('d',d).order('read_at').then(({data,error})=>{if(error)setErr('ยังไม่ได้สร้างตารางในฐานข้อมูล — แจ้งผู้ดูแลระบบ ('+error.message+')');else setToday(data||[]);});
+  useEffect(()=>{
+    loadToday();
+    SB.from('sand_moisture_tests').select('total_pct,created_at').eq('test_date',d).order('id',{ascending:false}).limit(1)
+      .then(({data})=>{if(data&&data[0])setMoist(Number(data[0].total_pct));});
+    SB.from('plant_amp_spec').select('amp_min,amp_max').eq('id',1).limit(1).then(({data})=>{if(data&&data[0])setSpec(data[0]);});
+  },[]);
+
+  const onFile=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=async ev=>{
+      setImg(ev.target.result);setErr('');setMsg('');setAmp('');setSure(null);setOthers([]);setTime(nowHHMM());
+      setReading(true);
+      try{const res=await readAmp(ev.target.result);
+        if(res.amp==null)setErr('อ่านตัวเลขไม่ได้ — ถ่ายใหม่ให้ตรงและชัด หรือพิมพ์ค่าเอง');
+        else{setAmp(String(res.amp));setSure(res.sure!==false);setOthers((res.all||[]).filter(v=>v!==res.amp));}
+      }catch(ex){setErr('อ่านรูปไม่สำเร็จ: '+ex.message+' — พิมพ์ค่าเองได้');}
+      finally{setReading(false);}
+    };
+    r.readAsDataURL(f);e.target.value='';
+  };
+
+  const ampN=Number(amp);
+  const lo=spec.amp_min!=null&&spec.amp_min!==''?Number(spec.amp_min):null,hi=spec.amp_max!=null&&spec.amp_max!==''?Number(spec.amp_max):null;
+  const outLow=amp!==''&&lo!=null&&ampN<lo,outHigh=amp!==''&&hi!=null&&ampN>hi;
+
+  const save=async()=>{
+    if(amp===''||!isFinite(ampN)||ampN<=0){setErr('กรุณาใส่ค่าแอมป์');return;}
+    if(!formula){setErr('กรุณาเลือกสูตรคอนกรีต');return;}
+    setErr('');setSaving(true);
+    const [hh,mm]=String(time||nowHHMM()).split(':');
+    const at=new Date();at.setHours(Number(hh)||0,Number(mm)||0,0,0);
+    const rec={d,read_at:at.toISOString(),formula,amp:ampN,water_l:water!==''?Number(water):null,
+      sand_moisture_pct:moist,note:note||null};
+    const{error}=await SB.from('plant_amp_readings').insert([rec]);
+    setSaving(false);
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    localStorage.setItem('plant_formula',formula);
+    const round=today.length+1;
+    // นอกช่วงปกติ → ให้ GAS ส่ง Telegram เข้ากลุ่ม QC (หน้านี้ไม่มีโทเคน)
+    if(outLow||outHigh){
+      try{fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({kind:'amp_alert',
+        d,time,round,formula,amp:ampN,amp_min:lo,amp_max:hi,water_l:rec.water_l,sand_moisture_pct:moist,note:note||''})});}catch(e){}
+    }
+    setMsg('✅ บันทึกรอบที่ '+round+' แล้ว — '+formula+' · '+ampN+' A'+(outLow||outHigh?' (นอกช่วงปกติ แจ้ง QC แล้ว)':''));
+    setImg(null);setAmp('');setSure(null);setOthers([]);setWater('');setNote('');setTime(nowHHMM());
+    loadToday();window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  const del=async r=>{
+    if(!window.confirm('ลบรอบเวลา '+hhmm(r.read_at)+' ('+r.formula+' · '+r.amp+' A) ?'))return;
+    await SB.from('plant_amp_readings').delete().eq('id',r.id);loadToday();
+  };
+
+  return(
+    <div className="wrap">
+      <div className="topbar">
+        <h1>⚡ บันทึกแอมป์เครื่องโม่</h1>
+        <p>แพล้นปูน RMC บางเลน · {thDate(d)} · วันนี้บันทึกแล้ว {today.length} รอบ</p>
+      </div>
+
+      {msg&&<div style={{margin:'14px 14px 0'}}><div className="ok">{msg}</div></div>}
+
+      <div className="card">
+        <div className="card-title">1. ถ่ายรูปมิเตอร์แอมป์ {today.length>0&&<span style={{color:'#0f766e'}}>— รอบที่ {today.length+1}</span>}</div>
+        <input type="file" accept="image/*" capture="environment" ref={fileRef} style={{display:'none'}} onChange={onFile}/>
+        <div className="photo-box" onClick={()=>fileRef.current.click()}>
+          {img?<img src={img} alt="มิเตอร์"/>:<>
+            <span className="ph-icon">📷</span>
+            <div className="ph-label">แตะเพื่อถ่ายรูปมิเตอร์</div>
+            <div className="ph-sub">ถ่ายให้ตรง เห็นตัวเลขชัด ไม่มีแสงสะท้อน</div></>}
+        </div>
+        {reading&&<div style={{textAlign:'center',padding:'14px 0'}}><div className="spinner"/><div style={{fontWeight:700,marginTop:8}}>กำลังอ่านตัวเลข…</div></div>}
+        {img&&!reading&&<button className="ghost" onClick={()=>fileRef.current.click()}>📷 ถ่ายใหม่</button>}
+      </div>
+
+      <div className="card">
+        <div className="card-title">2. ค่าแอมป์ (A)</div>
+        <input className="amp-big" type="number" inputMode="decimal" value={amp} onChange={e=>{setAmp(e.target.value);setSure(null);}} placeholder="0"/>
+        {sure===false&&<div style={{marginTop:8,fontSize:13.5,color:'#b45309',fontWeight:700}}>⚠️ รูปไม่ค่อยชัด — ตรวจตัวเลขกับมิเตอร์อีกครั้งก่อนบันทึก</div>}
+        {sure===true&&<div style={{marginTop:8,fontSize:13.5,color:'#047857'}}>อ่านจากรูปแล้ว — ถ้าไม่ตรงกับมิเตอร์ แก้ตัวเลขได้เลย</div>}
+        {others.length>0&&<div style={{marginTop:6,fontSize:13,color:'#5b6b69'}}>ตัวเลขอื่นบนจอ: {others.map((v,i)=><button key={i} className="chip" style={{padding:'4px 10px',fontSize:13,marginLeft:6}} onClick={()=>setAmp(String(v))}>{v}</button>)}</div>}
+        {(outLow||outHigh)&&<div className="err" style={{marginTop:10,marginBottom:0}}>{outLow?'แอมป์ต่ำกว่าปกติ (ต่ำสุด '+lo+' A) — คอนกรีตอาจเหลว/น้ำเยอะ':'แอมป์สูงกว่าปกติ (สูงสุด '+hi+' A) — คอนกรีตอาจแห้ง/ฝืด'} · บันทึกแล้วจะแจ้ง QC</div>}
+      </div>
+
+      <div className="card">
+        <div className="card-title">3. สูตรคอนกรีต</div>
+        <div className="chips">{FORMULAS.map(f=><button key={f} className={'chip'+(formula===f?' on':'')} onClick={()=>setFormula(f)}>{f}</button>)}</div>
+        <div className="field" style={{marginTop:12,marginBottom:0}}>
+          <label>หรือพิมพ์สูตรอื่น</label>
+          <input value={FORMULAS.includes(formula)?'':formula} onChange={e=>setFormula(e.target.value.toUpperCase())} placeholder="เช่น NP315 CK"/>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">4. ข้อมูลประกอบ</div>
+        <div style={{display:'flex',gap:10}}>
+          <div className="field" style={{flex:1}}>
+            <label>เวลาโม่</label>
+            <input type="time" value={time} onChange={e=>setTime(e.target.value)}/>
+          </div>
+          <div className="field" style={{flex:1}}>
+            <label>น้ำที่เติม (ลิตร) <span style={{fontWeight:400,color:'#8a9997'}}>ถ้ามี</span></label>
+            <input type="number" inputMode="decimal" value={water} onChange={e=>setWater(e.target.value)} placeholder="เช่น 150"/>
+          </div>
+        </div>
+        <div style={{fontSize:13.5,color:'#4b5a59',marginBottom:12}}>
+          ความชื้นทรายวันนี้: {moist!=null?<b>{moist.toFixed(2)}%</b>:<span style={{color:'#9aa8a6'}}>ยังไม่มีผลจาก QC</span>} <span style={{color:'#9aa8a6'}}>(บันทึกคู่ให้เอง)</span>
+        </div>
+        <div className="field" style={{marginBottom:0}}>
+          <label>หมายเหตุ <span style={{fontWeight:400,color:'#8a9997'}}>ถ้ามี</span></label>
+          <input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น เติมน้ำเพิ่ม / ทรายแฉะ"/>
+        </div>
+      </div>
+
+      <div className="card">
+        {err&&<div className="err">{err}</div>}
+        <button className="bigbtn" disabled={saving||reading} onClick={save}>{saving?'กำลังบันทึก…':'💾 บันทึกรอบที่ '+(today.length+1)}</button>
+      </div>
+
+      {today.length>0&&<div className="card">
+        <div className="card-title">วันนี้ ({today.length} รอบ)</div>
+        {[...today].reverse().map((r,i)=><div className="row" key={r.id}>
+          <span><b>รอบ {today.length-i}</b> · {hhmm(r.read_at)} · {r.formula}</span>
+          <span style={{display:'flex',alignItems:'center',gap:10}}>
+            <b style={{fontSize:18,color:(lo!=null&&r.amp<lo)||(hi!=null&&r.amp>hi)?'#c0392b':'#0f766e'}}>{Number(r.amp)} A</b>
+            <button onClick={()=>del(r)} style={{border:'none',background:'none',color:'#c0392b',fontSize:18,cursor:'pointer'}}>✕</button>
+          </span>
+        </div>)}
+      </div>}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

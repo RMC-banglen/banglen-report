@@ -25,6 +25,11 @@ function doPost(e) {
       notifyMaterialFail(data);
       return respond(true, 'แจ้งเตือนแล้ว');
     }
+    // หน้า plant.html (คนแพล้นปูน) ยิงมาเมื่อแอมป์เครื่องโม่นอกช่วงปกติ
+    if (data.kind === 'amp_alert') {
+      notifyAmpAlert(data);
+      return respond(true, 'แจ้งเตือนแล้ว');
+    }
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sh = ss.getSheetByName(SHEET_NAME);
@@ -928,6 +933,29 @@ function notifyMaterialFail(d) {
     sendTelegram(L.join('\n'), tgChatQC());
   } catch (err) {
     Logger.log('notifyMaterialFail error: ' + err.message);
+  }
+}
+
+// แอมป์เครื่องโม่นอกช่วงปกติ → กลุ่ม QC
+function notifyAmpAlert(d) {
+  try {
+    var amp = Number(d.amp), lo = d.amp_min, hi = d.amp_max;
+    var low = lo != null && amp < Number(lo);
+    var L = [];
+    L.push(low ? '⚡⬇️ <b>แอมป์เครื่องโม่ต่ำกว่าปกติ</b>' : '⚡⬆️ <b>แอมป์เครื่องโม่สูงกว่าปกติ</b>');
+    L.push('');
+    L.push('<b>ค่าที่อ่านได้:</b> ' + amp + ' A  (ปกติ ' + (lo != null ? lo : '–') + '–' + (hi != null ? hi : '–') + ' A)');
+    L.push('<b>สูตร:</b> ' + esc(d.formula || '-') + ' · รอบที่ ' + (d.round || '-') + ' · เวลา ' + esc(d.time || '-'));
+    if (d.sand_moisture_pct != null) L.push('ความชื้นทรายวันนี้: ' + Number(d.sand_moisture_pct).toFixed(2) + '%');
+    if (d.water_l != null) L.push('น้ำที่เติม: ' + d.water_l + ' ลิตร');
+    if (d.note) L.push('หมายเหตุ: ' + esc(d.note));
+    L.push('');
+    L.push(low ? '<i>แอมป์ต่ำ = คอนกรีตเหลว/น้ำเยอะ — เช็คความชื้นทรายและน้ำที่เติม กำลังอัดมีโอกาสตก</i>'
+               : '<i>แอมป์สูง = คอนกรีตแห้ง/ฝืด — เช็คน้ำ ความชื้นทราย และส่วนผสม</i>');
+    L.push('วันที่ ' + fmtThaiDate(d.d));
+    sendTelegram(L.join('\n'), tgChatQC());
+  } catch (err) {
+    Logger.log('notifyAmpAlert error: ' + err.message);
   }
 }
 
