@@ -922,8 +922,10 @@ function notifyMaterialFail(d) {
       L.push('');
       L.push('<b>ตั้งเครื่องตามนี้</b> (ต่อ 1 ม³)');
       L.push('<pre>' + padCol('สูตร', 7) + padCol('ทราย', 8) + padCol('น้ำ', 7) + 'น้ำยา');
+      // ปัดอีกชั้นที่นี่ด้วย เผื่อมือถือเครื่องที่ยังเปิดแอปเวอร์ชันเก่าค้างอยู่ส่งทศนิยมมา
       (d.rows || []).forEach(function (r) {
-        L.push(padCol(r.f, 7) + padCol(String(r.s), 8) + padCol(String(r.w), 7) + (r.np != null ? r.np : '-'));
+        L.push(padCol(r.f, 7) + padCol(String(Math.round(Number(r.s))), 8) +
+               padCol(String(Math.round(Number(r.w))), 7) + (r.np != null ? r.np : '-'));
       });
       L.push('</pre>');
       if (low.length) {
