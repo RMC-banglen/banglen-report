@@ -5243,14 +5243,18 @@ window.__dataReady.then(data => {
           สูตรคอนกรีต — ต่อ 1 ม³
           <span style={{fontWeight:400,color:'#64748b',marginLeft:8,fontSize:12.5}}>
             ทรายในสูตรชั่งที่ความชื้น {f1(Number(base))}%
-            {curRow&&<> · วันนี้ {f1(curRow.m)}% → ทุกสูตรชั่งทราย <b style={{color:'#1d4ed8'}}>{f1(curRow.wet)} กก.</b></>}
+            {curRow
+              ? <> · วันนี้ {f1(curRow.m)}% → ช่องสีฟ้าคือตัวเลขที่ต้องใช้จริง</>
+              : <> · ยังไม่มีผลความชื้นวันนี้ จึงแสดงค่าตามสูตรดิบ</>}
           </span>
         </div>
         <div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',width:'100%',fontSize:13.5}}>
             <thead><tr>
               <th style={{...th,textAlign:'left'}}>สูตร</th>
-              <th style={th}>ปูน</th><th style={th}>ทราย</th>
+              <th style={th}>ปูน</th>
+              <th style={th}>ทรายในสูตร</th>
+              {curRow&&<th style={{...th,background:'#eff6ff',color:'#1d4ed8'}}>ชั่งจริงวันนี้</th>}
               <th style={th}>หิน 3/4″</th><th style={th}>หิน 1″</th>
               <th style={th}>น้ำในสูตร</th>
               {curRow&&<th style={{...th,background:'#eff6ff',color:'#1d4ed8'}}>เติมจริงวันนี้</th>}
@@ -5258,11 +5262,19 @@ window.__dataReady.then(data => {
             </tr></thead>
             <tbody>
               {mixes.map(m=>{
-                const adj=curRow?Number(m.water_add_l)-curRow.extra:null;
+                // น้ำส่วนเกินคิดจากทรายของสูตรนั้นเอง ไม่ใช่ค่ากลางในช่องด้านบน
+                // ตอนนี้ทุกสูตรใช้ทราย 822 เท่ากันจึงได้เท่ากัน แต่ถ้าวันหลังต่างกันก็ยังถูก
+                const exM=curRow?Number(m.sand_kg)/(1+Number(base)/100)*(curRow.m-Number(base))/100:0;
+                const adj=curRow?Number(m.water_add_l)-exM:null;
                 const low=adj!=null&&adj<=0;
                 return <tr key={m.formula} style={{borderBottom:'1px solid #f1f3f7'}}>
                   <td style={{padding:'7px 10px',fontWeight:700,color:'#1a2540'}}>{m.formula}</td>
-                  <td style={td}>{f0(m.cement_kg)}</td><td style={td}>{f0(m.sand_kg)}</td>
+                  <td style={td}>{f0(m.cement_kg)}</td>
+                  <td style={{...td,color:'#64748b'}}>{f0(m.sand_kg)}</td>
+                  {/* ทรายในสูตรชั่งที่ความชื้นอ้างอิง วันที่ทรายชื้นกว่านั้นต้องชั่งเพิ่มให้ได้เนื้อทรายเท่าเดิม
+                      คิดจากทรายของสูตรนั้นเอง เผื่อวันหลังมีสูตรที่ใช้ทรายไม่เท่ากัน */}
+                  {curRow&&<td style={{...td,background:'#f8fbff',fontWeight:800,fontSize:15,color:'#1d4ed8'}}>
+                    {f1(Number(m.sand_kg)/(1+Number(base)/100)*(1+curRow.m/100))}</td>}
                   <td style={td}>{f0(m.rock34_kg)}</td><td style={td}>{f0(m.rock1_kg)}</td>
                   <td style={{...td,color:'#64748b'}}>{f1(m.water_add_l)}</td>
                   {curRow&&<td style={{...td,background:'#f8fbff',fontWeight:800,fontSize:15,color:low?'#b91c1c':'#1d4ed8'}}>{f1(adj)}</td>}
@@ -5273,7 +5285,7 @@ window.__dataReady.then(data => {
             </tbody>
           </table>
         </div>
-        {curRow&&mixes.some(m=>Number(m.water_add_l)-curRow.extra<=0)&&
+        {curRow&&mixes.some(m=>Number(m.water_add_l)-Number(m.sand_kg)/(1+Number(base)/100)*(curRow.m-Number(base))/100<=0)&&
           <div style={{padding:'9px 12px',background:'#fef2f2',borderTop:'1px solid #fecaca',fontSize:12.5,color:'#b91c1c',lineHeight:1.7}}>
             ⚠️ สูตรที่ขึ้นแดง น้ำที่ต้องเติมเหลือ 0 หรือติดลบ — ทรายชื้นเกินกว่าสูตรรับไหว ต่อให้ไม่เติมน้ำเลยก็ยังเหลวเกิน
           </div>}
