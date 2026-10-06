@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06j';
+var APP_VERSION='2026-10-06k';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4910,7 +4910,9 @@ window.__dataReady.then(data => {
         };
         // กราฟเทียบ น้ำหนัก (ความหนาแน่น) กับ KSC ทีละลูก
         const pts=hasW?list.flatMap(x=>x.k.map((kv,i)=>kv!=null&&x.w[i]?{d:x.densOf(x.w[i]),k:kv,low:x.tg!=null&&kv<x.tg}:null).filter(Boolean)):[];
-        const sx={min:Math.min(...pts.map(p=>p.d),2300),max:Math.max(...pts.map(p=>p.d),2500)},sy={min:Math.min(...pts.map(p=>p.k),300),max:Math.max(...pts.map(p=>p.k),550)};
+        // ช่วงแกนพอดีกับข้อมูล (เผื่อขอบ 8%) — เดิมตั้งตายตัว 2300–2500 จุดเลยไปกองชิดขอบ
+        const rng=(a)=>{const lo=Math.min(...a),hi=Math.max(...a),p=((hi-lo)||Math.max(1,Math.abs(hi)*0.01))*0.08;return{min:lo-p,max:hi+p};};
+        const sx=pts.length?rng(pts.map(p=>p.d)):{min:0,max:1},sy=pts.length?rng(pts.map(p=>p.k)):{min:0,max:1};
         const W=640,H=260,P=44,X=d=>P+(d-sx.min)/(sx.max-sx.min||1)*(W-P-12),Y=k=>H-28-(k-sy.min)/(sy.max-sy.min||1)*(H-40);
         const cell=(v,low)=>({textAlign:'right',padding:'5px 8px',whiteSpace:'nowrap',color:low?'#c0392b':'#1f2937',fontWeight:low?700:400});
         return <div className="chart-card" style={{marginBottom:24}}>
@@ -4921,7 +4923,17 @@ window.__dataReady.then(data => {
             <button onClick={exportXlsx} disabled={!list.length} style={{...btnStyle,color:'#15803d',borderColor:'#86efac'}}>⬇ Excel</button>
             <button onClick={exportPdf} disabled={!list.length} style={{...btnStyle,color:'#b91c1c',borderColor:'#fca5a5'}}>⬇ PDF</button>
           </div>
-          <div style={{fontSize:12,color:'#64748b',marginBottom:10}}>ตัวเลขแดง = ต่ำกว่าเกณฑ์ · พื้นส้ม = 3 ลูกต่างกันเกิน 8% (ASTM C39){!hasW&&' · ยังไม่มีข้อมูลน้ำหนักลูกปูน — ใส่ได้ในแอปบันทึกผลลูกปูน (ช่อง "น้ำหนักลูกปูน")'}</div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:10}}>ตัวเลขแดง = ต่ำกว่าเกณฑ์ · พื้นส้ม = 3 ลูกต่างกันเกิน 8% (ASTM C39)</div>
+          {!hasW&&(()=>{
+            // ช่วงที่เลือกไม่มีน้ำหนัก → บอกวันที่ที่มีน้ำหนัก กดแล้วเลื่อนช่วงวันที่ไปดูได้เลย
+            const wDates=[...new Set(rows.filter(r=>[r.weight1_kg,r.weight2_kg,r.weight3_kg].some(v=>Number(v)>0)).map(sd))].sort().reverse().slice(0,8);
+            return<div style={{fontSize:12.5,color:'#475569',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+              <span>⚖️ ช่วงนี้ยังไม่มีน้ำหนักลูกปูน</span>
+              {wDates.length?<><span>— วันที่มีน้ำหนัก:</span>{wDates.map(d=><button key={d} onClick={()=>{setDateFrom(d);setDateTo(d);setSelAges([]);}}
+                style={{padding:'2px 9px',borderRadius:999,border:'1px solid #93c5fd',background:'#eff6ff',color:'#1d4ed8',fontSize:12.5,cursor:'pointer',fontWeight:600}}>{shortDate(d)}</button>)}
+                <span style={{color:'#94a3b8'}}>(กดเพื่อดูวันนั้น ทุกอายุ)</span></>
+              :<span>— ใส่ได้ในแอปบันทึกผลลูกปูน (ช่อง "น้ำหนักลูกปูน") หรือคอลัมน์น้ำหนักในชีท</span>}
+            </div>;})()}
           {!list.length?<div style={{textAlign:'center',color:'#aaa',padding:30}}>ไม่มีข้อมูลในช่วงที่เลือก</div>:
           <div style={{overflowX:'auto',maxHeight:460,overflowY:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
