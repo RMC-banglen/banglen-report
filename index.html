@@ -5193,8 +5193,8 @@ window.__dataReady.then(data => {
     const curN=Number(cur);const curRow=cur!==''&&isFinite(curN)?calc(curN):null;
     const f0=n=>n==null?'–':Math.round(n).toLocaleString('th-TH');
     const f1=n=>n==null?'–':(Math.round(n*10)/10).toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1});
-    const sg=n=>n>0.05?'+'+f1(n):n<-0.05?f1(n):'0.0';
-    const waterTxt=e=>e>0.05?'ลดน้ำ '+f1(e):e<-0.05?'เติมน้ำ '+f1(-e):'ไม่ต้องปรับ';
+    const sg=n=>n>0.5?'+'+f0(n):n<-0.5?f0(n):'0';
+    const waterTxt=e=>e>0.5?'ลดน้ำ '+f0(e):e<-0.5?'เติมน้ำ '+f0(-e):'ไม่ต้องปรับ';
     const inp={width:90,padding:'6px 8px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:14,textAlign:'right',fontFamily:'inherit'};
     const lab=(t,v,s,u)=><label style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>{t}
       <span style={{display:'flex',alignItems:'center',gap:5}}><input type="number" step="any" value={v} onChange={e=>s(e.target.value)} style={inp}/><span style={{fontWeight:400,color:'#94a3b8'}}>{u}</span></span></label>;
@@ -5203,11 +5203,11 @@ window.__dataReady.then(data => {
     const Row=({x,cur})=>{const isBase=Math.abs(x.m-Number(base))<1e-9;
       return<tr style={{background:cur?'#eff6ff':isBase?'#f0fdf4':undefined,fontWeight:cur||isBase?700:400}}>
         <td style={{...td,textAlign:'left'}}>{f1(x.m)}%{isBase&&<span style={{marginLeft:6,fontSize:11,color:'#15803d'}}>ปกติ</span>}{cur&&<span style={{marginLeft:6,fontSize:11,color:'#1d4ed8'}}>วันนี้</span>}</td>
-        <td style={{...td,color:'#1d4ed8',fontWeight:800}}>{f1(x.wet)}</td>
+        <td style={{...td,color:'#1d4ed8',fontWeight:800}}>{f0(x.wet)}</td>
         <td style={{...td,color:x.diffSand>0.05?'#b45309':x.diffSand<-0.05?'#0f766e':'#64748b'}}>{sg(x.diffSand)}</td>
         <td style={{...td,fontWeight:800,color:x.extra>0.05?'#b91c1c':x.extra<-0.05?'#0f766e':'#64748b'}}>{waterTxt(x.extra)}</td>
-        <td style={{...td,color:x.waterNoAdj>0.05?'#b91c1c':'#64748b'}}>{x.waterNoAdj>0.05?'น้ำเกิน '+f1(x.waterNoAdj):x.waterNoAdj<-0.05?'น้ำขาด '+f1(-x.waterNoAdj):'–'}</td>
-        <td style={{...td,color:x.sandShort>0.05?'#b45309':'#64748b'}}>{x.sandShort>0.05?'ขาด '+f1(x.sandShort):x.sandShort<-0.05?'เกิน '+f1(-x.sandShort):'–'}</td>
+        <td style={{...td,color:x.waterNoAdj>0.05?'#b91c1c':'#64748b'}}>{x.waterNoAdj>0.05?'น้ำเกิน '+f0(x.waterNoAdj):x.waterNoAdj<-0.5?'น้ำขาด '+f0(-x.waterNoAdj):'–'}</td>
+        <td style={{...td,color:x.sandShort>0.05?'#b45309':'#64748b'}}>{x.sandShort>0.05?'ขาด '+f0(x.sandShort):x.sandShort<-0.5?'เกิน '+f0(-x.sandShort):'–'}</td>
       </tr>;};
     return<ChartCard span="full" title="ความชื้นทราย → ชั่งทราย / ปรับน้ำ"
       subtitle={`ใช้ได้ทุกสูตร · ทราย ${f0(S)} กก. ชั่งตอนความชื้น ${f1(Number(base))}% (ปกติ) = เนื้อทรายแห้ง ${f1(dry)} กก. + น้ำในทราย ${f1(S-dry)} กก. · ต่อคอนกรีต 1 ม³`}>
@@ -5231,9 +5231,9 @@ window.__dataReady.then(data => {
       {/* ตัวคำนวณความชื้นจากการคั่วทราย ย้ายไปอยู่ในแอปมือถืออย่างเดียว (แท็บ 💦 ความชื้น)
           หน้านี้แค่ดึงผลที่บันทึกไว้มาใช้ ไม่ต้องกรอกซ้ำสองที่ */}
       {curRow&&<div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:14.5,lineHeight:1.8}}>
-        ความชื้นวันนี้ <b>{f1(curRow.m)}%</b> → <b style={{color:'#1d4ed8'}}>ชั่งทราย {f1(curRow.wet)} กก.</b> ({sg(curRow.diffSand)} กก. จาก {f0(S)})
+        ความชื้นวันนี้ <b>{f1(curRow.m)}%</b> → <b style={{color:'#1d4ed8'}}>ชั่งทราย {f0(curRow.wet)} กก.</b> ({sg(curRow.diffSand)} กก. จาก {f0(S)})
         · <b>{waterTxt(curRow.extra)}{Math.abs(curRow.extra)>0.05?' ลิตร':''}</b> จากน้ำที่เติมตามสูตร (ทุกสูตร)
-        {curRow.waterNoAdj>0.05&&<div style={{color:'#b91c1c',fontSize:13.5}}>⚠️ ถ้าชั่ง {f0(S)} กก. เท่าเดิมและไม่ลดน้ำ → น้ำเกิน {f1(curRow.waterNoAdj)} ลิตร และเนื้อทรายขาด {f1(curRow.sandShort)} กก. → คอนกรีตเหลวขึ้น กำลังอัดมีโอกาสตก</div>}
+        {curRow.waterNoAdj>0.05&&<div style={{color:'#b91c1c',fontSize:13.5}}>⚠️ ถ้าชั่ง {f0(S)} กก. เท่าเดิมและไม่ลดน้ำ → น้ำเกิน {f0(curRow.waterNoAdj)} ลิตร และเนื้อทรายขาด {f0(curRow.sandShort)} กก. → คอนกรีตเหลวขึ้น กำลังอัดมีโอกาสตก</div>}
       </div>}
 
       {/* สูตรคอนกรีตที่ใช้อยู่ + น้ำที่ต้องเติมจริงเมื่อความชื้นไม่ใช่ค่าปกติ
