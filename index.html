@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06e';
+var APP_VERSION='2026-10-06f';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5047,6 +5047,11 @@ window.__dataReady.then(data => {
     const [pb,setPb]=useState(init.pb??'');
     const [pc,setPc]=useState(init.pc??['']);
     useEffect(()=>{try{localStorage.setItem(LS,JSON.stringify({sand,base,cur,pa,pb,pc}));}catch(e){}},[sand,base,cur,pa,pb,pc]);
+    // คั่วจนนิ่ง (ค่า C เท่าเดิม 3 ครั้ง) → ใส่ความชื้นวันนี้ให้อัตโนมัติ
+    const _cs=pc.map(Number).filter(v=>v>0),_C=_cs.length?_cs[_cs.length-1]:null,_l3=_cs.slice(-3);
+    const _stable=_l3.length===3&&Math.max(..._l3)-Math.min(..._l3)<0.05;
+    const _moist=_stable&&pa!==''&&pb!==''&&_C-Number(pa)>0?Math.round((Number(pb)-_C)/(_C-Number(pa))*10000)/100:null;
+    useEffect(()=>{if(_moist!=null)setCur(String(_moist));},[_moist]);
     const S=Number(sand)||0,B=(Number(base)||0)/100;
     const dry=S/(1+B);                 // เนื้อทรายแห้งที่สูตรต้องการ
     const calc=m=>{const M=m/100;
@@ -5118,7 +5123,7 @@ window.__dataReady.then(data => {
               </div>
               <span style={{fontSize:11.5,fontWeight:500,color:stable?'#15803d':'#b45309'}}>
                 {cs.length===0?'คั่วให้แห้ง (ปิดฝา กันทรายกระเด็น) แล้วชั่งใส่ครั้งที่ 1'
-                  :stable?'✓ ได้ค่าเท่าเดิมครบ 3 ครั้ง — หยุดคั่วได้'
+                  :stable?'✓ ได้ค่าเท่าเดิมครบ 3 ครั้ง — หยุดคั่วได้ (ใส่ความชื้นวันนี้ให้แล้ว)'
                   :'ยังไม่นิ่ง — คั่วต่อโดยปิดฝาอีก 1 นาที แล้วชั่งใหม่ (ต้องได้ค่าเท่าเดิม 3 ครั้ง) · ได้เท่าเดิมแล้ว '+(()=>{let n=1;for(let i=cs.length-1;i>0&&Math.abs(cs[i]-cs[i-1])<0.05;i--)n++;return n;})()+' ครั้ง'}
               </span>
             </div>
@@ -5126,8 +5131,9 @@ window.__dataReady.then(data => {
           {moist!=null&&<div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',marginTop:10,paddingTop:10,borderTop:'1px solid #e2e8f0'}}>
             <span style={{fontSize:13,color:'#475569'}}>น้ำที่ระเหย {f1(Bw-C)} ก. ÷ ทรายแห้ง {f1(dryW)} ก. × 100 =</span>
             <span style={{fontSize:24,fontWeight:900,color:stable?'#1d4ed8':'#94a3b8'}}>{moist.toFixed(2)}%</span>
-            {!stable&&<span style={{fontSize:12,color:'#b45309'}}>(ค่าชั่วคราว — ยังไม่นิ่ง)</span>}
-            <button onClick={()=>setCur(String(Math.round(moist*100)/100))} style={{padding:'7px 14px',borderRadius:8,border:'none',background:stable?'#1d4ed8':'#94a3b8',color:'#fff',fontSize:13.5,fontWeight:700,cursor:'pointer'}}>ใช้เป็นความชื้นวันนี้ →</button>
+            {!stable&&<span style={{fontSize:12,color:'#b45309'}}>(ค่าชั่วคราว — ยังไม่นิ่ง · นิ่งแล้วระบบใส่ให้เอง)</span>}
+            {stable?<span style={{fontSize:13,color:'#15803d',fontWeight:700}}>✓ ใส่เป็นความชื้นวันนี้แล้ว</span>
+              :<button onClick={()=>setCur(String(Math.round(moist*100)/100))} style={{padding:'6px 12px',borderRadius:8,border:'1px solid #cbd5e1',background:'#fff',color:'#475569',fontSize:12.5,cursor:'pointer'}}>ใช้ค่าชั่วคราวนี้ไปก่อน</button>}
           </div>}
         </div>;
       })()}
