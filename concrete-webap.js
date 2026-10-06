@@ -150,7 +150,7 @@ var WEIGHT_HEADERS = ['น้ำหนักลูก1(กก.)', 'น้ำห�
 
 // หา/สร้างคอลัมน์น้ำหนัก 3 คอลัมน์ — วางต่อจากคอลัมน์ธง M (13) เป็นอย่างน้อย กันทับธงกันแจ้งซ้ำ
 function ensureWeightCols(sh) {
-  var lastCol = Math.max(sh.getLastColumn(), ALERT_FLAG_COL);
+  var lastCol = Math.max(sh.getLastColumn(), flagCol(sh));
   var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (x) { return String(x).trim(); });
   var cols = WEIGHT_HEADERS.map(function (h) { var i = headers.indexOf(h); return i >= 0 ? i + 1 : 0; });
   var next = lastCol + 1;
@@ -463,6 +463,7 @@ function onOpen() {
     .addSeparator()
     .addItem('เรียงชีทตามวันที่', 'sortSheetNow')
     .addItem('สร้างคอลัมน์น้ำหนักลูกปูน', 'setupWeightColumns')
+    .addItem('ย้ายน้ำหนักมาไว้ M (ธงไปท้ายสุด)', 'moveWeightToM')
     .addItem('ตั้งซิงก์อัตโนมัติทุก 4 ชม.', 'installAutoSync')
     .addItem('ยกเลิกซิงก์อัตโนมัติ', 'removeAutoSync')
     .addToUi();
@@ -688,7 +689,36 @@ var TELEGRAM_CHAT_QC = '';   // ★ ไอดีกลุ่ม QC — เรื
 // เกณฑ์กำลังอัด (ksc) ตามอายุ — ต้องตรงกับที่หน้าแดชบอร์ดใช้ (TARGET_NORMAL / TARGET_NP280)
 var TARGET_NORMAL = { 1: 350, 3: 415, 5: 435, 7: 450 };
 var TARGET_NP280  = { 1: 340, 7: 420 };
-var ALERT_FLAG_COL = 13;   // คอลัมน์ M — กันส่งซ้ำแถวเดิม
+var ALERT_FLAG_COL = 13;   // ตำแหน่งเดิม (คอลัมน์ M ไม่มีหัว) — ใช้เมื่อยังไม่ได้ตั้งชื่อหัวคอลัมน์ธง
+var FLAG_HEADER = 'ธงแจ้งเตือน (ห้ามแก้)';
+
+// คอลัมน์ธงกันแจ้งซ้ำ: หาจากชื่อหัวคอลัมน์ก่อน (ย้ายไปท้ายสุดได้) ไม่เจอค่อยใช้คอลัมน์ M แบบเดิม
+function flagCol(sh) {
+  var lastCol = sh.getLastColumn();
+  if (lastCol < 1) return ALERT_FLAG_COL;
+  var h = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (x) { return String(x).trim(); });
+  var i = h.indexOf(FLAG_HEADER);
+  return i >= 0 ? i + 1 : ALERT_FLAG_COL;
+}
+
+// เมนู: ย้ายน้ำหนักลูก 1-3 มาไว้ M N O แล้วย้ายคอลัมน์ธงไปท้ายสุด (P) — ย้ายข้อมูลทุกแถวให้ด้วย
+function moveWeightToM() {
+  var ui = SpreadsheetApp.getUi();
+  var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  var lastCol = Math.max(sh.getLastColumn(), 16), last = sh.getLastRow();
+  var h = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (x) { return String(x).trim(); });
+  if (h[12] === WEIGHT_HEADERS[0] && h[15] === FLAG_HEADER) { ui.alert('ย้ายไว้แล้ว — น้ำหนักอยู่ M N O · ธงอยู่ P'); return; }
+  // ต้องเป็นรูปแบบเดิม: M = ธง (ไม่มีหัว) · N O P = น้ำหนัก
+  if (!(h[12] === '' || h[12] === FLAG_HEADER) || h[13] !== WEIGHT_HEADERS[0] || h[14] !== WEIGHT_HEADERS[1] || h[15] !== WEIGHT_HEADERS[2]) {
+    ui.alert('คอลัมน์ไม่ตรงรูปแบบที่ย้ายได้ (ต้องเป็น M = ธง, N–P = น้ำหนัก) — ยังไม่ได้ย้ายอะไร'); return;
+  }
+  if (last >= 2) {
+    var rng = sh.getRange(2, 13, last - 1, 4), v = rng.getValues();
+    rng.setValues(v.map(function (r) { return [r[1], r[2], r[3], r[0]]; }));   // [ธง,น1,น2,น3] → [น1,น2,น3,ธง]
+  }
+  sh.getRange(1, 13, 1, 4).setValues([[WEIGHT_HEADERS[0], WEIGHT_HEADERS[1], WEIGHT_HEADERS[2], FLAG_HEADER]]).setFontWeight('bold');
+  ui.alert('ย้ายเสร็จแล้ว ✅\nM N O = น้ำหนักลูก 1-3 (กก.)\nP = ธงแจ้งเตือน (ห้ามแก้ ใช้กันส่ง Telegram ซ้ำ)');
+}
 
 function targetFor(formula, age) {
   var a = Number(age);
@@ -838,7 +868,7 @@ function notifyIfBelowTarget(r) {
     var stamp = String(r.formula) + '|' + r.age + '|' + ksc;
     if (r.row) {
       var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
-      var cell = sh.getRange(r.row, ALERT_FLAG_COL);
+      var cell = sh.getRange(r.row, flagCol(sh));
       if (String(cell.getValue()) === stamp) return;
       cell.setValue(stamp);
     }
