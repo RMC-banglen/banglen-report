@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-06f';
+var APP_VERSION='2026-10-06g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -5109,12 +5109,12 @@ window.__dataReady.then(data => {
             <button onClick={()=>{setPa('');setPb('');setPc(['']);}} style={{padding:'5px 12px',borderRadius:6,border:'1px solid #e2e8f0',background:'#fff',color:'#64748b',fontSize:12.5,cursor:'pointer'}}>เริ่มใหม่</button>
           </div>
           <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-start'}}>
-            <label style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>1) A = กระทะเปล่า
+            <label style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>A = กระทะเปล่า
               <span style={{display:'flex',alignItems:'center',gap:5}}><input type="number" step="any" value={pa} onChange={e=>setPa(e.target.value)} style={sInp}/><span style={{fontWeight:400,color:'#94a3b8'}}>กรัม</span></span></label>
-            <label style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>2) B = ทรายเปียก + กระทะ
+            <label style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>B = ทรายเปียก + กระทะ
               <span style={{display:'flex',alignItems:'center',gap:5}}><input type="number" step="any" value={pb} onChange={e=>setPb(e.target.value)} style={sInp}/><span style={{fontWeight:400,color:'#94a3b8'}}>กรัม</span></span>
               {wetW!=null&&<span style={{fontSize:11.5,fontWeight:500,color:wetW<500?'#b91c1c':'#15803d'}}>ทรายเปียก {f1(wetW)} ก. {wetW<500?'— ควรเกิน 500 กรัม':'✓'}</span>}</label>
-            <div style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>4–6) C = ทรายแห้ง + กระทะ (ชั่งทุกครั้งหลังคั่วต่อ 1 นาที)
+            <div style={{display:'flex',flexDirection:'column',gap:4,fontSize:12.5,color:'#475569',fontWeight:600}}>C = ทรายแห้ง + กระทะ (ชั่งทุกครั้งหลังคั่วต่อ 1 นาที)
               <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
                 {pc.map((v,i)=><span key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
                   <input type="number" step="any" value={v} onChange={e=>setC(i,e.target.value)} placeholder={'ครั้งที่ '+(i+1)} style={{...inp,width:92}}/>
