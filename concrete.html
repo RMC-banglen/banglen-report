@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-02a';
+var APP_VERSION='2026-10-06a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -246,6 +246,10 @@ function ConcreteForm({prefill,onDone,onBack}){
   const[luk1,setLuk1]=useState(prefill?.luk1||'');
   const[luk2,setLuk2]=useState(prefill?.luk2||'');
   const[luk3,setLuk3]=useState(prefill?.luk3||'');
+  // น้ำหนักลูกปูนรายก้อน (กก.) — ชั่งก่อนกด ไม่บังคับ
+  const[w1,setW1]=useState(prefill?.w1||'');
+  const[w2,setW2]=useState(prefill?.w2||'');
+  const[w3,setW3]=useState(prefill?.w3||'');
   const[saving,setSaving]=useState(false);
   const[err,setErr]=useState('');
 
@@ -263,7 +267,8 @@ function ConcreteForm({prefill,onDone,onBack}){
       cast_date:castDate,test_date:testDate,age,
       formula:formula.trim(),cube_size:cubeSize,
       luk1:Number(luk1)||0,luk2:Number(luk2)||0,luk3:Number(luk3)||0,
-      avg_kn:res?res.avgKN:0, avg_mpa:res?res.avgMPa:0, avg_ksc:res?res.avgKSC:0
+      avg_kn:res?res.avgKN:0, avg_mpa:res?res.avgMPa:0, avg_ksc:res?res.avgKSC:0,
+      w1:Number(w1)||'', w2:Number(w2)||'', w3:Number(w3)||''
     };
     try{
       const r=await postToGas(gasUrl,body);
@@ -313,6 +318,16 @@ function ConcreteForm({prefill,onDone,onBack}){
               <label>{l}</label>
               <input type="number" inputMode="decimal" min="0" value={v}
                 onChange={e=>s(e.target.value)} placeholder="0"/>
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:13.5,fontWeight:800,color:'#22252e',margin:'14px 0 8px'}}>น้ำหนักลูกปูน (กก.) <span style={{fontWeight:500,color:'#8a90a0'}}>ถ้าชั่ง</span></div>
+        <div className="kn-grid">
+          {[['w1','ลูก 1',w1,setW1],['w2','ลูก 2',w2,setW2],['w3','ลูก 3',w3,setW3]].map(([k,l,v,s])=>(
+            <div className="kn-item" key={k}>
+              <label>{l}</label>
+              <input type="number" inputMode="decimal" min="0" step="0.001" value={v}
+                onChange={e=>s(e.target.value)} placeholder="เช่น 8.1"/>
             </div>
           ))}
         </div>

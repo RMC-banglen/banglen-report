@@ -84,6 +84,20 @@ function doPost(e) {
       String(fmtDate(sampleDate) || '').slice(0, 7)   // คอลัมน์ "เดือน" ใช้กรองตามเดือน
     ]]);
 
+    // น้ำหนักลูกปูนรายก้อน (กก.) — ไม่บังคับ เก็บในคอลัมน์ "น้ำหนักลูก1-3(กก.)" ต่อจากคอลัมน์ธง M
+    var w1 = data.w1 != null ? data.w1 : data.weight1_kg;
+    var w2 = data.w2 != null ? data.w2 : data.weight2_kg;
+    var w3 = data.w3 != null ? data.w3 : data.weight3_kg;
+    var hasW = [w1, w2, w3].some(function (x) { return Number(x) > 0; });
+    if (hasW) {
+      try {
+        var wc = ensureWeightCols(sh);
+        sh.getRange(newRow, wc[0]).setValue(Number(w1) || '');
+        sh.getRange(newRow, wc[1]).setValue(Number(w2) || '');
+        sh.getRange(newRow, wc[2]).setValue(Number(w3) || '');
+      } catch (wErr) { Logger.log('weight write error: ' + wErr.message); }
+    }
+
     // ผลไม่ผ่านเกณฑ์ → แจ้งเตือน Telegram ทันทีที่บันทึก
     // ต้องทำก่อนเรียงชีท เพราะใช้เลขแถวไปเขียนธงกันแจ้งซ้ำ
     notifyIfBelowTarget({
@@ -100,7 +114,7 @@ function doPost(e) {
 
     // ส่งแถวใหม่เข้า Supabase ทันที แดชบอร์ดจะเห็นโดยไม่ต้องกด Sync เอง
     try {
-      sbRequest('post', 'concrete_results', [{
+      var sbRow = {
         sample_date:  fmtDate(sampleDate),
         test_date:    fmtDate(testDate),
         age_days:     Number(ageDays) || 0,
@@ -112,7 +126,14 @@ function doPost(e) {
         avg_kn:       Number(avgKn)  || 0,
         avg_mpa:      Number(avgMpa) || 0,
         avg_ksc:      Number(avgKsc) || 0
-      }]);
+      };
+      // ส่งน้ำหนักเฉพาะเมื่อฐานข้อมูลมีคอลัมน์แล้ว (รัน supabase-concrete-weights.sql) ไม่งั้นทั้งแถวจะบันทึกไม่ผ่าน
+      if (hasW && hasWeightCols()) {
+        sbRow.weight1_kg = Number(w1) || null;
+        sbRow.weight2_kg = Number(w2) || null;
+        sbRow.weight3_kg = Number(w3) || null;
+      }
+      sbRequest('post', 'concrete_results', [sbRow]);
     } catch (syncErr) {
       Logger.log('Supabase sync error: ' + syncErr.message);
     }
@@ -122,6 +143,43 @@ function doPost(e) {
   } catch (err) {
     return respond(false, err.message);
   }
+}
+
+// ── น้ำหนักลูกปูนรายก้อน ──
+var WEIGHT_HEADERS = ['น้ำหนักลูก1(กก.)', 'น้ำหนักลูก2(กก.)', 'น้ำหนักลูก3(กก.)'];
+
+// หา/สร้างคอลัมน์น้ำหนัก 3 คอลัมน์ — วางต่อจากคอลัมน์ธง M (13) เป็นอย่างน้อย กันทับธงกันแจ้งซ้ำ
+function ensureWeightCols(sh) {
+  var lastCol = Math.max(sh.getLastColumn(), ALERT_FLAG_COL);
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (x) { return String(x).trim(); });
+  var cols = WEIGHT_HEADERS.map(function (h) { var i = headers.indexOf(h); return i >= 0 ? i + 1 : 0; });
+  var next = lastCol + 1;
+  cols = cols.map(function (c, i) {
+    if (c) return c;
+    sh.getRange(1, next).setValue(WEIGHT_HEADERS[i]).setFontWeight('bold');
+    return next++;
+  });
+  return cols;
+}
+
+// ฐานข้อมูลมีคอลัมน์น้ำหนักหรือยัง (จำผลไว้ในรอบการทำงานนี้)
+var _hasWeightCols = null;
+function hasWeightCols() {
+  if (_hasWeightCols !== null) return _hasWeightCols;
+  try {
+    var res = sbRequest('get', 'concrete_results', null, 'select=weight1_kg&limit=1');
+    _hasWeightCols = res.getResponseCode() === 200;
+  } catch (e) { _hasWeightCols = false; }
+  return _hasWeightCols;
+}
+
+// เมนู: สร้างหัวคอลัมน์น้ำหนักในชีท (ไว้กรอกเองในชีทได้)
+function setupWeightColumns() {
+  var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  var c = ensureWeightCols(sh);
+  var col = function (n) { var s = ''; while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  try { SpreadsheetApp.getUi().alert('พร้อมแล้ว — คอลัมน์น้ำหนักลูก 1-3 อยู่ที่ ' + c.map(col).join(', ') + '\n' +
+    (hasWeightCols() ? '✅ ฐานข้อมูลพร้อมรับน้ำหนักแล้ว' : '⚠️ ยังต้องรัน SQL supabase-concrete-weights.sql ใน Supabase ก่อน แดชบอร์ดถึงจะเห็นน้ำหนัก')); } catch (e) {}
 }
 
 // คำนวณค่าเฉลี่ยจากลูก 1-3 เอง เผื่อฝั่งที่ส่งมาไม่ได้คิดมาให้
@@ -404,6 +462,7 @@ function onOpen() {
     .addItem('ดู Log', 'viewLog')
     .addSeparator()
     .addItem('เรียงชีทตามวันที่', 'sortSheetNow')
+    .addItem('สร้างคอลัมน์น้ำหนักลูกปูน', 'setupWeightColumns')
     .addItem('ตั้งซิงก์อัตโนมัติทุก 4 ชม.', 'installAutoSync')
     .addItem('ยกเลิกซิงก์อัตโนมัติ', 'removeAutoSync')
     .addToUi();
@@ -1009,6 +1068,16 @@ function syncConcrete() {
       avg_ksc:      Number(o['เฉลี่ย KSC'] || 0) || null
     };
   });
+  // น้ำหนักรายก้อน — ส่งเฉพาะเมื่อชีทมีคอลัมน์และฐานข้อมูลพร้อมแล้ว (ไม่งั้นทั้งชุดจะบันทึกไม่ผ่าน)
+  if (headers.indexOf(WEIGHT_HEADERS[0]) >= 0 && hasWeightCols()) {
+    var wi = WEIGHT_HEADERS.map(function (h) { return headers.indexOf(h); });
+    var dataRows = rows.slice(1).filter(function(r){ return r[0]; });
+    concreteData.forEach(function (rec, k) {
+      rec.weight1_kg = Number(dataRows[k][wi[0]]) || null;
+      rec.weight2_kg = Number(dataRows[k][wi[1]]) || null;
+      rec.weight3_kg = Number(dataRows[k][wi[2]]) || null;
+    });
+  }
 
   sbRequest('delete', 'concrete_results', null, 'id=gte.1');
   if (concreteData.length > 0) {

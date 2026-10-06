@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-02a';
+var APP_VERSION='2026-10-06a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4601,14 +4601,19 @@ window.__dataReady.then(data => {
           avg_kn:      Number(r['เฉลี่ย kN']||0),
           avg_mpa:     Number(r['เฉลี่ย MPa']||0),
           avg_ksc:     Number(r['เฉลี่ย KSC']||0),
+          _w:[r['น้ำหนักลูก1(กก.)'],r['น้ำหนักลูก2(กก.)'],r['น้ำหนักลูก3(กก.)']],
         })).filter(r=>r.sample_date&&r.formula_name);
         const db=DB;
+        // ใส่น้ำหนักรายก้อนเฉพาะเมื่อฐานข้อมูลมีคอลัมน์แล้ว (ไม่งั้นทั้งชุดบันทึกไม่ผ่านหลังลบของเดิมไปแล้ว)
+        db.from('concrete_results').select('weight1_kg').limit(1).then(({error:wErr})=>{
+          rows.forEach(r=>{const w=r._w;delete r._w;if(!wErr){r.weight1_kg=Number(w[0])||null;r.weight2_kg=Number(w[1])||null;r.weight3_kg=Number(w[2])||null;}});
         db.from('concrete_results').delete().neq('id',0).then(()=>{
           db.from('concrete_results').insert(rows).then(({error})=>{
             if(error){setSyncMsg('❌ '+error.message);}
             else{setSyncMsg('✅ Sync สำเร็จ '+rows.length+' แถว'); loadFromSupabase();}
             setSyncing(false);
           });
+        });
         });
       }).catch(e=>{setSyncMsg('❌ ดึงข้อมูลไม่ได้: '+e.message);setSyncing(false);});
     };
@@ -4856,6 +4861,99 @@ window.__dataReady.then(data => {
           </>
         }
       </div>
+
+      {/* ผลรายก้อน (KSC ทีละลูก) + น้ำหนักลูกปูน — ใช้ช่วงวันที่/สูตร/อายุ เดียวกับกราฟด้านบน */}
+      {(()=>{
+        const side=r=>{const m=String(r.cube_size||'').match(/(\d+)\s*[xX×]/);return m?Number(m[1])*10:150;};   // 15x15 = 150 มม.
+        const toKsc=(kn,r)=>kn>0?kn*1000/(side(r)*side(r))*10.197:null;   // ไม่ปัดตรงนี้ ปัดตอนแสดง ค่าเฉลี่ยจะตรงกับกราฟ
+        const tgOf=(f,a)=>(isNP280(f)?TARGET_NP280:TARGET_NORMAL)[a]??null;
+        const avgOf=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
+        const list=[...filt].sort((a,b)=>sd(a).localeCompare(sd(b))||fm(a).localeCompare(fm(b))||ag(a)-ag(b)).map(r=>{
+          const k=[r.result1_kn,r.result2_kn,r.result3_kn].map(v=>toKsc(Number(v)||0,r));
+          const w=[r.weight1_kg,r.weight2_kg,r.weight3_kg].map(v=>Number(v)>0?Number(v):null);
+          const kv=k.filter(v=>v!=null),wv=w.filter(v=>v!=null);
+          const mean=avgOf(kv),wAvg=avgOf(wv),vol=Math.pow(side(r)/1000,3);
+          return{r,k,w,mean,rng:kv.length>1&&mean?(Math.max(...kv)-Math.min(...kv))/mean*100:null,
+            wAvg,dens:wAvg?wAvg/vol:null,densOf:x=>x?x/vol:null,tg:tgOf(fm(r),ag(r))};
+        });
+        const hasW=list.some(x=>x.wAvg);
+        const f0=n=>n==null?'–':Math.round(n).toLocaleString('th-TH');
+        const f2=n=>n==null?'–':n.toFixed(2);
+        const range=(dateFrom?shortDate(dateFrom):'')+' – '+(dateTo?shortDate(dateTo):'');
+        const fname='ผลลูกปูนรายก้อน_'+(dateFrom||'')+'_ถึง_'+(dateTo||'');
+        // แถวสำหรับส่งออก (Excel / PDF ใช้ชุดเดียวกัน)
+        const head=['วันที่เก็บ','วันที่ทดสอบ','สูตร','อายุ(วัน)','ลูก1 KSC','ลูก2 KSC','ลูก3 KSC','เฉลี่ย KSC','เกณฑ์','ต่างกัน %','นน.ลูก1 (กก.)','นน.ลูก2 (กก.)','นน.ลูก3 (กก.)','นน.เฉลี่ย (กก.)','ความหนาแน่น (กก./ม³)'];
+        const body=list.map(x=>[shortDate(sd(x.r)),shortDate(String(x.r.test_date||'').slice(0,10)),fm(x.r),ag(x.r),
+          ...x.k.map(v=>v!=null?Math.round(v):''),x.mean!=null?Math.round(x.mean):'',x.tg??'',x.rng!=null?Number(x.rng.toFixed(1)):'',
+          x.w[0]??'',x.w[1]??'',x.w[2]??'',x.wAvg!=null?Number(x.wAvg.toFixed(3)):'',x.dens!=null?Math.round(x.dens):'']);
+        const exportXlsx=()=>{
+          const ws=XLSX.utils.aoa_to_sheet([['ผลลูกปูนรายก้อน ช่วง '+range],[],head,...body]);
+          ws['!cols']=head.map((h,i)=>({wch:i<3?12:11}));
+          const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'รายก้อน');
+          XLSX.writeFile(wb,fname+'.xlsx');
+        };
+        const exportPdf=()=>{
+          const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+          const win=window.open('','_blank');if(!win){alert('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up แล้วลองใหม่');return;}
+          win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>${esc(fname)}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+            <style>@page{size:A4 landscape;margin:10mm}body{font-family:Sarabun,sans-serif;font-size:11px;color:#111}
+            h2{font-size:16px;margin:0 0 4px}p{margin:0 0 8px;color:#555}table{border-collapse:collapse;width:100%}
+            th,td{border:1px solid #bbb;padding:3px 5px;text-align:right}th{background:#eef2f7}td:nth-child(-n+3){text-align:left}
+            .low{color:#c0392b;font-weight:700}.wide{background:#fff4e5}</style></head><body>
+            <h2>ผลลูกปูนรายก้อน (KSC) — บางเลน</h2><p>ช่วงวันที่เก็บตัวอย่าง ${esc(range)} · สูตร: ${esc(selFormulas.length?selFormulas.join(', '):'ทั้งหมด')} · อายุ: ${esc(selAges.length?selAges.join(', ')+' วัน':'ทั้งหมด')} · ${list.length} ชุด</p>
+            <table><thead><tr>${head.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+            ${list.map((x,i)=>`<tr class="${x.rng!=null&&x.rng>8?'wide':''}">${body[i].map((v,j)=>`<td class="${j>=4&&j<=7&&x.tg!=null&&v!==''&&v<x.tg?'low':''}">${esc(v)}</td>`).join('')}</tr>`).join('')}
+            </tbody></table><p style="margin-top:6px">สีแดง = ต่ำกว่าเกณฑ์ · พื้นส้ม = 3 ลูกต่างกันเกิน 8% (ASTM C39)</p>
+            <script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script></body></html>`);
+          win.document.close();
+        };
+        // กราฟเทียบ น้ำหนัก (ความหนาแน่น) กับ KSC ทีละลูก
+        const pts=hasW?list.flatMap(x=>x.k.map((kv,i)=>kv!=null&&x.w[i]?{d:x.densOf(x.w[i]),k:kv,low:x.tg!=null&&kv<x.tg}:null).filter(Boolean)):[];
+        const sx={min:Math.min(...pts.map(p=>p.d),2300),max:Math.max(...pts.map(p=>p.d),2500)},sy={min:Math.min(...pts.map(p=>p.k),300),max:Math.max(...pts.map(p=>p.k),550)};
+        const W=640,H=260,P=44,X=d=>P+(d-sx.min)/(sx.max-sx.min||1)*(W-P-12),Y=k=>H-28-(k-sy.min)/(sy.max-sy.min||1)*(H-40);
+        const cell=(v,low)=>({textAlign:'right',padding:'5px 8px',whiteSpace:'nowrap',color:low?'#c0392b':'#1f2937',fontWeight:low?700:400});
+        return <div className="chart-card" style={{marginBottom:24}}>
+          <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:6}}>
+            <span style={{fontWeight:700,fontSize:15,color:'#1a2540'}}>ผลรายก้อน (KSC ทีละลูก)</span>
+            <span style={{fontSize:12.5,color:'#64748b'}}>ช่วง {range} · {list.length} ชุด · ใช้ตัวกรองเดียวกับกราฟด้านบน</span>
+            <span style={{flex:1}}/>
+            <button onClick={exportXlsx} disabled={!list.length} style={{...btnStyle,color:'#15803d',borderColor:'#86efac'}}>⬇ Excel</button>
+            <button onClick={exportPdf} disabled={!list.length} style={{...btnStyle,color:'#b91c1c',borderColor:'#fca5a5'}}>⬇ PDF</button>
+          </div>
+          <div style={{fontSize:12,color:'#64748b',marginBottom:10}}>ตัวเลขแดง = ต่ำกว่าเกณฑ์ · พื้นส้ม = 3 ลูกต่างกันเกิน 8% (ASTM C39){!hasW&&' · ยังไม่มีข้อมูลน้ำหนักลูกปูน — ใส่ได้ในแอปบันทึกผลลูกปูน (ช่อง "น้ำหนักลูกปูน")'}</div>
+          {!list.length?<div style={{textAlign:'center',color:'#aaa',padding:30}}>ไม่มีข้อมูลในช่วงที่เลือก</div>:
+          <div style={{overflowX:'auto',maxHeight:460,overflowY:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
+              <thead><tr style={{background:'#f4f6fa',position:'sticky',top:0,zIndex:1}}>
+                {['วันที่เก็บ','สูตร','อายุ','ลูก 1','ลูก 2','ลูก 3','เฉลี่ย','ต่างกัน',...(hasW?['นน. ลูก1','นน. ลูก2','นน. ลูก3','ความหนาแน่น']:[])].map((h,i)=><th key={h} style={{padding:'7px 8px',textAlign:i<2?'left':'right',whiteSpace:'nowrap',color:'#475569',borderBottom:'2px solid #e2e5ee',background:'#f4f6fa'}}>{h}</th>)}
+              </tr></thead>
+              <tbody>{list.map((x,i)=><tr key={x.r.id||i} style={{borderBottom:'1px solid #f1f3f7',background:x.rng!=null&&x.rng>8?'#fff4e5':undefined}}>
+                <td style={{padding:'5px 8px',whiteSpace:'nowrap'}}>{shortDate(sd(x.r))}</td>
+                <td style={{padding:'5px 8px',whiteSpace:'nowrap',fontWeight:600}}>{fm(x.r)}</td>
+                <td style={cell()}>{ag(x.r)} วัน</td>
+                {x.k.map((v,j)=><td key={j} style={cell(v,x.tg!=null&&v!=null&&v<x.tg)}>{f0(v)}</td>)}
+                <td style={{...cell(x.mean,x.tg!=null&&x.mean!=null&&x.mean<x.tg),fontWeight:800}} title={x.tg!=null?'เกณฑ์ '+x.tg+' ksc':''}>{f0(x.mean)}</td>
+                <td style={{...cell(),color:x.rng!=null&&x.rng>8?'#c2410c':'#64748b',fontWeight:x.rng!=null&&x.rng>8?700:400}}>{x.rng!=null?x.rng.toFixed(1)+'%':'–'}</td>
+                {hasW&&<>{x.w.map((v,j)=><td key={'w'+j} style={cell()}>{v!=null?v.toFixed(3):'–'}</td>)}
+                  <td style={cell()}>{f0(x.dens)}</td></>}
+              </tr>)}</tbody>
+            </table>
+          </div>}
+          {hasW&&pts.length>1&&<div style={{marginTop:14}}>
+            <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',marginBottom:4}}>เทียบความหนาแน่น (จากน้ำหนัก) กับ KSC — ทีละลูก</div>
+            <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',maxWidth:W,height:'auto'}}>
+              <line x1={P} y1={H-28} x2={W-8} y2={H-28} stroke="#cbd5e1"/><line x1={P} y1={8} x2={P} y2={H-28} stroke="#cbd5e1"/>
+              {[sy.min,(sy.min+sy.max)/2,sy.max].map(v=><text key={'y'+v} x={P-6} y={Y(v)+4} fontSize="10" textAnchor="end" fill="#64748b">{Math.round(v)}</text>)}
+              {[sx.min,(sx.min+sx.max)/2,sx.max].map(v=><text key={'x'+v} x={X(v)} y={H-12} fontSize="10" textAnchor="middle" fill="#64748b">{Math.round(v)}</text>)}
+              <text x={W/2} y={H-1} fontSize="10" textAnchor="middle" fill="#475569">ความหนาแน่น (กก./ม³)</text>
+              <text x={10} y={14} fontSize="10" fill="#475569">KSC</text>
+              {pts.map((p,i)=><circle key={i} cx={X(p.d)} cy={Y(p.k)} r="4" fill={p.low?'#ef4444':'#2563eb'} fillOpacity=".7"/>)}
+            </svg>
+            <div style={{fontSize:12,color:'#64748b'}}>จุดแดง = ลูกที่ต่ำกว่าเกณฑ์ · ถ้าจุดแดงกองอยู่ฝั่งความหนาแน่นต่ำ แปลว่าลูกเบา (น้ำเยอะ/ฟองอากาศ/อัดไม่แน่น) ทำให้กำลังตก</div>
+          </div>}
+        </div>;
+      })()}
 
       {/* Chart 2 */}
       <div className="chart-card">
