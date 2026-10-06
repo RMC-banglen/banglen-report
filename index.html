@@ -4908,12 +4908,6 @@ window.__dataReady.then(data => {
             <script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script></body></html>`);
           win.document.close();
         };
-        // กราฟเทียบ น้ำหนัก (ความหนาแน่น) กับ KSC ทีละลูก
-        const pts=hasW?list.flatMap(x=>x.k.map((kv,i)=>kv!=null&&x.w[i]?{d:x.densOf(x.w[i]),k:kv,low:x.tg!=null&&kv<x.tg}:null).filter(Boolean)):[];
-        // ช่วงแกนพอดีกับข้อมูล (เผื่อขอบ 8%) — เดิมตั้งตายตัว 2300–2500 จุดเลยไปกองชิดขอบ
-        const rng=(a)=>{const lo=Math.min(...a),hi=Math.max(...a),p=((hi-lo)||Math.max(1,Math.abs(hi)*0.01))*0.08;return{min:lo-p,max:hi+p};};
-        const sx=pts.length?rng(pts.map(p=>p.d)):{min:0,max:1},sy=pts.length?rng(pts.map(p=>p.k)):{min:0,max:1};
-        const W=640,H=260,P=44,X=d=>P+(d-sx.min)/(sx.max-sx.min||1)*(W-P-12),Y=k=>H-28-(k-sy.min)/(sy.max-sy.min||1)*(H-40);
         const cell=(v,low)=>({textAlign:'right',padding:'5px 8px',whiteSpace:'nowrap',color:low?'#c0392b':'#1f2937',fontWeight:low?700:400});
         return <div className="chart-card" style={{marginBottom:24}}>
           <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:6}}>
@@ -4951,18 +4945,6 @@ window.__dataReady.then(data => {
                   <td style={cell()}>{f0(x.dens)}</td></>}
               </tr>)}</tbody>
             </table>
-          </div>}
-          {hasW&&pts.length>1&&<div style={{marginTop:14}}>
-            <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',marginBottom:4}}>เทียบความหนาแน่น (จากน้ำหนัก) กับ KSC — ทีละลูก</div>
-            <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',maxWidth:W,height:'auto'}}>
-              <line x1={P} y1={H-28} x2={W-8} y2={H-28} stroke="#cbd5e1"/><line x1={P} y1={8} x2={P} y2={H-28} stroke="#cbd5e1"/>
-              {[sy.min,(sy.min+sy.max)/2,sy.max].map(v=><text key={'y'+v} x={P-6} y={Y(v)+4} fontSize="10" textAnchor="end" fill="#64748b">{Math.round(v)}</text>)}
-              {[sx.min,(sx.min+sx.max)/2,sx.max].map(v=><text key={'x'+v} x={X(v)} y={H-12} fontSize="10" textAnchor="middle" fill="#64748b">{Math.round(v)}</text>)}
-              <text x={W/2} y={H-1} fontSize="10" textAnchor="middle" fill="#475569">ความหนาแน่น (กก./ม³)</text>
-              <text x={10} y={14} fontSize="10" fill="#475569">KSC</text>
-              {pts.map((p,i)=><circle key={i} cx={X(p.d)} cy={Y(p.k)} r="4" fill={p.low?'#ef4444':'#2563eb'} fillOpacity=".7"/>)}
-            </svg>
-            <div style={{fontSize:12,color:'#64748b'}}>จุดแดง = ลูกที่ต่ำกว่าเกณฑ์ · ถ้าจุดแดงกองอยู่ฝั่งความหนาแน่นต่ำ แปลว่าลูกเบา (น้ำเยอะ/ฟองอากาศ/อัดไม่แน่น) ทำให้กำลังตก</div>
           </div>}
         </div>;
       })()}
