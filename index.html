@@ -5174,6 +5174,10 @@ window.__dataReady.then(data => {
     // เครื่องคิดความชื้นจากการคั่ว: A = กระทะเปล่า · B = ทรายเปียก+กระทะ · C = ทรายแห้ง+กระทะ (ชั่งซ้ำจนได้ค่าเท่าเดิม 3 ครั้ง)
     useEffect(()=>{try{localStorage.setItem(LS,JSON.stringify({sand,base,cur}));}catch(e){}},[sand,base,cur]);
     // ผลความชื้นที่บันทึกจากแอปมือถือ QC (แท็บ 💦 ความชื้น) — ผลของวันนี้ใส่ให้เองถ้าช่องยังว่าง
+    // สูตรคอนกรีต — ดึงจากฐานข้อมูล จะได้แก้น้ำ/น้ำยาโดยไม่ต้องแก้โค้ด (ตัวเดียวกับที่แอปมือถือใช้)
+    const [mixes,setMixes]=useState([]);
+    useEffect(()=>{DB.from('concrete_mix_design').select('*').eq('active',true).order('sort_order')
+      .then(({data})=>setMixes(data||[]));},[]);
     const [hist,setHist]=useState([]);
     useEffect(()=>{DB.from('sand_moisture_tests').select('id,test_date,total_pct,water_adj_l,sand_source,created_at').order('test_date',{ascending:false}).order('id',{ascending:false}).limit(10)
       .then(({data})=>{const d=data||[];setHist(d);
@@ -5234,6 +5238,53 @@ window.__dataReady.then(data => {
         · <b>{waterTxt(curRow.extra)}{Math.abs(curRow.extra)>0.05?' ลิตร':''}</b> จากน้ำที่เติมตามสูตร (ทุกสูตร)
         {curRow.waterNoAdj>0.05&&<div style={{color:'#b91c1c',fontSize:13.5}}>⚠️ ถ้าชั่ง {f0(S)} กก. เท่าเดิมและไม่ลดน้ำ → น้ำเกิน {f1(curRow.waterNoAdj)} ลิตร และเนื้อทรายขาด {f1(curRow.sandShort)} กก. → คอนกรีตเหลวขึ้น กำลังอัดมีโอกาสตก</div>}
       </div>}
+
+      {/* สูตรคอนกรีตที่ใช้อยู่ + น้ำที่ต้องเติมจริงเมื่อความชื้นไม่ใช่ค่าปกติ
+          ทุกสูตรใช้ทรายเท่ากัน น้ำส่วนเกินจึงเท่ากันหมด ต่างกันแค่น้ำตั้งต้นของแต่ละสูตร */}
+      {mixes.length>0&&<div style={{marginBottom:16,border:'1px solid #e2e8f0',borderRadius:10,overflow:'hidden'}}>
+        <div style={{background:'#f8fafc',padding:'9px 12px',fontSize:13.5,fontWeight:700,color:'#1a2540',borderBottom:'1px solid #e2e8f0'}}>
+          สูตรคอนกรีต — ต่อ 1 ม³
+          <span style={{fontWeight:400,color:'#64748b',marginLeft:8,fontSize:12.5}}>
+            ทรายในสูตรชั่งที่ความชื้น {f1(Number(base))}%
+            {curRow&&<> · วันนี้ {f1(curRow.m)}% → ทุกสูตรชั่งทราย <b style={{color:'#1d4ed8'}}>{f1(curRow.wet)} กก.</b></>}
+          </span>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:13.5}}>
+            <thead><tr>
+              <th style={{...th,textAlign:'left'}}>สูตร</th>
+              <th style={th}>ปูน</th><th style={th}>ทราย</th>
+              <th style={th}>หิน 3/4″</th><th style={th}>หิน 1″</th>
+              <th style={th}>น้ำในสูตร</th>
+              {curRow&&<th style={{...th,background:'#eff6ff',color:'#1d4ed8'}}>เติมจริงวันนี้</th>}
+              <th style={th}>น้ำยา (cc)</th><th style={th}>แอมป์</th><th style={th}>ยุบตัว</th>
+            </tr></thead>
+            <tbody>
+              {mixes.map(m=>{
+                const adj=curRow?Number(m.water_add_l)-curRow.extra:null;
+                const low=adj!=null&&adj<=0;
+                return <tr key={m.formula} style={{borderBottom:'1px solid #f1f3f7'}}>
+                  <td style={{padding:'7px 10px',fontWeight:700,color:'#1a2540'}}>{m.formula}</td>
+                  <td style={td}>{f0(m.cement_kg)}</td><td style={td}>{f0(m.sand_kg)}</td>
+                  <td style={td}>{f0(m.rock34_kg)}</td><td style={td}>{f0(m.rock1_kg)}</td>
+                  <td style={{...td,color:'#64748b'}}>{f1(m.water_add_l)}</td>
+                  {curRow&&<td style={{...td,background:'#f8fbff',fontWeight:800,fontSize:15,color:low?'#b91c1c':'#1d4ed8'}}>{f1(adj)}</td>}
+                  <td style={td}>{m.np_cc!=null?Number(m.np_cc).toLocaleString('th-TH'):'–'}</td>
+                  <td style={td}>{m.amp??'–'}</td><td style={td}>{m.slump_cm??'–'}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+        {curRow&&mixes.some(m=>Number(m.water_add_l)-curRow.extra<=0)&&
+          <div style={{padding:'9px 12px',background:'#fef2f2',borderTop:'1px solid #fecaca',fontSize:12.5,color:'#b91c1c',lineHeight:1.7}}>
+            ⚠️ สูตรที่ขึ้นแดง น้ำที่ต้องเติมเหลือ 0 หรือติดลบ — ทรายชื้นเกินกว่าสูตรรับไหว ต่อให้ไม่เติมน้ำเลยก็ยังเหลวเกิน
+          </div>}
+        <div style={{padding:'8px 12px',fontSize:12,color:'#94a3b8',borderTop:'1px solid #f1f5f9'}}>
+          แก้สูตรได้ที่ตาราง concrete_mix_design ใน Supabase · แอปมือถือ (แท็บ 💦 ความชื้น) ใช้ตัวเดียวกัน
+        </div>
+      </div>}
+
       <div style={{overflowX:'auto'}}>
         <table style={{borderCollapse:'collapse',width:'100%',fontSize:13.5}}>
           <thead><tr>
