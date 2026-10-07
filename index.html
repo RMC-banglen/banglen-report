@@ -5148,7 +5148,11 @@ window.__dataReady.then(data => {
               <td style={{padding:'5px 10px',fontWeight:600}}>{r.formula}</td>
               <td style={{padding:'5px 10px',textAlign:'right',fontWeight:800,color:out(r)?'#c0392b':'#0f766e'}}>{Number(r.amp)}</td>
               <td style={{padding:'5px 10px',textAlign:'right'}}>{r.sand_moisture_pct!=null?Number(r.sand_moisture_pct).toFixed(2)+'%':'–'}</td>
-              <td style={{padding:'5px 10px',textAlign:'right'}}>{r.water_l!=null?r.water_l+' ล.':'–'}</td>
+              {/* น้ำที่คนโม่เติมเองเป็นของที่เครื่องไม่ได้บันทึก เน้นให้เห็นชัดเมื่อมีการเติมจริง
+                  เตือนเฉพาะหน้านี้ ไม่ไปขึ้นที่หน้าคนแพล้นท์ ไม่งั้นคนจะเลิกกรอก */}
+              <td style={{padding:'5px 10px',textAlign:'right',
+                fontWeight:Number(r.water_l)>0?800:400,color:Number(r.water_l)>0?'#b45309':'#1f2937'}}>
+                {Number(r.water_l)>0?'+'+r.water_l+' ล.':r.water_l!=null?'0':'–'}</td>
               <td style={{padding:'5px 10px',color:'#64748b'}}>{r.note||''}</td>
             </tr>)}</tbody>
           </table>

@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-07c';
+var APP_VERSION='2026-10-07d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -185,19 +185,24 @@ function App(){
     setCam(false);
   };
   useEffect(()=>()=>stopCam(),[]);          // ปิดกล้องเมื่อออกจากหน้า ไม่งั้นไฟกล้องค้าง
+  // เปิดกล้องไม่ได้ด้วยเหตุผลอะไร เก็บไว้โชว์ปุ่มสำรองให้กดเอง
+  // (ห้ามสั่ง fileRef.click() เองหลัง await เพราะเบราว์เซอร์ถือว่าหมดจังหวะการกดของผู้ใช้แล้ว
+  //  จะโดนบล็อกเงียบ ๆ กดแล้วไม่มีอะไรขึ้นเลย)
+  const[camErr,setCamErr]=useState('');
   const openCam=async()=>{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-      fileRef.current.click();return;        // เครื่องเก่าที่ไม่รองรับ ใช้ช่องเลือกไฟล์แทน
+      setCamErr('เครื่องนี้เปิดกล้องในหน้าเว็บไม่ได้');return;
     }
     try{
       const st=await navigator.mediaDevices.getUserMedia({
         video:{facingMode:{ideal:'environment'},width:{ideal:1600}},audio:false});
-      streamRef.current=st;setCam(true);setErr('');
+      streamRef.current=st;setCam(true);setErr('');setCamErr('');
       setTimeout(()=>{if(videoRef.current){videoRef.current.srcObject=st;videoRef.current.play().catch(()=>{});}},0);
     }catch(ex){
-      // ไม่ให้สิทธิ์กล้อง หรือเครื่องไม่มีกล้อง — บอกให้รู้แล้วเปิดช่องเลือกไฟล์ให้
-      setErr('เปิดกล้องไม่ได้ ('+(ex.name||ex.message)+') — ถ้าเบราว์เซอร์ถามสิทธิ์กล้องให้กดอนุญาต');
-      fileRef.current.click();
+      const n=ex&&ex.name||'';
+      setCamErr(n==='NotAllowedError'?'ยังไม่ได้อนุญาตให้ใช้กล้อง'
+        :n==='NotFoundError'?'ไม่พบกล้องในเครื่องนี้'
+        :'เปิดกล้องไม่ได้ ('+(n||ex.message)+')');
     }
   };
   const shoot=()=>{
@@ -228,13 +233,15 @@ function App(){
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
     try{localStorage.setItem('plant_formula',formula);}catch(e){}
     const round=today.length+1;
-    // นอกช่วงปกติ → ให้ GAS ส่ง Telegram เข้ากลุ่ม QC (หน้านี้ไม่มีโทเคน)
-    if(outLow||outHigh){
-      // ส่งเป้าหมายน้ำไปด้วย ข้อความจะได้บอกได้ว่าน้ำที่ตั้งห่างจากเป้าเท่าไหร่
+    // ให้ GAS ส่ง Telegram เข้ากลุ่ม QC (หน้านี้ไม่มีโทเคน) — คนแพล้นท์ไม่ได้อยู่ในกลุ่มนั้น
+    // แจ้งเมื่อแอมป์นอกช่วงปกติ หรือมีการเติมน้ำเอง (เติมน้ำบางทีแอมป์ยังไม่หลุดช่วงแต่ QC ควรรู้)
+    const addedWater=rec.water_l!=null&&Number(rec.water_l)>0;
+    if(outLow||outHigh||addedWater){
+      // แจ้ง QC เรื่องน้ำที่คนโม่เติมเองด้วย (ข้อความไปไม่ถึงคนที่กรอก จึงไม่ทำให้เลิกกรอก)
+      // ส่งน้ำที่สูตรควรตั้งไปด้วย QC จะได้เทียบได้ว่าเติมบนฐานเท่าไหร่
       const mx=mixes.find(x=>x.formula===formula);
-      const wTgt=(mx&&moist!=null)
-        ? Math.round((Number(mx.water_add_l)-(Number(mx.sand_kg)||822)/1.07*(moist-7)/100)*10)/10
-        : (mx?Number(mx.water_add_l):null);
+      const wTgt=mx?Math.round((Number(mx.water_add_l)
+        -(moist!=null?(Number(mx.sand_kg)||822)/1.07*(moist-7)/100:0))*10)/10:null;
       try{fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({kind:'amp_alert',
         d,time,round,formula,amp:ampN,amp_min:lo,amp_max:hi,water_l:rec.water_l,water_target:wTgt,
         sand_moisture_pct:moist,note:note||''})});}catch(e){}
@@ -279,6 +286,17 @@ function App(){
                 <div className="ph-label">แตะเพื่อถ่ายรูปมิเตอร์</div>
                 <div className="ph-sub">ถ่ายให้ตรง เห็นตัวเลขชัด ไม่มีแสงสะท้อน</div></>}
             </div>}
+
+        {camErr&&!cam&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:10,background:'#fff7ed',
+          border:'1px solid #fed7aa',color:'#9a3412',fontSize:13.5,lineHeight:1.7}}>
+          {camErr} — กดปุ่มข้างล่างเพื่อใช้กล้องของเครื่องแทน
+          {camErr.indexOf('อนุญาต')>=0&&<div style={{fontSize:12.5,marginTop:4}}>
+            ถ้าอยากใช้กล้องในหน้านี้ ให้ไปเปิดสิทธิ์กล้องของเว็บนี้ในตั้งค่าเบราว์เซอร์
+          </div>}
+          <button className="ghost" style={{marginTop:8}} onClick={()=>fileRef.current.click()}>
+            📁 ถ่าย/เลือกรูปด้วยกล้องของเครื่อง
+          </button>
+        </div>}
 
         {reading&&<div style={{textAlign:'center',padding:'14px 0'}}><div className="spinner"/><div style={{fontWeight:700,marginTop:8}}>กำลังอ่านตัวเลข…</div></div>}
         {img&&!reading&&!cam&&<button className="ghost" onClick={openCam}>📷 ถ่ายใหม่</button>}
@@ -332,11 +350,9 @@ function App(){
               (อ้างอิง: สูตร {formula} {moist!=null?'วันนี้':'ตามสูตร'}ควรตั้งน้ำ {Math.round(tgt)} ลิตร/ม³
               {moist!=null&&' หักน้ำจากทรายชื้น '+moist.toFixed(2)+'% แล้ว'})
             </div>}
-            {add>0&&<div style={{marginTop:6,padding:'8px 10px',borderRadius:8,background:'#fef3c7',
-              border:'1px solid #fcd34d',color:'#92400e'}}>
-              เติมเอง <b>{add} ลิตร</b> · น้ำต่อปูนสูงขึ้น กำลังอัดมีโอกาสตก
-              {' '}ใส่เหตุผลในหมายเหตุด้วยว่าทำไมต้องเติม
-            </div>}
+            {/* ตั้งใจไม่ขึ้นข้อความอะไรเลยเมื่อกรอกน้ำ — คนที่เติมน้ำคือคนเดียวกับที่ต้องกรอก
+                ถ้ากรอกแล้วมีข้อความโผล่มาต่อว่า ครั้งหน้าก็จะใส่ 0 แล้วเราเสียข้อมูลไปเลย
+                ให้ไปดูที่หน้าแดชบอร์ดแทน */}
           </div>;
         })()}
         <div style={{fontSize:13.5,color:'#4b5a59',marginBottom:12}}>
