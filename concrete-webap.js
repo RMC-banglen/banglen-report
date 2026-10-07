@@ -966,7 +966,9 @@ function notifyAmpAlert(d) {
     L.push('<b>ค่าที่อ่านได้:</b> ' + amp + ' A  (ปกติ ' + (lo != null ? lo : '–') + '–' + (hi != null ? hi : '–') + ' A)');
     L.push('<b>สูตร:</b> ' + esc(d.formula || '-') + ' · รอบที่ ' + (d.round || '-') + ' · เวลา ' + esc(d.time || '-'));
     if (d.sand_moisture_pct != null) L.push('ความชื้นทรายวันนี้: ' + Number(d.sand_moisture_pct).toFixed(2) + '%');
-    if (d.water_l != null) L.push('น้ำที่เติม: ' + d.water_l + ' ลิตร');
+    if (d.water_l != null && Number(d.water_l) !== 0) {
+      L.push('⚠️ เติมน้ำเพิ่มจากสูตร: <b>' + d.water_l + ' ลิตร/ม³</b>');
+    }
     if (d.note) L.push('หมายเหตุ: ' + esc(d.note));
     L.push('');
     L.push(low ? '<i>แอมป์ต่ำ = คอนกรีตเหลว/น้ำเยอะ — เช็คความชื้นทรายและน้ำที่เติม กำลังอัดมีโอกาสตก</i>'

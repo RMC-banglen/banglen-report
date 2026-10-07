@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-07a';
+var APP_VERSION='2026-10-07b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -140,6 +140,10 @@ function App(){
   const[note,setNote]=useState('');
   const[moist,setMoist]=useState(null);       // ผลความชื้นทรายล่าสุดวันนี้จาก QC
   const[spec,setSpec]=useState({});
+  // สูตรคอนกรีต ใช้บอกว่าสูตรที่เลือกตั้งน้ำไว้เท่าไหร่ จะได้รู้ว่า "เติมเพิ่ม" คือเพิ่มจากอะไร
+  const[mixes,setMixes]=useState([]);
+  useEffect(()=>{SB.from('concrete_mix_design').select('formula,sand_kg,water_add_l').eq('active',true)
+    .then(({data})=>setMixes(data||[]));},[]);
   const[today,setToday]=useState([]);
   const[saving,setSaving]=useState(false);
   const[err,setErr]=useState('');
@@ -302,10 +306,33 @@ function App(){
             <input type="text" value={img?time:'—'} readOnly style={{background:'#f3f6f6',color:'#4b5a59'}}/>
           </div>
           <div className="field" style={{flex:1}}>
-            <label>น้ำที่เติม (ลิตร) <span style={{fontWeight:400,color:'#8a9997'}}>ถ้ามี</span></label>
-            <input type="number" inputMode="decimal" value={water} onChange={e=>setWater(e.target.value)} placeholder="เช่น 150"/>
+            {/* เดิมเขียนว่า "น้ำที่เติม" ตัวอย่าง 150 ซึ่งกำกวม น้ำทั้งสูตรยังแค่ 60-70 ลิตร
+                คนกรอกเลยไม่รู้ว่าจะใส่น้ำทั้งหมดหรือเฉพาะที่เติมเพิ่ม */}
+            <label>น้ำที่เติม<u>เพิ่ม</u>จากสูตร (ลิตร/ม³)</label>
+            <input type="number" inputMode="decimal" value={water} onChange={e=>setWater(e.target.value)} placeholder="ไม่ได้เติมเพิ่ม = 0"/>
           </div>
         </div>
+        {(()=>{
+          // น้ำที่ควรตั้งของสูตรที่เลือก = น้ำในสูตร − น้ำที่ทรายพามาเกินความชื้นปกติ 7%
+          const m=mixes.find(x=>x.formula===formula);
+          const base=m?Number(m.water_add_l):null;
+          const tgt=(base!=null&&moist!=null)
+            ? base-(Number(m.sand_kg)||822)/1.07*(moist-7)/100 : base;
+          const add=water!==''?Number(water):0;
+          return <div style={{fontSize:12.5,color:'#6b7a79',marginBottom:10,lineHeight:1.75}}>
+            นับเฉพาะน้ำที่<b>เติมเพิ่มเอง</b>นอกเหนือจากที่ตั้งเครื่องไว้ ไม่ใช่น้ำทั้งหมดในสูตร
+            · ไม่ได้เติมเพิ่มให้ใส่ 0 หรือเว้นว่าง
+            {tgt!=null&&<div style={{marginTop:4}}>
+              สูตร <b>{formula}</b> {moist!=null?'วันนี้':'ตามสูตร'}ควรตั้งน้ำไว้ <b>{Math.round(tgt)} ลิตร/ม³</b>
+              {moist!=null&&<span style={{color:'#9aa8a6'}}> (ปรับตามความชื้นทราย {moist.toFixed(2)}% แล้ว)</span>}
+            </div>}
+            {add>0&&<div style={{marginTop:6,padding:'8px 10px',borderRadius:8,background:'#fef3c7',
+              border:'1px solid #fcd34d',color:'#92400e'}}>
+              เติมเพิ่ม {add} ลิตร{tgt!=null?' → รวมเป็น '+Math.round(tgt+add)+' ลิตร/ม³':''}
+              {' '}· น้ำต่อปูนสูงขึ้น กำลังอัดมีโอกาสตก ใส่เหตุผลในหมายเหตุด้วย
+            </div>}
+          </div>;
+        })()}
         <div style={{fontSize:13.5,color:'#4b5a59',marginBottom:12}}>
           ความชื้นทรายวันนี้: {moist!=null?<b>{moist.toFixed(2)}%</b>:<span style={{color:'#9aa8a6'}}>ยังไม่มีผลจาก QC</span>} <span style={{color:'#9aa8a6'}}>(บันทึกคู่ให้เอง)</span>
         </div>
