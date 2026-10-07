@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-07b';
+var APP_VERSION='2026-10-07c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -230,8 +230,14 @@ function App(){
     const round=today.length+1;
     // นอกช่วงปกติ → ให้ GAS ส่ง Telegram เข้ากลุ่ม QC (หน้านี้ไม่มีโทเคน)
     if(outLow||outHigh){
+      // ส่งเป้าหมายน้ำไปด้วย ข้อความจะได้บอกได้ว่าน้ำที่ตั้งห่างจากเป้าเท่าไหร่
+      const mx=mixes.find(x=>x.formula===formula);
+      const wTgt=(mx&&moist!=null)
+        ? Math.round((Number(mx.water_add_l)-(Number(mx.sand_kg)||822)/1.07*(moist-7)/100)*10)/10
+        : (mx?Number(mx.water_add_l):null);
       try{fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({kind:'amp_alert',
-        d,time,round,formula,amp:ampN,amp_min:lo,amp_max:hi,water_l:rec.water_l,sand_moisture_pct:moist,note:note||''})});}catch(e){}
+        d,time,round,formula,amp:ampN,amp_min:lo,amp_max:hi,water_l:rec.water_l,water_target:wTgt,
+        sand_moisture_pct:moist,note:note||''})});}catch(e){}
     }
     setMsg('✅ บันทึกรอบที่ '+round+' แล้ว — '+formula+' · '+ampN+' A'+(outLow||outHigh?' (นอกช่วงปกติ แจ้ง QC แล้ว)':''));
     setImg(null);setAmp('');setSure(null);setOthers([]);setWater('');setNote('');setTime(nowHHMM());
@@ -306,10 +312,10 @@ function App(){
             <input type="text" value={img?time:'—'} readOnly style={{background:'#f3f6f6',color:'#4b5a59'}}/>
           </div>
           <div className="field" style={{flex:1}}>
-            {/* เดิมเขียนว่า "น้ำที่เติม" ตัวอย่าง 150 ซึ่งกำกวม น้ำทั้งสูตรยังแค่ 60-70 ลิตร
-                คนกรอกเลยไม่รู้ว่าจะใส่น้ำทั้งหมดหรือเฉพาะที่เติมเพิ่ม */}
-            <label>น้ำที่เติม<u>เพิ่ม</u>จากสูตร (ลิตร/ม³)</label>
-            <input type="number" inputMode="decimal" value={water} onChange={e=>setWater(e.target.value)} placeholder="ไม่ได้เติมเพิ่ม = 0"/>
+            {/* น้ำที่ตั้งหน้าเครื่อง เครื่องบันทึกเองอยู่แล้ว ไม่ต้องให้คนกรอกซ้ำ
+                ที่ไม่มีใครบันทึกคือน้ำที่คนโม่สาดเพิ่มเองตอนเห็นว่าคอนกรีตฝืด จึงเก็บเฉพาะตัวนี้ */}
+            <label>น้ำที่คนโม่เติมเอง (ลิตร)</label>
+            <input type="number" inputMode="decimal" value={water} onChange={e=>setWater(e.target.value)} placeholder="ไม่ได้เติม = 0"/>
           </div>
         </div>
         {(()=>{
@@ -318,18 +324,18 @@ function App(){
           const base=m?Number(m.water_add_l):null;
           const tgt=(base!=null&&moist!=null)
             ? base-(Number(m.sand_kg)||822)/1.07*(moist-7)/100 : base;
-          const add=water!==''?Number(water):0;
+          const add=water!==''?Number(water):null;
           return <div style={{fontSize:12.5,color:'#6b7a79',marginBottom:10,lineHeight:1.75}}>
-            นับเฉพาะน้ำที่<b>เติมเพิ่มเอง</b>นอกเหนือจากที่ตั้งเครื่องไว้ ไม่ใช่น้ำทั้งหมดในสูตร
-            · ไม่ได้เติมเพิ่มให้ใส่ 0 หรือเว้นว่าง
-            {tgt!=null&&<div style={{marginTop:4}}>
-              สูตร <b>{formula}</b> {moist!=null?'วันนี้':'ตามสูตร'}ควรตั้งน้ำไว้ <b>{Math.round(tgt)} ลิตร/ม³</b>
-              {moist!=null&&<span style={{color:'#9aa8a6'}}> (ปรับตามความชื้นทราย {moist.toFixed(2)}% แล้ว)</span>}
+            น้ำที่ตั้งหน้าเครื่องมีบันทึกในเครื่องอยู่แล้ว ไม่ต้องกรอกซ้ำ
+            · ช่องนี้เอาไว้บันทึก<b>น้ำที่สาดเพิ่มเองตอนโม่</b> ซึ่งไม่มีที่ไหนบันทึกไว้เลย
+            {tgt!=null&&<div style={{marginTop:4,color:'#9aa8a6'}}>
+              (อ้างอิง: สูตร {formula} {moist!=null?'วันนี้':'ตามสูตร'}ควรตั้งน้ำ {Math.round(tgt)} ลิตร/ม³
+              {moist!=null&&' หักน้ำจากทรายชื้น '+moist.toFixed(2)+'% แล้ว'})
             </div>}
             {add>0&&<div style={{marginTop:6,padding:'8px 10px',borderRadius:8,background:'#fef3c7',
               border:'1px solid #fcd34d',color:'#92400e'}}>
-              เติมเพิ่ม {add} ลิตร{tgt!=null?' → รวมเป็น '+Math.round(tgt+add)+' ลิตร/ม³':''}
-              {' '}· น้ำต่อปูนสูงขึ้น กำลังอัดมีโอกาสตก ใส่เหตุผลในหมายเหตุด้วย
+              เติมเอง <b>{add} ลิตร</b> · น้ำต่อปูนสูงขึ้น กำลังอัดมีโอกาสตก
+              {' '}ใส่เหตุผลในหมายเหตุด้วยว่าทำไมต้องเติม
             </div>}
           </div>;
         })()}
