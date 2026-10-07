@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-07d';
+var APP_VERSION='2026-10-07e';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -158,7 +158,14 @@ function App(){
     SB.from('plant_amp_spec').select('amp_min,amp_max').eq('id',1).limit(1).then(({data})=>{if(data&&data[0])setSpec(data[0]);});
   },[]);
 
-  // รับรูปมาแล้วส่งไปอ่านค่า ใช้ร่วมกันทั้งกล้องในหน้าและช่องเลือกไฟล์
+  // รับรูปจากกล้องของเครื่องแล้วส่งไปอ่านค่า
+  const onFile=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>useShot(ev.target.result);
+    r.readAsDataURL(f);e.target.value='';
+  };
+
   const useShot=async dataUrl=>{
     setImg(dataUrl);setErr('');setMsg('');setAmp('');setSure(null);setOthers([]);setTime(nowHHMM());
     setReading(true);
@@ -169,50 +176,6 @@ function App(){
     finally{setReading(false);}
   };
 
-  const onFile=e=>{
-    const f=e.target.files[0];if(!f)return;
-    const r=new FileReader();
-    r.onload=ev=>useShot(ev.target.result);
-    r.readAsDataURL(f);e.target.value='';
-  };
-
-  // กล้องในหน้าเว็บเอง — capture="environment" เป็นแค่คำขอ บางเครื่อง/บางเบราว์เซอร์
-  // ไม่ทำตามแล้วเด้งไปอัลบั้มแทน อันนี้เปิดกล้องตรงจึงได้ถ่ายจริงทุกเครื่องที่มีกล้อง
-  const videoRef=useRef(); const streamRef=useRef(null);
-  const[cam,setCam]=useState(false);
-  const stopCam=()=>{
-    if(streamRef.current){streamRef.current.getTracks().forEach(t=>t.stop());streamRef.current=null;}
-    setCam(false);
-  };
-  useEffect(()=>()=>stopCam(),[]);          // ปิดกล้องเมื่อออกจากหน้า ไม่งั้นไฟกล้องค้าง
-  // เปิดกล้องไม่ได้ด้วยเหตุผลอะไร เก็บไว้โชว์ปุ่มสำรองให้กดเอง
-  // (ห้ามสั่ง fileRef.click() เองหลัง await เพราะเบราว์เซอร์ถือว่าหมดจังหวะการกดของผู้ใช้แล้ว
-  //  จะโดนบล็อกเงียบ ๆ กดแล้วไม่มีอะไรขึ้นเลย)
-  const[camErr,setCamErr]=useState('');
-  const openCam=async()=>{
-    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-      setCamErr('เครื่องนี้เปิดกล้องในหน้าเว็บไม่ได้');return;
-    }
-    try{
-      const st=await navigator.mediaDevices.getUserMedia({
-        video:{facingMode:{ideal:'environment'},width:{ideal:1600}},audio:false});
-      streamRef.current=st;setCam(true);setErr('');setCamErr('');
-      setTimeout(()=>{if(videoRef.current){videoRef.current.srcObject=st;videoRef.current.play().catch(()=>{});}},0);
-    }catch(ex){
-      const n=ex&&ex.name||'';
-      setCamErr(n==='NotAllowedError'?'ยังไม่ได้อนุญาตให้ใช้กล้อง'
-        :n==='NotFoundError'?'ไม่พบกล้องในเครื่องนี้'
-        :'เปิดกล้องไม่ได้ ('+(n||ex.message)+')');
-    }
-  };
-  const shoot=()=>{
-    const v=videoRef.current;if(!v||!v.videoWidth)return;
-    const c=document.createElement('canvas');
-    c.width=v.videoWidth;c.height=v.videoHeight;
-    c.getContext('2d').drawImage(v,0,0,c.width,c.height);
-    const url=c.toDataURL('image/jpeg',0.85);
-    stopCam();useShot(url);
-  };
 
   const ampN=Number(amp);
   const lo=spec.amp_min!=null&&spec.amp_min!==''?Number(spec.amp_min):null,hi=spec.amp_max!=null&&spec.amp_max!==''?Number(spec.amp_max):null;
@@ -267,39 +230,20 @@ function App(){
 
       <div className="card">
         <div className="card-title">1. ถ่ายรูปมิเตอร์แอมป์ {today.length>0&&<span style={{color:'#0f766e'}}>— รอบที่ {today.length+1}</span>}</div>
-        <input type="file" accept="image/*" capture="environment" ref={fileRef} style={{display:'none'}} onChange={onFile}/>
-
-        {cam
-          ? <div>
-              <video ref={videoRef} playsInline muted
-                style={{width:'100%',borderRadius:12,background:'#000',display:'block'}}/>
-              <div style={{display:'flex',gap:10,marginTop:10}}>
-                <button className="ghost" style={{flex:1,marginTop:0}} onClick={stopCam}>ยกเลิก</button>
-                <button style={{flex:2,padding:'14px',borderRadius:12,border:'none',background:'#0f766e',
-                  color:'#fff',fontSize:18,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}
-                  onClick={shoot}>📷 ถ่าย</button>
-              </div>
-            </div>
-          : <div className="photo-box" onClick={openCam}>
-              {img?<img src={img} alt="มิเตอร์"/>:<>
-                <span className="ph-icon">📷</span>
-                <div className="ph-label">แตะเพื่อถ่ายรูปมิเตอร์</div>
-                <div className="ph-sub">ถ่ายให้ตรง เห็นตัวเลขชัด ไม่มีแสงสะท้อน</div></>}
-            </div>}
-
-        {camErr&&!cam&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:10,background:'#fff7ed',
-          border:'1px solid #fed7aa',color:'#9a3412',fontSize:13.5,lineHeight:1.7}}>
-          {camErr} — กดปุ่มข้างล่างเพื่อใช้กล้องของเครื่องแทน
-          {camErr.indexOf('อนุญาต')>=0&&<div style={{fontSize:12.5,marginTop:4}}>
-            ถ้าอยากใช้กล้องในหน้านี้ ให้ไปเปิดสิทธิ์กล้องของเว็บนี้ในตั้งค่าเบราว์เซอร์
-          </div>}
-          <button className="ghost" style={{marginTop:8}} onClick={()=>fileRef.current.click()}>
-            📁 ถ่าย/เลือกรูปด้วยกล้องของเครื่อง
-          </button>
-        </div>}
+        {/* ใช้กล้องของเครื่องตรง ๆ แบบเดิม (capture=environment) — เรียบง่ายและคุ้นมือที่สุด
+            เคยลองเปิดกล้องในหน้าเว็บเองแล้ว ยุ่งกว่าและมีปัญหาเรื่องสิทธิ์ จึงกลับมาแบบนี้
+            accept=image/* + capture ทำให้มือถือเด้งกล้องให้เลย ไม่ต้องผ่านอัลบั้ม */}
+        <input type="file" accept="image/*" capture="environment" ref={fileRef}
+               style={{display:'none'}} onChange={onFile}/>
+        <div className="photo-box" onClick={()=>fileRef.current.click()}>
+          {img?<img src={img} alt="มิเตอร์"/>:<>
+            <span className="ph-icon">📷</span>
+            <div className="ph-label">แตะเพื่อถ่ายรูปมิเตอร์</div>
+            <div className="ph-sub">ถ่ายให้ตรง เห็นตัวเลขชัด ไม่มีแสงสะท้อน</div></>}
+        </div>
 
         {reading&&<div style={{textAlign:'center',padding:'14px 0'}}><div className="spinner"/><div style={{fontWeight:700,marginTop:8}}>กำลังอ่านตัวเลข…</div></div>}
-        {img&&!reading&&!cam&&<button className="ghost" onClick={openCam}>📷 ถ่ายใหม่</button>}
+        {img&&!reading&&<button className="ghost" onClick={()=>fileRef.current.click()}>📷 ถ่ายใหม่</button>}
       </div>
 
       <div className="card">
