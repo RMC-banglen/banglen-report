@@ -512,7 +512,7 @@ function ActualCell({ row, stockMode }) {
     placeholder="0" style={inp(100, true)} disabled={READONLY} />;
 }
 
-function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, onOpenCutIn, extraRebarButton, allowExtraSpec, showCutIn }) {
+function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGeneralUse, onOpenCutIn, extraRebarButton, allowExtraSpec, showCutIn, showRemain }) {
   if (!rows || !rows.length) return null;
   // คอลัมน์ "เข้า-ออกสต็อก" มีเฉพาะเพลท (สต็อกปลาย−ต้นงวด หน่วยแผ่นใหญ่ เหมือนคอลัมน์คำนวณ) — วัตถุดิบอื่นไม่มีข้อมูลนี้ ซ่อนคอลัมน์ไปเลย
   const hasStockInOut = rows.some(r => r.stockInOutFmt != null);
@@ -532,6 +532,7 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
             {hasStockInOut && <th style={th(10, true)}>เข้า-ออกสต็อกสำเร็จ (แผ่นใหญ่)</th>}
             <th style={th(8, true)}>ส่วนต่างจริง</th>
             <th style={th(7, true)}>% หาย</th>
+            {showRemain && <th style={th(9, true)}>คงเหลือ ({unitLabel})</th>}
           </tr>
         </thead>
         <tbody>
@@ -578,6 +579,9 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
               {hasStockInOut && <td style={td(true)}>{row.stockInOutFmt ?? '-'}</td>}
               <td style={{ ...td(true), fontWeight: 700, color: row.realDiffColor || 'inherit' }}>{row.realDiffFmt}</td>
               <td style={{ ...td(true), fontWeight: 700, background: row.rowBg, borderRadius: 6 }}>{row.pctLostFmt}</td>
+              {showRemain && <td style={{ ...td(true), fontWeight: row.remainCounted ? 700 : 400, color: row.remainVal < 0 ? '#c0392b' : row.remainCounted ? '#1f2a3d' : '#8a93a6' }}
+                title={row.remainVal == null ? '' : row.remainCounted ? 'นับปลายงวดแล้ว' : 'ยังไม่ได้นับปลายงวด — ประมาณจาก ยกมา+รับเข้า−คำนวณ−ใช้งานอื่น+ตัดรับเข้า'}>
+                {row.remainVal == null ? '-' : (row.remainCounted ? '' : '≈ ') + fmt(row.remainVal, row.dg)}</td>}
             </tr>
           ))}
         </tbody>
@@ -1028,8 +1032,13 @@ class App extends React.Component {
     // ตัดรับเข้าจากความยาวอื่น (cutInQty) คือของเข้าจริงที่ไม่ได้มาจากสูตร ช่วยลดส่วนต่างจริงที่ดูเหมือนขาด/เกินโดยไม่ทราบสาเหตุ
     const realDiff = A != null ? A + generalUse - cutInQty : null;
     const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
+    // คงเหลือ: นับปลายงวดแล้ว = ตัวเลขนับจริง, ยังไม่นับ = ประมาณจาก ยกมา+รับเข้า−คำนวณ−ใช้งานอื่น+ตัดรับเข้า
+    const n0 = v => (v == null || v === '' ? 0 : Number(v) || 0);
+    const remainCounted = stockVals.closing != null && stockVals.closing !== '';
+    const hasAnyStock = remainCounted || (stockVals.opening != null && stockVals.opening !== '') || (stockVals.received != null && stockVals.received !== '');
+    const remainVal = remainCounted ? n0(stockVals.closing) : hasAnyStock ? n0(stockVals.opening) + n0(stockVals.received) - calcVal - generalUse + cutInQty : null;
     return {
-      key, label, dg, calcFmt: fmt(calcVal, dg), actual: info.actual,
+      key, label, dg, calcFmt: fmt(calcVal, dg), actual: info.actual, remainVal, remainCounted,
       actualFmt: (info.actual === '' || info.actual == null || isNaN(Number(info.actual))) ? '-' : fmt(Number(info.actual), dg),
       diffFmt: info.diffFmt, pctFmt: info.pctFmt, diffColor: info.diffColor,
       onActualChange: v => this.setActual(key, v),
@@ -1113,6 +1122,23 @@ class App extends React.Component {
     });
     // เรียงรายการเหล็กค้าง/ไม่อยู่ในสูตรปนไปกับแถวคำนวณตามขนาด แทนที่จะโยนไปกองท้ายตารางเหมือนเดิม
     const rebarRowsM = markRebarGroups(sortRebarBySpec([...baseRebarRowsM, ...stockOnlyRowsM, ...extraRebarRowsM], row => row.label));
+    // ยอดคงเหลือรวมต่อขนาด (DB12 / DB16 …) เป็นเส้นและเป็นตัน — น้ำหนัก = เส้น × ความยาว × กก./ม. (ตารางน้ำหนักเหล็กในตั้งค่า)
+    const rw = this.state.rebarWeights || {};
+    const groups = {};
+    [...baseRebarRowsM, ...otherRows].forEach(row => {
+      if (row.remainVal == null) return;
+      const p = parseRebarSpec(row.label); if (!p.ok) return;
+      const g = p.pre + p.diam;
+      const G = groups[g] || (groups[g] = { g, pre: p.pre, diam: p.diam, pcs: 0, kg: 0, est: false, noW: false });
+      G.pcs += row.remainVal;
+      const w = Number(rw[g]);
+      if (w > 0) G.kg += row.remainVal * p.len * w; else G.noW = true;
+      if (!row.remainCounted && row.remainVal) G.est = true;
+    });
+    rebarInfo.groups = Object.values(groups).sort((a, b) => a.pre.localeCompare(b.pre) || a.diam - b.diam);
+    rebarInfo.totalKg = rebarInfo.groups.reduce((a, G) => a + G.kg, 0);
+    rebarInfo.totalPcs = rebarInfo.groups.reduce((a, G) => a + G.pcs, 0);
+    rebarInfo.est = rebarInfo.groups.some(G => G.est);
     const pcBuckets = { 4: 0, 5: 0, 7: 0 };
     r.pc.forEach(x => { pcBuckets[4] += x.pc4Kg; pcBuckets[5] += x.pc5Kg; pcBuckets[7] += x.pc7Kg; });
     const pcRowsM = Object.entries(pcBuckets).filter(([, v]) => v > 0).map(([mm, v]) => this.buildRow('main:pc:' + mm, 'PC.wire' + mm + 'มม.', v, { unit: 'กก.' }));
@@ -1833,8 +1859,21 @@ class App extends React.Component {
                     {stockMode && (sub === 'all' || sub === 'plate') && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
                     {(sub === 'all' || sub === 'whisker') && <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
                     {(sub === 'all' || sub === 'collar') && <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                    {(sub === 'all' || sub === 'rebar') && (() => { const ri = mp.rebarInfo; return <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn allowExtraSpec
+                    {(sub === 'all' || sub === 'rebar') && (() => { const ri = mp.rebarInfo; return <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn showRemain allowExtraSpec
                       subtitle={<span>เหล็กเส้นทั้งหมด <b style={{ color: '#2b3445' }}>{ri.total}</b> ขนาด — ผลิตงวดนี้ {ri.produced} · ไม่ได้ผลิตแต่มีของ {ri.stockOnly}{ri.empty > 0 ? ' · ไม่มีของ ' + ri.empty : ''}
+                        {ri.groups.length > 0 && (
+                          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                            {ri.groups.map(G => (
+                              <span key={G.g} style={{ background: '#f1f5fb', border: '1px solid #dbe4f3', borderRadius: 8, padding: '6px 10px', color: '#2b3445' }}>
+                                <b>{G.g}</b> คงเหลือ {G.est ? '≈ ' : ''}<b>{fmt(G.pcs, 0)}</b> เส้น{G.kg > 0 ? ' · ' + fmt(G.kg / 1000, 2) + ' ตัน' : ''}{G.noW ? ' (ไม่มีน้ำหนัก/ม.)' : ''}
+                              </span>
+                            ))}
+                            <span style={{ background: '#2f5fd0', borderRadius: 8, padding: '6px 10px', color: 'white', fontWeight: 600 }}>
+                              รวมเหล็กเส้น {ri.est ? '≈ ' : ''}{fmt(ri.totalPcs, 0)} เส้น · {fmt(ri.totalKg / 1000, 2)} ตัน
+                            </span>
+                          </span>
+                        )}
+                        {ri.est && <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: '#8a93a6' }}>≈ = บางขนาดยังไม่ได้นับปลายงวด ใช้ยอดประมาณ (ยกมา+รับเข้า−คำนวณ−ใช้งานอื่น+ตัดรับเข้า)</span>}
                         {ri.stale.length > 0 && <span style={{ display: 'block', marginTop: 4, color: '#9a4a00' }}>⚠️ ค้างนาน (ไม่ได้ผลิต 3 เดือนขึ้นไป) {ri.stale.length} ขนาด รวม {fmt(ri.stale.reduce((a, x) => a + x.aging.remain, 0), 0)} เส้น: {ri.stale.map(x => x.label.replace(' ม.', '') + ' (' + fmt(x.aging.remain, 0) + ')').join(', ')} — เอาไปตัดใช้ก่อนสั่งเพิ่ม</span>}</span>}
                       extraRebarButton={<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-no-print="true">
                         {!READONLY && <button onClick={() => this.setState({ cutModalOpen: true })} style={{ ...btnDashed(), borderColor: '#2f5fd0', color: '#2f5fd0', fontWeight: 600 }}>✂️ ตัดเหล็ก</button>}
