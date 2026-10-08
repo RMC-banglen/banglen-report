@@ -187,12 +187,6 @@ function parseFmtNum(str) {
 const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 // เรียงรายชื่องวด "ชื่อเดือน ปี" ตามลำดับเวลาจริง (ปี → เดือน) แทนลำดับที่สร้างงวดไว้ก่อนหลัง
 // (เช่น สร้างงวดมีนาคมทีหลังสิงหาคม/กันยายน ก็ต้องให้มีนาคมมาก่อนตามปฏิทิน) ป้ายที่แจงเดือน/ปีไม่ได้ (ถ้ามี) จะถูกเรียงไปท้ายสุด
-// "กันยายน 2569" → เลขเดือนต่อเนื่อง (ปี×12+เดือน) เอาไว้ลบกันหาว่าห่างกี่เดือน; แจงไม่ได้ = NaN
-function periodMonthIndex(label) {
-  const [m, y] = String(label || '').split(' ');
-  const mi = THAI_MONTHS.indexOf(m), yr = parseInt(y, 10);
-  return (mi < 0 || isNaN(yr)) ? NaN : yr * 12 + mi;
-}
 // "สิงหาคม 2569" → "ส.ค. 69"
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 function shortPeriod(label) {
@@ -552,15 +546,9 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
                 ) : row.notProduced ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ color: row.hasData ? 'inherit' : '#9aa3b2' }}>{row.label}</span>
-                    {row.aging && row.aging.stale ? (
-                      <span title={'มีของ ' + fmt(row.aging.remain, 0) + ' เส้น แต่ไม่ได้ผลิตมานาน — เอาไปตัดใช้ก่อนสั่งเพิ่ม'} style={{ fontSize: 11, color: '#9a4a00', background: '#ffe7cc', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                        ⚠️ ค้างนาน · {row.aging.never ? 'ไม่ได้ผลิตเลยตั้งแต่ ' + shortPeriod(row.aging.label) : 'ผลิตล่าสุด ' + shortPeriod(row.aging.label)}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 11, color: '#78839A', background: '#f1f3f7', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>
-                        {!row.hasData ? 'ไม่มีของ' : row.aging && row.aging.label && !row.aging.never ? 'ผลิตล่าสุด ' + shortPeriod(row.aging.label) : 'ไม่ได้ผลิตงวดนี้'}
-                      </span>
-                    )}
+                    <span style={{ fontSize: 11, color: '#78839A', background: '#f1f3f7', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>
+                      {!row.hasData ? 'ไม่มีของ' : row.aging && row.aging.label && !row.aging.never ? 'ผลิตล่าสุด ' + shortPeriod(row.aging.label) : 'ไม่ได้ผลิตงวดนี้'}
+                    </span>
                     {!READONLY && row.onRemoveSpec && <button onClick={row.onRemoveSpec} style={{ ...btnGhost('#c0392b'), padding: '2px 8px', fontSize: 11 }}>ลบ</button>}
                   </div>
                 ) : row.label}
@@ -948,7 +936,7 @@ class App extends React.Component {
     });
     return out.sort((a, b) => b.cutId.localeCompare(a.cutId));
   }
-  // ผลิตขนาดนี้ล่าสุดงวดไหน (ดูจากงวดที่ปิดแล้ว) — ใช้บอกเหล็กค้างนาน
+  // ผลิตขนาดนี้ล่าสุดงวดไหน (ดูจากงวดที่ปิดแล้ว) — ขึ้นเป็นป้ายเทาข้างชื่อ
   rebarLastProduced(spec) {
     const ph = this.state.periodHistory || {};
     const labels = sortPeriodLabels(Object.keys(ph).filter(l => l !== this.state.periodLabel && ph[l] && ph[l].result));
@@ -1095,14 +1083,13 @@ class App extends React.Component {
         : (row.realDiffFmt !== '-' && row.realDiffFmt.startsWith('-')) ? '#c0392b' : 'inherit';
       // ขนาดที่เพิ่มเองแต่ยังไม่มีข้อมูล และไม่เคยมีในงวดไหนเลย ลบทิ้งได้ (กันพิมพ์ผิด)
       const removable = !hasData && !this.rebarCatalog(true).has(spec);
-      // ของคงเหลือตอนนี้ (ยังไม่นับปลายงวด = ยกมา+รับเข้า) — มีของแต่ไม่ได้ผลิตมานาน 3 เดือนขึ้นไป = ค้างนาน ควรเอาไปตัดใช้ก่อนสั่งเพิ่ม
+      // มีของอยู่ → บอกว่าผลิตขนาดนี้ล่าสุดงวดไหน
       const num = v => (v == null || v === '' ? 0 : Number(v) || 0);
       const remain = st.closing != null && st.closing !== '' ? num(st.closing) : num(st.opening) + num(st.received);
       let aging = null;
       if (remain > 0) {
         const lp = this.rebarLastProduced(spec);
-        const months = lp.label ? periodMonthIndex(this.state.periodLabel) - periodMonthIndex(lp.label) : 0;
-        aging = { remain, label: lp.label, never: lp.never, months, stale: isFinite(months) && months >= 3 };
+        aging = { remain, label: lp.label, never: lp.never };
       }
       return { ...row, isStockOnly: true, hasData, notProduced: true, aging, onRemoveSpec: removable ? () => this.removeRebarSpec(spec) : null,
         diffFmt: '-', diffColor: 'inherit', pctLostFmt: '-', rowBg: 'transparent', realDiffColor };
@@ -1110,8 +1097,7 @@ class App extends React.Component {
     // ขนาดที่ทุกช่องว่าง/0 (ไม่ผลิต ไม่มีของ) ซ่อนไว้ก่อน กดดูได้ จะได้ไม่รกตาราง
     const stockOnlyRowsM = otherRows.filter(x => x.hasData || this.state.showEmptyRebar);
     const rebarInfo = { total: inCalc.size + otherRows.length, produced: inCalc.size,
-      stockOnly: otherRows.filter(x => x.hasData).length, empty: otherRows.filter(x => !x.hasData).length,
-      stale: otherRows.filter(x => x.aging && x.aging.stale).sort((a, b) => b.aging.remain - a.aging.remain) };
+      stockOnly: otherRows.filter(x => x.hasData).length, empty: otherRows.filter(x => !x.hasData).length };
     const extraRebarRowsM = this.state.extraRebarItems.map(item => {
       const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
       // แถวนี้ไม่มีสูตรคำนวณให้เทียบ (คำนวณ = 0 เสมอ) เอา "ส่วนต่างจริง" ไปหาร % หาย เลยเพี้ยนได้ง่าย (ฐานติดลบพลิกเครื่องหมายมั่ว)
@@ -1874,7 +1860,7 @@ class App extends React.Component {
                           </span>
                         )}
                         {ri.est && <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: '#8a93a6' }}>≈ = บางขนาดยังไม่ได้นับปลายงวด ใช้ยอดประมาณ (ยกมา+รับเข้า−คำนวณ−ใช้งานอื่น+ตัดรับเข้า)</span>}
-                        {ri.stale.length > 0 && <span style={{ display: 'block', marginTop: 4, color: '#9a4a00' }}>⚠️ ค้างนาน (ไม่ได้ผลิต 3 เดือนขึ้นไป) {ri.stale.length} ขนาด รวม {fmt(ri.stale.reduce((a, x) => a + x.aging.remain, 0), 0)} เส้น: {ri.stale.map(x => x.label.replace(' ม.', '') + ' (' + fmt(x.aging.remain, 0) + ')').join(', ')} — เอาไปตัดใช้ก่อนสั่งเพิ่ม</span>}</span>}
+                        </span>}
                       extraRebarButton={<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-no-print="true">
                         {!READONLY && <button onClick={() => this.setState({ cutModalOpen: true })} style={{ ...btnDashed(), borderColor: '#2f5fd0', color: '#2f5fd0', fontWeight: 600 }}>✂️ ตัดเหล็ก</button>}
                         {this.cutList().length > 0 && <button onClick={() => this.setState({ cutModalOpen: true })} style={btnDashed()}>รายการตัดงวดนี้ ({this.cutList().length})</button>}
