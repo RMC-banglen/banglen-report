@@ -1249,7 +1249,8 @@ class App extends React.Component {
       });
       const openWeightTotal = rows.reduce((s, x) => s + x.openWeight, 0), closeWeightTotal = rows.reduce((s, x) => s + x.closeWeight, 0);
       // ช่องปลายงวดว่าง = ยังไม่ได้ลงไปนับ ไม่ใช่นับได้ศูนย์ ต้องแยกให้ออกก่อนเอาไปคิดส่วนต่าง
-      const closeCounted = rows.length > 0 && rows.every(x => x.close !== '' && x.close != null);
+      // ยกเว้นขนาดที่ไม่มีของค้างเลย (ยกมาว่าง/0) ไม่ต้องนับ — กติกาเดียวกับคอลัมน์ "เข้า-ออกสต็อกสำเร็จ" ในตารางเพลท
+      const closeCounted = rows.length > 0 && rows.every(x => (x.close !== '' && x.close != null) || x.open === '' || x.open == null || Number(x.open) === 0);
       const kgPerSheet = bigSheetKg[t] || 1;
       const openSheets = openWeightTotal / kgPerSheet, closeSheets = closeWeightTotal / kgPerSheet;
       const plateCalcBig = (r.plates || []).filter(x => thickMap[x.diam] === t).reduce((s, x) => s + x.weightKg, 0) / kgPerSheet;
