@@ -479,6 +479,8 @@ function ExtraSpecInput({ value, onCommit, disabled }) {
   );
 }
 function ActualCell({ row, stockMode }) {
+  const closingSet = row.closing !== '' && row.closing != null;
+  const mismatch = closingSet && row.nextOpening != null && Math.abs(Number(row.closing) - row.nextOpening) > 1e-9;
   if (stockMode) return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
       <div style={{ fontSize: 13, color: '#2f5fd0', fontWeight: 700 }}>{row.actualFmt}</div>
@@ -490,8 +492,16 @@ function ActualCell({ row, stockMode }) {
       ))}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 11, color: '#2f5fd0', fontWeight: 600, whiteSpace: 'nowrap' }}>นับสต็อก</span>
-        <FormattedNumberInput value={row.closing} digits={row.dg} onChange={v => row.onClosingChange(v)} style={{ ...inp(80, true), borderColor: '#2f5fd0' }} disabled={READONLY} />
+        <FormattedNumberInput value={row.closing} digits={row.dg} onChange={v => row.onClosingChange(v)} style={{ ...inp(80, true), borderColor: mismatch ? '#c0392b' : '#2f5fd0', background: mismatch ? '#fdf1f1' : undefined }} disabled={READONLY} />
       </div>
+      {row.nextOpening != null && (mismatch || !closingSet) && (
+        <div style={{ fontSize: 11, color: mismatch ? '#c0392b' : '#78839A', textAlign: 'right', lineHeight: 1.4 }}>
+          {mismatch
+            ? <span>ไม่ตรงกับยกมา {shortPeriod(row.nextLabel)} ({fmt(row.nextOpening, row.dg)}) ต่าง {(Number(row.closing) - row.nextOpening > 0 ? '+' : '') + fmt(Number(row.closing) - row.nextOpening, row.dg)}</span>
+            : <span>ยกมา {shortPeriod(row.nextLabel)} = {fmt(row.nextOpening, row.dg)}</span>}
+          {!READONLY && <button onClick={() => row.onClosingChange(String(row.nextOpening))} style={{ ...btnGhost('#2f5fd0'), padding: '1px 6px', fontSize: 11, marginLeft: 4 }}>ใช้เลขนี้</button>}
+        </div>
+      )}
     </div>
   );
   // โชว์แบบมีลูกน้ำ+ทศนิยมตรงกับคอลัมน์คำนวณ (row.actualFmt) เฉพาะตอนไม่ได้โฟกัส — ตอนพิมพ์ให้เห็นเลขดิบ พิมพ์ง่าย ไม่ต้องกังวลลูกน้ำ
@@ -1025,8 +1035,13 @@ class App extends React.Component {
     const remainCounted = stockVals.closing != null && stockVals.closing !== '';
     const hasAnyStock = remainCounted || (stockVals.opening != null && stockVals.opening !== '') || (stockVals.received != null && stockVals.received !== '');
     const remainVal = remainCounted ? n0(stockVals.closing) : hasAnyStock ? n0(stockVals.opening) + n0(stockVals.received) - calcVal - generalUse + cutInQty : null;
+    // กรอกงวดย้อนหลัง: นับสต็อกปลายงวดนี้ต้องเท่ากับยกมาของงวดถัดไป — ไม่ตรงขึ้นเตือน
+    const nx = this.nextPeriodSnap();
+    const nextOpenRaw = nx ? ((nx.snap.stock || {})[key] || {}).opening : null;
+    const nextOpening = nextOpenRaw == null || nextOpenRaw === '' ? null : Number(nextOpenRaw);
     return {
       key, label, dg, calcFmt: fmt(calcVal, dg), actual: info.actual, remainVal, remainCounted,
+      nextOpening, nextLabel: nx ? nx.label : null,
       actualFmt: (info.actual === '' || info.actual == null || isNaN(Number(info.actual))) ? '-' : fmt(Number(info.actual), dg),
       diffFmt: info.diffFmt, pctFmt: info.pctFmt, diffColor: info.diffColor,
       onActualChange: v => this.setActual(key, v),
@@ -1623,6 +1638,11 @@ class App extends React.Component {
     if (mi < 0 || isNaN(yr)) return null;
     return THAI_MONTHS[(mi + 1) % 12] + ' ' + (mi === 11 ? yr + 1 : yr);
   }
+  nextPeriodSnap() {
+    if (!this.isBackfillPeriod()) return null;
+    const label = this.nextPeriodLabel();
+    return { label, snap: this.state.periodHistory[label] };
+  }
   isBackfillPeriod() { const n = this.nextPeriodLabel(); return !!(n && (this.state.periods || []).includes(n) && this.state.periodHistory[n]); }
   // กรอกงวดย้อนหลัง: ยอดนับปลายงวดนี้ = ยอดยกมาของงวดถัดไปที่กรอกไว้แล้ว ดึงมาใส่ให้ ไม่ต้องพิมพ์ซ้ำ
   pullClosingFromNextPeriod() {
@@ -1855,6 +1875,14 @@ class App extends React.Component {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
+                      {stockMode && this.isBackfillPeriod() && mp && (() => {
+                        // นับสต็อกปลายงวดนี้ที่ไม่ตรงกับยกมาของงวดถัดไป
+                        const bad = [...mp.pcRowsM, ...mp.stirrupRowsM, ...mp.whiskerRowsM, ...mp.collarRowsM, ...mp.rebarRowsM]
+                          .filter(x => x.nextOpening != null && x.closing !== '' && x.closing != null && Math.abs(Number(x.closing) - x.nextOpening) > 1e-9);
+                        return <div data-no-print="true" style={{ fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, background: bad.length ? '#fdf1f1' : '#eaf7ea', color: bad.length ? '#c0392b' : '#3f7d2b', border: '1px solid ' + (bad.length ? '#e0a3a3' : '#8fc17a') }}>
+                          {bad.length ? '⚠️ นับสต็อกไม่ตรงกับยกมา ' + shortPeriod(this.nextPeriodLabel()) + ' ' + bad.length + ' รายการ: ' + bad.slice(0, 5).map(x => x.label).join(', ') + (bad.length > 5 ? ' …' : '') : '✓ นับสต็อกตรงกับยกมา ' + shortPeriod(this.nextPeriodLabel()) + ' ทุกรายการ'}
+                        </div>;
+                      })()}
                       {stockMode && !READONLY && (
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => this.pullOpeningFromPreviousPeriod()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #b9cdf0', background: '#eef3fc', color: '#244c9b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>⬇ ดึงยอดยกมาจากงวดก่อนหน้า</button>
