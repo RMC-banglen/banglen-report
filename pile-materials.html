@@ -123,6 +123,50 @@ function markRebarGroups(rows) {
   return rows;
 }
 
+// เขียนสเปคเหล็กให้เป็นแบบเดียวกับที่ระบบคำนวณออกมา "DB12x2.00 ม." — พิมพ์ db12x2 / DB12 x 2.0 ก็ได้ key เดียวกัน
+function canonRebarSpec(spec) {
+  const p = parseRebarSpec(spec);
+  return p.ok ? p.pre + p.diam + 'x' + p.len.toFixed(2) + ' ม.' : String(spec || '').trim();
+}
+
+// แถวเหลือง "เพิ่มรายการเหล็กเส้นเอง" (main:rebarExtra:<id>) เป็นของเก่าตอนระบบยังรู้จักแค่เหล็กที่มียอดผลิต
+// ตอนนี้ระบบจำทุกขนาดที่เคยเห็นแล้ว (ดู rebarCatalog) เลยย้ายข้อมูลแถวเหลืองไปไว้ที่ key ปกติ main:rebar:<สเปค>
+// - แถวเหลืองว่างเปล่า → ทิ้ง
+// - key ปกติยังว่าง → ย้ายสต็อก/ใช้จริง/ใช้งานอื่น/ตัดรับเข้า ไปทั้งหมด
+// - key ปกติมีข้อมูลแล้ว และแถวเหลืองเป็นแค่ตัวเลขซ้ำ (เช่น ยอดยกมาเดียวกัน) → ทิ้งแถวเหลือง
+// - ข้อมูลขัดกันจริงๆ → ปล่อยเป็นแถวเหลืองไว้เหมือนเดิม ให้คนดูเองว่าตัวไหนถูก
+function migrateExtraRebar(snap) {
+  const items = (snap && snap.extraRebarItems) || [];
+  if (!items.length) return null;
+  const empty = v => v == null || v === '' || Number(v) === 0;
+  const stock = { ...(snap.stock || {}) }, actual = { ...(snap.actual || {}) };
+  const gu = { ...(snap.generalUseEntries || {}) }, cut = { ...(snap.cutInEntries || {}) };
+  const hasData = k => ['opening', 'received', 'closing'].some(f => !empty((stock[k] || {})[f]))
+    || (actual[k] != null && actual[k] !== '') || (gu[k] || []).length > 0 || (cut[k] || []).length > 0;
+  const keep = [];
+  items.forEach(it => {
+    const spec = canonRebarSpec(it.spec);
+    const src = 'main:rebarExtra:' + it.id, dst = 'main:rebar:' + spec;
+    if (!hasData(src)) return;
+    if (!spec || !parseRebarSpec(spec).ok) { keep.push(it); return; }
+    if (!hasData(dst)) {
+      if (stock[src]) stock[dst] = { ...stock[src] };
+      if (actual[src] != null) actual[dst] = actual[src];
+      if ((gu[src] || []).length) gu[dst] = gu[src];
+      if ((cut[src] || []).length) cut[dst] = cut[src];
+      delete stock[src]; delete actual[src]; delete gu[src]; delete cut[src];
+      return;
+    }
+    const s = stock[src] || {}, d = stock[dst] || {};
+    const dup = ['opening', 'received', 'closing'].every(f => empty(s[f]) || Number(s[f]) === Number(d[f]))
+      && !(gu[src] || []).length && !(cut[src] || []).length && (actual[src] == null || actual[src] === '');
+    if (dup) { delete stock[src]; return; }
+    keep.push(it);
+  });
+  if (keep.length === items.length) return null;
+  return { ...snap, stock, actual, generalUseEntries: gu, cutInEntries: cut, extraRebarItems: keep };
+}
+
 function fmt(n, digits) {
   if (n == null || !isFinite(n)) return '-';
   return n.toLocaleString('th-TH', { minimumFractionDigits: digits ?? 1, maximumFractionDigits: digits ?? 1 });
@@ -304,6 +348,21 @@ function FormattedNumberInput({ value, onChange, digits, style, disabled }) {
     }}
     style={style} disabled={disabled} />;
 }
+// เพิ่มขนาดเหล็กใหม่ที่ระบบยังไม่เคยเห็น (ไม่เคยผลิต ไม่เคยมีสต็อก) — ขนาดที่เคยเห็นแล้วขึ้นในตารางเองอยู่แล้ว
+function AddRebarSpec({ onAdd }) {
+  const [open, setOpen] = React.useState(false);
+  const [v, setV] = React.useState('');
+  if (!open) return <button onClick={() => setOpen(true)} style={btnDashed()}>+ เพิ่มขนาดเหล็กใหม่</button>;
+  const submit = () => { if (v.trim() && onAdd(v)) { setV(''); setOpen(false); } };
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <input autoFocus type="text" value={v} onChange={e => setV(e.target.value)} placeholder="เช่น DB16x4.00"
+        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setOpen(false); }} style={{ ...inp(140) }} />
+      <button onClick={submit} style={{ ...btnGhost('#2f5fd0'), padding: '6px 10px', fontSize: 12 }}>เพิ่ม</button>
+      <button onClick={() => { setOpen(false); setV(''); }} style={{ ...btnGhost('#78839A'), padding: '6px 10px', fontSize: 12 }}>ยกเลิก</button>
+    </div>
+  );
+}
 function ExtraSpecInput({ value, onCommit, disabled }) {
   // ช่องกรอกสเปคเหล็กที่เพิ่มเอง — พิมพ์ในสถานะ local ก่อน ไม่ยิงขึ้นแอปทันทีทุกตัวอักษร
   // เพราะพอสเปคเปลี่ยนแถวจะถูกจัดเรียงใหม่ตามขนาดทันที ทำให้แถวดีดขึ้น/ลงระหว่างพิมพ์ (โฟกัสหลุด)
@@ -394,6 +453,12 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
                       {!READONLY && <button onClick={row.onRemoveExtra} style={{ ...btnGhost('#c0392b'), padding: '4px 9px', fontSize: 12, whiteSpace: 'nowrap' }}>ลบ</button>}
                     </div>
                   </div>
+                ) : row.notProduced ? (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ color: row.hasData ? 'inherit' : '#9aa3b2' }}>{row.label}</span>
+                    <span style={{ fontSize: 11, color: '#78839A', background: '#f1f3f7', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>{row.hasData ? 'ไม่ได้ผลิตงวดนี้' : 'ไม่มีของ'}</span>
+                    {!READONLY && row.onRemoveSpec && <button onClick={row.onRemoveSpec} style={{ ...btnGhost('#c0392b'), padding: '2px 8px', fontSize: 11 }}>ลบ</button>}
+                  </div>
                 ) : row.label}
               </td>
               <td style={td(true)}>{row.calcFmt}</td>
@@ -427,7 +492,7 @@ class App extends React.Component {
     fileName: '', loading: false, error: '', result: null, actual: {},
     showSettings: false, settingsTab: 'rebar', resultView: 'main', stockSubTab: 'all',
     stock: {}, plateStockDiam: {}, plateGeneralUseEntries: {}, plateGeneralUseOpen: {},
-    extraRebarItems: [], alertThresholdPct: 5, alertThresholdByCategory: {},
+    extraRebarItems: [], showEmptyRebar: false, alertThresholdPct: 5, alertThresholdByCategory: {},
     mainSearchQuery: '', showAlertList: false, periodLocked: {}, periodSummaries: {},
     generalUseEntries: {}, generalUseOpen: {}, cutInEntries: {}, cutInOpen: {}, periodLabel: null, periods: [], periodHistory: {},
     periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
@@ -464,12 +529,22 @@ class App extends React.Component {
     await this.loadFromSupabase();
     this._lastSavedSnapshot = JSON.stringify(this.persistKeys.map(k => this.state[k]));
     this._persistReady = true;
+    // ย้ายแถวเหลืองเสร็จ → สำรองข้อมูลก่อนย้ายไว้ก่อน แล้วบันทึกของใหม่ขึ้นไป (ไม่ต้องรอให้ใครแก้อะไรก่อน)
+    if (this._migratedFrom && !READONLY) { this._lastBackupAt = null; this.maybeSaveBackup(this._migratedFrom); this._migratedFrom = null; this.savePersisted(); }
   }
   applyPersistedObj(saved) {
     if (!saved) return;
     const patch = {};
     this.persistKeys.forEach(k => { if (saved[k] !== undefined) patch[k] = saved[k]; });
     if (patch.periodLabel === 'งวดปัจจุบัน') patch.periodLabel = null;
+    // ย้ายแถวเหลือง (เหล็กที่เพิ่มเอง) ไปเป็นแถวปกติ ทั้งงวดปัจจุบันและงวดที่ปิดแล้ว — ดู migrateExtraRebar
+    const cur = migrateExtraRebar(patch);
+    if (cur) { ['stock', 'actual', 'generalUseEntries', 'cutInEntries', 'extraRebarItems'].forEach(k => { patch[k] = cur[k]; }); this._migratedFrom = saved; }
+    if (patch.periodHistory) {
+      const ph = { ...patch.periodHistory };
+      Object.keys(ph).forEach(k => { const m = migrateExtraRebar(ph[k]); if (m) { ph[k] = m; this._migratedFrom = saved; } });
+      patch.periodHistory = ph;
+    }
     // ผลลัพธ์ที่บันทึกไว้อาจคำนวณด้วยโค้ดเวอร์ชันเก่า (ยังไม่มีสรุปเสา/เพลทพิเศษ) — คำนวณใหม่จากรายการดิบให้
     this.setState(patch, () => {
       const r = this.state.result;
@@ -699,6 +774,38 @@ class App extends React.Component {
 
   toggleGeneralUseOpen(key) { this.setState(s => ({ generalUseOpen: { ...s.generalUseOpen, [key]: !s.generalUseOpen[key] } })); }
   togglePlateGeneralUseOpen(t) { this.setState(s => ({ plateGeneralUseOpen: { ...s.plateGeneralUseOpen, [t]: !s.plateGeneralUseOpen[t] } })); }
+  // รายการเหล็กเส้นทุกขนาดที่ระบบเคยเห็น: มียอดผลิต หรือมีสต็อก ในงวดไหนก็ได้ (historyOnly = เฉพาะงวดที่ปิดแล้ว)
+  rebarCatalog(historyOnly) {
+    const ph = this.state.periodHistory || {};
+    if (!this._rebarHistCache || this._rebarHistCache.ph !== ph) {
+      const set = new Set();
+      Object.entries(ph).forEach(([lbl, snap]) => {
+        if (!snap || lbl === this.state.periodLabel) return;
+        ((snap.result && snap.result.rebar) || []).forEach(x => x.spec && set.add(x.spec));
+        Object.keys(snap.stock || {}).forEach(k => { if (k.startsWith('main:rebar:')) set.add(k.slice(11)); });
+      });
+      this._rebarHistCache = { ph, set };
+    }
+    if (historyOnly) return this._rebarHistCache.set;
+    const all = new Set(this._rebarHistCache.set);
+    ((this.state.result && this.state.result.rebar) || []).forEach(x => x.spec && all.add(x.spec));
+    Object.keys(this.state.stock || {}).forEach(k => { if (k.startsWith('main:rebar:')) all.add(k.slice(11)); });
+    all.delete('');
+    return all;
+  }
+  addRebarSpec(raw) {
+    if (READONLY) return false;
+    const spec = canonRebarSpec(raw);
+    if (!parseRebarSpec(spec).ok) { alert('รูปแบบขนาดไม่ถูกต้อง — พิมพ์แบบ DB16x4.00 หรือ RB9x2.5'); return false; }
+    if (this.rebarCatalog().has(spec)) { this.setState({ showEmptyRebar: true }); alert(spec + ' มีอยู่ในรายการแล้ว'); return false; }
+    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], showEmptyRebar: true,
+      stock: { ...s.stock, ['main:rebar:' + spec]: { opening: '', received: '', closing: '' } } }));
+    return true;
+  }
+  removeRebarSpec(spec) {
+    if (READONLY) return;
+    this.setState(s => { const stock = { ...s.stock }; delete stock['main:rebar:' + spec]; return { undoStack: this.pushUndo(s), redoStack: [], stock }; });
+  }
   addExtraRebarItem() { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: [...s.extraRebarItems, { id: 'x' + Date.now() + Math.random(), spec: '' }] })); }
   removeExtraRebarItem(id) { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.filter(it => it.id !== id) })); }
   updateExtraRebarSpec(id, v) { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.map(it => it.id === id ? { ...it, spec: v } : it) })); }
@@ -816,25 +923,29 @@ class App extends React.Component {
     const dl = this._mod ? this._mod.diamLabel : (x => x);
     const baseRebarRowsM = r.rebar.map(x => this.buildRow('main:rebar:' + x.spec, x.spec, x.pieces, { unit: 'เส้น', notExtra: true }));
 
-    // ขนาดที่เดือนนี้ไม่ได้ผลิต แต่ยังมีสต็อกค้างอยู่ ต้องขึ้นให้เห็นด้วย
-    // ไม่งั้นของหายไปจากตารางทั้งที่ยังอยู่ในโกดัง (เคยเจอ DB12x4.00 ค้าง 1,021 เส้น แล้วไม่โผล่เลย)
-    // แถวพวกนี้ไม่มีสูตรคำนวณให้เทียบ เลยซ่อน ส่วนต่าง/% หาย เหมือนแถวที่เพิ่มเอง
+    // ขนาดที่เดือนนี้ไม่ได้ผลิต ต้องขึ้นให้เห็นด้วย ไม่งั้นของหายไปจากตารางทั้งที่ยังอยู่ในโกดัง
+    // (เคยเจอ DB12x4.00 ค้าง 1,021 เส้น แล้วไม่โผล่เลย) — เดิมต้องกด "เพิ่มรายการเหล็กเส้น" เอง (แถวเหลือง) ซ้ำกับแถวคำนวณได้ง่าย
+    // ตอนนี้ระบบจำทุกขนาดที่เคยเห็นเอง (rebarCatalog: ผลิต/มีสต็อก ทุกงวด) ขึ้นเป็นแถวปกติ ไม่ต้องเพิ่มเอง
+    // แถวพวกนี้ไม่มีสูตรคำนวณให้เทียบ เลยซ่อน ส่วนต่าง/% หาย
     const inCalc = new Set(r.rebar.map(x => x.spec));
-    const stockOnlyRowsM = Object.keys(this.state.stock || {})
-      .filter(k => k.startsWith('main:rebar:'))
-      .map(k => k.slice('main:rebar:'.length))
-      .filter(spec => spec && !inCalc.has(spec))
-      // เอาเฉพาะที่มีของจริง ถ้าทุกช่องเป็น 0 หรือว่าง ไม่ต้องขึ้น จะได้ไม่รกตาราง
-      .filter(spec => {
-        const s = this.state.stock['main:rebar:' + spec] || {};
-        return [s.opening, s.received, s.closing].some(v => v != null && v !== '' && Number(v) !== 0);
-      })
-      .map(spec => {
-        const row = this.buildRow('main:rebar:' + spec, spec, 0, { unit: 'เส้น', notExtra: true });
-        const realDiffColor = row.realDiffFmt.startsWith('+') ? '#3f7d2b'
-          : (row.realDiffFmt !== '-' && row.realDiffFmt.startsWith('-')) ? '#c0392b' : 'inherit';
-        return { ...row, isStockOnly: true, diffFmt: '-', diffColor: 'inherit', pctLostFmt: '-', rowBg: 'transparent', realDiffColor };
-      });
+    const catalog = this.rebarCatalog();
+    const otherRows = [...catalog].filter(spec => !inCalc.has(spec)).map(spec => {
+      const key = 'main:rebar:' + spec;
+      const row = this.buildRow(key, spec, 0, { unit: 'เส้น', notExtra: true });
+      const st = this.state.stock[key] || {};
+      const hasData = [st.opening, st.received, st.closing].some(v => v != null && v !== '' && Number(v) !== 0)
+        || (this.state.generalUseEntries[key] || []).length > 0 || (this.state.cutInEntries[key] || []).length > 0;
+      const realDiffColor = row.realDiffFmt.startsWith('+') ? '#3f7d2b'
+        : (row.realDiffFmt !== '-' && row.realDiffFmt.startsWith('-')) ? '#c0392b' : 'inherit';
+      // ขนาดที่เพิ่มเองแต่ยังไม่มีข้อมูล และไม่เคยมีในงวดไหนเลย ลบทิ้งได้ (กันพิมพ์ผิด)
+      const removable = !hasData && !this.rebarCatalog(true).has(spec);
+      return { ...row, isStockOnly: true, hasData, notProduced: true, onRemoveSpec: removable ? () => this.removeRebarSpec(spec) : null,
+        diffFmt: '-', diffColor: 'inherit', pctLostFmt: '-', rowBg: 'transparent', realDiffColor };
+    });
+    // ขนาดที่ทุกช่องว่าง/0 (ไม่ผลิต ไม่มีของ) ซ่อนไว้ก่อน กดดูได้ จะได้ไม่รกตาราง
+    const stockOnlyRowsM = otherRows.filter(x => x.hasData || this.state.showEmptyRebar);
+    const rebarInfo = { total: inCalc.size + otherRows.length, produced: inCalc.size,
+      stockOnly: otherRows.filter(x => x.hasData).length, empty: otherRows.filter(x => !x.hasData).length };
     const extraRebarRowsM = this.state.extraRebarItems.map(item => {
       const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
       // แถวนี้ไม่มีสูตรคำนวณให้เทียบ (คำนวณ = 0 เสมอ) เอา "ส่วนต่างจริง" ไปหาร % หาย เลยเพี้ยนได้ง่าย (ฐานติดลบพลิกเครื่องหมายมั่ว)
@@ -908,7 +1019,7 @@ class App extends React.Component {
     const allMokDiams = Object.keys(this.state.plateWeights || {}).filter(mok);
     const collarCountByDiam = Object.fromEntries(r.collar.map(x => [x.diam, x.count]));
     const collarRowsM = allMokDiams.map(diam => this.buildRow('main:collar:' + diam, 'Colla ' + dl(diam).replace(' มอก.', '').replace('-', ''), collarCountByDiam[diam] || 0, { unit: 'ชุด' }));
-    return { rebarRowsM, pcRowsM, stirrupRowsM, plateRowsM, whiskerRowsM, collarRowsM };
+    return { rebarRowsM, rebarInfo, pcRowsM, stirrupRowsM, plateRowsM, whiskerRowsM, collarRowsM };
   }
 
   buildDetailPage(r) {
@@ -1565,8 +1676,12 @@ class App extends React.Component {
                     {stockMode && (sub === 'all' || sub === 'plate') && this.buildPlateReconcile(r).map((pr, i) => <PlateReconcileCard key={i} pr={pr} />)}
                     {(sub === 'all' || sub === 'whisker') && <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
                     {(sub === 'all' || sub === 'collar') && <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />}
-                    {(sub === 'all' || sub === 'rebar') && <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn allowExtraSpec
-                      extraRebarButton={!READONLY && <button onClick={() => this.addExtraRebarItem()} style={btnDashed()}>+ เพิ่มรายการเหล็กเส้น (เหล็กค้าง/ไม่อยู่ในสูตร)</button>} />}
+                    {(sub === 'all' || sub === 'rebar') && (() => { const ri = mp.rebarInfo; return <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn allowExtraSpec
+                      subtitle={<span>เหล็กเส้นทั้งหมด <b style={{ color: '#2b3445' }}>{ri.total}</b> ขนาด — ผลิตงวดนี้ {ri.produced} · ไม่ได้ผลิตแต่มีของ {ri.stockOnly}{ri.empty > 0 ? ' · ไม่มีของ ' + ri.empty : ''}</span>}
+                      extraRebarButton={<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-no-print="true">
+                        {ri.empty > 0 && <button onClick={() => this.setState(st => ({ showEmptyRebar: !st.showEmptyRebar }))} style={btnDashed()}>{s.showEmptyRebar ? 'ซ่อนขนาดที่ไม่มีของ' : 'แสดงขนาดที่ไม่มีของ (' + ri.empty + ')'}</button>}
+                        {!READONLY && <AddRebarSpec onAdd={v => this.addRebarSpec(v)} />}
+                      </div>} />; })()}
                     </React.Fragment>
                     ); })()}
 
