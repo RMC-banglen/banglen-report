@@ -1164,9 +1164,13 @@ class App extends React.Component {
       diams.forEach(d => { const st = this.state.plateStockDiam[d] || {}; const w = plateWeightsM[d] || 0; openW += (st.open || 0) * w; closeW += (st.close || 0) * w; });
       // ขึ้นงวดใหม่ช่องปลายงวดจะว่าง ต้องไม่คิดว่างเป็น 0 ไม่งั้นเข้า-ออกสต็อกขึ้นติดลบก้อนใหญ่
       // เหมือนเพลทหายไปทั้งหมด ทั้งที่แค่ยังไม่ได้ลงไปนับ
+      // ขนาดเสาที่ไม่มีเพลทสำเร็จค้างเลย (ยกมาว่าง/0 และยังไม่กรอกนับ) ไม่ต้องนับ ถือว่า 0 — ไม่งั้นติด "ยังไม่ได้นับ" ทั้งหมวด
+      // (เช่น เพลท 6 มม. = อ22/อ26/อส22 — อ22 ไม่มีของเลย ทั้งที่อ26/อส22 นับครบแล้ว)
       const closeCounted = diams.length > 0 && diams.every(d => {
-        const v = (this.state.plateStockDiam[d] || {}).close;
-        return v !== '' && v != null;
+        const st = this.state.plateStockDiam[d] || {};
+        const v = st.close;
+        if (v !== '' && v != null) return true;
+        return st.open == null || st.open === '' || Number(st.open) === 0;
       });
       const openSheets = kgPerBigSheet ? openW / kgPerBigSheet : 0, closeSheets = kgPerBigSheet ? closeW / kgPerBigSheet : 0;
       const stockInOut = closeCounted ? closeSheets - openSheets : null;
