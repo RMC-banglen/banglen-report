@@ -187,6 +187,19 @@ function parseFmtNum(str) {
 const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 // เรียงรายชื่องวด "ชื่อเดือน ปี" ตามลำดับเวลาจริง (ปี → เดือน) แทนลำดับที่สร้างงวดไว้ก่อนหลัง
 // (เช่น สร้างงวดมีนาคมทีหลังสิงหาคม/กันยายน ก็ต้องให้มีนาคมมาก่อนตามปฏิทิน) ป้ายที่แจงเดือน/ปีไม่ได้ (ถ้ามี) จะถูกเรียงไปท้ายสุด
+// "กันยายน 2569" → เลขเดือนต่อเนื่อง (ปี×12+เดือน) เอาไว้ลบกันหาว่าห่างกี่เดือน; แจงไม่ได้ = NaN
+function periodMonthIndex(label) {
+  const [m, y] = String(label || '').split(' ');
+  const mi = THAI_MONTHS.indexOf(m), yr = parseInt(y, 10);
+  return (mi < 0 || isNaN(yr)) ? NaN : yr * 12 + mi;
+}
+// "สิงหาคม 2569" → "ส.ค. 69"
+const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+function shortPeriod(label) {
+  const [m, y] = String(label || '').split(' ');
+  const mi = THAI_MONTHS.indexOf(m);
+  return mi < 0 ? String(label || '') : THAI_MONTHS_SHORT[mi] + ' ' + String(y || '').slice(-2);
+}
 function sortPeriodLabels(labels) {
   const key = label => {
     const [m, y] = String(label || '').split(' ');
@@ -246,9 +259,9 @@ function GeneralUseModal({ title, entries, onAdd, onClose, unit }) {
       <div style={{ fontSize: 14, color: '#78839A' }}>ระบุจำนวนและสาเหตุทีละรายการ ระบบจะรวมยอดให้อัตโนมัติ</div>
       {entries.map((e, i) => (
         <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input type="number" value={e.amount ?? ''} onChange={ev => e.onAmountChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} disabled={READONLY} />
+          <input type="number" value={e.amount ?? ''} onChange={ev => e.onAmountChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} disabled={READONLY || !!e.cutId} title={e.cutId ? 'มาจากการตัดเหล็ก — แก้ไม่ได้ ถ้าผิดให้ลบแล้วตัดใหม่' : undefined} />
           <input type="text" value={e.reason} onChange={ev => e.onReasonChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
-          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')} title={e.cutId ? 'ลบทั้งสองฝั่ง (ต้นทาง+ปลายทาง)' : undefined}>{e.cutId ? '✂️ ลบ' : 'ลบ'}</button>}
         </div>
       ))}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
@@ -270,9 +283,9 @@ function CutInModal({ title, entries, onAdd, onClose, unit }) {
       <div style={{ fontSize: 14, color: '#78839A' }}>สำหรับกรณีตัดเหล็กความยาวอื่นมาใช้แทน (เช่น ตัด 4 ม. มาใช้แทน 2 ม.) ระบุจำนวนที่ได้เป็นบวกตรงๆ ไม่ต้องใส่ติดลบ ระบบจะเอาไปหักลดส่วนต่างจริงให้อัตโนมัติ</div>
       {entries.map((e, i) => (
         <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input type="number" min="0" value={e.qty ?? ''} onChange={ev => e.onQtyChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} disabled={READONLY} />
+          <input type="number" min="0" value={e.qty ?? ''} onChange={ev => e.onQtyChange(ev.target.value)} placeholder={unit || 'จำนวน'} style={inp(130, true)} disabled={READONLY || !!e.cutId} title={e.cutId ? 'มาจากการตัดเหล็ก — แก้ไม่ได้ ถ้าผิดให้ลบแล้วตัดใหม่' : undefined} />
           <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="ตัดจากความยาวไหน/สาเหตุ" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
-          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')} title={e.cutId ? 'ลบทั้งสองฝั่ง (ต้นทาง+ปลายทาง)' : undefined}>{e.cutId ? '✂️ ลบ' : 'ลบ'}</button>}
         </div>
       ))}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
@@ -283,6 +296,88 @@ function CutInModal({ title, entries, onAdd, onClose, unit }) {
           <button onClick={onClose} style={btnPrimary()}>เสร็จสิ้น</button>
         </div>
       </div>
+    </Modal>
+  );
+}
+// ✂️ ตัดเหล็ก — เลือกต้นทาง/จำนวน แล้วบอกว่าได้ขนาดไหนกี่เส้น (ตัดเป็นหลายขนาดในเส้นเดียวได้ เช่น 4 ม. → 2.5+1+0.5)
+// ระบบลง "ใช้งานอื่น" ฝั่งต้นทาง และ "ตัดรับเข้า" ฝั่งปลายทางให้เอง
+function CutRebarModal({ specs, remainOf, cuts, onCut, onRemove, onClose }) {
+  const [src, setSrc] = React.useState('');
+  const [qty, setQty] = React.useState('');
+  const [outs, setOuts] = React.useState([{ spec: '', qty: '' }]);
+  const [note, setNote] = React.useState('');
+  const [err, setErr] = React.useState('');
+  const L = parseRebarSpec(src).ok ? parseRebarSpec(src).len : 0;
+  const n = Number(qty) || 0;
+  const lenOf = sp => { const p = parseRebarSpec(sp); return p.ok ? p.len : 0; };
+  // ยังไม่ได้พิมพ์จำนวนที่ได้ → เดาให้: ตัดเป็นขนาดเดียว = ได้เต็มที่ต่อเส้น × จำนวน, หลายขนาด = ขนาดละ 1 ต่อเส้น
+  const autoQty = o => { const l = lenOf(o.spec); if (!l || !L || !n) return ''; return outs.length === 1 ? Math.floor(L / l + 1e-9) * n : n; };
+  const outQty = o => (o.qty !== '' ? Number(o.qty) || 0 : Number(autoQty(o)) || 0);
+  const used = outs.reduce((a, o) => a + lenOf(o.spec) * outQty(o), 0), avail = L * n, scrap = avail - used;
+  const setOut = (i, patch) => setOuts(list => list.map((o, j) => j === i ? { ...o, ...patch } : o));
+  const save = () => {
+    const s = canonRebarSpec(src);
+    if (!parseRebarSpec(s).ok) return setErr('เลือกเหล็กต้นทาง');
+    if (!(n > 0)) return setErr('ใส่จำนวนเส้นที่เอามาตัด');
+    const list = outs.filter(o => o.spec.trim()).map(o => ({ spec: canonRebarSpec(o.spec), qty: outQty(o) }));
+    if (!list.length) return setErr('ใส่ขนาดที่ตัดได้');
+    if (list.some(o => !parseRebarSpec(o.spec).ok)) return setErr('ขนาดที่ตัดได้ต้องเป็นแบบ DB16x2.00');
+    if (list.some(o => o.spec === s)) return setErr('ขนาดที่ตัดได้ต้องไม่ใช่ขนาดเดียวกับต้นทาง');
+    if (list.some(o => !(o.qty > 0))) return setErr('ใส่จำนวนเส้นที่ได้');
+    if (used > avail + 1e-6) return setErr('ความยาวที่ได้ (' + fmt(used, 2) + ' ม.) เกินความยาวต้นทาง (' + fmt(avail, 2) + ' ม.)');
+    onCut(s, n, list, note.trim());
+    setQty(''); setOuts([{ spec: '', qty: '' }]); setNote(''); setErr('');
+  };
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>✂️ ตัดเหล็ก</div>
+      <div style={{ fontSize: 13, color: '#78839A' }}>กรอกครั้งเดียว ระบบลง "ใช้งานอื่น" ฝั่งต้นทาง และ "ตัดรับเข้า" ฝั่งขนาดที่ได้ให้เอง</div>
+      <datalist id="rebar-specs">{specs.map(sp => <option key={sp} value={sp} />)}</datalist>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ width: 70, fontSize: 13, fontWeight: 600 }}>ตัดจาก</span>
+        <select value={src} onChange={e => setSrc(e.target.value)} style={{ ...inp(190), padding: '7px 8px' }}>
+          <option value="">— เลือกเหล็ก —</option>
+          {specs.map(sp => <option key={sp} value={sp}>{sp}{remainOf(sp) > 0 ? ' (มี ' + fmt(remainOf(sp), 0) + ')' : ''}</option>)}
+        </select>
+        <input type="number" min="0" value={qty} onChange={e => setQty(e.target.value)} placeholder="จำนวน" style={inp(90, true)} />
+        <span style={{ fontSize: 13 }}>เส้น</span>
+      </div>
+      {outs.map((o, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ width: 70, fontSize: 13, fontWeight: 600 }}>{i === 0 ? 'ได้เป็น' : '+'}</span>
+          <input list="rebar-specs" value={o.spec} onChange={e => setOut(i, { spec: e.target.value })} placeholder="เช่น DB16x2.00" style={inp(190)} />
+          <input type="number" min="0" value={o.qty !== '' ? o.qty : autoQty(o)} onChange={e => setOut(i, { qty: e.target.value })} placeholder="จำนวน"
+            style={{ ...inp(90, true), color: o.qty === '' ? '#8a93a6' : undefined }} />
+          <span style={{ fontSize: 13 }}>เส้น</span>
+          {outs.length > 1 && <button onClick={() => setOuts(list => list.filter((_, j) => j !== i))} style={{ ...btnGhost('#c0392b'), padding: '4px 8px', fontSize: 12 }}>✕</button>}
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ width: 70 }} />
+        <button onClick={() => setOuts(list => [...list, { spec: '', qty: '' }])} style={{ ...btnDashed(), padding: '5px 10px', fontSize: 12 }}>+ ตัดได้อีกขนาด (ในเส้นเดียวกัน)</button>
+      </div>
+      <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="หมายเหตุ (ถ้ามี) เช่น งานลูกค้า…" style={inp(null)} />
+      {avail > 0 && used > 0 && (
+        <div style={{ fontSize: 13, color: used > avail + 1e-6 ? '#c0392b' : '#4a5468', background: '#f6f8fb', borderRadius: 6, padding: '8px 10px' }}>
+          ใช้ความยาว {fmt(used, 2)} ม. จาก {fmt(avail, 2)} ม. · เศษ {fmt(Math.max(0, scrap), 2)} ม. ({fmt(avail ? Math.max(0, scrap) / avail * 100 : 0, 1)}%)
+        </div>
+      )}
+      {err && <div style={{ fontSize: 13, color: '#c0392b' }}>{err}</div>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button onClick={onClose} style={btnGhost()}>ปิด</button>
+        <button onClick={save} style={btnPrimary()}>บันทึกการตัด</button>
+      </div>
+      {cuts.length > 0 && (
+        <div style={{ borderTop: '1px solid #eee', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>ตัดแล้วงวดนี้ ({cuts.length})</div>
+          {cuts.map(c => (
+            <div key={c.cutId} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+              <div style={{ flex: 1 }}><b>{c.src}</b> {fmt(c.qty, 0)} เส้น → {String(c.text || '').replace(/^✂️ ตัดเป็น /, '')}</div>
+              <button onClick={() => onRemove(c.cutId)} style={{ ...btnGhost('#c0392b'), padding: '4px 9px', fontSize: 12 }}>ลบ</button>
+            </div>
+          ))}
+        </div>
+      )}
     </Modal>
   );
 }
@@ -456,7 +551,15 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
                 ) : row.notProduced ? (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ color: row.hasData ? 'inherit' : '#9aa3b2' }}>{row.label}</span>
-                    <span style={{ fontSize: 11, color: '#78839A', background: '#f1f3f7', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>{row.hasData ? 'ไม่ได้ผลิตงวดนี้' : 'ไม่มีของ'}</span>
+                    {row.aging && row.aging.stale ? (
+                      <span title={'มีของ ' + fmt(row.aging.remain, 0) + ' เส้น แต่ไม่ได้ผลิตมานาน — เอาไปตัดใช้ก่อนสั่งเพิ่ม'} style={{ fontSize: 11, color: '#9a4a00', background: '#ffe7cc', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                        ⚠️ ค้างนาน · {row.aging.never ? 'ไม่ได้ผลิตเลยตั้งแต่ ' + shortPeriod(row.aging.label) : 'ผลิตล่าสุด ' + shortPeriod(row.aging.label)}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#78839A', background: '#f1f3f7', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>
+                        {!row.hasData ? 'ไม่มีของ' : row.aging && row.aging.label && !row.aging.never ? 'ผลิตล่าสุด ' + shortPeriod(row.aging.label) : 'ไม่ได้ผลิตงวดนี้'}
+                      </span>
+                    )}
                     {!READONLY && row.onRemoveSpec && <button onClick={row.onRemoveSpec} style={{ ...btnGhost('#c0392b'), padding: '2px 8px', fontSize: 11 }}>ลบ</button>}
                   </div>
                 ) : row.label}
@@ -789,7 +892,8 @@ class App extends React.Component {
     if (historyOnly) return this._rebarHistCache.set;
     const all = new Set(this._rebarHistCache.set);
     ((this.state.result && this.state.result.rebar) || []).forEach(x => x.spec && all.add(x.spec));
-    Object.keys(this.state.stock || {}).forEach(k => { if (k.startsWith('main:rebar:')) all.add(k.slice(11)); });
+    [this.state.stock, this.state.generalUseEntries, this.state.cutInEntries].forEach(m =>
+      Object.keys(m || {}).forEach(k => { if (k.startsWith('main:rebar:')) all.add(k.slice(11)); }));
     all.delete('');
     return all;
   }
@@ -805,6 +909,49 @@ class App extends React.Component {
   removeRebarSpec(spec) {
     if (READONLY) return;
     this.setState(s => { const stock = { ...s.stock }; delete stock['main:rebar:' + spec]; return { undoStack: this.pushUndo(s), redoStack: [], stock }; });
+  }
+  // ตัดเหล็ก: กรอกครั้งเดียว ลงให้ 2 ฝั่ง — ต้นทางลง "ใช้งานอื่น" ปลายทางลง "ตัดรับเข้า" ผูกกันด้วย cutId
+  // (เดิมต้องกรอกเองทั้งสองที่ ลืมฝั่งเดียวส่วนต่างจริงก็เพี้ยน) ลบฝั่งไหนก็ลบทั้งคู่
+  addCut(src, qty, outs, note) {
+    if (READONLY) return;
+    const cutId = 'c' + Date.now() + Math.random().toString(36).slice(2, 6);
+    const srcKey = 'main:rebar:' + src;
+    const outTxt = outs.map(o => o.spec + ' ' + o.qty + ' เส้น').join(' + ');
+    this.setState(s => {
+      const gu = { ...s.generalUseEntries }, cut = { ...s.cutInEntries };
+      gu[srcKey] = [...(gu[srcKey] || []), { amount: qty, reason: '✂️ ตัดเป็น ' + outTxt + (note ? ' · ' + note : ''), cutId }];
+      outs.forEach(o => {
+        const k = 'main:rebar:' + o.spec;
+        cut[k] = [...(cut[k] || []), { qty: o.qty, note: '✂️ ตัดจาก ' + src + ' ' + qty + ' เส้น' + (note ? ' · ' + note : ''), cutId }];
+      });
+      return { undoStack: this.pushUndo(s), redoStack: [], generalUseEntries: gu, cutInEntries: cut };
+    });
+  }
+  removeCut(cutId) {
+    if (READONLY) return;
+    if (!confirm('ลบรายการตัดเหล็กนี้ทั้งสองฝั่ง (ต้นทางและปลายทาง)?')) return;
+    this.setState(s => {
+      const strip = m => Object.fromEntries(Object.entries(m || {}).map(([k, list]) => [k, (list || []).filter(e => e.cutId !== cutId)]));
+      return { undoStack: this.pushUndo(s), redoStack: [], generalUseEntries: strip(s.generalUseEntries), cutInEntries: strip(s.cutInEntries) };
+    });
+  }
+  // รายการตัดเหล็กของงวดนี้ (อ่านจากฝั่งต้นทาง)
+  cutList() {
+    const out = [];
+    Object.entries(this.state.generalUseEntries || {}).forEach(([k, list]) => {
+      if (!k.startsWith('main:rebar:')) return;
+      (list || []).forEach(e => { if (e.cutId) out.push({ cutId: e.cutId, src: k.slice(11), qty: e.amount, text: e.reason }); });
+    });
+    return out.sort((a, b) => b.cutId.localeCompare(a.cutId));
+  }
+  // ผลิตขนาดนี้ล่าสุดงวดไหน (ดูจากงวดที่ปิดแล้ว) — ใช้บอกเหล็กค้างนาน
+  rebarLastProduced(spec) {
+    const ph = this.state.periodHistory || {};
+    const labels = sortPeriodLabels(Object.keys(ph).filter(l => l !== this.state.periodLabel && ph[l] && ph[l].result));
+    for (let i = labels.length - 1; i >= 0; i--) {
+      if ((ph[labels[i]].result.rebar || []).some(x => x.spec === spec)) return { label: labels[i], never: false };
+    }
+    return { label: labels[0] || null, never: true };
   }
   addExtraRebarItem() { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: [...s.extraRebarItems, { id: 'x' + Date.now() + Math.random(), spec: '' }] })); }
   removeExtraRebarItem(id) { if (READONLY) return; this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], extraRebarItems: s.extraRebarItems.filter(it => it.id !== id) })); }
@@ -890,10 +1037,10 @@ class App extends React.Component {
       onOpeningChange: v => this.updateStock(key, 'opening', v), onReceivedChange: v => this.updateStock(key, 'received', v), onClosingChange: v => this.updateStock(key, 'closing', v),
       generalUse,
       generalUseEntries: generalUseEntriesRaw.map((e, idx) => ({
-        amount: e.amount, reason: e.reason,
+        amount: e.amount, reason: e.reason, cutId: e.cutId,
         onAmountChange: v => this.updateGeneralUseEntry(key, idx, 'amount', v),
         onReasonChange: v => this.updateGeneralUseEntry(key, idx, 'reason', v),
-        onRemove: () => this.removeGeneralUseEntry(key, idx),
+        onRemove: () => e.cutId ? this.removeCut(e.cutId) : this.removeGeneralUseEntry(key, idx),
       })),
       onAddGeneralUseEntry: () => this.addGeneralUseEntry(key),
       generalUseOpen: !!this.state.generalUseOpen[key],
@@ -901,10 +1048,10 @@ class App extends React.Component {
       onToggleGeneralUseOpen: () => this.toggleGeneralUseOpen(key),
       cutInQty,
       cutInEntries: cutInEntriesRaw.map((e, idx) => ({
-        qty: e.qty, note: e.note,
+        qty: e.qty, note: e.note, cutId: e.cutId,
         onQtyChange: v => this.updateCutInEntry(key, idx, 'qty', v),
         onNoteChange: v => this.updateCutInEntry(key, idx, 'note', v),
-        onRemove: () => this.removeCutInEntry(key, idx),
+        onRemove: () => e.cutId ? this.removeCut(e.cutId) : this.removeCutInEntry(key, idx),
       })),
       onAddCutInEntry: () => this.addCutInEntry(key),
       cutInOpen: !!this.state.cutInOpen[key],
@@ -939,13 +1086,23 @@ class App extends React.Component {
         : (row.realDiffFmt !== '-' && row.realDiffFmt.startsWith('-')) ? '#c0392b' : 'inherit';
       // ขนาดที่เพิ่มเองแต่ยังไม่มีข้อมูล และไม่เคยมีในงวดไหนเลย ลบทิ้งได้ (กันพิมพ์ผิด)
       const removable = !hasData && !this.rebarCatalog(true).has(spec);
-      return { ...row, isStockOnly: true, hasData, notProduced: true, onRemoveSpec: removable ? () => this.removeRebarSpec(spec) : null,
+      // ของคงเหลือตอนนี้ (ยังไม่นับปลายงวด = ยกมา+รับเข้า) — มีของแต่ไม่ได้ผลิตมานาน 3 เดือนขึ้นไป = ค้างนาน ควรเอาไปตัดใช้ก่อนสั่งเพิ่ม
+      const num = v => (v == null || v === '' ? 0 : Number(v) || 0);
+      const remain = st.closing != null && st.closing !== '' ? num(st.closing) : num(st.opening) + num(st.received);
+      let aging = null;
+      if (remain > 0) {
+        const lp = this.rebarLastProduced(spec);
+        const months = lp.label ? periodMonthIndex(this.state.periodLabel) - periodMonthIndex(lp.label) : 0;
+        aging = { remain, label: lp.label, never: lp.never, months, stale: isFinite(months) && months >= 3 };
+      }
+      return { ...row, isStockOnly: true, hasData, notProduced: true, aging, onRemoveSpec: removable ? () => this.removeRebarSpec(spec) : null,
         diffFmt: '-', diffColor: 'inherit', pctLostFmt: '-', rowBg: 'transparent', realDiffColor };
     });
     // ขนาดที่ทุกช่องว่าง/0 (ไม่ผลิต ไม่มีของ) ซ่อนไว้ก่อน กดดูได้ จะได้ไม่รกตาราง
     const stockOnlyRowsM = otherRows.filter(x => x.hasData || this.state.showEmptyRebar);
     const rebarInfo = { total: inCalc.size + otherRows.length, produced: inCalc.size,
-      stockOnly: otherRows.filter(x => x.hasData).length, empty: otherRows.filter(x => !x.hasData).length };
+      stockOnly: otherRows.filter(x => x.hasData).length, empty: otherRows.filter(x => !x.hasData).length,
+      stale: otherRows.filter(x => x.aging && x.aging.stale).sort((a, b) => b.aging.remain - a.aging.remain) };
     const extraRebarRowsM = this.state.extraRebarItems.map(item => {
       const row = this.buildRow('main:rebarExtra:' + item.id, item.spec || '(ระบุขนาด/สเปค)', 0, { unit: 'กก.' });
       // แถวนี้ไม่มีสูตรคำนวณให้เทียบ (คำนวณ = 0 เสมอ) เอา "ส่วนต่างจริง" ไปหาร % หาย เลยเพี้ยนได้ง่าย (ฐานติดลบพลิกเครื่องหมายมั่ว)
@@ -1677,8 +1834,11 @@ class App extends React.Component {
                     {(sub === 'all' || sub === 'whisker') && <MaterialTable title="เหล็กหนวดกุ้ง" rows={mp.whiskerRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
                     {(sub === 'all' || sub === 'collar') && <MaterialTable title="เหล็ก Collar" subtitle="1 ชุด ต่อ 1 หัวเพลท — เฉพาะเสามาตรฐาน มอก. เท่านั้น" rows={mp.collarRowsM} unitLabel="ชุด" stockMode={stockMode} onOpenGeneralUse={openGU} />}
                     {(sub === 'all' || sub === 'rebar') && (() => { const ri = mp.rebarInfo; return <MaterialTable title="เหล็กเสริมหลัก (DB/RB)" rows={mp.rebarRowsM} unitLabel="เส้น" stockMode={stockMode} onOpenGeneralUse={openGU} onOpenCutIn={openCutIn} showCutIn allowExtraSpec
-                      subtitle={<span>เหล็กเส้นทั้งหมด <b style={{ color: '#2b3445' }}>{ri.total}</b> ขนาด — ผลิตงวดนี้ {ri.produced} · ไม่ได้ผลิตแต่มีของ {ri.stockOnly}{ri.empty > 0 ? ' · ไม่มีของ ' + ri.empty : ''}</span>}
+                      subtitle={<span>เหล็กเส้นทั้งหมด <b style={{ color: '#2b3445' }}>{ri.total}</b> ขนาด — ผลิตงวดนี้ {ri.produced} · ไม่ได้ผลิตแต่มีของ {ri.stockOnly}{ri.empty > 0 ? ' · ไม่มีของ ' + ri.empty : ''}
+                        {ri.stale.length > 0 && <span style={{ display: 'block', marginTop: 4, color: '#9a4a00' }}>⚠️ ค้างนาน (ไม่ได้ผลิต 3 เดือนขึ้นไป) {ri.stale.length} ขนาด รวม {fmt(ri.stale.reduce((a, x) => a + x.aging.remain, 0), 0)} เส้น: {ri.stale.map(x => x.label.replace(' ม.', '') + ' (' + fmt(x.aging.remain, 0) + ')').join(', ')} — เอาไปตัดใช้ก่อนสั่งเพิ่ม</span>}</span>}
                       extraRebarButton={<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-no-print="true">
+                        {!READONLY && <button onClick={() => this.setState({ cutModalOpen: true })} style={{ ...btnDashed(), borderColor: '#2f5fd0', color: '#2f5fd0', fontWeight: 600 }}>✂️ ตัดเหล็ก</button>}
+                        {this.cutList().length > 0 && <button onClick={() => this.setState({ cutModalOpen: true })} style={btnDashed()}>รายการตัดงวดนี้ ({this.cutList().length})</button>}
                         {ri.empty > 0 && <button onClick={() => this.setState(st => ({ showEmptyRebar: !st.showEmptyRebar }))} style={btnDashed()}>{s.showEmptyRebar ? 'ซ่อนขนาดที่ไม่มีของ' : 'แสดงขนาดที่ไม่มีของ (' + ri.empty + ')'}</button>}
                         {!READONLY && <AddRebarSpec onAdd={v => this.addRebarSpec(v)} />}
                       </div>} />; })()}
@@ -1694,6 +1854,12 @@ class App extends React.Component {
                     {mp.rebarRowsM.map((row, i) => row.cutInOpen && (
                       <CutInModal key={'c' + i} title={row.label} entries={row.cutInEntries} onAdd={row.onAddCutInEntry} onClose={row.onToggleCutInOpen} unit={row.isExtra ? '' : 'เส้น'} />
                     ))}
+                    {s.cutModalOpen && (() => {
+                      const num = v => (v == null || v === '' ? 0 : Number(v) || 0);
+                      const remainOf = sp => { const st = s.stock['main:rebar:' + sp] || {}; return st.closing != null && st.closing !== '' ? num(st.closing) : num(st.opening) + num(st.received); };
+                      return <CutRebarModal specs={sortRebarBySpec([...this.rebarCatalog()], x => x)} remainOf={remainOf} cuts={this.cutList()}
+                        onCut={(src, q, outs, note) => this.addCut(src, q, outs, note)} onRemove={id => this.removeCut(id)} onClose={() => this.setState({ cutModalOpen: false })} />;
+                    })()}
                   </React.Fragment>
                 )}
               </React.Fragment>
@@ -1713,7 +1879,7 @@ function GeneralUseModalPlate({ row, onClose }) {
         <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="number" value={e.kg ?? ''} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(130, true)} disabled={READONLY} />
           <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="ใช้งาน/เสียหายจากอะไร" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
-          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')} title={e.cutId ? 'ลบทั้งสองฝั่ง (ต้นทาง+ปลายทาง)' : undefined}>{e.cutId ? '✂️ ลบ' : 'ลบ'}</button>}
         </div>
       ))}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 14, borderTop: '1px solid #eee' }}>
@@ -1754,7 +1920,7 @@ function PlateReconcileCard({ pr }) {
         <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="number" value={e.kg ?? ''} onChange={ev => e.onKgChange(ev.target.value)} placeholder="กก." style={inp(90, true)} disabled={READONLY} />
           <input type="text" value={e.note} onChange={ev => e.onNoteChange(ev.target.value)} placeholder="สาเหตุ" style={{ ...inp(null), flex: 1 }} disabled={READONLY} />
-          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')}>ลบ</button>}
+          {!READONLY && <button onClick={e.onRemove} style={btnGhost('#c0392b')} title={e.cutId ? 'ลบทั้งสองฝั่ง (ต้นทาง+ปลายทาง)' : undefined}>{e.cutId ? '✂️ ลบ' : 'ลบ'}</button>}
         </div>
       ))}
       {!READONLY && <button onClick={pr.onAddGeneralUseEntry} style={{ ...btnDashed(), alignSelf: 'flex-start' }}>+ เพิ่มสาเหตุ</button>}
