@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09l';
+var APP_VERSION='2026-10-09m';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -19,7 +19,13 @@ var APP_VERSION='2026-10-09l';
   };
   check();
   document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
+  // แอปบนหน้าจอ iPhone บางทีไม่ส่ง visibilitychange ตอนสลับกลับมา → เช็กเพิ่มตอน pageshow/focus และทุก 5 นาที
+  window.addEventListener('pageshow',check);
+  window.addEventListener('focus',check);
+  setInterval(function(){if(!document.hidden)check();},300000);
 })();
+// ปุ่มรีเฟรชในแอป (แอปบนหน้าจอไม่มีปุ่มรีเฟรชของเบราว์เซอร์)
+function hardReload(){location.replace(location.pathname+'?r='+Date.now()+location.hash);}
 </script>
 <!-- ติดตั้งเป็นแอปบนหน้าจอมือถือได้ (Android: ปุ่มติดตั้ง / iPhone: แชร์ → เพิ่มไปยังหน้าจอโฮม) -->
 <link rel="manifest" href="repair.webmanifest"/>
@@ -601,7 +607,8 @@ function App(){
   const back=()=>{history.replaceState(null,'',location.pathname+location.search);setOpenId(null);setReloadKey(k=>k+1);};
   return <div className="wrap">
     <div className="topbar">
-      <h1>🔧 แจ้งซ่อม — บางเลน</h1>
+      <h1 style={{display:'flex',alignItems:'center',gap:8}}>🔧 แจ้งซ่อม — บางเลน
+        <button onClick={()=>hardReload()} title="โหลดใหม่ / อัปเดตแอป" style={{marginLeft:'auto',background:'rgba(255,255,255,.18)',border:'none',color:'#fff',borderRadius:8,padding:'4px 10px',fontFamily:'inherit',fontSize:12.5,fontWeight:700,cursor:'pointer'}}>⟳ v{APP_VERSION.slice(5)}</button></h1>
       {me&&<div className="me">ผู้ใช้: {me.name} ({me.dept}) <button onClick={()=>setEditMe(true)}>เปลี่ยน</button></div>}
       {me&&!editMe&&<div className="tabs">
         <button className={'tab'+(tab==='report'?' on':'')} onClick={()=>{setTab('report');setDone(null);back();}}>➕ แจ้งซ่อม</button>
