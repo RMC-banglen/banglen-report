@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09m';
+var APP_VERSION='2026-10-09n';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -559,7 +559,7 @@ function JobList({onOpen,reloadKey,me,jobs}){
   const[rows,setRows]=useState(null);const[f,setF]=useState('active');
   useEffect(()=>{
     const since=new Date(Date.now()-45*864e5).toISOString();
-    SB.from('repair_requests').select('*').eq('site',SITE).or('status.in.(open,accepted,in_progress,waiting_parts,done),reported_at.gte.'+since)
+    SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at').eq('site',SITE).or('status.in.(open,accepted,in_progress,waiting_parts,done),reported_at.gte.'+since)
       .order('reported_at',{ascending:false}).limit(300).then(({data})=>setRows(data||[]));
   },[reloadKey]);
   if(!rows)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
@@ -590,11 +590,11 @@ function App(){
   const[jobs,setJobs]=useState([]);const[,setStaffTick]=useState(0);
   useEffect(()=>{SB.from('repair_staff').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name')
     .then(({data,error})=>{if(!error){STAFF=data||[];setStaffTick(t=>t+1);}});},[]);
-  // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 1 นาที และทุกครั้งที่กลับมาเปิดแอป
+  // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
     const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
       .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(data)setJobs(data);});
-    load();const iv=setInterval(()=>{if(!document.hidden)load();},60000);
+    load();const iv=setInterval(()=>{if(!document.hidden)load();},120000); // ทุก 2 นาที (ประหยัดโควตา Supabase)
     const vis=()=>{if(!document.hidden)load();};document.addEventListener('visibilitychange',vis);
     return()=>{clearInterval(iv);document.removeEventListener('visibilitychange',vis);};
   },[reloadKey,openId]);
