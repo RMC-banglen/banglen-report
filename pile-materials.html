@@ -185,15 +185,35 @@ function parseFmtNum(str) {
   return isFinite(n) ? n : null;
 }
 const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-// เรียงรายชื่องวด "ชื่อเดือน ปี" ตามลำดับเวลาจริง (ปี → เดือน) แทนลำดับที่สร้างงวดไว้ก่อนหลัง
-// (เช่น สร้างงวดมีนาคมทีหลังสิงหาคม/กันยายน ก็ต้องให้มีนาคมมาก่อนตามปฏิทิน) ป้ายที่แจงเดือน/ปีไม่ได้ (ถ้ามี) จะถูกเรียงไปท้ายสุด
-// "สิงหาคม 2569" → "ส.ค. 69"
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+// งวดที่เก็บข้อมูลรวมหลายเดือน (ช่วงแรกที่เพิ่งเริ่มใช้ระบบ ลงเป็นรายไตรมาส: "มีนาคม 2569" = ม.ค.–มี.ค.)
+// key คือชื่องวด (เดือนสุดท้ายของช่วง) → จำนวนเดือน — ตั้งจากช่องข้างตัวเลือกงวด ตั้งค่าใน App.render ทุกครั้ง
+let PERIOD_SPAN = {};
+function periodSpanInfo(label) {
+  const [m, y] = String(label || '').split(' ');
+  const mi = THAI_MONTHS.indexOf(m), yr = parseInt(y, 10), span = Number(PERIOD_SPAN[label]) || 1;
+  if (mi < 0 || isNaN(yr) || span <= 1) return null;
+  const startMi = ((mi - span + 1) % 12 + 12) % 12;
+  const range = THAI_MONTHS_SHORT[startMi] + '–' + THAI_MONTHS_SHORT[mi] + ' ' + String(yr).slice(-2);
+  const q = span === 3 && (mi + 1) % 3 === 0 ? (mi + 1) / 3 : null;
+  return { span, range, q, yy: String(yr).slice(-2) };
+}
+// ชื่อเต็มสำหรับโชว์ "มิถุนายน 2569" → "ไตรมาส 2 (เม.ย.–มิ.ย. 69)"
+function periodName(label) {
+  const info = periodSpanInfo(label);
+  if (!info) return String(label || '');
+  return (info.q ? 'ไตรมาส ' + info.q : info.span + ' เดือน') + ' (' + info.range + ')';
+}
+// "สิงหาคม 2569" → "ส.ค. 69" · งวดไตรมาส → "ไตรมาส 2/69"
 function shortPeriod(label) {
+  const info = periodSpanInfo(label);
+  if (info) return info.q ? 'ไตรมาส ' + info.q + '/' + info.yy : info.range;
   const [m, y] = String(label || '').split(' ');
   const mi = THAI_MONTHS.indexOf(m);
   return mi < 0 ? String(label || '') : THAI_MONTHS_SHORT[mi] + ' ' + String(y || '').slice(-2);
 }
+// เรียงรายชื่องวด "ชื่อเดือน ปี" ตามลำดับเวลาจริง (ปี → เดือน) แทนลำดับที่สร้างงวดไว้ก่อนหลัง
+// (เช่น สร้างงวดมีนาคมทีหลังสิงหาคม/กันยายน ก็ต้องให้มีนาคมมาก่อนตามปฏิทิน) ป้ายที่แจงเดือน/ปีไม่ได้ (ถ้ามี) จะถูกเรียงไปท้ายสุด
 function sortPeriodLabels(labels) {
   const key = label => {
     const [m, y] = String(label || '').split(' ');
@@ -597,7 +617,7 @@ class App extends React.Component {
     fileName: '', loading: false, error: '', result: null, actual: {},
     showSettings: false, settingsTab: 'rebar', resultView: 'main', stockSubTab: 'all',
     stock: {}, plateStockDiam: {}, plateGeneralUseEntries: {}, plateGeneralUseOpen: {},
-    extraRebarItems: [], showEmptyRebar: false, alertThresholdPct: 5, alertThresholdByCategory: {},
+    extraRebarItems: [], showEmptyRebar: false, periodSpan: {}, alertThresholdPct: 5, alertThresholdByCategory: {},
     mainSearchQuery: '', showAlertList: false, periodLocked: {}, periodSummaries: {},
     generalUseEntries: {}, generalUseOpen: {}, cutInEntries: {}, cutInOpen: {}, periodLabel: null, periods: [], periodHistory: {},
     periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
@@ -616,7 +636,7 @@ class App extends React.Component {
   persistKeys = ['result', 'rawRows', 'fileName', 'actual', 'stock', 'plateStockDiam', 'generalUseEntries', 'plateGeneralUseEntries', 'cutInEntries',
     'periodLabel', 'periods', 'periodHistory', 'periodLocked', 'periodSummaries', 'extraRebarItems', 'alertThresholdPct', 'alertThresholdByCategory',
     'rebarWeights', 'plateWeights', 'whiskerWeights', 'whiskerSpecs', 'pcWireKgPerM', 'pcWireTable', 'stirrupTable', 'stirrupWireMm', 'plateThicknessMm',
-    'plateBigSheetKg', 'locks', 'pileAreaM2', 'concreteMix'];
+    'plateBigSheetKg', 'locks', 'pileAreaM2', 'concreteMix', 'periodSpan'];
   fileInputRef = React.createRef();
 
   async componentDidMount() {
@@ -1333,8 +1353,8 @@ class App extends React.Component {
   // แถวเทียบคิวผลิต/ความยาว ข้ามงวด
   buildPileTrendRows() {
     const s = this.state;
-    const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
-    const cols = [...closedLabels, s.periodLabel];
+    const closedLabels = sortPeriodLabels((s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel));
+    const cols = sortPeriodLabels([...closedLabels, s.periodLabel]);
     const totalsFor = pl => {
       if (pl === s.periodLabel) return this.computePileTotals(s);
       const sum = this.summaryForClosedPeriod(pl);
@@ -1411,9 +1431,9 @@ class App extends React.Component {
   // แนวโน้มแบบแยกทีละรายการ (ไม่รวมยอดทั้งหมวด) — ใช้ items ที่เก็บไว้ในสรุปแต่ละงวด
   buildTrendItemRows() {
     const s = this.state;
-    const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
+    const closedLabels = sortPeriodLabels((s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel));
     const currentSummary = this.computePeriodSummary(s);
-    const periodCols = [...closedLabels, s.periodLabel];
+    const periodCols = sortPeriodLabels([...closedLabels, s.periodLabel]);
     const summaryFor = pl => (pl === s.periodLabel ? currentSummary : this.summaryForClosedPeriod(pl));
     return CATS.map(m => {
       const dg = digitsForKey('x:' + m.key);
@@ -1446,9 +1466,9 @@ class App extends React.Component {
   }
   buildTrendRows() {
     const s = this.state;
-    const closedLabels = (s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel);
+    const closedLabels = sortPeriodLabels((s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel));
     const currentSummary = this.computePeriodSummary(s);
-    const periodCols = [...closedLabels, s.periodLabel];
+    const periodCols = sortPeriodLabels([...closedLabels, s.periodLabel]);
     return CATS.map(m => {
       const dg = digitsForKey('x:' + m.key);
       const vals = [];
@@ -1638,12 +1658,14 @@ class App extends React.Component {
     });
   }
   // งวดถัดไป (เดือนถัดจากงวดที่ดูอยู่) — มีในระบบแล้วแปลว่ากำลังกรอกย้อนหลัง
-  nextPeriodLabel() {
-    const [m, y] = String(this.state.periodLabel || '').split(' ');
-    const mi = THAI_MONTHS.indexOf(m), yr = parseInt(y, 10);
-    if (mi < 0 || isNaN(yr)) return null;
-    return THAI_MONTHS[(mi + 1) % 12] + ' ' + (mi === 11 ? yr + 1 : yr);
+  // งวดที่มีอยู่จริงที่ติดกัน (ก่อน/หลัง) ตามปฏิทิน — ไม่ใช่เดือน ±1 เฉยๆ เพราะช่วงแรกลงเป็นไตรมาส (มี.ค. → มิ.ย. → ก.ค.)
+  adjacentPeriodLabel(dir) {
+    const list = sortPeriodLabels([...new Set([...(this.state.periods || []), this.state.periodLabel].filter(Boolean))]);
+    const i = list.indexOf(this.state.periodLabel);
+    return i < 0 ? null : (list[i + dir] || null);
   }
+  nextPeriodLabel() { return this.adjacentPeriodLabel(1); }
+  setPeriodSpan(v) { if (READONLY) return; this.setState(s => ({ periodSpan: { ...(s.periodSpan || {}), [s.periodLabel]: Number(v) || 1 } })); }
   nextPeriodSnap() {
     if (!this.isBackfillPeriod()) return null;
     const label = this.nextPeriodLabel();
@@ -1690,14 +1712,9 @@ class App extends React.Component {
   // ปุ่มนี้ให้ดึงย้อนหลังทีหลังได้ โดยไม่ต้องพิมพ์ตัวเลขเองทุกช่อง
   pullOpeningFromPreviousPeriod() {
     if (READONLY) return;
-    const curIdx = THAI_MONTHS.indexOf((this.state.periodLabel || '').split(' ')[0]);
-    const curYear = parseInt((this.state.periodLabel || '').split(' ')[1], 10);
-    if (curIdx < 0 || isNaN(curYear)) { alert('ไม่ทราบเดือน/ปีของงวดปัจจุบัน'); return; }
-    const prevMonth = (curIdx + 11) % 12;
-    const prevYear = curIdx === 0 ? curYear - 1 : curYear;
-    const prevLabel = THAI_MONTHS[prevMonth] + ' ' + prevYear;
-    const prev = this.state.periodHistory[prevLabel];
-    if (!prev) { alert('ไม่พบข้อมูลงวด "' + prevLabel + '" ในระบบ (ต้องเคยบันทึกงวดนั้นไว้ก่อน ถึงจะดึงยอดมาได้)'); return; }
+    const prevLabel = this.adjacentPeriodLabel(-1);
+    const prev = prevLabel && this.state.periodHistory[prevLabel];
+    if (!prev) { alert('ไม่พบงวดก่อนหน้าในระบบ (ต้องเคยบันทึกงวดก่อนหน้าไว้ก่อน ถึงจะดึงยอดมาได้)'); return; }
     if (!confirm('ดึงยอด "นับสต็อก" ของงวด "' + prevLabel + '" มาใส่เป็น "ยกมา" ของงวดนี้ทุกรายการ?\nยอดยกมาที่กรอกไว้อยู่ตอนนี้ (ถ้ามี) จะถูกแทนที่')) return;
     this.setState(s => {
       const undoStack = this.pushUndo(s);
@@ -1734,6 +1751,7 @@ class App extends React.Component {
 
   render() {
     const s = this.state, r = s.result, mod = this._mod;
+    PERIOD_SPAN = s.periodSpan || {};
     if (!mod && !r) return <div style={{ padding: 40, textAlign: 'center', color: '#78839A' }}>กำลังโหลด...</div>;
     const mp = r ? this.filterMainPage(this.buildMainPage(r)) : null;
     const status = mp ? this.computeMaterialStatus(this.buildMainPage(r)) : { normal: 0, alert: 0 };
@@ -1797,7 +1815,14 @@ class App extends React.Component {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 10, padding: '12px 18px' }} data-no-print="true">
               <div style={{ fontSize: 14, fontWeight: 700, color: '#244c9b' }}>📅 กำลังดูข้อมูลงวด:</div>
               <select value={s.periodLabel || ''} onChange={e => this.switchPeriod(e.target.value)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #2f5fd0', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#244c9b', background: 'white' }}>
-                {sortPeriodLabels(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{p}</option>)}
+                {sortPeriodLabels(s.periods.length ? s.periods : [s.periodLabel]).map(p => <option key={p} value={p}>{periodSpanInfo(p) ? p + ' — ' + periodName(p) : p}</option>)}
+              </select>
+              {/* งวดนี้เก็บข้อมูลกี่เดือน — ช่วงแรกลงเป็นไตรมาส */}
+              <select value={String((s.periodSpan || {})[s.periodLabel] || 1)} onChange={e => this.setPeriodSpan(e.target.value)} disabled={READONLY}
+                title="ข้อมูลงวดนี้ครอบคลุมกี่เดือน" style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid #b9cdf0', fontFamily: 'inherit', fontSize: 13, color: '#244c9b', background: 'white' }}>
+                <option value="1">ข้อมูล 1 เดือน</option>
+                <option value="2">ข้อมูล 2 เดือน</option>
+                <option value="3">ข้อมูล 3 เดือน (ไตรมาส)</option>
               </select>
               {!READONLY && <button onClick={() => this.setState({ periodPickerOpen: true, periodPickerPurpose: 'add' })} style={btnDashed()}>+ งวดใหม่</button>}
               {!READONLY && <button onClick={() => this.deleteCurrentPeriod()} style={{ ...btnGhost('#c0392b'), border: '1px solid #e0a3a3', background: '#fdf1f1' }}>🗑 ลบงวดนี้</button>}
@@ -2330,11 +2355,11 @@ function DetailView({ app }) {
 function TrendView({ app }) {
   const s = app.state;
   const rows = app.buildTrendRows();
-  const periodCols = [...(s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel), s.periodLabel];
+  const periodCols = sortPeriodLabels([...(s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel), s.periodLabel]);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
-        <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}><th style={{ padding: '10px 14px', fontSize: 13 }}>วัตถุดิบ</th>{periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}<th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>รวมสุทธิ</th></tr></thead>
+        <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}><th style={{ padding: '10px 14px', fontSize: 13 }}>วัตถุดิบ</th>{periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{periodSpanInfo(pl) ? shortPeriod(pl) : pl}</th>)}<th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>รวมสุทธิ</th></tr></thead>
         <tbody>{rows.map((row, i) => (
           <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
             <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 600 }}>{row.label}</td>
@@ -2354,7 +2379,7 @@ function TrendView({ app }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
               <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
                 <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
-                {periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}
+                {periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{periodSpanInfo(pl) ? shortPeriod(pl) : pl}</th>)}
                 <th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>รวมสุทธิ</th>
               </tr></thead>
               <tbody>{groups.map(g => [
@@ -2384,7 +2409,7 @@ function TrendView({ app }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
               <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
                 <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
-                {pt.cols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{pl}</th>)}
+                {pt.cols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{periodSpanInfo(pl) ? shortPeriod(pl) : pl}</th>)}
                 <th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>เฉลี่ย</th>
               </tr></thead>
               <tbody>{pt.rows.map((row, i) => (
