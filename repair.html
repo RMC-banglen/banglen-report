@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09k';
+var APP_VERSION='2026-10-09l';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -527,12 +527,14 @@ function myWork(me,jobs){
   const confirm=jobs.filter(r=>r.status==='done'&&r.reporter_name===me.name);
   const waiting=role?jobs.filter(r=>r.status==='open'):[];
   const mine=role?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts'].includes(r.status)):[];
+  // งานที่ฉันแจ้งที่ยังไม่เสร็จ (ไว้ติดตามสถานะ ไม่นับเป็นงานที่ต้องทำ)
+  const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','accepted','in_progress','waiting_parts'].includes(r.status));
   const stale=role==='head'?jobs.filter(r=>r.status==='done'&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
-  return{role,confirm,waiting,mine,stale,count:confirm.length+waiting.length+mine.length};
+  return{role,confirm,waiting,mine,stale,reported,count:confirm.length+waiting.length+mine.length};
 }
 function MyWork({me,jobs,onOpen}){
   const w=myWork(me,jobs);
-  const empty=!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.stale.length;
+  const empty=!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.stale.length&&!w.reported.length;
   const row=(r,extra)=><div key={r.id} className="tl" style={{cursor:'pointer'}} onClick={()=>onOpen(r.id)}>
     <b>{r.ticket_no}</b> · {assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''} <small>{extra||ago(r.reported_at)}</small></div>;
   return <div className="card" style={{borderLeft:'5px solid #b45309'}}>
@@ -541,6 +543,7 @@ function MyWork({me,jobs,onOpen}){
     {w.confirm.length>0&&<><div style={{fontWeight:800,color:'#0f766e',margin:'4px 0'}}>✅ ซ่อมเสร็จแล้ว รอคุณกดยืนยัน ({w.confirm.length})</div>{w.confirm.map(r=>row(r,'เสร็จ '+ago(r.done_at)))}</>}
     {w.mine.length>0&&<><div style={{fontWeight:800,color:'#1d4ed8',margin:'8px 0 4px'}}>🔧 งานที่ฉันรับไว้ ({w.mine.length})</div>{w.mine.map(r=>row(r,(STATUS[r.status]||{}).label))}</>}
     {w.waiting.length>0&&<><div style={{fontWeight:800,color:'#b91c1c',margin:'8px 0 4px'}}>🙋 รอช่างรับงาน ({w.waiting.length})</div>{w.waiting.map(r=>row(r))}</>}
+    {w.reported.length>0&&<><div style={{fontWeight:800,color:'#6b5b4a',margin:'8px 0 4px'}}>📝 งานที่ฉันแจ้ง กำลังดำเนินการ ({w.reported.length})</div>{w.reported.map(r=>row(r,(STATUS[r.status]||{}).label+(r.technician?' · ช่าง'+r.technician.replace(/^ช่าง/,''):'')))}</>}
     {w.stale.length>0&&<><div style={{fontWeight:800,color:'#78716c',margin:'8px 0 4px'}}>⏳ ซ่อมเสร็จ ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน ({w.stale.length}) — หัวหน้ากดปิดแทนได้</div>{w.stale.map(r=>row(r,r.reporter_name))}</>}
   </div>;
 }
