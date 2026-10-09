@@ -561,7 +561,7 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={row.key || i} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
+            <tr key={row.key || i} data-rowkey={row.key} style={{ borderTop: row.groupStart ? '2px solid #c8cfdb' : '1px solid #eef0f4', verticalAlign: 'top', background: row.isExtra ? '#fffbea' : 'transparent' }}>
               <td style={td()}>
                 {allowExtraSpec && row.isExtra ? (
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -923,9 +923,18 @@ class App extends React.Component {
     if (READONLY) return false;
     const spec = canonRebarSpec(raw);
     if (!parseRebarSpec(spec).ok) { alert('รูปแบบขนาดไม่ถูกต้อง — พิมพ์แบบ DB16x4.00 หรือ RB9x2.5'); return false; }
-    if (this.rebarCatalog().has(spec)) { this.setState({ showEmptyRebar: true }); alert(spec + ' มีอยู่ในรายการแล้ว'); return false; }
-    this.setState(s => ({ undoStack: this.pushUndo(s), redoStack: [], showEmptyRebar: true,
-      stock: { ...s.stock, ['main:rebar:' + spec]: { opening: '', received: '', closing: '' } } }));
+    // ขนาดที่ระบบรู้จักแล้ว (มีในงวดอื่น) แต่งวดนี้ยังไม่มีของ จะซ่อนอยู่ในกลุ่ม "ไม่มีของ"
+    // → เปิดแถวนั้นขึ้นมาให้กรอกเลย แทนที่จะเตือนว่าซ้ำ (เช่น กรอกไตรมาส 2 ย้อนหลังแล้วต้องการ DB12x5.00 ที่เพิ่งมีในงวดหลัง)
+    const known = this.rebarCatalog().has(spec);
+    this.setState(s => ({ forceShowRebar: { ...(s.forceShowRebar || {}), [spec]: true },
+      ...(known ? {} : { undoStack: this.pushUndo(s), redoStack: [], stock: { ...s.stock, ['main:rebar:' + spec]: { opening: '', received: '', closing: '' } } }) }),
+      () => setTimeout(() => {
+        const el = document.querySelector('[data-rowkey="' + CSS.escape('main:rebar:' + spec) + '"]');
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.transition = 'background 0.4s'; el.style.background = '#fff3c4';
+        setTimeout(() => { el.style.background = ''; }, 2200);
+      }, 50));
     return true;
   }
   removeRebarSpec(spec) {
@@ -1130,7 +1139,7 @@ class App extends React.Component {
         diffFmt: '-', diffColor: 'inherit', pctLostFmt: '-', rowBg: 'transparent', realDiffColor };
     });
     // ขนาดที่ทุกช่องว่าง/0 (ไม่ผลิต ไม่มีของ) ซ่อนไว้ก่อน กดดูได้ จะได้ไม่รกตาราง
-    const stockOnlyRowsM = otherRows.filter(x => x.hasData || this.state.showEmptyRebar);
+    const stockOnlyRowsM = otherRows.filter(x => x.hasData || this.state.showEmptyRebar || (this.state.forceShowRebar || {})[x.label]);
     const rebarInfo = { total: inCalc.size + otherRows.length, produced: inCalc.size,
       stockOnly: otherRows.filter(x => x.hasData).length, empty: otherRows.filter(x => !x.hasData).length };
     const extraRebarRowsM = this.state.extraRebarItems.map(item => {
