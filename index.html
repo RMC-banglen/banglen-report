@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09g';
+var APP_VERSION='2026-10-09h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9126,7 +9126,7 @@ window.__dataReady.then(data => {
         {card('ช่างรับงานเฉลี่ย',fmtH(resp),'นับจากแจ้ง จนช่างกดรับ')}
         {card('ซ่อมซ้ำ',repeats+' ครั้ง','ตีกลับ + เสียซ้ำใน 30 วัน',repeats?'#b91c1c':undefined)}
         {card('ค่าอะไหล่+จ้างนอก',baht(cost)+' ฿','จากใบงาน (ไม่รวม PM)')}
-        {card('🗓 PM ตามรอบ',pmPeriod.filter(r=>r.done_at).length+' / '+pmPeriod.length,'ทำแล้ว / ใบงาน PM'+(pmOverdue?' · ค้าง '+pmOverdue:''),pmOverdue?'#b45309':'#1d4ed8')}
+        {card('🗓 PM / บำรุงรักษา',pmPeriod.filter(r=>r.done_at).length+' / '+pmPeriod.length,'ทำแล้ว / ทั้งหมด (ตามรอบ+นอกรอบ)'+(pmOverdue?' · ค้าง '+pmOverdue:''),pmOverdue?'#b45309':'#1d4ed8')}
       </div>
 
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
@@ -9136,7 +9136,7 @@ window.__dataReady.then(data => {
           {[...open,...waitConfirm].sort((a,b)=>({stop:0,abnormal:1,normal:2}[a.urgency]-{stop:0,abnormal:1,normal:2}[b.urgency])||(new Date(a.reported_at)-new Date(b.reported_at))).map(r=><tr key={r.id}>
             <td style={{...td,textAlign:'left'}}><a href={'repair.html#'+r.id} target="_blank" rel="noreferrer" style={{color:'#1e293b',fontWeight:700}}>{r.ticket_no}</a></td>
             <td style={{...td,textAlign:'left',fontWeight:700}}>{dn(r.asset_name)}</td>
-            <td style={{...td,textAlign:'left',color:isPM(r)?'#1d4ed8':(URG[r.urgency]||{}).c}}>{isPM(r)?'🗓 PM ตามรอบ':(URG[r.urgency]||{}).t}</td>
+            <td style={{...td,textAlign:'left',color:isPM(r)?'#1d4ed8':(URG[r.urgency]||{}).c}}>{isPM(r)?(r.pm_item_id?'🗓 PM ตามรอบ':'🔧 บำรุงรักษา'):(URG[r.urgency]||{}).t}</td>
             <td style={{...td,textAlign:'left',whiteSpace:'normal',maxWidth:280}}>{r.symptom}</td>
             <td style={td}><span style={{padding:'2px 8px',borderRadius:99,fontSize:12,fontWeight:700,color:(ST[r.status]||[])[1],background:(ST[r.status]||[])[2]}}>{(ST[r.status]||[])[0]}</span></td>
             <td style={td}>{r.technician||'–'}</td>

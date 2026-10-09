@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09g';
+var APP_VERSION='2026-10-09h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -184,6 +184,11 @@ function assetLabel(name){
 }
 function notify(event,req,extra){
   req={...req,asset_name:assetLabel(req.asset_name)}; // ข้อความ Telegram เห็นชื่อคนขับด้วย
+  // บำรุงรักษานอกรอบ (pm ที่ไม่ได้มาจากรอบงานประจำ): บอกในอาการว่าไม่ใช่เครื่องเสีย · ทำเสร็จส่งเป็น "ปิดงาน" (ไม่มีรอบงานให้อัปเดต)
+  if(req.kind==='pm'&&!req.pm_item_id){
+    if(event==='new')req.symptom='🔧 บำรุงรักษา (เครื่องไม่ได้เสีย): '+(req.symptom||'');
+    if(event==='done'){event='closed';extra={...(extra||{}),actor:req.technician};}
+  }
   if(!GAS_URL)return;
   try{fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({kind:'repair_event',event,link:jobLink(req.id),req,...(extra||{})})});}catch(e){}
@@ -261,6 +266,7 @@ function MeSetup({me,onSave}){
 function ReportForm({me,assets,onDone,preAssetId}){
   const[cat,setCat]=useState('');const[asset,setAsset]=useState('');const[other,setOther]=useState('');
   const[fromQR,setFromQR]=useState(false);
+  const[maint,setMaint]=useState(false);
   // สแกน QR → เลือกเครื่องให้เลย
   useEffect(()=>{
     if(!preAssetId||!assets.length)return;
@@ -274,15 +280,18 @@ function ReportForm({me,assets,onDone,preAssetId}){
   const assetName=asset==='__other'?other.trim():asset;
   const submit=async()=>{
     if(!assetName){setErr('เลือกเครื่องจักร/รถ');return;}
-    if(!urg){setErr('เลือกความเร่งด่วน');return;}
+    if(!maint&&!urg){setErr('เลือกความเร่งด่วน');return;}
     if(!symptom.trim()){setErr('บอกอาการสั้นๆ');return;}
     setSaving(true);setErr('');
     const a=assets.find(x=>x.name===assetName);
-    const row={site:SITE,asset_name:assetName,asset_category:a?a.category:(cat||'อื่นๆ'),urgency:urg,symptom:symptom.trim(),
-      reporter_name:me.name,reporter_dept:me.dept,photos,status:'open'};
+    // บำรุงรักษานอกรอบ = kind pm (ไม่นับเป็นเครื่องเสีย) · ช่างแจ้งเอง = รับงานให้เลย
+    const selfTech=maint&&me.dept==='ช่างซ่อมบำรุง';
+    const row={site:SITE,asset_name:assetName,asset_category:a?a.category:(cat||'อื่นๆ'),urgency:maint?'normal':urg,symptom:symptom.trim(),
+      reporter_name:me.name,reporter_dept:me.dept,photos,status:selfTech?'accepted':'open',kind:maint?'pm':'repair',
+      ...(selfTech?{technician:me.name,accepted_at:new Date().toISOString()}:{})};
     const{data,error}=await SB.from('repair_requests').insert([row]).select().single();
     if(error){setSaving(false);setErr('แจ้งไม่สำเร็จ: '+error.message);return;}
-    await logEvent(data.id,me.name,'แจ้งซ่อม',symptom.trim());
+    await logEvent(data.id,me.name,maint?'แจ้งงานบำรุงรักษา'+(selfTech?' (รับงานเอง)':''):'แจ้งซ่อม',symptom.trim());
     notify('new',data);
     setSaving(false);onDone(data);
   };
@@ -296,16 +305,19 @@ function ReportForm({me,assets,onDone,preAssetId}){
     {fromQR&&asset&&<div className="ok" style={{marginTop:10}}>📷 สแกนจาก QR: <b>{assetLabel(asset)}</b></div>}
     {asset&&asset!=='__other'&&<AssetHistory asset={asset}/>}
 
-    <div className="card-title" style={{marginTop:18}}>2. ความเร่งด่วน</div>
-    <div className="urg">{Object.entries(URG).map(([k,v])=><button key={k} className={(urg===k?'on ':'')+k} onClick={()=>setUrg(k)}>
-      <div>{v.label}<small>{v.sub}</small></div></button>)}</div>
+    <div className="card-title" style={{marginTop:18}}>2. ประเภทงาน / ความเร่งด่วน</div>
+    <div className="urg">{Object.entries(URG).map(([k,v])=><button key={k} className={(!maint&&urg===k?'on ':'')+k} onClick={()=>{setMaint(false);setUrg(k);}}>
+      <div>{v.label}<small>{v.sub}</small></div></button>)}
+      <button className={maint?'on':''} style={maint?{borderColor:'#1d4ed8',background:'#eff6ff'}:{}} onClick={()=>setMaint(true)}>
+        <div>🔧 บำรุงรักษา<small>เครื่องไม่ได้เสีย — ขันน็อต อัดจาระบี เปลี่ยนน้ำมัน ตรวจเช็ค (ไม่นับเป็นเครื่องเสีย)</small></div></button>
+    </div>
 
     <div className="card-title" style={{marginTop:18}}>3. อาการ</div>
-    <textarea value={symptom} onChange={e=>setSymptom(e.target.value)} placeholder="เช่น เครนยกขึ้นไม่ได้ มีเสียงดังที่มอเตอร์"/>
+    <textarea value={symptom} onChange={e=>setSymptom(e.target.value)} placeholder={maint?'เช่น อัดจาระบีรอก เปลี่ยนน้ำมันเกียร์':'เช่น เครนยกขึ้นไม่ได้ มีเสียงดังที่มอเตอร์'}/>
     <label className="lbl">รูป / จุดที่เสีย (ถ้ามี)</label>
     <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
     {err&&<div className="err">{err}</div>}
-    <button className="bigbtn" disabled={saving} onClick={submit}>{saving?'กำลังส่ง...':'🔔 แจ้งซ่อม'}</button>
+    <button className="bigbtn" disabled={saving} onClick={submit}>{saving?'กำลังส่ง...':maint?'🔧 บันทึกงานบำรุงรักษา':'🔔 แจ้งซ่อม'}</button>
   </div>;
 }
 
@@ -346,7 +358,7 @@ function DoneForm({req,me,onSaved,onCancel}){
       technician:req.technician||me.name,updated_at:now.toISOString()};
     const{data,error}=await SB.from('repair_requests').update(patch).eq('id',req.id).select().single();
     if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
-    await logEvent(req.id,me.name,isPM?'ทำ PM เสร็จ ปิดงาน':'ซ่อมเสร็จ',cause+' · '+work.trim());
+    await logEvent(req.id,me.name,isPM?'ทำเสร็จ ปิดงาน':'ซ่อมเสร็จ',cause+' · '+work.trim());
     if(isPM){try{await updatePmItem(data);}catch(e){}}
     notify('done',data);
     setSaving(false);onSaved(data);
@@ -374,7 +386,7 @@ function DoneForm({req,me,onSaved,onCancel}){
     <label className="lbl">รูปหลังซ่อม</label>
     <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
     {err&&<div className="err">{err}</div>}
-    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':isPM?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
+    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':isPM?(req.pm_item_id?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ทำเสร็จ ปิดงาน'):'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
     <button className="ghost" onClick={onCancel}>ย้อนกลับ</button>
   </div>;
 }
@@ -413,7 +425,7 @@ function JobDetail({id,me,onBack}){
         <div style={{fontSize:13,color:'#8a7a68',fontWeight:700}}>{req.ticket_no}</div><Badge s={req.status}/>
       </div>
       <div style={{fontSize:20,fontWeight:800,marginTop:4}}>{assetLabel(req.asset_name)}</div>
-      <div style={{fontSize:14,fontWeight:800,color:req.kind==='pm'?'#1d4ed8':u.color,marginTop:2}}>{req.kind==='pm'?'🗓 บำรุงรักษาตามรอบ (PM)':u.label}</div>
+      <div style={{fontSize:14,fontWeight:800,color:req.kind==='pm'?'#1d4ed8':u.color,marginTop:2}}>{req.kind==='pm'?(req.pm_item_id?'🗓 บำรุงรักษาตามรอบ (PM)':'🔧 บำรุงรักษา (เครื่องไม่ได้เสีย)'):u.label}</div>
       <div style={{fontSize:15.5,marginTop:10,whiteSpace:'pre-wrap'}}>{req.symptom}</div>
       {req.photos&&req.photos.length>0&&<div className="photos" style={{marginTop:10}}>{req.photos.map((p,i)=><a key={i} href={p} target="_blank"><img className="ph" src={p}/></a>)}</div>}
       <div style={{marginTop:12}}>
@@ -499,7 +511,7 @@ function JobList({onOpen,reloadKey}){
     </div>
     {list.length===0&&<div style={{textAlign:'center',color:'#8a7a68',padding:30}}>ไม่มีรายการ</div>}
     {list.map(r=><div key={r.id} className={'job '+r.urgency} onClick={()=>onOpen(r.id)}>
-      <div className="t1"><span>{r.kind==='pm'?'🗓 ':''}{assetLabel(r.asset_name)}</span><Badge s={r.status}/></div>
+      <div className="t1"><span>{r.kind==='pm'?(r.pm_item_id?'🗓 ':'🔧 '):''}{assetLabel(r.asset_name)}</span><Badge s={r.status}/></div>
       <div className="t2">{r.symptom}</div>
       <div className="t2">{r.ticket_no} · {r.reporter_name} · แจ้ง {ago(r.reported_at)}{r.technician?' · ช่าง '+r.technician:''}</div>
     </div>)}
