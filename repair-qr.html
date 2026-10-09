@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>พิมพ์สติกเกอร์ QR แจ้งซ่อม</title>
+<link rel="icon" type="image/png" href="icons/repair-icon-192.png?v=2"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:#f1f5f9;color:#1e293b;}
+.bar{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:2;}
+.bar h1{font-size:18px;font-weight:800;margin-right:auto;}
+.bar button{padding:8px 16px;border-radius:8px;border:1px solid #d6dbe3;background:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;}
+.bar button.main{background:#b45309;border-color:#b45309;color:#fff;}
+.filters{padding:10px 18px;display:flex;gap:8px;flex-wrap:wrap;font-size:14px;}
+.filters label{display:flex;gap:5px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:99px;padding:5px 12px;cursor:pointer;}
+.hint{padding:0 18px 10px;font-size:13px;color:#64748b;}
+.sheet{display:grid;grid-template-columns:repeat(3,63mm);gap:4mm;padding:8mm;justify-content:center;}
+.st{width:63mm;height:84mm;background:#fff;border:1.5px solid #b45309;border-radius:4mm;padding:3mm;display:flex;flex-direction:column;align-items:center;break-inside:avoid;page-break-inside:avoid;}
+.st .logo{height:9mm;}
+.st .t{font-size:11pt;font-weight:800;color:#b45309;margin-top:1mm;}
+.st .qr{margin-top:1.5mm;}
+.st .qr img,.st .qr canvas{width:40mm!important;height:40mm!important;}
+.st .name{font-size:13pt;font-weight:800;text-align:center;margin-top:2mm;line-height:1.15;}
+.st .cat{font-size:8.5pt;color:#64748b;}
+.st .foot{font-size:7.5pt;color:#64748b;margin-top:auto;text-align:center;}
+@media print{
+  @page{size:A4;margin:6mm;}
+  body{background:#fff;}
+  .bar,.filters,.hint{display:none;}
+  .sheet{padding:0;gap:3mm;}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>🔧 สติกเกอร์ QR แจ้งซ่อม — บางเลน</h1>
+  <button onclick="setAll(true)">เลือกทั้งหมด</button>
+  <button onclick="setAll(false)">ไม่เลือกเลย</button>
+  <button class="main" onclick="window.print()">🖨 พิมพ์</button>
+</div>
+<div class="filters" id="filters">กำลังโหลด...</div>
+<div class="hint">ติดสติกเกอร์ที่เครื่อง/รถ — สแกนด้วยกล้องมือถือ จะเปิดหน้าแจ้งซ่อมพร้อมเลือกเครื่องนั้นให้เลย และเห็นประวัติซ่อม · กระดาษ A4 ได้ 9 ดวง/แผ่น (แนะนำสติกเกอร์กันน้ำ หรือเคลือบพลาสติกใส)</div>
+<div class="sheet" id="sheet"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// สติกเกอร์ QR ของเครื่องจักร/รถแต่ละคัน → repair.html?a=<id>
+var SB=supabase.createClient('https://npxzerdirspwunuckcqr.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI');
+var BASE=location.origin+location.pathname.replace(/[^/]*$/,'')+'repair.html';
+var assets=[],picked={};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function render(){
+  var sheet=document.getElementById('sheet');sheet.innerHTML='';
+  assets.filter(function(a){return picked[a.id];}).forEach(function(a){
+    var d=document.createElement('div');d.className='st';
+    d.innerHTML='<img class="logo" src="logo.png"/><div class="t">สแกนแจ้งซ่อม</div><div class="qr"></div>'
+      +'<div class="name">'+esc(a.name)+'</div><div class="cat">'+esc(a.category||'')+'</div>'
+      +'<div class="foot">เครื่องเสีย/ผิดปกติ สแกนแล้วแจ้งได้เลย<br/>ระบบเตือนช่างทันที</div>';
+    sheet.appendChild(d);
+    new QRCode(d.querySelector('.qr'),{text:BASE+'?a='+a.id,width:300,height:300,correctLevel:QRCode.CorrectLevel.M});
+  });
+}
+function renderFilters(){
+  var cats=[];assets.forEach(function(a){var c=a.category||'อื่นๆ';if(cats.indexOf(c)<0)cats.push(c);});
+  var f=document.getElementById('filters');f.innerHTML='';
+  cats.forEach(function(c){
+    var list=assets.filter(function(a){return (a.category||'อื่นๆ')===c;});
+    var on=list.every(function(a){return picked[a.id];});
+    var l=document.createElement('label');
+    l.innerHTML='<input type="checkbox" '+(on?'checked':'')+'/> '+esc(c)+' ('+list.length+')';
+    l.querySelector('input').onchange=function(e){list.forEach(function(a){picked[a.id]=e.target.checked;});render();};
+    f.appendChild(l);
+  });
+}
+function setAll(v){assets.forEach(function(a){picked[a.id]=v;});renderFilters();render();}
+SB.from('repair_assets').select('*').eq('site','banglen').eq('active',true).order('sort_order').order('name').then(function(r){
+  assets=r.data||[];assets.forEach(function(a){picked[a.id]=true;});renderFilters();render();
+});
+</script>
+</body>
+</html>

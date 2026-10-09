@@ -1,6 +1,7 @@
 // ============================================================
 // Apps Script แยก — ระบบแจ้งซ่อม (หน้า repair.html) อย่างเดียว ไม่เกี่ยวกับผลลูกปูน
 // หน้าที่: รับเหตุการณ์จาก repair.html → ส่ง Telegram เข้ากลุ่มช่าง · เตือนงานค้างทุก 10 นาที
+//         รอบงานประจำของช่าง + เปิดใบงาน PM ให้เอง (ทุกวัน 08:00) · สรุปประจำสัปดาห์ (จันทร์ 08:00)
 //
 // วิธีติดตั้ง (ครั้งเดียว):
 //   1. เปิด https://script.google.com → New project → ตั้งชื่อ "แจ้งซ่อม"
@@ -72,6 +73,11 @@ function notifyRepair(d) {
   } else if (d.event === 'waiting_parts') {
     L.push('⏸ <b>รออะไหล่</b> — ' + head);
     if (d.note) L.push('รอ: ' + esc(d.note));
+  } else if (d.event === 'done' && r.kind === 'pm') {
+    L.push('✅ <b>ทำ PM เสร็จ</b> — ' + head);
+    L.push('ช่าง: ' + esc(r.technician || '-') + (r.helpers ? ' + ' + esc(r.helpers) : ''));
+    L.push('ทำ: ' + esc(r.work_done || '-'));
+    L.push('<i>อัปเดตวันที่ทำในรอบงานประจำให้แล้ว</i>');
   } else if (d.event === 'done') {
     var cost = (Number(r.parts_cost) || 0) + (Number(r.vendor_cost) || 0);
     L.push('✅ <b>ซ่อมเสร็จ</b> — ' + head);
@@ -92,7 +98,7 @@ function notifyRepair(d) {
   } else {
     return;
   }
-  var withLink = !(d.event === 'closed' || d.event === 'cancelled') && r.id;
+  var withLink = !(d.event === 'closed' || d.event === 'cancelled' || (d.event === 'done' && r.kind === 'pm')) && r.id;
   sendTelegram(L.join('\n') + (withLink ? jobLink(r.id) : ''));
 }
 
@@ -131,12 +137,10 @@ function repairReminderCheck() {
   });
 }
 
-function sb(method, path, payload) {
-  var opts = {
-    method: method,
-    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-    muteHttpExceptions: true
-  };
+function sb(method, path, payload, returnRows) {
+  var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  if (returnRows) headers.Prefer = 'return=representation';
+  var opts = { method: method, headers: headers, muteHttpExceptions: true };
   if (payload) opts.payload = JSON.stringify(payload);
   return UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + path, opts);
 }
@@ -147,27 +151,91 @@ function sb(method, path, payload) {
 // หมวด "เปลี่ยนเมื่อชำรุด" ไม่เตือน · ส่งวันละครั้ง 08:00 (ตั้งด้วย setup) — กลุ่มหลักยังได้เตือนตามเดิม ไม่ได้ย้าย
 var DASHBOARD_URL = 'https://rmc-banglen.github.io/banglen-report/';
 function routineCheck() {
-  var res = sb('get', 'calibration_items?select=name,category,interval_type,interval_value,next_cal_date,responsible');
+  var res = sb('get', 'calibration_items?select=id,name,category,interval_type,interval_value,next_cal_date,responsible');
   if (res.getResponseCode() >= 300) { Logger.log('routineCheck: ' + res.getContentText()); return; }
   var today = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
   var t0 = new Date(today + 'T00:00:00Z').getTime();
+  // ใบงาน PM ที่ยังไม่ปิด (กันเปิดซ้ำ) — ถ้ายังไม่ได้รัน supabase-repair-v2.sql จะอ่านไม่ได้ → แค่เตือน ไม่เปิดใบงาน
+  var openPm = {}, canPm = true;
+  var act = sb('get', 'repair_requests?kind=eq.pm&status=in.(open,accepted,in_progress,waiting_parts,done)&select=id,ticket_no,pm_item_id');
+  if (act.getResponseCode() >= 300) canPm = false;
+  else JSON.parse(act.getContentText() || '[]').forEach(function (t) { openPm[t.pm_item_id] = t; });
   var overdue = [], soon = [];
   JSON.parse(res.getContentText() || '[]').forEach(function (x) {
     if (String(x.responsible || '').indexOf('ช่าง') < 0) return;
     if (x.category === 'เปลี่ยนเมื่อชำรุด' || !x.next_cal_date) return;
     var days = Math.round((new Date(String(x.next_cal_date).slice(0, 10) + 'T00:00:00Z').getTime() - t0) / 864e5);
     var warn = x.interval_type === 'day' ? 3 : 30;
+    if (days > warn) return;
     var line = '• ' + esc(x.name) + ' — ' + esc(x.responsible) + ' · กำหนด ' + thDate(x.next_cal_date);
+    // เหลือ ≤ 7 วัน (หรือเกินแล้ว) → เปิดใบงาน PM ให้ช่างกดรับ/ปิดเหมือนงานซ่อม
+    var t = openPm[x.id];
+    if (!t && canPm && days <= PM_OPEN_DAYS) t = createPmTicket(x, days);
+    if (t) line += ' → <a href="' + REPAIR_PAGE_URL + '#' + t.id + '">' + esc(t.ticket_no) + '</a>';
     if (days < 0) overdue.push(line + ' <b>(เกินมา ' + (-days) + ' วัน)</b>');
-    else if (days <= warn) soon.push(line + ' (อีก ' + days + ' วัน)');
+    else soon.push(line + ' (อีก ' + days + ' วัน)');
   });
   if (!overdue.length && !soon.length) return;
   var L = ['🗓 <b>รอบงานประจำของช่าง</b>'];
   if (overdue.length) { L.push(''); L.push('🔴 <b>เกินกำหนด ' + overdue.length + ' รายการ</b>'); L = L.concat(overdue); }
   if (soon.length) { L.push(''); L.push('🟡 <b>ใกล้ถึงกำหนด ' + soon.length + ' รายการ</b>'); L = L.concat(soon); }
   L.push('');
-  L.push('<i>ทำเสร็จแล้ว แจ้งคนบันทึกวันที่ทำในหน้า "รอบงานประจำ" บนแดชบอร์ด เตือนจะหยุดเอง</i>');
-  L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดแดชบอร์ด</a>');
+  L.push('<i>เหลือ 7 วัน ระบบเปิดใบงาน PM ให้เอง — ช่างกดรับงาน ทำเสร็จกด "ทำ PM เสร็จ" วันที่ในรอบงานประจำจะอัปเดตเอง</i>');
+  sendTelegram(L.join('\n'));
+}
+var PM_OPEN_DAYS = 7;
+function createPmTicket(x, days) {
+  var iv = x.interval_type === 'day' ? 'ทุก ' + x.interval_value + ' วัน' : x.interval_type === 'month' ? 'ทุก ' + x.interval_value + ' เดือน' : 'ทุก ' + x.interval_value + ' ปี';
+  var row = { site: 'banglen', kind: 'pm', pm_item_id: x.id, asset_name: x.name, asset_category: 'PM', urgency: 'normal',
+    symptom: 'PM ตามรอบ (' + iv + ') · กำหนด ' + thDate(x.next_cal_date) + (days < 0 ? ' — เกินมา ' + (-days) + ' วัน' : ''),
+    reporter_name: 'ระบบ (รอบงานประจำ)', reporter_dept: 'PM', status: 'open' };
+  var r = sb('post', 'repair_requests', [row], true);
+  if (r.getResponseCode() >= 300) { Logger.log('createPmTicket: ' + r.getContentText()); return null; }
+  var t = JSON.parse(r.getContentText())[0];
+  sb('post', 'repair_events', [{ request_id: t.id, actor: 'ระบบ', action: 'เปิดใบงาน PM ตามรอบ', note: x.responsible || null }]);
+  return t;
+}
+
+// ── สรุปประจำสัปดาห์ (ทุกวันจันทร์ 08:00) ─────────────────────
+function weeklySummary() {
+  var now = new Date(), since = new Date(now.getTime() - 7 * 864e5);
+  var res = sb('get', 'repair_requests?site=eq.banglen&status=neq.cancelled&or=(reported_at.gte.' + since.toISOString() + ',done_at.gte.' + since.toISOString()
+    + ',status.in.(open,accepted,in_progress,waiting_parts,done))&select=*');
+  if (res.getResponseCode() >= 300) { Logger.log('weeklySummary: ' + res.getContentText()); return; }
+  var rows = JSON.parse(res.getContentText() || '[]');
+  var isPm = function (r) { return r.kind === 'pm'; };
+  var newR = rows.filter(function (r) { return !isPm(r) && new Date(r.reported_at) >= since; });
+  var doneR = rows.filter(function (r) { return !isPm(r) && r.done_at && new Date(r.done_at) >= since; });
+  var openR = rows.filter(function (r) { return ['open', 'accepted', 'in_progress', 'waiting_parts'].indexOf(r.status) >= 0; });
+  var waitR = rows.filter(function (r) { return r.status === 'done'; });
+  var pmDone = rows.filter(function (r) { return isPm(r) && r.done_at && new Date(r.done_at) >= since; }).length;
+  // เครื่องหยุด: เฉพาะช่วง 7 วันนี้ ของงานที่แจ้งว่า "เครื่องหยุด"
+  var downH = 0, byAsset = {};
+  rows.filter(function (r) { return !isPm(r) && r.urgency === 'stop'; }).forEach(function (r) {
+    var a = Math.max(new Date(r.reported_at).getTime(), since.getTime());
+    var b = r.done_at ? new Date(r.done_at).getTime() : now.getTime();
+    if (b > a) { downH += (b - a) / 3600e3; byAsset[r.asset_name] = (byAsset[r.asset_name] || 0) + (b - a) / 3600e3; }
+  });
+  var cnt = {};
+  newR.forEach(function (r) { cnt[r.asset_name] = (cnt[r.asset_name] || 0) + 1; });
+  var top = Object.keys(cnt).sort(function (x, y) { return cnt[y] - cnt[x] || (byAsset[y] || 0) - (byAsset[x] || 0); }).slice(0, 3);
+  var cost = doneR.reduce(function (s, r) { return s + (Number(r.parts_cost) || 0) + (Number(r.vendor_cost) || 0); }, 0);
+  var avgRep = doneR.length ? doneR.reduce(function (s, r) { return s + (new Date(r.done_at) - new Date(r.reported_at)); }, 0) / doneR.length : null;
+  var L = ['📊 <b>สรุปงานซ่อม 7 วันที่ผ่านมา</b> (' + thDate(Utilities.formatDate(since, 'Asia/Bangkok', 'yyyy-MM-dd')) + ' – ' + thDate(Utilities.formatDate(now, 'Asia/Bangkok', 'yyyy-MM-dd')) + ')', ''];
+  L.push('🔧 แจ้งซ่อมใหม่ <b>' + newR.length + '</b> · ซ่อมเสร็จ <b>' + doneR.length + '</b>' + (pmDone ? ' · ทำ PM ' + pmDone : ''));
+  L.push('⏱ เครื่องหยุดรวม <b>' + downH.toFixed(1) + ' ชม.</b>' + (avgRep != null ? ' · ซ่อมเฉลี่ย ' + dur(avgRep) : ''));
+  if (cost > 0) L.push('💰 ค่าอะไหล่+จ้างนอก ' + Math.round(cost).toLocaleString() + ' บาท');
+  if (top.length) {
+    L.push(''); L.push('<b>เสียบ่อยสุด</b>');
+    top.forEach(function (n, i) { L.push((i + 1) + '. ' + esc(n) + ' — ' + cnt[n] + ' ครั้ง' + (byAsset[n] ? ' · หยุด ' + byAsset[n].toFixed(1) + ' ชม.' : '')); });
+  }
+  L.push('');
+  if (openR.length) {
+    L.push('⏳ <b>งานค้างตอนนี้ ' + openR.length + ' ใบ</b>');
+    openR.slice(0, 8).forEach(function (r) { L.push('• <a href="' + REPAIR_PAGE_URL + '#' + r.id + '">' + esc(r.ticket_no) + '</a> ' + esc(r.asset_name) + ' (' + dur(now - new Date(r.reported_at)) + ')'); });
+  } else L.push('✅ ไม่มีงานค้าง');
+  if (waitR.length) L.push('🕓 ซ่อมเสร็จรอผู้แจ้งยืนยัน ' + waitR.length + ' ใบ');
+  L.push(''); L.push('<a href="' + DASHBOARD_URL + '">👉 ดูแดชบอร์ด</a>');
   sendTelegram(L.join('\n'));
 }
 function thDate(v) {
@@ -180,15 +248,16 @@ function setup() {
   stopReminder(true);
   ScriptApp.newTrigger('repairReminderCheck').timeBased().everyMinutes(10).create();
   ScriptApp.newTrigger('routineCheck').timeBased().atHour(8).everyDays(1).inTimezone('Asia/Bangkok').create();
-  sendTelegram('✅ ระบบแจ้งซ่อมพร้อมใช้งาน — เตือนงานซ่อมค้างทุก 10 นาที + รอบงานประจำของช่างทุกวัน 08:00');
+  ScriptApp.newTrigger('weeklySummary').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('Asia/Bangkok').create();
+  sendTelegram('✅ ระบบแจ้งซ่อมพร้อมใช้งาน — เตือนงานซ่อมค้างทุก 10 นาที · รอบงานประจำ/เปิดใบงาน PM ทุกวัน 08:00 · สรุปทุกวันจันทร์ 08:00');
   routineCheck();
-  Logger.log('ตั้งเตือนงานค้างทุก 10 นาที + รอบงานประจำทุกวัน 08:00 แล้ว');
+  Logger.log('ตั้งเตือนงานค้างทุก 10 นาที + รอบงานประจำ/PM ทุกวัน 08:00 + สรุปทุกวันจันทร์ 08:00 แล้ว');
 }
 // ยกเลิกการเตือนทั้งหมด (ถ้าต้องการหยุด)
 function stopReminder(silent) {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var h = t.getHandlerFunction();
-    if (h === 'repairReminderCheck' || h === 'routineCheck') ScriptApp.deleteTrigger(t);
+    if (h === 'repairReminderCheck' || h === 'routineCheck' || h === 'weeklySummary') ScriptApp.deleteTrigger(t);
   });
   if (silent !== true) Logger.log('ยกเลิกการเตือนทั้งหมดแล้ว');
 }
