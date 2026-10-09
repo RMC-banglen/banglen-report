@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09b';
+var APP_VERSION='2026-10-09c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -8999,6 +8999,7 @@ window.__dataReady.then(data => {
     const [month,setMonth]=useState(0); // 0 = ทั้งปี
     const [newAsset,setNewAsset]=useState({name:'',category:''});
     const [showAssets,setShowAssets]=useState(false);
+    const [showAll,setShowAll]=useState(false);
     const yearCE=yearBE-543;
     const load=()=>{
       fetchAll(()=>DB.from('repair_requests').select('*').eq('site','banglen').gte('reported_at',(yearCE-1)+'-12-01T00:00:00+07:00')).then(r=>setRows((r&&r.data)||[])).catch(()=>setRows([]));
@@ -9052,6 +9053,13 @@ window.__dataReady.then(data => {
     const addAsset=async()=>{if(!newAsset.name.trim())return;const{error}=await DB.from('repair_assets').insert([{site:'banglen',name:newAsset.name.trim(),category:newAsset.category.trim()||'อื่นๆ',sort_order:999}]);
       if(error){alert('เพิ่มไม่สำเร็จ: '+error.message);return;}setNewAsset({name:'',category:''});load();};
     const toggleAsset=async a=>{await DB.from('repair_assets').update({active:!a.active}).eq('id',a.id);load();};
+    // ลบใบงาน (เช่น ใบทดสอบ/แจ้งผิด) — ประวัติใบงานถูกลบตามไปด้วย (on delete cascade)
+    const delReq=async r=>{
+      if(!confirm('ลบใบงาน '+r.ticket_no+' · '+r.asset_name+' ทิ้งถาวร?\nใช้กับใบทดสอบ/แจ้งผิด — ลบแล้วไม่นับในสถิติ และย้อนกลับไม่ได้'))return;
+      const{error}=await DB.from('repair_requests').delete().eq('id',r.id);
+      if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}
+      load();
+    };
     return <div>
       <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13}}>
         <span>ลิงก์แจ้งซ่อม (ส่งให้ทุกฝ่าย): <a href="repair.html" target="_blank" rel="noreferrer" style={{color:'#b45309',fontWeight:700}}>repair.html</a></span>
@@ -9115,6 +9123,24 @@ window.__dataReady.then(data => {
             <div style={{fontSize:12,color:'#64748b'}}>{r.work_done}</div></div>)}
           {inPeriod.filter(r=>r.status==='closed').length===0&&<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีงานที่ปิด</div>}
         </div>
+      </div>
+
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{fontWeight:800}}>ใบงานทั้งหมดในช่วงนี้ ({rows.filter(r=>month?bkk(r.reported_at).getUTCFullYear()===yearCE&&bkk(r.reported_at).getUTCMonth()+1===month:bkk(r.reported_at).getUTCFullYear()===yearCE).length})</div>
+          <button onClick={()=>setShowAll(!showAll)} style={{padding:'4px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>{showAll?'ซ่อน':'ดูทั้งหมด'}</button>
+        </div>
+        {showAll&&<div style={{overflowX:'auto',marginTop:10}}><table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
+          {rows.filter(r=>{const d=bkk(r.reported_at);return d.getUTCFullYear()===yearCE&&(!month||d.getUTCMonth()+1===month);}).slice().reverse().map(r=><tr key={r.id}>
+            <td style={{...td,textAlign:'left'}}><a href={'repair.html#'+r.id} target="_blank" rel="noreferrer" style={{color:'#1e293b',fontWeight:700}}>{r.ticket_no}</a></td>
+            <td style={{...td,textAlign:'left'}}>{new Date(r.reported_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',timeZone:'Asia/Bangkok'})}</td>
+            <td style={{...td,textAlign:'left',fontWeight:700}}>{r.asset_name}</td>
+            <td style={{...td,textAlign:'left',whiteSpace:'normal',maxWidth:260}}>{r.symptom}</td>
+            <td style={td}><span style={{padding:'2px 8px',borderRadius:99,fontSize:12,fontWeight:700,color:(ST[r.status]||[])[1],background:(ST[r.status]||[])[2]}}>{(ST[r.status]||[])[0]}</span></td>
+            <td style={td}>{r.reporter_name}</td>
+            <td style={td}>{canEdit&&<button onClick={()=>delReq(r)} title="ลบใบงานนี้" style={{padding:'3px 9px',border:'1px solid #fecaca',borderRadius:6,background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>🗑 ลบ</button>}</td>
+          </tr>)}
+        </tbody></table></div>}
       </div>
 
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>
