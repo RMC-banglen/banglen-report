@@ -63,12 +63,14 @@ create table if not exists repair_events (
 create index if not exists repair_events_req_idx on repair_events (request_id);
 
 -- เลขใบงาน MR-ปปดด-ลำดับ (ปี พ.ศ. 2 หลัก)
+-- ใช้เลขสูงสุดของเดือน + 1 (ไม่ใช่นับจำนวน) — ลบใบกลางๆ ทิ้งแล้วเลขใหม่จะไม่ชนใบที่มีอยู่ (เลขที่ลบไปจะเว้นว่าง)
 create or replace function repair_ticket_no() returns trigger as $$
 declare ym text; n int;
 begin
   ym := lpad((((extract(year from (now() at time zone 'Asia/Bangkok'))::int + 543) % 100))::text, 2, '0')
         || to_char(now() at time zone 'Asia/Bangkok', 'MM');
-  select count(*) + 1 into n from repair_requests where ticket_no like 'MR-' || ym || '-%';
+  select coalesce(max(split_part(ticket_no, '-', 3)::int), 0) + 1 into n
+    from repair_requests where ticket_no like 'MR-' || ym || '-%';
   new.ticket_no := 'MR-' || ym || '-' || lpad(n::text, 3, '0');
   return new;
 end $$ language plpgsql;
