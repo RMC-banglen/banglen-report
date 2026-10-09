@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09j';
+var APP_VERSION='2026-10-09k';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -532,11 +532,12 @@ function myWork(me,jobs){
 }
 function MyWork({me,jobs,onOpen}){
   const w=myWork(me,jobs);
-  if(!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.stale.length)return null;
+  const empty=!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.stale.length;
   const row=(r,extra)=><div key={r.id} className="tl" style={{cursor:'pointer'}} onClick={()=>onOpen(r.id)}>
     <b>{r.ticket_no}</b> · {assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''} <small>{extra||ago(r.reported_at)}</small></div>;
   return <div className="card" style={{borderLeft:'5px solid #b45309'}}>
-    <div className="card-title">🔔 งานของฉัน</div>
+    <div className="card-title">🔔 งานของฉัน <span style={{fontWeight:400,fontSize:12.5,color:'#8a7a68'}}>({me.name}{w.role==='head'?' · หัวหน้าช่าง':w.role?' · ช่าง':''})</span></div>
+    {empty&&<div style={{fontSize:14,color:'#15803d'}}>✓ ไม่มีงานที่ต้องทำตอนนี้{w.role?'':' — งานที่คุณแจ้ง พอช่างซ่อมเสร็จจะขึ้นที่นี่ให้กดยืนยัน'}</div>}
     {w.confirm.length>0&&<><div style={{fontWeight:800,color:'#0f766e',margin:'4px 0'}}>✅ ซ่อมเสร็จแล้ว รอคุณกดยืนยัน ({w.confirm.length})</div>{w.confirm.map(r=>row(r,'เสร็จ '+ago(r.done_at)))}</>}
     {w.mine.length>0&&<><div style={{fontWeight:800,color:'#1d4ed8',margin:'8px 0 4px'}}>🔧 งานที่ฉันรับไว้ ({w.mine.length})</div>{w.mine.map(r=>row(r,(STATUS[r.status]||{}).label))}</>}
     {w.waiting.length>0&&<><div style={{fontWeight:800,color:'#b91c1c',margin:'8px 0 4px'}}>🙋 รอช่างรับงาน ({w.waiting.length})</div>{w.waiting.map(r=>row(r))}</>}
@@ -610,7 +611,12 @@ function App(){
         <div className="ok">แจ้งซ่อมแล้ว เลขที่ <b>{done.ticket_no}</b><br/>ระบบส่งเตือนช่างแล้ว</div>
         <button className="bigbtn" onClick={()=>{setTab('jobs');open(done.id);}}>ดูใบงาน</button>
         <button className="ghost" onClick={()=>setDone(null)}>แจ้งเรื่องอื่นต่อ</button>
-      </div>:<ReportForm me={me} assets={assets} preAssetId={preAssetId} onDone={d=>setDone(d)}/>):
+      </div>:<>
+        {/* หน้าแรก: มีงานรอคุณ → แถบเตือน กดไปดูได้เลย */}
+        {badge>0&&<div className="card" style={{background:'#fff7ed',border:'1.5px solid #f59e0b',cursor:'pointer',display:'flex',alignItems:'center',gap:10}} onClick={()=>{setTab('jobs');back();}}>
+          <span style={{fontSize:26}}>🔔</span><div style={{flex:1}}><b>มีงานรอคุณ {badge} งาน</b><div style={{fontSize:13,color:'#8a7a68'}}>{(()=>{const w=myWork(me,jobs);return [w.confirm.length?'รอยืนยัน '+w.confirm.length:'',w.waiting.length?'รอรับงาน '+w.waiting.length:'',w.mine.length?'งานที่รับไว้ '+w.mine.length:''].filter(Boolean).join(' · ');})()}</div></div><b style={{color:'#b45309'}}>ดู ›</b>
+        </div>}
+        <ReportForm me={me} assets={assets} preAssetId={preAssetId} onDone={d=>setDone(d)}/></>):
      openId?<JobDetail id={openId} me={me} onBack={back}/>:<JobList onOpen={open} reloadKey={reloadKey} me={me} jobs={jobs}/>}
   </div>;
 }
