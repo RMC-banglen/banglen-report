@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09h';
+var APP_VERSION='2026-10-09i';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -416,6 +416,12 @@ function JobDetail({id,me,onBack}){
     const ev=await SB.from('repair_events').select('*').eq('request_id',id).order('at');setEvents(ev.data||[]);
   };
   const now=new Date().toISOString();
+  // สิทธิ์ตามฝ่าย: รับงาน/ซ่อม/รออะไหล่/บันทึกการซ่อม = ฝ่ายช่างซ่อมบำรุงเท่านั้น
+  // ปิดงาน = ผู้แจ้ง/คนอื่น (ช่างที่ซ่อมเองกดยืนยันงานตัวเองไม่ได้ ยกเว้นเป็นคนแจ้งเอง) · ยกเลิก = ผู้แจ้ง หรือช่าง
+  const isTech=me.dept==='ช่างซ่อมบำรุง';
+  const ownWork=req.technician&&req.technician===me.name&&req.reporter_name!==me.name;
+  const canCancel=isTech||req.reporter_name===me.name;
+  const techOnly=<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>🔧 รอช่างซ่อมบำรุงดำเนินการ{req.technician?' ('+req.technician+')':''} — ปุ่มรับงาน/บันทึกการซ่อม ใช้ได้เฉพาะฝ่ายช่างซ่อมบำรุง</div>;
   const waitAdd=()=>req.waiting_since?Math.round((Date.now()-new Date(req.waiting_since).getTime())/60000):0;
   if(mode==='done')return <DoneForm req={req} me={me} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
   const endT=req.done_at?new Date(req.done_at).getTime():Date.now();
@@ -450,26 +456,29 @@ function JobDetail({id,me,onBack}){
 
     <div className="card">
       {req.status==='open'&&<>
-        <button className="bigbtn blue" disabled={busy} onClick={()=>act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted')}>🙋 รับงานนี้ ({me.name})</button>
-        {mode!=='cancel'?<button className="ghost" onClick={()=>setMode('cancel')}>ยกเลิกใบแจ้ง (แจ้งผิด/ซ้ำ)</button>:<>
+        {isTech?<button className="bigbtn blue" disabled={busy} onClick={()=>act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted')}>🙋 รับงานนี้ ({me.name})</button>:techOnly}
+        {!canCancel?null:mode!=='cancel'?<button className="ghost" onClick={()=>setMode('cancel')}>ยกเลิกใบแจ้ง (แจ้งผิด/ซ้ำ)</button>:<>
           <label className="lbl">เหตุผลที่ยกเลิก</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น แจ้งซ้ำ"/>
           <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>act({status:'cancelled',closed_at:now,close_note:note.trim(),closed_by:me.name},'ยกเลิก',note.trim(),'cancelled')}>ยืนยันยกเลิก</button></>}
       </>}
-      {req.status==='accepted'&&<>
+      {req.status==='accepted'&&!isTech&&techOnly}
+      {req.status==='accepted'&&isTech&&<>
         <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',started_at:req.started_at||now},'เริ่มซ่อม')}>▶️ เริ่มซ่อม</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จแล้ว (บันทึกเลย)</button>
       </>}
-      {req.status==='in_progress'&&<>
+      {(req.status==='in_progress'||req.status==='waiting_parts')&&!isTech&&techOnly}
+      {req.status==='in_progress'&&isTech&&<>
         <button className="bigbtn green" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
         {mode!=='wait'?<button className="ghost" onClick={()=>setMode('wait')}>⏸ รออะไหล่</button>:<>
           <label className="lbl">รออะไหล่อะไร</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ลูกปืน 6205 สั่งร้านแล้ว"/>
           <button className="bigbtn" style={{background:'#b45309'}} disabled={busy||!note.trim()} onClick={()=>act({status:'waiting_parts',waiting_since:now},'รออะไหล่',note.trim(),'waiting_parts')}>⏸ ยืนยันรออะไหล่</button></>}
       </>}
-      {req.status==='waiting_parts'&&<>
+      {req.status==='waiting_parts'&&isTech&&<>
         <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',waiting_since:null,waiting_minutes:(req.waiting_minutes||0)+waitAdd()},'ได้อะไหล่ ซ่อมต่อ')}>▶️ ได้อะไหล่แล้ว ซ่อมต่อ</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
       </>}
-      {req.status==='done'&&<>
+      {req.status==='done'&&ownWork&&<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>รอ {req.reporter_name||'ผู้แจ้ง'} หรือหัวหน้างาน ตรวจแล้วกดปิดงาน (ช่างที่ซ่อมยืนยันงานตัวเองไม่ได้)</div>}
+      {req.status==='done'&&!ownWork&&<>
         <div style={{fontSize:14,color:'#6b5b4a',marginBottom:4}}>ผู้แจ้ง/หัวหน้างาน ตรวจว่าใช้งานได้จริง แล้วกดปิดงาน</div>
         <button className="bigbtn green" disabled={busy} onClick={()=>act({status:'closed',closed_at:now,closed_by:me.name},'ยืนยันใช้งานได้ ปิดงาน',null,'closed')}>👍 ใช้งานได้แล้ว ปิดงาน</button>
         {mode!=='reopen'?<button className="ghost" onClick={()=>setMode('reopen')}>👎 ยังไม่หาย ส่งกลับให้ช่าง</button>:<>
