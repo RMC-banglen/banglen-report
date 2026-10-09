@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09e';
+var APP_VERSION='2026-10-09f';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9001,14 +9001,54 @@ window.__dataReady.then(data => {
     const [showAssets,setShowAssets]=useState(false);
     const [showAll,setShowAll]=useState(false);
     const [histAsset,setHistAsset]=useState(null);
+    const [fleet,setFleet]=useState({});
     const yearCE=yearBE-543;
-    const load=()=>{
-      fetchAll(()=>DB.from('repair_requests').select('*').eq('site','banglen').gte('reported_at',(yearCE-1)+'-12-01T00:00:00+07:00')).then(r=>setRows((r&&r.data)||[])).catch(()=>setRows([]));
-      DB.from('repair_assets').select('*').eq('site','banglen').order('sort_order').order('name').then(({data})=>setAssets(data||[]));
+    // รถขนส่งบริษัท + คนขับปัจจุบัน จากงานขนส่ง (transport_vehicles / drivers / assignments)
+    const loadFleet=async()=>{
+      const [v,d,a]=await Promise.all([DB.from('transport_vehicles').select('*'),DB.from('transport_drivers').select('*'),DB.from('transport_assignments').select('*')]);
+      const today=new Date(Date.now()+7*3600e3).toISOString().slice(0,10);
+      const nick=n=>{const m=String(n||'').match(/\(([^)]+)\)/);return m?m[1]:String(n||'').trim().split(' ')[0];};
+      const map={};
+      (v.data||[]).filter(x=>x.is_company&&x.active).forEach(x=>{
+        const asg=(a.data||[]).filter(t=>t.vehicle_id===x.id&&t.start_date<=today&&(!t.end_date||t.end_date>=today)).sort((p,q)=>String(q.start_date).localeCompare(String(p.start_date)))[0];
+        const dr=asg&&(d.data||[]).find(z=>z.id===asg.driver_id);
+        map[x.plate]={driver:dr?nick(dr.name):'',label:x.label||'',type:x.vehicle_type};
+      });
+      return map;
+    };
+    // รายชื่อ รถขนส่ง / เครนรถขนส่ง ในแจ้งซ่อม = รถบริษัทที่ใช้งานอยู่ในงานขนส่ง (ชื่อ = ทะเบียน · คนขับแสดงต่อท้ายเอง)
+    // รถที่เลิกใช้: เคยมีใบงาน → ปิดการใช้งาน (เก็บประวัติ) · ไม่เคยมี → ลบออก · เครนรถที่กดปิดไว้ (รถไม่มีเครน) ไม่เปิดกลับเอง
+    const syncFleet=async(as,fl,used)=>{
+      const plates=Object.keys(fl);if(!plates.length)return false;
+      const want=[];plates.forEach((p,i)=>{want.push({name:p,category:'รถขนส่ง',sort_order:50+i});want.push({name:'เครนรถ '+p,category:'เครนรถขนส่ง',sort_order:80+i});});
+      const truck=as.filter(x=>x.category==='รถขนส่ง'||x.category==='เครนรถขนส่ง');
+      let changed=false;
+      for(const x of truck){
+        if(want.some(w=>w.name===x.name))continue;
+        if(used.has(x.name)){if(x.active){await DB.from('repair_assets').update({active:false}).eq('id',x.id);changed=true;}}
+        else{await DB.from('repair_assets').delete().eq('id',x.id);changed=true;}
+      }
+      const ins=want.filter(w=>!truck.some(x=>x.name===w.name)).map(w=>({site:'banglen',...w}));
+      if(ins.length){await DB.from('repair_assets').insert(ins);changed=true;}
+      return changed;
+    };
+    const load=async()=>{
+      const r=await fetchAll(()=>DB.from('repair_requests').select('*').eq('site','banglen').gte('reported_at',(yearCE-1)+'-12-01T00:00:00+07:00')).catch(()=>null);
+      const reqs=(r&&r.data)||[];setRows(reqs);
+      const getAssets=async()=>((await DB.from('repair_assets').select('*').eq('site','banglen').order('sort_order').order('name')).data||[]);
+      let as=await getAssets();
+      const fl=await loadFleet().catch(()=>({}));setFleet(fl);
+      if(canEdit){
+        const{data:usedRows}=await DB.from('repair_requests').select('asset_name').in('asset_category',['รถขนส่ง','เครนรถขนส่ง']);
+        if(await syncFleet(as,fl,new Set((usedRows||[]).map(x=>x.asset_name))))as=await getAssets();
+      }
+      setAssets(as);
     };
     useEffect(()=>{load();},[yearBE]);
     const link=location.origin+location.pathname.replace(/[^/]*$/,'')+'repair.html';
     const hrs=ms=>ms/3600000;
+    // ชื่อแสดงผล: รถ/เครนรถ ต่อท้ายคนขับปัจจุบัน
+    const dn=n=>{const f=fleet[String(n||'').replace(/^เครนรถ /,'')];return f?n+' · '+(f.driver||f.label||'ไม่มีคนขับประจำ'):n;};
     const fmtH=h=>h==null||!isFinite(h)?'–':h<1?Math.round(h*60)+' นาที':h<48?h.toFixed(1)+' ชม.':(h/24).toFixed(1)+' วัน';
     const baht=n=>Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:0});
     const card=(label,val,sub,color)=><div style={{flex:'1 1 150px',background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'12px 14px'}}>
@@ -9093,7 +9133,7 @@ window.__dataReady.then(data => {
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
           {[...open,...waitConfirm].sort((a,b)=>({stop:0,abnormal:1,normal:2}[a.urgency]-{stop:0,abnormal:1,normal:2}[b.urgency])||(new Date(a.reported_at)-new Date(b.reported_at))).map(r=><tr key={r.id}>
             <td style={{...td,textAlign:'left'}}><a href={'repair.html#'+r.id} target="_blank" rel="noreferrer" style={{color:'#1e293b',fontWeight:700}}>{r.ticket_no}</a></td>
-            <td style={{...td,textAlign:'left',fontWeight:700}}>{r.asset_name}</td>
+            <td style={{...td,textAlign:'left',fontWeight:700}}>{dn(r.asset_name)}</td>
             <td style={{...td,textAlign:'left',color:isPM(r)?'#1d4ed8':(URG[r.urgency]||{}).c}}>{isPM(r)?'🗓 PM ตามรอบ':(URG[r.urgency]||{}).t}</td>
             <td style={{...td,textAlign:'left',whiteSpace:'normal',maxWidth:280}}>{r.symptom}</td>
             <td style={td}><span style={{padding:'2px 8px',borderRadius:99,fontSize:12,fontWeight:700,color:(ST[r.status]||[])[1],background:(ST[r.status]||[])[2]}}>{(ST[r.status]||[])[0]}</span></td>
@@ -9110,7 +9150,7 @@ window.__dataReady.then(data => {
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr><th style={{...th,textAlign:'left'}}>เครื่อง/รถ</th>{MO.map(m=><th key={m} style={th}>{m}</th>)}<th style={{...th,color:'#b45309'}}>รวม</th><th style={th}>ครั้ง</th><th style={th}>ซ่อมเฉลี่ย</th><th style={th}>เสียทุกๆ</th><th style={th}>ค่าใช้จ่าย</th></tr></thead>
           <tbody>{used.sort((a,b)=>b.dt-a.dt||b.fails-a.fails).map(a=><tr key={a.n}>
-            <td style={{...td,textAlign:'left',fontWeight:700,cursor:'pointer'}} onClick={()=>setHistAsset(a.n)} title="ดูประวัติซ่อม"><span style={{color:'#1d4ed8',textDecoration:'underline'}}>{a.n}</span> 📜<div style={{fontSize:11,color:'#94a3b8',fontWeight:400}}>{a.cat}</div></td>
+            <td style={{...td,textAlign:'left',fontWeight:700,cursor:'pointer'}} onClick={()=>setHistAsset(a.n)} title="ดูประวัติซ่อม"><span style={{color:'#1d4ed8',textDecoration:'underline'}}>{dn(a.n)}</span> 📜<div style={{fontSize:11,color:'#94a3b8',fontWeight:400}}>{a.cat}</div></td>
             {a.mo.map((v,i)=><td key={i} style={{...td,color:v?'#1e293b':'#cbd5e1',background:v>8?'#fee2e2':v>2?'#fef3c7':'transparent'}}>{v?v.toFixed(1):'–'}</td>)}
             <td style={{...td,fontWeight:800,color:'#b45309'}}>{a.mo.reduce((s,v)=>s+v,0).toFixed(1)}</td>
             <td style={td}>{a.fails||'–'}</td><td style={td}>{fmtH(a.mttr)}</td><td style={td}>{a.mtbf!=null?fmtH(a.mtbf):'–'}</td><td style={td}>{a.cost?baht(a.cost):'–'}</td>
@@ -9136,7 +9176,7 @@ window.__dataReady.then(data => {
       {histAsset&&<div onClick={()=>setHistAsset(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.45)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
         <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,padding:18,width:'min(720px,100%)',maxHeight:'85vh',overflow:'auto'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <div style={{fontWeight:800,fontSize:17}}>📜 ประวัติซ่อม — {histAsset} ({histRows.length} ครั้ง)</div>
+            <div style={{fontWeight:800,fontSize:17}}>📜 ประวัติซ่อม — {dn(histAsset)} ({histRows.length} ครั้ง)</div>
             <button onClick={()=>setHistAsset(null)} style={{border:'none',background:'#f1f5f9',borderRadius:8,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>ปิด</button>
           </div>
           {histRows.length===0?<div style={{color:'#94a3b8'}}>ยังไม่มีประวัติ</div>:histRows.map(r=><div key={r.id} style={{borderTop:'1px solid #f1f5f9',padding:'8px 0',fontSize:13.5}}>
@@ -9157,7 +9197,7 @@ window.__dataReady.then(data => {
           {rows.filter(r=>{const d=bkk(r.reported_at);return d.getUTCFullYear()===yearCE&&(!month||d.getUTCMonth()+1===month);}).slice().reverse().map(r=><tr key={r.id}>
             <td style={{...td,textAlign:'left'}}><a href={'repair.html#'+r.id} target="_blank" rel="noreferrer" style={{color:'#1e293b',fontWeight:700}}>{r.ticket_no}</a></td>
             <td style={{...td,textAlign:'left'}}>{new Date(r.reported_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',timeZone:'Asia/Bangkok'})}</td>
-            <td style={{...td,textAlign:'left',fontWeight:700}}>{r.asset_name}</td>
+            <td style={{...td,textAlign:'left',fontWeight:700}}>{dn(r.asset_name)}</td>
             <td style={{...td,textAlign:'left',whiteSpace:'normal',maxWidth:260}}>{r.symptom}</td>
             <td style={td}><span style={{padding:'2px 8px',borderRadius:99,fontSize:12,fontWeight:700,color:(ST[r.status]||[])[1],background:(ST[r.status]||[])[2]}}>{(ST[r.status]||[])[0]}</span></td>
             <td style={td}>{r.reporter_name}</td>
@@ -9183,10 +9223,10 @@ window.__dataReady.then(data => {
               return <div key={cat} style={{display:'flex',gap:10,alignItems:'flex-start',borderTop:'1px solid #f1f5f9',paddingTop:10}}>
                 <div style={{width:110,flexShrink:0,fontWeight:800,fontSize:13,color:'#b45309',paddingTop:4}}>{cat} <span style={{color:'#94a3b8',fontWeight:400}}>({list.filter(a=>a.active).length})</span></div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6,flex:1}}>{list.map(a=><span key={a.id} onClick={()=>canEdit&&toggleAsset(a)} title={canEdit?'กดเพื่อเปิด/ปิดการใช้งาน':''}
-                  style={{padding:'4px 10px',borderRadius:99,fontSize:12.5,border:'1px solid #e2e8f0',cursor:canEdit?'pointer':'default',background:a.active?'#fff':'#f1f5f9',color:a.active?'#1e293b':'#94a3b8',textDecoration:a.active?'none':'line-through'}}>{a.name}</span>)}</div>
+                  style={{padding:'4px 10px',borderRadius:99,fontSize:12.5,border:'1px solid #e2e8f0',cursor:canEdit?'pointer':'default',background:a.active?'#fff':'#f1f5f9',color:a.active?'#1e293b':'#94a3b8',textDecoration:a.active?'none':'line-through'}}>{dn(a.name)}</span>)}</div>
               </div>;
             })}
-            {canEdit&&<div style={{fontSize:11.5,color:'#94a3b8'}}>กดชื่อเพื่อปิด/เปิดการใช้งาน (ขีดฆ่า = ไม่ขึ้นให้เลือกตอนแจ้งซ่อม)</div>}
+            {canEdit&&<div style={{fontSize:11.5,color:'#94a3b8'}}>กดชื่อเพื่อปิด/เปิดการใช้งาน (ขีดฆ่า = ไม่ขึ้นให้เลือกตอนแจ้งซ่อม) · รถขนส่ง/เครนรถ ซิงก์จากงานขนส่งเอง (รถบริษัทที่ใช้งานอยู่ + คนขับปัจจุบัน) — รถคันไหนไม่มีเครน กดปิด "เครนรถ" ของคันนั้นได้</div>}
           </div>
         </div>}
       </div>

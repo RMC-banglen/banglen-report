@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09f';
+var APP_VERSION='2026-10-09g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -163,7 +163,27 @@ async function uploadPhoto(file){
   return SB.storage.from('repair-photos').getPublicUrl(path).data.publicUrl;
 }
 // แจ้ง Apps Script ให้ส่ง Telegram (no-cors: ไม่ต้องรอคำตอบ)
+// รถขนส่ง/เครนรถ: ชื่อในระบบ = ทะเบียน (ไม่เปลี่ยน ประวัติซ่อมติดรถคันเดิม) · คนขับปัจจุบันดึงจากงานขนส่งมาแสดงต่อท้าย
+let FLEET={};
+async function loadFleet(){
+  const [v,d,a]=await Promise.all([SB.from('transport_vehicles').select('*'),SB.from('transport_drivers').select('*'),SB.from('transport_assignments').select('*')]);
+  const today=new Date(Date.now()+7*3600e3).toISOString().slice(0,10);
+  const nick=n=>{const m=String(n||'').match(/\(([^)]+)\)/);return m?m[1]:String(n||'').trim().split(' ')[0];};
+  const map={};
+  (v.data||[]).filter(x=>x.is_company&&x.active).forEach(x=>{
+    const asg=(a.data||[]).filter(t=>t.vehicle_id===x.id&&t.start_date<=today&&(!t.end_date||t.end_date>=today)).sort((p,q)=>String(q.start_date).localeCompare(String(p.start_date)))[0];
+    const dr=asg&&(d.data||[]).find(z=>z.id===asg.driver_id);
+    map[x.plate]={driver:dr?nick(dr.name):'',label:x.label||''};
+  });
+  FLEET=map;return map;
+}
+function assetLabel(name){
+  const plate=String(name||'').replace(/^เครนรถ /,'');const f=FLEET[plate];
+  if(!f)return name;
+  return name+' · '+(f.driver||f.label||'ไม่มีคนขับประจำ');
+}
 function notify(event,req,extra){
+  req={...req,asset_name:assetLabel(req.asset_name)}; // ข้อความ Telegram เห็นชื่อคนขับด้วย
   if(!GAS_URL)return;
   try{fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({kind:'repair_event',event,link:jobLink(req.id),req,...(extra||{})})});}catch(e){}
@@ -271,9 +291,9 @@ function ReportForm({me,assets,onDone,preAssetId}){
     <div className="chips">{cats.map(c=><button key={c} className={'chip'+(cat===c?' on':'')} onClick={()=>{setCat(c);setAsset('');}}>{c}</button>)}
       <button className={'chip'+(cat==='__other'?' on':'')} onClick={()=>{setCat('__other');setAsset('__other');}}>อื่นๆ (พิมพ์เอง)</button></div>
     {cat&&cat!=='__other'&&<><label className="lbl">เลือก{cat}</label>
-      <div className="chips">{list.map(a=><button key={a.id} className={'chip'+(asset===a.name?' on':'')} onClick={()=>setAsset(a.name)}>{a.name}</button>)}</div></>}
+      <div className="chips">{list.map(a=><button key={a.id} className={'chip'+(asset===a.name?' on':'')} onClick={()=>setAsset(a.name)}>{assetLabel(a.name)}</button>)}</div></>}
     {asset==='__other'&&<><label className="lbl">ชื่อเครื่อง/รถ</label><input value={other} onChange={e=>setOther(e.target.value)} placeholder="เช่น ปั๊มน้ำบ่อบ่ม"/></>}
-    {fromQR&&asset&&<div className="ok" style={{marginTop:10}}>📷 สแกนจาก QR: <b>{asset}</b></div>}
+    {fromQR&&asset&&<div className="ok" style={{marginTop:10}}>📷 สแกนจาก QR: <b>{assetLabel(asset)}</b></div>}
     {asset&&asset!=='__other'&&<AssetHistory asset={asset}/>}
 
     <div className="card-title" style={{marginTop:18}}>2. ความเร่งด่วน</div>
@@ -392,7 +412,7 @@ function JobDetail({id,me,onBack}){
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
         <div style={{fontSize:13,color:'#8a7a68',fontWeight:700}}>{req.ticket_no}</div><Badge s={req.status}/>
       </div>
-      <div style={{fontSize:20,fontWeight:800,marginTop:4}}>{req.asset_name}</div>
+      <div style={{fontSize:20,fontWeight:800,marginTop:4}}>{assetLabel(req.asset_name)}</div>
       <div style={{fontSize:14,fontWeight:800,color:req.kind==='pm'?'#1d4ed8':u.color,marginTop:2}}>{req.kind==='pm'?'🗓 บำรุงรักษาตามรอบ (PM)':u.label}</div>
       <div style={{fontSize:15.5,marginTop:10,whiteSpace:'pre-wrap'}}>{req.symptom}</div>
       {req.photos&&req.photos.length>0&&<div className="photos" style={{marginTop:10}}>{req.photos.map((p,i)=><a key={i} href={p} target="_blank"><img className="ph" src={p}/></a>)}</div>}
@@ -479,7 +499,7 @@ function JobList({onOpen,reloadKey}){
     </div>
     {list.length===0&&<div style={{textAlign:'center',color:'#8a7a68',padding:30}}>ไม่มีรายการ</div>}
     {list.map(r=><div key={r.id} className={'job '+r.urgency} onClick={()=>onOpen(r.id)}>
-      <div className="t1"><span>{r.kind==='pm'?'🗓 ':''}{r.asset_name}</span><Badge s={r.status}/></div>
+      <div className="t1"><span>{r.kind==='pm'?'🗓 ':''}{assetLabel(r.asset_name)}</span><Badge s={r.status}/></div>
       <div className="t2">{r.symptom}</div>
       <div className="t2">{r.ticket_no} · {r.reporter_name} · แจ้ง {ago(r.reported_at)}{r.technician?' · ช่าง '+r.technician:''}</div>
     </div>)}
@@ -492,6 +512,8 @@ function App(){
   const[tab,setTab]=useState(location.hash.replace('#','')&&!preAssetId?'jobs':'report');
   const[openId,setOpenId]=useState(location.hash.replace('#','')||null);
   const[assets,setAssets]=useState([]);const[done,setDone]=useState(null);const[reloadKey,setReloadKey]=useState(0);
+  const[,setFleetTick]=useState(0);
+  useEffect(()=>{loadFleet().then(()=>setFleetTick(t=>t+1)).catch(()=>{});},[]);
   useEffect(()=>{SB.from('repair_assets').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name').then(({data})=>setAssets(data||[]));},[]);
   useEffect(()=>{const h=()=>{const id=location.hash.replace('#','');if(id){setOpenId(id);setTab('jobs');window.scrollTo(0,0);}};window.addEventListener('hashchange',h);return()=>window.removeEventListener('hashchange',h);},[]);
   const open=id=>{location.hash=id;setOpenId(String(id));};
