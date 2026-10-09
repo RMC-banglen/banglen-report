@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09o';
+var APP_VERSION='2026-10-09p';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -587,13 +587,16 @@ function App(){
   const[tab,setTab]=useState(location.hash.replace('#','')&&!preAssetId?'jobs':'report');
   const[openId,setOpenId]=useState(location.hash.replace('#','')||null);
   const[assets,setAssets]=useState([]);const[done,setDone]=useState(null);const[reloadKey,setReloadKey]=useState(0);
-  const[jobs,setJobs]=useState([]);const[tick,setTick]=useState(0);const[,setStaffTick]=useState(0);
+  const[jobs,setJobs]=useState([]);const[tick,setTick]=useState(0);const sigRef=useRef('');const[,setStaffTick]=useState(0);
   useEffect(()=>{SB.from('repair_staff').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name')
     .then(({data,error})=>{if(!error){STAFF=data||[];setStaffTick(t=>t+1);}});},[]);
   // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
     const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
-      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(data){setJobs(data);setTick(t=>t+1);}});
+      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(!data)return;setJobs(data);
+        // โหลดรายการงาน/ใบงานใหม่ เฉพาะเมื่อมีงานเปลี่ยน (ใบใหม่ / สถานะเปลี่ยน / ปิดไป) — ไม่เปลี่ยน = ไม่ดึงซ้ำ ประหยัดโควตา
+        const sig=data.map(r=>r.id+':'+r.status+':'+(r.technician||'')).sort().join(',');
+        if(sig!==sigRef.current){sigRef.current=sig;setTick(t=>t+1);}});
     load();const iv=setInterval(()=>{if(!document.hidden)load();},120000); // ทุก 2 นาที (ประหยัดโควตา Supabase)
     const vis=()=>{if(!document.hidden)load();};document.addEventListener('visibilitychange',vis);
     return()=>{clearInterval(iv);document.removeEventListener('visibilitychange',vis);};
