@@ -395,6 +395,61 @@ function CutRebarModal({ specs, remainOf, cuts, onCut, onRemove, onClose }) {
     </Modal>
   );
 }
+// หน้าหลักแบบรวมทั้งไตรมาส — อ่านอย่างเดียว (แก้ตัวเลขที่งวดของแต่ละเดือน)
+const QUARTER_TITLES = { pc: 'ลวด PC.wire', stirrup: 'ลวดปลอก', plate: 'แผ่นเพลทเชื่อมต่อเสาเข็ม (แผ่นใหญ่)', whisker: 'เหล็กหนวดกุ้ง', collar: 'เหล็ก Collar', rebar: 'เหล็กเสริมหลัก (DB/RB)' };
+function QuarterMainView({ q }) {
+  const g = q.group;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 10, padding: '10px 16px', fontSize: 13, color: '#244c9b' }}>
+        <b>{g.label}</b> — รวม {q.periodsUsed.map(periodName).join(' + ')} ({q.periodsUsed.length} งวด{g.months && g.months < 3 ? ' · มีข้อมูล ' + g.months + '/3 เดือน' : ''})
+        {q.missing.length > 0 && <span style={{ color: '#c0392b' }}> · ยังไม่มีไฟล์รายการเสา: {q.missing.join(', ')}</span>}
+        <div style={{ fontSize: 12, color: '#78839A', marginTop: 4 }}>ตัวเลขรวมจากทุกงวดในไตรมาส · หน้านี้ดูอย่างเดียว ถ้าจะแก้ตัวเลข ให้กลับไป "งวดนี้" แล้วเลือกงวดที่ต้องการ</div>
+      </div>
+      {CATS.map(c => {
+        const rows = q[c.key + 'RowsM'] || [];
+        if (!rows.length) return null;
+        const unit = c.key === 'plate' ? 'แผ่นใหญ่' : c.unit;
+        const showCut = c.key === 'rebar', showSio = c.key === 'plate';
+        return (
+          <div key={c.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{QUARTER_TITLES[c.key] || c.label}</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden', tableLayout: 'fixed' }}>
+              <thead>
+                <tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
+                  <th style={th(22)}>รายการ</th>
+                  <th style={th(12, true)}>คำนวณ ({unit})</th>
+                  <th style={th(12, true)}>ใช้จริง ({unit})</th>
+                  <th style={th(10, true)}>ส่วนต่าง</th>
+                  <th style={th(11, true)}>ใช้งานอื่น-เสียหาย</th>
+                  {showCut && <th style={th(10, true)}>ตัดรับเข้า</th>}
+                  {showSio && <th style={th(10, true)}>เข้า-ออกสต็อกสำเร็จ</th>}
+                  <th style={th(10, true)}>ส่วนต่างจริง</th>
+                  <th style={th(8, true)}>% หาย</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
+                    <td style={td()}>{row.label}{row.periodsNote && <div style={{ fontSize: 11, color: '#8a93a6' }}>{row.periodsNote}</div>}</td>
+                    <td style={td(true)}>{row.calcFmt}</td>
+                    <td style={td(true)}>{row.actualFmt}</td>
+                    <td style={{ ...td(true), color: row.diffColor }}>{row.diffFmt}</td>
+                    <td style={td(true)}>{row.generalUseFmt}</td>
+                    {showCut && <td style={td(true)}>{row.cutInFmt}</td>}
+                    {showSio && <td style={td(true)}>{row.stockInOutFmt}</td>}
+                    <td style={{ ...td(true), fontWeight: 700, color: row.realDiffColor }}>{row.realDiffFmt}</td>
+                    <td style={{ ...td(true), fontWeight: 700, background: row.rowBg, borderRadius: 6 }}>{row.pctLostFmt}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 function ScrollToTopButton() {
   // หน้านี้ยาวมาก (โดยเฉพาะแท็บนับสต็อกที่มีการ์ดกระทบยอดเพลทหลายใบ) — ปุ่มลอยเลื่อนกลับด้านบนช่วยไม่ต้องลากสกรอลล์เอง
   // ใช้เทคนิคเดียวกับ Modal: หน้านี้ฝังใน iframe แบบยืดความสูงเต็มเนื้อหา (หน้าแม่เลื่อนแทน) position:fixed ปกติเลยใช้ไม่ได้
@@ -617,7 +672,7 @@ class App extends React.Component {
     fileName: '', loading: false, error: '', result: null, actual: {},
     showSettings: false, settingsTab: 'rebar', resultView: 'main', stockSubTab: 'all',
     stock: {}, plateStockDiam: {}, plateGeneralUseEntries: {}, plateGeneralUseOpen: {},
-    extraRebarItems: [], showEmptyRebar: false, periodSpan: {}, alertThresholdPct: 5, alertThresholdByCategory: {},
+    extraRebarItems: [], showEmptyRebar: false, periodSpan: {}, mainScope: (() => { try { return localStorage.getItem('pile_main_scope') || 'period'; } catch (e) { return 'period'; } })(), alertThresholdPct: 5, alertThresholdByCategory: {},
     mainSearchQuery: '', showAlertList: false, periodLocked: {}, periodSummaries: {},
     generalUseEntries: {}, generalUseOpen: {}, cutInEntries: {}, cutInOpen: {}, periodLabel: null, periods: [], periodHistory: {},
     periodPickerOpen: false, periodPickerPurpose: null, periodPickerRequired: false,
@@ -1472,6 +1527,75 @@ class App extends React.Component {
     }
     return this.summaryForClosedPeriod(pl);
   }
+  // ตารางหน้าหลักของงวดใดก็ได้ — งวดที่ไม่ได้เปิดอยู่ คำนวณจากข้อมูลที่เก็บไว้ของงวดนั้น (สลับ state ชั่วคราวเหมือน summaryForClosedPeriod)
+  mainPageForPeriod(pl) {
+    const s = this.state;
+    if (pl === s.periodLabel) return s.result ? this.buildMainPage(s.result) : null;
+    const snap = (s.periodHistory || {})[pl];
+    if (!snap || !snap.result) return null;
+    this._mainPageCache = this._mainPageCache || {};
+    const c = this._mainPageCache[pl];
+    if (c && c.snap === snap && c.cfg === s.rebarWeights) return c.mp;
+    const realState = this.state;
+    let mp = null;
+    try {
+      this.state = { ...realState, periodLabel: pl, stock: snap.stock || {}, plateStockDiam: snap.plateStockDiam || {},
+        actual: snap.actual || {}, generalUseEntries: snap.generalUseEntries || {},
+        plateGeneralUseEntries: snap.plateGeneralUseEntries || {}, cutInEntries: snap.cutInEntries || {},
+        extraRebarItems: snap.extraRebarItems || [], result: snap.result, rawRows: snap.rawRows, showEmptyRebar: false, forceShowRebar: {} };
+      mp = this.buildMainPage(snap.result);
+    } catch (e) { mp = null; } finally { this.state = realState; }
+    this._mainPageCache[pl] = { snap, cfg: s.rebarWeights, mp };
+    return mp;
+  }
+  // หน้าหลักแบบรวมทั้งไตรมาส (ไตรมาสของงวดที่เปิดอยู่) — บวกยอดของทุกงวดในไตรมาสต่อรายการ
+  // ส่วนต่าง = ใช้จริง − คำนวณ (เฉพาะงวดที่กรอกใช้จริงแล้ว) · % หาย = ส่วนต่างจริงรวม ÷ ใช้จริงรวม (สูตรเดียวกับรายงวด)
+  buildQuarterMain() {
+    const s = this.state;
+    const g = this.trendGroups('quarter').find(x => x.periods.includes(s.periodLabel));
+    if (!g) return null;
+    const pages = g.periods.map(pl => ({ pl, mp: this.mainPageForPeriod(pl) })).filter(x => x.mp);
+    const out = { group: g, periodsUsed: pages.map(x => x.pl), missing: g.periods.filter(pl => !pages.some(x => x.pl === pl)) };
+    const q = (s.mainSearchQuery || '').trim().toLowerCase();
+    const num = v => { const n = parseFmtNum(v); return n != null && isFinite(n) ? n : null; };
+    CATS.forEach(c => {
+      const key = 'main:' + c.key, dg = digitsForKey(key);
+      const map = new Map();
+      pages.forEach(({ pl, mp }) => (mp[c.key + 'RowsM'] || []).forEach(row => {
+        const a = map.get(row.label) || { label: row.label, calc: 0, actual: 0, calcWithActual: 0, nActual: 0, gu: 0, cut: 0, sio: 0, nSio: 0, real: 0, nReal: 0, periods: [] };
+        const calc = num(row.calcFmt) || 0;
+        const act = row.actual === '' || row.actual == null || isNaN(Number(row.actual)) ? null : Number(row.actual);
+        a.calc += calc;
+        if (act != null) { a.actual += act; a.calcWithActual += calc; a.nActual++; }
+        a.gu += num(row.generalUseSummaryFmt) || 0;
+        a.cut += row.cutInQty || 0;
+        const sio = row.stockInOutFmt != null ? num(row.stockInOutFmt) : null;
+        if (sio != null) { a.sio += sio; a.nSio++; }
+        const rd = num(row.realDiffFmt);
+        if (rd != null) { a.real += rd; a.nReal++; }
+        a.periods.push(pl);
+        map.set(row.label, a);
+      }));
+      let rows = [...map.values()];
+      if (c.key === 'rebar') rows = sortRebarBySpec(rows, x => x.label);
+      if (q) rows = rows.filter(x => String(x.label).toLowerCase().includes(q));
+      out[c.key + 'RowsM'] = rows.map(a => {
+        const diff = a.nActual ? a.actual - a.calcWithActual : null;
+        const pct = a.nReal && a.actual ? (a.real / a.actual) * 100 : null;
+        const sign = v => (v > 0 ? '+' : '') + fmt(v, dg);
+        return {
+          label: a.label, calcFmt: fmt(a.calc, dg), actualFmt: a.nActual ? fmt(a.actual, dg) : '-',
+          diffFmt: diff != null ? sign(diff) : '-', diffColor: diff == null ? 'inherit' : diff > 0 ? '#c0392b' : diff < 0 ? '#3f7d2b' : '#999',
+          generalUseFmt: fmt(a.gu, dg), cutInFmt: fmt(a.cut, dg), stockInOutFmt: a.nSio ? sign(a.sio) : (c.key === 'plate' ? '-' : null),
+          realDiffFmt: a.nReal ? sign(a.real) : '-', realDiffColor: 'inherit',
+          pctLostFmt: pct != null && isFinite(pct) ? (pct > 0 ? '+' : '') + fmt(pct, c.key === 'plate' ? 2 : 1) + '%' : '-',
+          rowBg: this.thresholdBg(pct, key),
+          periodsNote: a.periods.length < pages.length ? 'มีใน ' + a.periods.map(shortPeriod).join(', ') : null,
+        };
+      });
+    });
+    return out;
+  }
   // แนวโน้มแบบแยกทีละรายการ (ไม่รวมยอดทั้งหมวด) — ใช้ items ที่เก็บไว้ในสรุปแต่ละงวด
   buildTrendItemRows(groups) {
     groups = groups || this.trendGroups('period');
@@ -1795,7 +1919,8 @@ class App extends React.Component {
     PERIOD_SPAN = s.periodSpan || {};
     if (!mod && !r) return <div style={{ padding: 40, textAlign: 'center', color: '#78839A' }}>กำลังโหลด...</div>;
     const mp = r ? this.filterMainPage(this.buildMainPage(r)) : null;
-    const status = mp ? this.computeMaterialStatus(this.buildMainPage(r)) : { normal: 0, alert: 0 };
+    const quarterMain = s.resultView === 'main' && s.mainScope === 'quarter' && mp ? this.buildQuarterMain() : null;
+    const status = quarterMain ? this.computeMaterialStatus(quarterMain) : mp ? this.computeMaterialStatus(this.buildMainPage(r)) : { normal: 0, alert: 0 };
     const stockMode = s.resultView === 'stock';
     const openGU = (row) => {
       if (row.key && row.key.startsWith('main:plate:')) this.togglePlateGeneralUseOpen(row.thickness);
@@ -1947,6 +2072,12 @@ class App extends React.Component {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
+                      {!stockMode && (() => {
+                        const qg = this.trendGroups('quarter').find(x => x.periods.includes(s.periodLabel));
+                        const setScope = v => { this.setState({ mainScope: v }); try { localStorage.setItem('pile_main_scope', v); } catch (e) {} };
+                        const pill = (v, lbl) => <button key={v} onClick={() => setScope(v)} style={{ padding: '7px 16px', borderRadius: 20, border: '1.5px solid ' + (s.mainScope === v ? '#2f5fd0' : '#d8dde6'), fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: s.mainScope === v ? '#2f5fd0' : 'white', color: s.mainScope === v ? 'white' : '#333' }}>{lbl}</button>;
+                        return <div style={{ display: 'flex', gap: 8 }} data-no-print="true">{pill('period', 'งวดนี้ (' + shortPeriod(s.periodLabel) + ')')}{qg && pill('quarter', 'ทั้ง' + qg.label)}</div>;
+                      })()}
                       {stockMode && this.isBackfillPeriod() && mp && (() => {
                         // นับสต็อกปลายงวดนี้ที่ไม่ตรงกับยกมาของงวดถัดไป
                         const bad = [...mp.pcRowsM, ...mp.stirrupRowsM, ...mp.whiskerRowsM, ...mp.collarRowsM, ...mp.rebarRowsM]
@@ -1979,7 +2110,8 @@ class App extends React.Component {
                         ))}
                       </div>
                     )}
-                    {(() => { const sub = stockMode ? s.stockSubTab : 'all'; return (
+                    {quarterMain && <QuarterMainView q={quarterMain} />}
+                    {!quarterMain && (() => { const sub = stockMode ? s.stockSubTab : 'all'; return (
                     <React.Fragment>
                     {(sub === 'all' || sub === 'pc') && <MaterialTable title="ลวด PC.wire" rows={mp.pcRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
                     {(sub === 'all' || sub === 'stirrup') && <MaterialTable title="ลวดปลอก" rows={mp.stirrupRowsM} unitLabel="กก." stockMode={stockMode} onOpenGeneralUse={openGU} />}
