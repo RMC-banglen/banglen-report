@@ -1350,11 +1350,39 @@ class App extends React.Component {
       return { key: c.key, label: c.label, totalCalc, totalRealDiff, pct, hasDiff, items };
     }));
   }
-  // แถวเทียบคิวผลิต/ความยาว ข้ามงวด
-  buildPileTrendRows() {
+  // คอลัมน์ของหน้าแนวโน้ม — รายงวด (1 งวด = 1 คอลัมน์) หรือรายไตรมาส (รวมงวดในไตรมาสเดียวกัน)
+  // ช่วงแรกลงข้อมูลเป็นไตรมาส (มี.ค. = Q1, มิ.ย. = Q2) ต่อมาลงรายเดือน (ก.ค./ส.ค./ก.ย. = Q3) → โหมดไตรมาสรวมให้เทียบกันได้
+  trendGroups(mode) {
     const s = this.state;
-    const closedLabels = sortPeriodLabels((s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel));
-    const cols = sortPeriodLabels([...closedLabels, s.periodLabel]);
+    // งวดที่มีสรุปเก็บไว้ หรือมีไฟล์รายการเสาในข้อมูลงวด (งวดที่กรอกย้อนหลังด้วย + งวดใหม่ ไม่ได้ผ่านปิดเดือน เลยไม่มีสรุปเก็บไว้)
+    const hasData = p => (s.periodSummaries || {})[p] || ((s.periodHistory || {})[p] || {}).result;
+    const labels = sortPeriodLabels([...(s.periods || []).filter(p => p !== s.periodLabel && hasData(p)), s.periodLabel].filter(Boolean));
+    if (mode !== 'quarter') return labels.map(l => ({ key: l, label: periodSpanInfo(l) ? shortPeriod(l) : l, sub: null, periods: [l] }));
+    const out = [];
+    labels.forEach(l => {
+      const [m, y] = String(l).split(' ');
+      const mi = THAI_MONTHS.indexOf(m);
+      if (mi < 0) { out.push({ key: l, label: l, sub: null, periods: [l], months: 0 }); return; }
+      const q = Math.floor(mi / 3) + 1, key = y + '-Q' + q;
+      let g = out.find(x => x.key === key);
+      if (!g) { g = { key, label: 'ไตรมาส ' + q + '/' + String(y).slice(-2), periods: [], months: 0 }; out.push(g); }
+      g.periods.push(l);
+      g.months += Number(PERIOD_SPAN[l]) || 1;
+    });
+    // บอกว่าไตรมาสนั้นมีข้อมูลครบกี่เดือน (เช่น ไตรมาส 4 เพิ่งมี ต.ค. เดือนเดียว)
+    out.forEach(g => { g.sub = g.months && g.months < 3 ? 'มี ' + g.months + '/3 เดือน' : (g.periods.length > 1 ? g.periods.map(shortPeriod).join(' + ') : null); });
+    return out;
+  }
+  // รวมค่าของงวดในกลุ่ม (ไม่มีค่าเลย = null)
+  sumGroup(g, valOf) {
+    let tot = null;
+    g.periods.forEach(pl => { const v = valOf(pl); if (v != null && isFinite(v)) tot = (tot || 0) + v; });
+    return tot;
+  }
+  // แถวเทียบคิวผลิต/ความยาว ข้ามงวด
+  buildPileTrendRows(groups) {
+    const s = this.state;
+    groups = groups || this.trendGroups('period');
     const totalsFor = pl => {
       if (pl === s.periodLabel) return this.computePileTotals(s);
       const sum = this.summaryForClosedPeriod(pl);
@@ -1367,17 +1395,16 @@ class App extends React.Component {
       { label: 'คิวผลิต (m³)', dg: 2, val: t => (t ? t.volume : null), note: t => (t && t.volume == null ? 'ยังไม่ตั้งหน้าตัด' : null) },
     ];
     return {
-      cols,
+      cols: groups,
       rows: defs.map(d => {
         const vals = [];
-        const cells = cols.map(pl => {
-          const t = totalsFor(pl);
-          const v = d.val(t);
-          const note = d.note ? d.note(t) : null;
-          if (v != null && isFinite(v)) vals.push(v);
-          return { period: pl, text: v != null && isFinite(v) ? fmt(v, d.dg) : (note || '-') };
+        const cells = groups.map(g => {
+          const v = this.sumGroup(g, pl => d.val(totalsFor(pl)));
+          const note = v == null && d.note ? g.periods.map(pl => d.note(totalsFor(pl))).find(Boolean) : null;
+          if (v != null) vals.push(v);
+          return { period: g.key, text: v != null ? fmt(v, d.dg) : (note || '-') };
         });
-        // ค่าเฉลี่ยต่องวด — คิดเฉพาะงวดที่มีตัวเลข
+        // ค่าเฉลี่ยต่อคอลัมน์ (ต่องวด / ต่อไตรมาส) — คิดเฉพาะคอลัมน์ที่มีตัวเลข
         const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
         return { label: d.label, cells, avgFmt: avg != null ? fmt(avg, d.dg) : '-' };
       }),
@@ -1428,34 +1455,40 @@ class App extends React.Component {
     this._closedSummaryCache[pl] = { snap, summary: out };
     return out;
   }
-  // แนวโน้มแบบแยกทีละรายการ (ไม่รวมยอดทั้งหมวด) — ใช้ items ที่เก็บไว้ในสรุปแต่ละงวด
-  buildTrendItemRows() {
+  summaryForTrend(pl) {
     const s = this.state;
-    const closedLabels = sortPeriodLabels((s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel));
-    const currentSummary = this.computePeriodSummary(s);
-    const periodCols = sortPeriodLabels([...closedLabels, s.periodLabel]);
-    const summaryFor = pl => (pl === s.periodLabel ? currentSummary : this.summaryForClosedPeriod(pl));
+    if (pl === s.periodLabel) {
+      if (!this._curSummaryCache || this._curSummaryCache.s !== s) this._curSummaryCache = { s, sum: this.computePeriodSummary(s) };
+      return this._curSummaryCache.sum;
+    }
+    return this.summaryForClosedPeriod(pl);
+  }
+  // แนวโน้มแบบแยกทีละรายการ (ไม่รวมยอดทั้งหมวด) — ใช้ items ที่เก็บไว้ในสรุปแต่ละงวด
+  buildTrendItemRows(groups) {
+    groups = groups || this.trendGroups('period');
+    const allPeriods = groups.flatMap(g => g.periods);
+    const catOf = (pl, key) => { const sum = this.summaryForTrend(pl); return sum && sum.find ? sum.find(x => x.key === key) : null; };
     return CATS.map(m => {
       const dg = digitsForKey('x:' + m.key);
       // รวมชื่อรายการจากทุกงวด (งวดเก่าที่บันทึกก่อนมีฟีเจอร์นี้จะไม่มี items → ข้ามไป)
       const order = [];
       const seen = new Set();
-      periodCols.forEach(pl => {
-        const sum = summaryFor(pl);
-        const cat = sum && sum.find ? sum.find(x => x.key === m.key) : null;
+      allPeriods.forEach(pl => {
+        const cat = catOf(pl, m.key);
         (cat && cat.items ? cat.items : []).forEach(it => {
           if (!seen.has(it.label)) { seen.add(it.label); order.push(it.label); }
         });
       });
       const items = order.map(label => {
         const vals = [];
-        const cells = periodCols.map(pl => {
-          const sum = summaryFor(pl);
-          const cat = sum && sum.find ? sum.find(x => x.key === m.key) : null;
-          const it = cat && cat.items ? cat.items.find(x => x.label === label) : null;
-          const d = it && it.realDiff != null && isFinite(it.realDiff) ? it.realDiff : null;
+        const cells = groups.map(g => {
+          const d = this.sumGroup(g, pl => {
+            const cat = catOf(pl, m.key);
+            const it = cat && cat.items ? cat.items.find(x => x.label === label) : null;
+            return it && it.realDiff != null && isFinite(it.realDiff) ? it.realDiff : null;
+          });
           if (d != null) vals.push(d);
-          return { period: pl, text: d != null ? ((d > 0 ? '+' : '') + fmt(d, dg)) : '-' };
+          return { period: g.key, text: d != null ? ((d > 0 ? '+' : '') + fmt(d, dg)) : '-' };
         });
         // รวมสุทธิทุกงวด — เดือนนี้ขาด เดือนหน้าเกิน หักล้างกันเหลือส่วนต่างจริงเท่านี้
         const net = vals.length ? vals.reduce((a, b) => a + b, 0) : null;
@@ -1464,22 +1497,21 @@ class App extends React.Component {
       return { key: m.key, label: m.label, unit: m.unit || '', items };
     }).filter(g => g.items.length);
   }
-  buildTrendRows() {
-    const s = this.state;
-    const closedLabels = sortPeriodLabels((s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel));
-    const currentSummary = this.computePeriodSummary(s);
-    const periodCols = sortPeriodLabels([...closedLabels, s.periodLabel]);
+  buildTrendRows(groups) {
+    groups = groups || this.trendGroups('period');
     return CATS.map(m => {
       const dg = digitsForKey('x:' + m.key);
       const vals = [];
-      const cells = periodCols.map(pl => {
-        const summary = pl === s.periodLabel ? currentSummary : this.summaryForClosedPeriod(pl);
-        const item = summary && summary.find(x => x.key === m.key);
-        // สรุปงวดเก่าอาจยังไม่มี hasDiff — ใช้ pct เป็นตัวบอกแทนว่ามีการกรอกใช้จริงหรือยัง
-        const has = item ? (item.hasDiff !== undefined ? item.hasDiff : item.pct != null) : false;
-        const d = has && item && isFinite(item.totalRealDiff) ? item.totalRealDiff : null;
+      const cells = groups.map(g => {
+        const d = this.sumGroup(g, pl => {
+          const summary = this.summaryForTrend(pl);
+          const item = summary && summary.find ? summary.find(x => x.key === m.key) : null;
+          // สรุปงวดเก่าอาจยังไม่มี hasDiff — ใช้ pct เป็นตัวบอกแทนว่ามีการกรอกใช้จริงหรือยัง
+          const has = item ? (item.hasDiff !== undefined ? item.hasDiff : item.pct != null) : false;
+          return has && item && isFinite(item.totalRealDiff) ? item.totalRealDiff : null;
+        });
         if (d != null) vals.push(d);
-        return { period: pl, pctFmt: d != null ? ((d > 0 ? '+' : '') + fmt(d, dg)) : '-' };
+        return { period: g.key, pctFmt: d != null ? ((d > 0 ? '+' : '') + fmt(d, dg)) : '-' };
       });
       // รวมสุทธิทุกงวด (หักล้างขาด/เกินข้ามเดือน) — คิดเฉพาะงวดที่กรอกใช้จริงแล้วเท่านั้น
       const avg = vals.length ? vals.reduce((a, b) => a + b, 0) : null;
@@ -2353,13 +2385,26 @@ function DetailView({ app }) {
   );
 }
 function TrendView({ app }) {
-  const s = app.state;
-  const rows = app.buildTrendRows();
-  const periodCols = sortPeriodLabels([...(s.periods || []).filter(p => s.periodSummaries[p] && p !== s.periodLabel), s.periodLabel]);
+  // ดูรายงวด หรือ รวมเป็นรายไตรมาส (จำไว้ในเครื่อง)
+  const [mode, setModeRaw] = React.useState(() => { try { return localStorage.getItem('pile_trend_mode') || 'period'; } catch (e) { return 'period'; } });
+  const setMode = v => { setModeRaw(v); try { localStorage.setItem('pile_trend_mode', v); } catch (e) {} };
+  const groups = app.trendGroups(mode);
+  const rows = app.buildTrendRows(groups);
+  const colHead = (g, i) => (
+    <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', verticalAlign: 'bottom' }}>
+      {g.label}{g.sub && <div style={{ fontSize: 11, fontWeight: 400, color: '#8a93a6' }}>{g.sub}</div>}
+    </th>
+  );
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} data-no-print="true">
+        {[['period', 'รายงวด'], ['quarter', 'รายไตรมาส']].map(([v, lbl]) => (
+          <button key={v} onClick={() => setMode(v)} style={{ padding: '7px 16px', borderRadius: 20, border: '1.5px solid ' + (mode === v ? '#2f5fd0' : '#d8dde6'), fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: mode === v ? '#2f5fd0' : 'white', color: mode === v ? 'white' : '#333' }}>{lbl}</button>
+        ))}
+        {mode === 'quarter' && <span style={{ fontSize: 12, color: '#78839A' }}>รวมทุกงวดที่อยู่ในไตรมาสเดียวกัน (เช่น ก.ค. + ส.ค. + ก.ย. = ไตรมาส 3)</span>}
+      </div>
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
-        <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}><th style={{ padding: '10px 14px', fontSize: 13 }}>วัตถุดิบ</th>{periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{periodSpanInfo(pl) ? shortPeriod(pl) : pl}</th>)}<th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>รวมสุทธิ</th></tr></thead>
+        <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}><th style={{ padding: '10px 14px', fontSize: 13 }}>วัตถุดิบ</th>{groups.map(colHead)}<th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>รวมสุทธิ</th></tr></thead>
         <tbody>{rows.map((row, i) => (
           <tr key={i} style={{ borderTop: '1px solid #eef0f4' }}>
             <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 600 }}>{row.label}</td>
@@ -2371,20 +2416,20 @@ function TrendView({ app }) {
       <div style={{ fontSize: 12, color: '#78839A' }}>ส่วนต่างจริง = ยอดคำนวณ − ใช้จริง + ใช้งานอื่น-เสียหาย รวมทุกรายการของวัตถุดิบนั้นในแต่ละงวด · <b>+ = ของหาย</b> / <b>− = ของเกิน</b> · <b>รวมสุทธิ</b> = รวมทุกงวด เดือนไหนขาด เดือนไหนเกิน หักล้างกันแล้วเหลือเท่านี้ (คิดเฉพาะงวดที่กรอกใช้จริงแล้ว · “-” คือยังไม่ได้กรอก)</div>
 
       {(() => {
-        const groups = app.buildTrendItemRows();
-        if (!groups.length) return null;
+        const itemGroups = app.buildTrendItemRows(groups);
+        if (!itemGroups.length) return null;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
             <div style={{ fontSize: 17, fontWeight: 700 }}>แยกรายตัว — ส่วนต่างจริงของแต่ละรายการ</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
               <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
                 <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
-                {periodCols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{periodSpanInfo(pl) ? shortPeriod(pl) : pl}</th>)}
+                {groups.map(colHead)}
                 <th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>รวมสุทธิ</th>
               </tr></thead>
-              <tbody>{groups.map(g => [
+              <tbody>{itemGroups.map(g => [
                 <tr key={'h-' + g.key} style={{ background: '#eef3fc' }}>
-                  <td colSpan={periodCols.length + 2} style={{ padding: '7px 14px', fontSize: 13, fontWeight: 700, color: '#2f5fd0' }}>{g.label}{g.unit ? ' (' + g.unit + ')' : ''}</td>
+                  <td colSpan={groups.length + 2} style={{ padding: '7px 14px', fontSize: 13, fontWeight: 700, color: '#2f5fd0' }}>{g.label}{g.unit ? ' (' + g.unit + ')' : ''}</td>
                 </tr>,
                 ...g.items.map((row, i) => (
                   <tr key={g.key + '-' + i} style={{ borderTop: '1px solid #eef0f4' }}>
@@ -2401,7 +2446,7 @@ function TrendView({ app }) {
       })()}
 
       {(() => {
-        const pt = app.buildPileTrendRows();
+        const pt = app.buildPileTrendRows(groups);
         if (!pt.rows.some(r => r.cells.some(c => c.text !== '-'))) return null;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
@@ -2409,7 +2454,7 @@ function TrendView({ app }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
               <thead><tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
                 <th style={{ padding: '10px 14px', fontSize: 13 }}>รายการ</th>
-                {pt.cols.map((pl, i) => <th key={i} style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right' }}>{periodSpanInfo(pl) ? shortPeriod(pl) : pl}</th>)}
+                {pt.cols.map(colHead)}
                 <th style={{ padding: '10px 14px', fontSize: 13, textAlign: 'right', background: '#eef3fc', color: '#2f5fd0' }}>เฉลี่ย</th>
               </tr></thead>
               <tbody>{pt.rows.map((row, i) => (
@@ -2420,7 +2465,7 @@ function TrendView({ app }) {
                 </tr>
               ))}</tbody>
             </table>
-            <div style={{ fontSize: 12, color: '#78839A' }}>ตัวเลขของแต่ละงวดมาจากไฟล์รายการเสาที่อัปโหลดในงวดนั้น · <b>เฉลี่ย</b> = เฉลี่ยต่องวดจากงวดที่มีข้อมูล</div>
+            <div style={{ fontSize: 12, color: '#78839A' }}>ตัวเลขของแต่ละงวดมาจากไฟล์รายการเสาที่อัปโหลดในงวดนั้น · <b>เฉลี่ย</b> = เฉลี่ยต่อ{mode === 'quarter' ? 'ไตรมาส' : 'งวด'}จากที่มีข้อมูล</div>
           </div>
         );
       })()}
