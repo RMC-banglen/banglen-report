@@ -1,0 +1,18 @@
+{
+  "id": "./repair.html",
+  "name": "แจ้งซ่อม — ร่วมมิตรคอนกรีต(บางเลน)",
+  "short_name": "แจ้งซ่อม",
+  "description": "แจ้งซ่อมเครื่องจักร/รถ — เตือนช่างทันที บันทึกงานซ่อม",
+  "lang": "th",
+  "dir": "ltr",
+  "start_url": "./repair.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f1ea",
+  "theme_color": "#b45309",
+  "icons": [
+    { "src": "icons/repair-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/repair-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

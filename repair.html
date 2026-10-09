@@ -2,12 +2,12 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"/>
 <title>แจ้งซ่อม — บางเลน</title>
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09c';
+var APP_VERSION='2026-10-09d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -21,16 +21,25 @@ var APP_VERSION='2026-10-09c';
   document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
 })();
 </script>
+<!-- ติดตั้งเป็นแอปบนหน้าจอมือถือได้ (Android: ปุ่มติดตั้ง / iPhone: แชร์ → เพิ่มไปยังหน้าจอโฮม) -->
+<link rel="manifest" href="repair.webmanifest"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="แจ้งซ่อม"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="mobile-web-app-capable" content="yes"/>
+<link rel="apple-touch-icon" href="icons/repair-icon-180.png"/>
+<link rel="icon" type="image/png" href="icons/repair-icon-192.png"/>
 <meta name="theme-color" content="#b45309"/>
+<script>
+// service worker แบบส่งผ่าน (ไม่แคช) — ให้ Chrome บนมือถือขึ้นปุ่ม "ติดตั้งแอป"
+if('serviceWorker' in navigator&&location.protocol==='https:'){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Sarabun',sans-serif;background:#f5f1ea;min-height:100vh;color:#2a2219;}
 .wrap{max-width:520px;margin:0 auto;padding:0 0 70px;}
-.topbar{background:#b45309;color:#fff;padding:14px 16px 0;position:sticky;top:0;z-index:5;}
+.topbar{background:#b45309;color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 0;position:sticky;top:0;z-index:5;}
 .topbar h1{font-size:18px;font-weight:800;}
 .topbar .me{font-size:12.5px;opacity:.9;margin-top:2px;}
 .topbar .me button{background:none;border:none;color:#fff;text-decoration:underline;font-family:inherit;font-size:12.5px;cursor:pointer;}
