@@ -141,19 +141,54 @@ function sb(method, path, payload) {
   return UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + path, opts);
 }
 
-// ── ติดตั้ง: กด Run ฟังก์ชันนี้ครั้งเดียว ─────────────────────
-function setup() {
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'repairReminderCheck') ScriptApp.deleteTrigger(t);
+// ── รอบงานประจำของช่าง (PM / เปลี่ยนอุปกรณ์ตามรอบ) → กลุ่มซ่อมบำรุงด้วย ──────
+// อ่านจากตาราง calibration_items (หน้า "รอบงานประจำ" บนแดชบอร์ด) เฉพาะที่ผู้รับผิดชอบมีคำว่า "ช่าง" (เช่น ช่างวัฒ)
+// กติกาเดียวกับแดชบอร์ด: เกินกำหนด / ใกล้ถึง (รอบนับวัน = ล่วงหน้า 3 วัน, รอบเดือน/ปี = ล่วงหน้า 30 วัน)
+// หมวด "เปลี่ยนเมื่อชำรุด" ไม่เตือน · ส่งวันละครั้ง 08:00 (ตั้งด้วย setup) — กลุ่มหลักยังได้เตือนตามเดิม ไม่ได้ย้าย
+var DASHBOARD_URL = 'https://rmc-banglen.github.io/banglen-report/';
+function routineCheck() {
+  var res = sb('get', 'calibration_items?select=name,category,interval_type,interval_value,next_cal_date,responsible');
+  if (res.getResponseCode() >= 300) { Logger.log('routineCheck: ' + res.getContentText()); return; }
+  var today = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
+  var t0 = new Date(today + 'T00:00:00Z').getTime();
+  var overdue = [], soon = [];
+  JSON.parse(res.getContentText() || '[]').forEach(function (x) {
+    if (String(x.responsible || '').indexOf('ช่าง') < 0) return;
+    if (x.category === 'เปลี่ยนเมื่อชำรุด' || !x.next_cal_date) return;
+    var days = Math.round((new Date(String(x.next_cal_date).slice(0, 10) + 'T00:00:00Z').getTime() - t0) / 864e5);
+    var warn = x.interval_type === 'day' ? 3 : 30;
+    var line = '• ' + esc(x.name) + ' — ' + esc(x.responsible) + ' · กำหนด ' + thDate(x.next_cal_date);
+    if (days < 0) overdue.push(line + ' <b>(เกินมา ' + (-days) + ' วัน)</b>');
+    else if (days <= warn) soon.push(line + ' (อีก ' + days + ' วัน)');
   });
-  ScriptApp.newTrigger('repairReminderCheck').timeBased().everyMinutes(10).create();
-  sendTelegram('✅ ระบบแจ้งซ่อมพร้อมใช้งาน — ถ้าเห็นข้อความนี้ในกลุ่มช่าง แปลว่าตั้งค่าถูกแล้ว');
-  Logger.log('ตั้งเตือนงานค้างทุก 10 นาทีแล้ว + ส่งข้อความทดสอบเข้ากลุ่มช่างแล้ว');
+  if (!overdue.length && !soon.length) return;
+  var L = ['🗓 <b>รอบงานประจำของช่าง</b>'];
+  if (overdue.length) { L.push(''); L.push('🔴 <b>เกินกำหนด ' + overdue.length + ' รายการ</b>'); L = L.concat(overdue); }
+  if (soon.length) { L.push(''); L.push('🟡 <b>ใกล้ถึงกำหนด ' + soon.length + ' รายการ</b>'); L = L.concat(soon); }
+  L.push('');
+  L.push('<i>ทำเสร็จแล้ว แจ้งคนบันทึกวันที่ทำในหน้า "รอบงานประจำ" บนแดชบอร์ด เตือนจะหยุดเอง</i>');
+  L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดแดชบอร์ด</a>');
+  sendTelegram(L.join('\n'));
 }
-// ยกเลิกเตือนงานค้าง (ถ้าต้องการหยุด)
-function stopReminder() {
+function thDate(v) {
+  var p = String(v || '').slice(0, 10).split('-');
+  return p.length === 3 ? Number(p[2]) + '/' + Number(p[1]) + '/' + (Number(p[0]) + 543) : '-';
+}
+
+// ── ติดตั้ง: กด Run ฟังก์ชันนี้ครั้งเดียว (รันซ้ำได้ ไม่ซ้อน) ───────────
+function setup() {
+  stopReminder(true);
+  ScriptApp.newTrigger('repairReminderCheck').timeBased().everyMinutes(10).create();
+  ScriptApp.newTrigger('routineCheck').timeBased().atHour(8).everyDays(1).inTimezone('Asia/Bangkok').create();
+  sendTelegram('✅ ระบบแจ้งซ่อมพร้อมใช้งาน — เตือนงานซ่อมค้างทุก 10 นาที + รอบงานประจำของช่างทุกวัน 08:00');
+  routineCheck();
+  Logger.log('ตั้งเตือนงานค้างทุก 10 นาที + รอบงานประจำทุกวัน 08:00 แล้ว');
+}
+// ยกเลิกการเตือนทั้งหมด (ถ้าต้องการหยุด)
+function stopReminder(silent) {
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'repairReminderCheck') ScriptApp.deleteTrigger(t);
+    var h = t.getHandlerFunction();
+    if (h === 'repairReminderCheck' || h === 'routineCheck') ScriptApp.deleteTrigger(t);
   });
-  Logger.log('ยกเลิกเตือนงานค้างแล้ว');
+  if (silent !== true) Logger.log('ยกเลิกการเตือนทั้งหมดแล้ว');
 }
