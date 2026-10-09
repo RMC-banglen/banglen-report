@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09n';
+var APP_VERSION='2026-10-09o';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -410,7 +410,7 @@ function DoneForm({req,me,onSaved,onCancel}){
 }
 
 // ---------- รายละเอียดใบงาน ----------
-function JobDetail({id,me,onBack}){
+function JobDetail({id,me,onBack,tick}){
   const[req,setReq]=useState(null);const[events,setEvents]=useState([]);const[mode,setMode]=useState('');
   const[note,setNote]=useState('');const[busy,setBusy]=useState(false);const[err,setErr]=useState('');
   const load=async()=>{
@@ -420,7 +420,7 @@ function JobDetail({id,me,onBack}){
     const ev=await SB.from('repair_events').select('*').eq('request_id',id).order('at');
     setEvents(ev.data||[]);
   };
-  useEffect(()=>{load();},[id]);
+  useEffect(()=>{load();},[id,tick]); // tick = รีเฟรชเองทุก 2 นาที / กลับมาเปิดแอป
   if(err&&!req)return <div className="card"><div className="err">{err}</div><button className="ghost" onClick={onBack}>กลับ</button></div>;
   if(!req)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
   const u=URG[req.urgency]||URG.abnormal;
@@ -555,13 +555,13 @@ function MyWork({me,jobs,onOpen}){
 }
 
 // ---------- รายการงาน ----------
-function JobList({onOpen,reloadKey,me,jobs}){
+function JobList({onOpen,reloadKey,me,jobs,tick}){
   const[rows,setRows]=useState(null);const[f,setF]=useState('active');
   useEffect(()=>{
     const since=new Date(Date.now()-45*864e5).toISOString();
     SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at').eq('site',SITE).or('status.in.(open,accepted,in_progress,waiting_parts,done),reported_at.gte.'+since)
       .order('reported_at',{ascending:false}).limit(300).then(({data})=>setRows(data||[]));
-  },[reloadKey]);
+  },[reloadKey,tick]);
   if(!rows)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
   const rank={stop:0,abnormal:1,normal:2};
   const groups={active:rows.filter(r=>ACTIVE.includes(r.status)).sort((a,b)=>(rank[a.urgency]-rank[b.urgency])||(new Date(a.reported_at)-new Date(b.reported_at))),
@@ -587,13 +587,13 @@ function App(){
   const[tab,setTab]=useState(location.hash.replace('#','')&&!preAssetId?'jobs':'report');
   const[openId,setOpenId]=useState(location.hash.replace('#','')||null);
   const[assets,setAssets]=useState([]);const[done,setDone]=useState(null);const[reloadKey,setReloadKey]=useState(0);
-  const[jobs,setJobs]=useState([]);const[,setStaffTick]=useState(0);
+  const[jobs,setJobs]=useState([]);const[tick,setTick]=useState(0);const[,setStaffTick]=useState(0);
   useEffect(()=>{SB.from('repair_staff').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name')
     .then(({data,error})=>{if(!error){STAFF=data||[];setStaffTick(t=>t+1);}});},[]);
   // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
     const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
-      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(data)setJobs(data);});
+      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(data){setJobs(data);setTick(t=>t+1);}});
     load();const iv=setInterval(()=>{if(!document.hidden)load();},120000); // ทุก 2 นาที (ประหยัดโควตา Supabase)
     const vis=()=>{if(!document.hidden)load();};document.addEventListener('visibilitychange',vis);
     return()=>{clearInterval(iv);document.removeEventListener('visibilitychange',vis);};
@@ -627,7 +627,7 @@ function App(){
           <span style={{fontSize:26}}>🔔</span><div style={{flex:1}}><b>มีงานรอคุณ {badge} งาน</b><div style={{fontSize:13,color:'#8a7a68'}}>{(()=>{const w=myWork(me,jobs);return [w.confirm.length?'รอยืนยัน '+w.confirm.length:'',w.waiting.length?'รอรับงาน '+w.waiting.length:'',w.mine.length?'งานที่รับไว้ '+w.mine.length:''].filter(Boolean).join(' · ');})()}</div></div><b style={{color:'#b45309'}}>ดู ›</b>
         </div>}
         <ReportForm me={me} assets={assets} preAssetId={preAssetId} onDone={d=>setDone(d)}/></>):
-     openId?<JobDetail id={openId} me={me} onBack={back}/>:<JobList onOpen={open} reloadKey={reloadKey} me={me} jobs={jobs}/>}
+     openId?<JobDetail id={openId} me={me} onBack={back} tick={tick}/>:<JobList onOpen={open} reloadKey={reloadKey} me={me} jobs={jobs} tick={tick}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
