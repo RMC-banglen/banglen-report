@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09a';
+var APP_VERSION='2026-10-09b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -98,8 +98,9 @@ const SB=supabase.createClient(
   'https://npxzerdirspwunuckcqr.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI'
 );
-// การแจ้งเตือน Telegram อยู่ใน Google Apps Script ตัวเดียวกับแอปผลลูกปูน (หน้านี้ไม่เก็บความลับ)
-const GAS_URL='https://script.google.com/macros/s/AKfycbzyu-ZNgAu9Rxof-PP-JVG6wmKfw1nSnbr75novSi3VbThXxwBfUvZjKrs1OuuW3617/exec';
+// การแจ้งเตือน Telegram อยู่ใน Google Apps Script แยกของแจ้งซ่อมเอง (repair-webapp.js) ไม่ปนกับแอปผลลูกปูน — หน้านี้ไม่เก็บความลับ
+// ยังไม่ได้ Deploy = เว้นว่าง (แจ้งซ่อมได้ปกติ แค่ยังไม่เด้ง Telegram)
+const GAS_URL='';
 const SITE='banglen';
 const DEPTS=['ฝ่ายผลิต','แพล้นปูน','QC','ขนส่ง','ช่างซ่อมบำรุง','สำนักงาน','อื่นๆ'];
 const URG={
@@ -152,6 +153,7 @@ async function uploadPhoto(file){
 }
 // แจ้ง Apps Script ให้ส่ง Telegram (no-cors: ไม่ต้องรอคำตอบ)
 function notify(event,req,extra){
+  if(!GAS_URL)return;
   try{fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({kind:'repair_event',event,link:jobLink(req.id),req,...(extra||{})})});}catch(e){}
 }
