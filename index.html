@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09f';
+var APP_VERSION='2026-10-09g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9090,7 +9090,9 @@ window.__dataReady.then(data => {
       return{n,cat:catOf(n),fails,dt,mo,cost:list.reduce((s,r)=>s+costOf(r),0),mtbf:fails?(periodHours-dt)/fails:null,
         mttr:avg(list.filter(r=>r.done_at).map(r=>hrs(new Date(r.done_at)-new Date(r.reported_at))))};
     });
-    const used=perAsset.filter(a=>a.fails||a.mo.some(v=>v>0));
+    // แสดงทุกเครื่องทุกเดือน (แบบไฟล์ Excel) — ไม่มีเครื่องหยุด = ขีด · จัดกลุ่มตามหมวด เรียงตามรายชื่อ
+    const used=perAsset;
+    const usedCats=[...new Set(used.map(a=>a.cat))];
     const causes={};inPeriod.filter(r=>r.cause).forEach(r=>{causes[r.cause]=(causes[r.cause]||0)+1;});
     const causeList=Object.entries(causes).sort((a,b)=>b[1]-a[1]);
     const th={padding:'8px 10px',fontSize:12.5,color:'#64748b',textAlign:'right',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'};
@@ -9146,15 +9148,17 @@ window.__dataReady.then(data => {
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
         <div style={{fontWeight:800,marginBottom:4}}>⏱ เวลาเครื่องหยุด รายเครื่อง รายเดือน (ชม.) — ปี {yearBE}</div>
         <div style={{fontSize:12,color:'#94a3b8',marginBottom:8}}>แบบเดียวกับตาราง "เวลาเสียเครื่องจักร-รถ" แต่เกิดเองจากใบแจ้งซ่อม · <b>ซ่อมเฉลี่ย</b> = ซ่อมแต่ละครั้งใช้เวลาเท่าไร (น้อยดี) · <b>เสียทุกๆ</b> = เฉลี่ยเครื่องเดินได้นานเท่าไรกว่าจะเสียอีก (มากดี) · คิดตามช่วงที่เลือก</div>
-        {used.length===0?<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีใบแจ้งซ่อมในปีนี้</div>:
+        {used.length===0?<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีรายชื่อเครื่องจักร</div>:
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr><th style={{...th,textAlign:'left'}}>เครื่อง/รถ</th>{MO.map(m=><th key={m} style={th}>{m}</th>)}<th style={{...th,color:'#b45309'}}>รวม</th><th style={th}>ครั้ง</th><th style={th}>ซ่อมเฉลี่ย</th><th style={th}>เสียทุกๆ</th><th style={th}>ค่าใช้จ่าย</th></tr></thead>
-          <tbody>{used.sort((a,b)=>b.dt-a.dt||b.fails-a.fails).map(a=><tr key={a.n}>
-            <td style={{...td,textAlign:'left',fontWeight:700,cursor:'pointer'}} onClick={()=>setHistAsset(a.n)} title="ดูประวัติซ่อม"><span style={{color:'#1d4ed8',textDecoration:'underline'}}>{dn(a.n)}</span> 📜<div style={{fontSize:11,color:'#94a3b8',fontWeight:400}}>{a.cat}</div></td>
+          <tbody>{usedCats.map(cat=>[
+            <tr key={'h-'+cat}><td colSpan={MO.length+6} style={{padding:'6px 10px',fontSize:12.5,fontWeight:800,color:'#b45309',background:'#fff7ed'}}>{cat}</td></tr>,
+            ...used.filter(a=>a.cat===cat).map(a=><tr key={a.n}>
+            <td style={{...td,textAlign:'left',fontWeight:700,cursor:'pointer'}} onClick={()=>setHistAsset(a.n)} title="ดูประวัติซ่อม"><span style={{color:'#1d4ed8',textDecoration:'underline'}}>{dn(a.n)}</span> 📜</td>
             {a.mo.map((v,i)=><td key={i} style={{...td,color:v?'#1e293b':'#cbd5e1',background:v>8?'#fee2e2':v>2?'#fef3c7':'transparent'}}>{v?v.toFixed(1):'–'}</td>)}
-            <td style={{...td,fontWeight:800,color:'#b45309'}}>{a.mo.reduce((s,v)=>s+v,0).toFixed(1)}</td>
+            <td style={{...td,fontWeight:800,color:a.mo.some(v=>v>0)?'#b45309':'#cbd5e1'}}>{a.mo.some(v=>v>0)?a.mo.reduce((s,v)=>s+v,0).toFixed(1):'–'}</td>
             <td style={td}>{a.fails||'–'}</td><td style={td}>{fmtH(a.mttr)}</td><td style={td}>{a.mtbf!=null?fmtH(a.mtbf):'–'}</td><td style={td}>{a.cost?baht(a.cost):'–'}</td>
-          </tr>)}</tbody>
+          </tr>)])}</tbody>
         </table></div>}
       </div>
 
