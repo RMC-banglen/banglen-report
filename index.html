@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09a';
+var APP_VERSION='2026-10-09b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9064,9 +9064,9 @@ window.__dataReady.then(data => {
       <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:16}}>
         {card('งานค้างตอนนี้',open.length,open.filter(r=>r.urgency==='stop').length+' เครื่องหยุด · รอยืนยัน '+waitConfirm.length,open.length?'#b91c1c':'#15803d')}
         {card('แจ้งซ่อม',inPeriod.length+' ครั้ง',month?MO[month-1]:'ทั้งปี')}
-        {card('Downtime รวม',fmtH(downtime),'เฉพาะงาน "เครื่องหยุด"','#b45309')}
-        {card('MTTR เวลาซ่อมเฉลี่ย',fmtH(mttr),'แจ้ง → ซ่อมเสร็จ')}
-        {card('รับงานเฉลี่ย',fmtH(resp),'แจ้ง → ช่างกดรับ')}
+        {card('เครื่องหยุดรวม',fmtH(downtime),'เฉพาะงานที่แจ้งว่า "เครื่องหยุด"','#b45309')}
+        {card('ซ่อมเสร็จเฉลี่ย',fmtH(mttr),'นับจากแจ้ง จนซ่อมเสร็จ')}
+        {card('ช่างรับงานเฉลี่ย',fmtH(resp),'นับจากแจ้ง จนช่างกดรับ')}
         {card('ซ่อมซ้ำ',repeats+' ครั้ง','ตีกลับ + เสียซ้ำใน 30 วัน',repeats?'#b91c1c':undefined)}
         {card('ค่าอะไหล่+จ้างนอก',baht(cost)+' ฿','จากใบงาน')}
       </div>
@@ -9088,11 +9088,11 @@ window.__dataReady.then(data => {
       </div>
 
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
-        <div style={{fontWeight:800,marginBottom:4}}>⏱ Downtime รายเครื่อง รายเดือน (ชม.) — ปี {yearBE}</div>
-        <div style={{fontSize:12,color:'#94a3b8',marginBottom:8}}>แบบเดียวกับตาราง "เวลาเสียเครื่องจักร-รถ" แต่เกิดเองจากใบแจ้งซ่อม · ครั้ง/MTTR/MTBF/ค่าใช้จ่าย ตามช่วงที่เลือก</div>
+        <div style={{fontWeight:800,marginBottom:4}}>⏱ เวลาเครื่องหยุด รายเครื่อง รายเดือน (ชม.) — ปี {yearBE}</div>
+        <div style={{fontSize:12,color:'#94a3b8',marginBottom:8}}>แบบเดียวกับตาราง "เวลาเสียเครื่องจักร-รถ" แต่เกิดเองจากใบแจ้งซ่อม · <b>ซ่อมเฉลี่ย</b> = ซ่อมแต่ละครั้งใช้เวลาเท่าไร (น้อยดี) · <b>เสียทุกๆ</b> = เฉลี่ยเครื่องเดินได้นานเท่าไรกว่าจะเสียอีก (มากดี) · คิดตามช่วงที่เลือก</div>
         {used.length===0?<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีใบแจ้งซ่อมในปีนี้</div>:
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}>
-          <thead><tr><th style={{...th,textAlign:'left'}}>เครื่อง/รถ</th>{MO.map(m=><th key={m} style={th}>{m}</th>)}<th style={{...th,color:'#b45309'}}>รวม</th><th style={th}>ครั้ง</th><th style={th}>MTTR</th><th style={th}>MTBF</th><th style={th}>ค่าใช้จ่าย</th></tr></thead>
+          <thead><tr><th style={{...th,textAlign:'left'}}>เครื่อง/รถ</th>{MO.map(m=><th key={m} style={th}>{m}</th>)}<th style={{...th,color:'#b45309'}}>รวม</th><th style={th}>ครั้ง</th><th style={th}>ซ่อมเฉลี่ย</th><th style={th}>เสียทุกๆ</th><th style={th}>ค่าใช้จ่าย</th></tr></thead>
           <tbody>{used.sort((a,b)=>b.dt-a.dt||b.fails-a.fails).map(a=><tr key={a.n}>
             <td style={{...td,textAlign:'left',fontWeight:700}}>{a.n}<div style={{fontSize:11,color:'#94a3b8',fontWeight:400}}>{a.cat}</div></td>
             {a.mo.map((v,i)=><td key={i} style={{...td,color:v?'#1e293b':'#cbd5e1',background:v>8?'#fee2e2':v>2?'#fef3c7':'transparent'}}>{v?v.toFixed(1):'–'}</td>)}
@@ -9312,7 +9312,7 @@ window.__dataReady.then(data => {
         <button onClick={()=>setView('table')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='table'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='table'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📋 ตารางรายละเอียด</button>
         <button onClick={()=>setView('compare')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='compare'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='compare'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🎯 KPI เปรียบเทียบ</button>
         <button onClick={()=>setView('analyze')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='analyze'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='analyze'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🔍 วิเคราะห์ผิดปกติ</button>
-        <button onClick={()=>setView('workorders')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='workorders'?'#b45309':'transparent'}`,background:'transparent',color:view==='workorders'?'#b45309':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🛠 แจ้งซ่อม / Downtime</button>
+        <button onClick={()=>setView('workorders')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='workorders'?'#b45309':'transparent'}`,background:'transparent',color:view==='workorders'?'#b45309':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🛠 แจ้งซ่อม / เครื่องหยุด</button>
       </div>
 
       {view==='workorders'&&<RepairWorkOrders yearBE={selYear} canEdit={canEditBL}/>}
