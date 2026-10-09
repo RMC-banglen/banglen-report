@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09c';
+var APP_VERSION='2026-10-09d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9153,8 +9153,18 @@ window.__dataReady.then(data => {
             <datalist id="repair-cats">{[...new Set(assets.map(a=>a.category))].map(c=><option key={c} value={c}/>)}</datalist>
             <button onClick={addAsset} style={{padding:'6px 12px',border:'none',borderRadius:6,background:'#b45309',color:'#fff',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>+ เพิ่ม</button>
           </div>}
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{assets.map(a=><span key={a.id} onClick={()=>canEdit&&toggleAsset(a)} title={canEdit?'กดเพื่อเปิด/ปิดการใช้งาน':''}
-            style={{padding:'4px 10px',borderRadius:99,fontSize:12.5,border:'1px solid #e2e8f0',cursor:canEdit?'pointer':'default',background:a.active?'#fff':'#f1f5f9',color:a.active?'#1e293b':'#94a3b8',textDecoration:a.active?'none':'line-through'}}>{a.name} <small style={{color:'#94a3b8'}}>{a.category}</small></span>)}</div>
+          {/* แยกเป็นกลุ่มตามหมวด เรียงตามลำดับที่ตั้งไว้ (เครน → รถไฟ → เครื่องจักร → รถในโรงงาน → รถขนส่ง → เครนรถขนส่ง) */}
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {[...new Set(assets.map(a=>a.category||'อื่นๆ'))].map(cat=>{
+              const list=assets.filter(a=>(a.category||'อื่นๆ')===cat);
+              return <div key={cat} style={{display:'flex',gap:10,alignItems:'flex-start',borderTop:'1px solid #f1f5f9',paddingTop:10}}>
+                <div style={{width:110,flexShrink:0,fontWeight:800,fontSize:13,color:'#b45309',paddingTop:4}}>{cat} <span style={{color:'#94a3b8',fontWeight:400}}>({list.filter(a=>a.active).length})</span></div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6,flex:1}}>{list.map(a=><span key={a.id} onClick={()=>canEdit&&toggleAsset(a)} title={canEdit?'กดเพื่อเปิด/ปิดการใช้งาน':''}
+                  style={{padding:'4px 10px',borderRadius:99,fontSize:12.5,border:'1px solid #e2e8f0',cursor:canEdit?'pointer':'default',background:a.active?'#fff':'#f1f5f9',color:a.active?'#1e293b':'#94a3b8',textDecoration:a.active?'none':'line-through'}}>{a.name}</span>)}</div>
+              </div>;
+            })}
+            {canEdit&&<div style={{fontSize:11.5,color:'#94a3b8'}}>กดชื่อเพื่อปิด/เปิดการใช้งาน (ขีดฆ่า = ไม่ขึ้นให้เลือกตอนแจ้งซ่อม)</div>}
+          </div>
         </div>}
       </div>
     </div>;
