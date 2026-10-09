@@ -30,6 +30,11 @@ function doPost(e) {
       notifyAmpAlert(data);
       return respond(true, 'แจ้งเตือนแล้ว');
     }
+    // หน้า repair.html (แจ้งซ่อม) ยิงมาทุกครั้งที่มีแจ้งใหม่/เปลี่ยนสถานะ → กลุ่มช่าง
+    if (data.kind === 'repair_event') {
+      notifyRepair(data);
+      return respond(true, 'แจ้งเตือนแล้ว');
+    }
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sh = ss.getSheetByName(SHEET_NAME);
@@ -481,6 +486,13 @@ function onOpen() {
     .addItem('ทดสอบเตือน QC แพค้างตรวจ', 'qcTestAlertNow')
     .addToUi();
 
+  ui.createMenu('🔧 แจ้งซ่อม')
+    .addItem('หาไอดีกลุ่ม Telegram', 'findChatIds')
+    .addItem('ทดสอบส่งเข้ากลุ่มช่าง', 'testRepairAlert')
+    .addItem('ตั้งเตือนงานซ่อมค้าง (ทุก 10 นาที)', 'installRepairReminder')
+    .addItem('ยกเลิกเตือนงานซ่อมค้าง', 'removeRepairReminder')
+    .addToUi();
+
   // onOpen เป็น simple trigger สิทธิ์จำกัด เรียก openById ไม่ได้ (จะโยน error แล้วเมนูที่เหลือไม่ขึ้น)
   // ใช้ชีทที่เปิดอยู่แทน และครอบ try ไว้ เผื่ออ่านข้อมูลไม่ได้ก็ยังได้เมนูพื้นฐาน
   var menu = ui.createMenu('เลือกเดือน');
@@ -690,6 +702,7 @@ function onEditConcreteResult(e) {
 var TELEGRAM_TOKEN = '';   // เช่น '8852411771:AAG...'
 var TELEGRAM_CHAT  = '';   // ไอดีกลุ่มหลัก (แจ้งเตือนรอบงาน)
 var TELEGRAM_CHAT_QC = '';   // ★ ไอดีกลุ่ม QC — เรื่อง QC เข้ากลุ่มนี้ (เว้นว่าง = ใช้กลุ่มหลัก)
+var TELEGRAM_CHAT_REPAIR = '';   // ★ ไอดีกลุ่มช่างซ่อม — แจ้งซ่อมเข้ากลุ่มนี้ (เว้นว่าง = ใช้กลุ่มหลัก)
 
 // เกณฑ์กำลังอัด (ksc) ตามอายุ — ต้องตรงกับที่หน้าแดชบอร์ดใช้ (TARGET_NORMAL / TARGET_NP280)
 var TARGET_NORMAL = { 1: 350, 3: 415, 5: 435, 7: 450 };
@@ -1091,6 +1104,118 @@ function respond(success, message) {
   return ContentService
     .createTextOutput(JSON.stringify({ success: success, message: message }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── แจ้งซ่อม (repair.html) ──────────────────────────────────
+
+// กลุ่มช่าง — ถ้ายังไม่ได้ตั้ง ใช้กลุ่มหลักไปก่อน จะได้ไม่เงียบหาย
+function tgChatRepair() {
+  return TELEGRAM_CHAT_REPAIR || PropertiesService.getScriptProperties().getProperty('TELEGRAM_CHAT_REPAIR') || tgChat();
+}
+var REPAIR_URG = { stop: '🔴 เครื่องหยุด', abnormal: '🟠 ผิดปกติ', normal: '🟢 ไม่ด่วน' };
+function repairDur(ms) {
+  var m = Math.round(ms / 60000);
+  if (m < 60) return m + ' นาที';
+  var h = Math.floor(m / 60), mm = m % 60;
+  if (h < 24) return h + ' ชม.' + (mm ? ' ' + mm + ' นาที' : '');
+  return Math.floor(h / 24) + ' วัน ' + (h % 24) + ' ชม.';
+}
+function repairLink(d) {
+  return d.link ? '\n<a href="' + d.link + '">👉 เปิดใบงาน</a>' : '';
+}
+function notifyRepair(d) {
+  try {
+    var r = d.req || {}, L = [];
+    var head = '<b>' + esc(r.ticket_no || '') + '</b> · ' + esc(r.asset_name || '');
+    if (d.event === 'new') {
+      L.push('🔧 <b>แจ้งซ่อมใหม่</b> — ' + (REPAIR_URG[r.urgency] || ''));
+      L.push(head);
+      L.push('อาการ: ' + esc(r.symptom || '-'));
+      L.push('แจ้งโดย: ' + esc(r.reporter_name || '-') + ' (' + esc(r.reporter_dept || '-') + ')');
+      if (r.photos && r.photos.length) L.push('📷 มีรูป ' + r.photos.length + ' รูป');
+      L.push('<i>ช่างที่ว่าง กดเปิดใบงานแล้วกด "รับงาน"</i>');
+    } else if (d.event === 'accepted') {
+      L.push('🙋 ' + esc(d.actor || r.technician || '') + ' รับงานแล้ว');
+      L.push(head);
+    } else if (d.event === 'waiting_parts') {
+      L.push('⏸ <b>รออะไหล่</b> — ' + head);
+      if (d.note) L.push('รอ: ' + esc(d.note));
+    } else if (d.event === 'done') {
+      var cost = (Number(r.parts_cost) || 0) + (Number(r.vendor_cost) || 0);
+      L.push('✅ <b>ซ่อมเสร็จ</b> — ' + head);
+      L.push('ช่าง: ' + esc(r.technician || '-') + (r.helpers ? ' + ' + esc(r.helpers) : ''));
+      L.push('สาเหตุ: ' + esc(r.cause || '-'));
+      L.push('ทำ: ' + esc(r.work_done || '-'));
+      if (cost > 0) L.push('ค่าใช้จ่าย: ' + cost.toLocaleString() + ' บาท');
+      if (r.reported_at && r.done_at) L.push('ใช้เวลา: ' + repairDur(new Date(r.done_at) - new Date(r.reported_at)));
+      L.push('<i>' + esc(r.reporter_name || 'ผู้แจ้ง') + ' ตรวจแล้วกด "ใช้งานได้แล้ว ปิดงาน"</i>');
+    } else if (d.event === 'reopened') {
+      L.push('👎 <b>ยังไม่หาย ส่งกลับให้ช่าง</b> — ' + head);
+      if (d.note) L.push('อาการ: ' + esc(d.note));
+      L.push('ช่าง: ' + esc(r.technician || '-'));
+    } else if (d.event === 'closed') {
+      L.push('👍 ปิดงาน ' + head + ' (ยืนยันโดย ' + esc(d.actor || '') + ')');
+    } else if (d.event === 'cancelled') {
+      L.push('✖️ ยกเลิกใบแจ้ง ' + head + (d.note ? ' — ' + esc(d.note) : ''));
+    } else {
+      return;
+    }
+    sendTelegram(L.join('\n') + (d.event === 'closed' || d.event === 'cancelled' ? '' : repairLink(d)), tgChatRepair());
+  } catch (err) {
+    Logger.log('notifyRepair error: ' + err.message);
+  }
+}
+
+// เตือนงานที่ยังไม่มีช่างรับ (ตั้งให้รันทุก 10 นาที จากเมนู)
+//   🔴 เครื่องหยุด: เกิน 15 นาที เตือนซ้ำทุก 15 นาที (ตลอดเวลา)
+//   🟠 ผิดปกติ: เกิน 2 ชม. เตือนซ้ำทุก 2 ชม. · 🟢 ไม่ด่วน: เกิน 1 วัน (เฉพาะ 07:00–18:00)
+//   ซ่อมเสร็จแต่ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน → เตือนวันละครั้ง
+var REPAIR_REPO_URL = 'https://rmc-banglen.github.io/banglen-report/repair.html';
+function repairReminderCheck() {
+  var now = new Date();
+  var hour = Number(Utilities.formatDate(now, 'Asia/Bangkok', 'H'));
+  var workHours = hour >= 7 && hour < 18;
+  var res = sbRequest('get', 'repair_requests', null,
+    'site=eq.banglen&status=in.(open,done)&select=id,ticket_no,asset_name,urgency,symptom,reporter_name,status,reported_at,done_at,technician,last_alert_at,alert_count');
+  if (res.getResponseCode() >= 300) { Logger.log('repairReminderCheck: ' + res.getContentText()); return; }
+  var rows = JSON.parse(res.getContentText() || '[]');
+  rows.forEach(function (r) {
+    var since = r.status === 'done' ? new Date(r.done_at) : new Date(r.reported_at);
+    var age = now - since, last = r.last_alert_at ? now - new Date(r.last_alert_at) : Infinity;
+    var first, every, msg;
+    if (r.status === 'done') {
+      if (!workHours) return;
+      first = 24 * 3600e3; every = 24 * 3600e3;
+      msg = '⏳ <b>ซ่อมเสร็จแล้ว ยังไม่มีคนยืนยันปิดงาน</b> (' + repairDur(age) + ')\n<b>' + esc(r.ticket_no) + '</b> · ' + esc(r.asset_name)
+          + '\n' + esc(r.reporter_name || 'ผู้แจ้ง') + ' ช่วยตรวจแล้วกดปิดงานด้วย';
+    } else {
+      if (r.urgency === 'stop') { first = 15 * 60e3; every = 15 * 60e3; }
+      else if (r.urgency === 'abnormal') { if (!workHours) return; first = 2 * 3600e3; every = 2 * 3600e3; }
+      else { if (!workHours) return; first = 24 * 3600e3; every = 24 * 3600e3; }
+      var n = (r.alert_count || 0) + 1;
+      msg = (r.urgency === 'stop' ? '🚨' : '⏰') + ' <b>ยังไม่มีช่างรับงาน</b> ' + repairDur(age) + (n >= 3 ? ' — ‼️ หัวหน้าช่างช่วยจัดคน' : '')
+          + '\n' + (REPAIR_URG[r.urgency] || '') + ' <b>' + esc(r.ticket_no) + '</b> · ' + esc(r.asset_name)
+          + '\nอาการ: ' + esc(r.symptom || '-');
+    }
+    if (age < first || last < every) return;
+    sendTelegram(msg + '\n<a href="' + REPAIR_REPO_URL + '#' + r.id + '">👉 เปิดใบงาน</a>', tgChatRepair());
+    sbRequest('patch', 'repair_requests', { last_alert_at: now.toISOString(), alert_count: (r.alert_count || 0) + 1 }, 'id=eq.' + r.id);
+  });
+}
+function installRepairReminder() {
+  removeRepairReminder(true);
+  ScriptApp.newTrigger('repairReminderCheck').timeBased().everyMinutes(10).create();
+  SpreadsheetApp.getUi().alert('ตั้งเตือนงานซ่อมค้างแล้ว — ตรวจทุก 10 นาที');
+}
+function removeRepairReminder(silent) {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'repairReminderCheck') ScriptApp.deleteTrigger(t);
+  });
+  if (silent !== true) SpreadsheetApp.getUi().alert('ยกเลิกเตือนงานซ่อมค้างแล้ว');
+}
+function testRepairAlert() {
+  sendTelegram('✅ ทดสอบแจ้งซ่อม — ถ้าเห็นข้อความนี้ในกลุ่มช่าง แปลว่าตั้งค่าถูกแล้ว', tgChatRepair());
+  SpreadsheetApp.getUi().alert('ส่งข้อความทดสอบเข้ากลุ่มช่างแล้ว (ถ้ายังไม่ได้ใส่ TELEGRAM_CHAT_REPAIR จะเข้ากลุ่มหลัก)');
 }
 
 // ── Supabase helpers ────────────────────────────────────────

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>แจ้งซ่อม — บางเลน</title>
+<script>
+// iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
+// จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
+var APP_VERSION='2026-10-09a';
+(function(){
+  var check=function(){
+    fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
+      .then(function(r){return r.text();})
+      .then(function(t){
+        var m=t.match(/APP_VERSION='([^']+)'/);
+        if(m&&m[1]!==APP_VERSION) location.replace(location.pathname+'?v='+m[1]+location.hash);
+      }).catch(function(){});
+  };
+  check();
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
+})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="แจ้งซ่อม"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#b45309"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:#f5f1ea;min-height:100vh;color:#2a2219;}
+.wrap{max-width:520px;margin:0 auto;padding:0 0 70px;}
+.topbar{background:#b45309;color:#fff;padding:14px 16px 0;position:sticky;top:0;z-index:5;}
+.topbar h1{font-size:18px;font-weight:800;}
+.topbar .me{font-size:12.5px;opacity:.9;margin-top:2px;}
+.topbar .me button{background:none;border:none;color:#fff;text-decoration:underline;font-family:inherit;font-size:12.5px;cursor:pointer;}
+.tabs{display:flex;margin-top:10px;}
+.tab{flex:1;padding:10px 0;text-align:center;font-weight:800;font-size:15px;color:#fde7c8;border:none;background:none;font-family:inherit;border-bottom:3px solid transparent;cursor:pointer;}
+.tab.on{color:#fff;border-bottom-color:#fff;}
+.card{background:#fff;border-radius:14px;padding:16px;margin:12px 12px 0;box-shadow:0 1px 6px rgba(0,0,0,.07);}
+.card-title{font-size:15px;font-weight:800;margin-bottom:10px;}
+.lbl{display:block;font-size:13px;font-weight:700;color:#6b5b4a;margin:12px 0 6px;}
+input,textarea,select{-webkit-appearance:none;appearance:none;width:100%;padding:11px 12px;border:1.5px solid #ddd2c4;border-radius:10px;font-size:16px;font-family:inherit;outline:none;background:#fff;color:#2a2219;}
+textarea{min-height:80px;resize:vertical;}
+input:focus,textarea:focus{border-color:#b45309;box-shadow:0 0 0 3px rgba(180,83,9,.14);}
+.chips{display:flex;flex-wrap:wrap;gap:7px;}
+.chip{padding:8px 12px;border-radius:999px;border:1.5px solid #ddd2c4;background:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;color:#4a3d30;}
+.chip.on{background:#b45309;border-color:#b45309;color:#fff;}
+.urg{display:flex;flex-direction:column;gap:8px;}
+.urg button{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;border:2px solid #e7ddd0;background:#fff;font-family:inherit;font-size:15.5px;font-weight:800;text-align:left;cursor:pointer;color:#2a2219;}
+.urg button small{display:block;font-weight:400;font-size:12.5px;color:#7a6a58;}
+.urg button.on.stop{border-color:#dc2626;background:#fef2f2;}
+.urg button.on.abnormal{border-color:#ea580c;background:#fff7ed;}
+.urg button.on.normal{border-color:#16a34a;background:#f0fdf4;}
+.bigbtn{width:100%;padding:15px;border-radius:12px;border:none;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer;background:#b45309;color:#fff;margin-top:14px;}
+.bigbtn.green{background:#15803d;}.bigbtn.red{background:#b91c1c;}.bigbtn.blue{background:#1d4ed8;}.bigbtn.gray{background:#78716c;}
+.bigbtn:disabled{opacity:.45;cursor:not-allowed;}
+.ghost{width:100%;padding:12px;border-radius:12px;border:1.5px solid #ddd2c4;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;background:#fff;color:#4a3d30;margin-top:10px;}
+.err{color:#b91c1c;font-size:14px;font-weight:600;padding:10px 12px;background:#fef2f2;border-radius:10px;margin-top:12px;}
+.ok{color:#15803d;font-size:14.5px;font-weight:700;padding:12px;background:#f0fdf4;border-radius:10px;margin-top:12px;}
+.photos{display:flex;gap:8px;flex-wrap:wrap;}
+.photos .ph{width:84px;height:84px;border-radius:10px;object-fit:cover;border:1px solid #e7ddd0;}
+.photos .add{width:84px;height:84px;border-radius:10px;border:2px dashed #d6a26b;background:#fffaf3;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:12px;color:#b45309;font-weight:700;cursor:pointer;}
+.photos .add span{font-size:26px;}
+.job{background:#fff;border-radius:12px;padding:12px 14px;margin:10px 12px 0;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;border-left:5px solid #ddd;}
+.job.stop{border-left-color:#dc2626;}.job.abnormal{border-left-color:#ea580c;}.job.normal{border-left-color:#16a34a;}
+.job .t1{display:flex;justify-content:space-between;gap:8px;font-weight:800;font-size:15.5px;}
+.job .t2{font-size:13px;color:#6b5b4a;margin-top:3px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap;}
+.filters{display:flex;gap:7px;padding:12px 12px 0;flex-wrap:wrap;}
+.row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #f1ebe2;font-size:14.5px;}
+.row:last-child{border-bottom:none;}
+.row b{text-align:right;}
+.tl{font-size:13px;color:#4a3d30;padding:5px 0 5px 12px;border-left:2px solid #e7ddd0;margin-left:4px;}
+.tl small{color:#8a7a68;}
+.part{display:flex;gap:6px;margin-bottom:6px;}
+.part input{padding:9px;font-size:15px;}
+.spinner{display:inline-block;width:32px;height:32px;border:4px solid #eadfd2;border-top-color:#b45309;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script type="text/babel">
+// ============================================================
+// แจ้งซ่อมเครื่องจักร/รถ — ลิงก์เดียวใช้ทุกฝ่าย (ใส่ชื่อตัวเองครั้งแรก เครื่องจำไว้)
+// ผู้แจ้ง: เลือกเครื่อง + ความเร่งด่วน + อาการ + รูป → เด้งเตือนช่างใน Telegram
+// ช่าง: รับงาน → เริ่มซ่อม → (รออะไหล่) → ซ่อมเสร็จ + บันทึกสาเหตุ/สิ่งที่ทำ/อะไหล่/ค่าใช้จ่าย
+// ผู้แจ้ง: ยืนยันใช้งานได้ → ปิดงาน (ยังไม่หาย → ตีกลับไปหาช่าง)
+// เปิดใบงานตรงๆ ได้ด้วย repair.html#<id> (ลิงก์ใน Telegram)
+// ============================================================
+const {useState,useEffect,useRef}=React;
+const SB=supabase.createClient(
+  'https://npxzerdirspwunuckcqr.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI'
+);
+// การแจ้งเตือน Telegram อยู่ใน Google Apps Script ตัวเดียวกับแอปผลลูกปูน (หน้านี้ไม่เก็บความลับ)
+const GAS_URL='https://script.google.com/macros/s/AKfycbzyu-ZNgAu9Rxof-PP-JVG6wmKfw1nSnbr75novSi3VbThXxwBfUvZjKrs1OuuW3617/exec';
+const SITE='banglen';
+const DEPTS=['ฝ่ายผลิต','แพล้นปูน','QC','ขนส่ง','ช่างซ่อมบำรุง','สำนักงาน','อื่นๆ'];
+const URG={
+  stop:{label:'🔴 เครื่องหยุด',sub:'ใช้งานต่อไม่ได้ ต้องซ่อมด่วน',color:'#dc2626',bg:'#fef2f2'},
+  abnormal:{label:'🟠 ผิดปกติ',sub:'ยังใช้งานได้ แต่มีอาการ',color:'#ea580c',bg:'#fff7ed'},
+  normal:{label:'🟢 ไม่ด่วน',sub:'ซ่อมเมื่อว่าง / ปรับปรุง',color:'#16a34a',bg:'#f0fdf4'},
+};
+const STATUS={
+  open:{label:'รอช่างรับงาน',color:'#b91c1c',bg:'#fee2e2'},
+  accepted:{label:'ช่างรับงานแล้ว',color:'#1d4ed8',bg:'#dbeafe'},
+  in_progress:{label:'กำลังซ่อม',color:'#7c3aed',bg:'#ede9fe'},
+  waiting_parts:{label:'รออะไหล่',color:'#b45309',bg:'#fef3c7'},
+  done:{label:'ซ่อมเสร็จ รอยืนยัน',color:'#0f766e',bg:'#ccfbf1'},
+  closed:{label:'ปิดงานแล้ว',color:'#15803d',bg:'#dcfce7'},
+  cancelled:{label:'ยกเลิก',color:'#78716c',bg:'#f5f5f4'},
+};
+const CAUSES=['สึกหรอตามอายุ','ใช้งานผิดวิธี','ขาดการบำรุงรักษา','ระบบไฟฟ้า','ไฮดรอลิก/ลม','เครื่องกล/เกียร์/ลูกปืน','อุบัติเหตุ/ชน','ยาง/ช่วงล่าง (รถ)','เครื่องยนต์ (รถ)','อื่นๆ'];
+const ACTIVE=['open','accepted','in_progress','waiting_parts'];
+
+const fmtTime=t=>t?new Date(t).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'}):'-';
+function dur(ms){
+  if(ms==null||!isFinite(ms)||ms<0)return '-';
+  const m=Math.round(ms/60000);
+  if(m<60)return m+' นาที';
+  const h=Math.floor(m/60),mm=m%60;
+  if(h<24)return h+' ชม.'+(mm?' '+mm+' นาที':'');
+  const d=Math.floor(h/24),hh=h%24;
+  return d+' วัน'+(hh?' '+hh+' ชม.':'');
+}
+const ago=t=>t?dur(Date.now()-new Date(t).getTime())+'ที่แล้ว':'';
+const baht=n=>Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:2});
+function loadMe(){try{return JSON.parse(localStorage.getItem('repair_me')||'null');}catch(e){return null;}}
+function saveMe(v){try{localStorage.setItem('repair_me',JSON.stringify(v));}catch(e){}}
+const jobLink=id=>location.origin+location.pathname+'#'+id;
+
+// ย่อรูปก่อนอัปโหลด (ด้านยาว 1280px, JPEG ~150KB) → เก็บใน Supabase Storage
+function shrink(file){
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{
+    let w=img.width,h=img.height,M=1280;if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}
+    const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+    c.toBlob(b=>b?res(b):rej(new Error('ย่อรูปไม่ได้')),'image/jpeg',0.72);};img.onerror=()=>rej(new Error('เปิดรูปไม่ได้'));img.src=r.result;};
+    r.onerror=()=>rej(new Error('อ่านไฟล์ไม่ได้'));r.readAsDataURL(file);});
+}
+async function uploadPhoto(file){
+  const blob=await shrink(file);
+  const d=new Date(),path=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.jpg';
+  const{error}=await SB.storage.from('repair-photos').upload(path,blob,{contentType:'image/jpeg'});
+  if(error)throw error;
+  return SB.storage.from('repair-photos').getPublicUrl(path).data.publicUrl;
+}
+// แจ้ง Apps Script ให้ส่ง Telegram (no-cors: ไม่ต้องรอคำตอบ)
+function notify(event,req,extra){
+  try{fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({kind:'repair_event',event,link:jobLink(req.id),req,...(extra||{})})});}catch(e){}
+}
+async function logEvent(id,actor,action,note){await SB.from('repair_events').insert([{request_id:id,actor,action,note:note||null}]);}
+
+function PhotoPicker({urls,setUrls,max}){
+  const ref=useRef();const[busy,setBusy]=useState(false);const[err,setErr]=useState('');
+  const pick=async e=>{const files=[...e.target.files].slice(0,(max||3)-urls.length);e.target.value='';if(!files.length)return;
+    setBusy(true);setErr('');
+    try{const out=[];for(const f of files)out.push(await uploadPhoto(f));setUrls([...urls,...out]);}
+    catch(ex){setErr('อัปโหลดรูปไม่สำเร็จ: '+(ex.message||ex));}
+    setBusy(false);};
+  return <div>
+    <div className="photos">
+      {urls.map((u,i)=><div key={i} style={{position:'relative'}}><img className="ph" src={u}/>
+        <button onClick={()=>setUrls(urls.filter((_,j)=>j!==i))} style={{position:'absolute',top:-6,right:-6,width:22,height:22,borderRadius:11,border:'none',background:'#1f1a14',color:'#fff',fontSize:12,cursor:'pointer'}}>✕</button></div>)}
+      {urls.length<(max||3)&&<div className="add" onClick={()=>!busy&&ref.current.click()}>{busy?<div className="spinner" style={{width:22,height:22,borderWidth:3}}/>:<><span>📷</span>ถ่าย/เลือกรูป</>}</div>}
+    </div>
+    <input ref={ref} type="file" accept="image/*" multiple style={{display:'none'}} onChange={pick}/>
+    {err&&<div className="err">{err}</div>}
+  </div>;
+}
+
+function Badge({s}){const v=STATUS[s]||{label:s,color:'#555',bg:'#eee'};return <span className="badge" style={{color:v.color,background:v.bg}}>{v.label}</span>;}
+
+// ---------- ตั้งชื่อตัวเอง ----------
+function MeSetup({me,onSave}){
+  const[name,setName]=useState(me?.name||'');const[dept,setDept]=useState(me?.dept||'');
+  return <div className="card">
+    <div className="card-title">ก่อนเริ่ม ใส่ชื่อตัวเองครั้งเดียว</div>
+    <label className="lbl">ชื่อเล่น / ชื่อ</label>
+    <input value={name} onChange={e=>setName(e.target.value)} placeholder="เช่น สมชาย"/>
+    <label className="lbl">ฝ่าย</label>
+    <div className="chips">{DEPTS.map(d=><button key={d} className={'chip'+(dept===d?' on':'')} onClick={()=>setDept(d)}>{d}</button>)}</div>
+    <button className="bigbtn" disabled={!name.trim()||!dept} onClick={()=>onSave({name:name.trim(),dept})}>บันทึก</button>
+    <div style={{fontSize:12.5,color:'#8a7a68',marginTop:8}}>เครื่องนี้จะจำชื่อไว้ เปลี่ยนได้ที่ด้านบน</div>
+  </div>;
+}
+
+// ---------- ฟอร์มแจ้งซ่อม ----------
+function ReportForm({me,assets,onDone}){
+  const[cat,setCat]=useState('');const[asset,setAsset]=useState('');const[other,setOther]=useState('');
+  const[urg,setUrg]=useState('');const[symptom,setSymptom]=useState('');const[photos,setPhotos]=useState([]);
+  const[saving,setSaving]=useState(false);const[err,setErr]=useState('');
+  const cats=[...new Set(assets.map(a=>a.category||'อื่นๆ'))];
+  const list=assets.filter(a=>(a.category||'อื่นๆ')===cat);
+  const assetName=asset==='__other'?other.trim():asset;
+  const submit=async()=>{
+    if(!assetName){setErr('เลือกเครื่องจักร/รถ');return;}
+    if(!urg){setErr('เลือกความเร่งด่วน');return;}
+    if(!symptom.trim()){setErr('บอกอาการสั้นๆ');return;}
+    setSaving(true);setErr('');
+    const a=assets.find(x=>x.name===assetName);
+    const row={site:SITE,asset_name:assetName,asset_category:a?a.category:(cat||'อื่นๆ'),urgency:urg,symptom:symptom.trim(),
+      reporter_name:me.name,reporter_dept:me.dept,photos,status:'open'};
+    const{data,error}=await SB.from('repair_requests').insert([row]).select().single();
+    if(error){setSaving(false);setErr('แจ้งไม่สำเร็จ: '+error.message);return;}
+    await logEvent(data.id,me.name,'แจ้งซ่อม',symptom.trim());
+    notify('new',data);
+    setSaving(false);onDone(data);
+  };
+  return <div className="card">
+    <div className="card-title">1. เครื่องจักร / รถ คันไหน</div>
+    <div className="chips">{cats.map(c=><button key={c} className={'chip'+(cat===c?' on':'')} onClick={()=>{setCat(c);setAsset('');}}>{c}</button>)}
+      <button className={'chip'+(cat==='__other'?' on':'')} onClick={()=>{setCat('__other');setAsset('__other');}}>อื่นๆ (พิมพ์เอง)</button></div>
+    {cat&&cat!=='__other'&&<><label className="lbl">เลือก{cat}</label>
+      <div className="chips">{list.map(a=><button key={a.id} className={'chip'+(asset===a.name?' on':'')} onClick={()=>setAsset(a.name)}>{a.name}</button>)}</div></>}
+    {asset==='__other'&&<><label className="lbl">ชื่อเครื่อง/รถ</label><input value={other} onChange={e=>setOther(e.target.value)} placeholder="เช่น ปั๊มน้ำบ่อบ่ม"/></>}
+
+    <div className="card-title" style={{marginTop:18}}>2. ความเร่งด่วน</div>
+    <div className="urg">{Object.entries(URG).map(([k,v])=><button key={k} className={(urg===k?'on ':'')+k} onClick={()=>setUrg(k)}>
+      <div>{v.label}<small>{v.sub}</small></div></button>)}</div>
+
+    <div className="card-title" style={{marginTop:18}}>3. อาการ</div>
+    <textarea value={symptom} onChange={e=>setSymptom(e.target.value)} placeholder="เช่น เครนยกขึ้นไม่ได้ มีเสียงดังที่มอเตอร์"/>
+    <label className="lbl">รูป / จุดที่เสีย (ถ้ามี)</label>
+    <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
+    {err&&<div className="err">{err}</div>}
+    <button className="bigbtn" disabled={saving} onClick={submit}>{saving?'กำลังส่ง...':'🔔 แจ้งซ่อม'}</button>
+  </div>;
+}
+
+// ---------- ฟอร์มช่างปิดงานซ่อม ----------
+function DoneForm({req,me,onSaved,onCancel}){
+  const[cause,setCause]=useState(req.cause||'');const[work,setWork]=useState(req.work_done||'');
+  const[parts,setParts]=useState(req.parts&&req.parts.length?req.parts:[{name:'',qty:'',price:''}]);
+  const[vendor,setVendor]=useState(req.vendor||'');const[vcost,setVcost]=useState(req.vendor_cost||'');
+  const[helpers,setHelpers]=useState(req.helpers||'');const[photos,setPhotos]=useState(req.after_photos||[]);
+  const[saving,setSaving]=useState(false);const[err,setErr]=useState('');
+  const setPart=(i,k,v)=>setParts(parts.map((p,j)=>j===i?{...p,[k]:v}:p));
+  const cleanParts=parts.filter(p=>String(p.name||'').trim()).map(p=>({name:p.name.trim(),qty:Number(p.qty)||1,price:Number(p.price)||0}));
+  const partsCost=cleanParts.reduce((s,p)=>s+p.qty*p.price,0);
+  const save=async()=>{
+    if(!cause){setErr('เลือกสาเหตุ');return;}
+    if(!work.trim()){setErr('บอกสิ่งที่ทำ');return;}
+    setSaving(true);setErr('');
+    const now=new Date();
+    let waiting=req.waiting_minutes||0;
+    if(req.status==='waiting_parts'&&req.waiting_since)waiting+=Math.round((now-new Date(req.waiting_since))/60000);
+    const patch={status:'done',done_at:now.toISOString(),cause,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
+      vendor:vendor.trim()||null,vendor_cost:Number(vcost)||0,helpers:helpers.trim()||null,after_photos:photos,
+      waiting_since:null,waiting_minutes:waiting,started_at:req.started_at||req.accepted_at||now.toISOString(),
+      technician:req.technician||me.name,updated_at:now.toISOString()};
+    const{data,error}=await SB.from('repair_requests').update(patch).eq('id',req.id).select().single();
+    if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    await logEvent(req.id,me.name,'ซ่อมเสร็จ',cause+' · '+work.trim());
+    notify('done',data);
+    setSaving(false);onSaved(data);
+  };
+  return <div className="card">
+    <div className="card-title">✅ บันทึกการซ่อม</div>
+    <label className="lbl">สาเหตุ</label>
+    <div className="chips">{CAUSES.map(c=><button key={c} className={'chip'+(cause===c?' on':'')} onClick={()=>setCause(c)}>{c}</button>)}</div>
+    <label className="lbl">สิ่งที่ทำ / วิธีแก้</label>
+    <textarea value={work} onChange={e=>setWork(e.target.value)} placeholder="เช่น เปลี่ยนลูกปืนมอเตอร์ยก อัดจาระบี"/>
+    <label className="lbl">อะไหล่ที่ใช้ (ชื่อ · จำนวน · ราคา/ชิ้น)</label>
+    {parts.map((p,i)=><div className="part" key={i}>
+      <input style={{flex:3}} value={p.name} onChange={e=>setPart(i,'name',e.target.value)} placeholder="ชื่ออะไหล่"/>
+      <input style={{flex:1}} type="number" inputMode="decimal" value={p.qty} onChange={e=>setPart(i,'qty',e.target.value)} placeholder="จำนวน"/>
+      <input style={{flex:1.4}} type="number" inputMode="decimal" value={p.price} onChange={e=>setPart(i,'price',e.target.value)} placeholder="บาท"/>
+    </div>)}
+    <button className="chip" onClick={()=>setParts([...parts,{name:'',qty:'',price:''}])}>+ เพิ่มอะไหล่</button>
+    {partsCost>0&&<div style={{fontSize:13.5,marginTop:6,color:'#6b5b4a'}}>ค่าอะไหล่รวม <b>{baht(partsCost)}</b> บาท</div>}
+    <label className="lbl">จ้างร้านภายนอก (ถ้ามี)</label>
+    <div className="part"><input style={{flex:2}} value={vendor} onChange={e=>setVendor(e.target.value)} placeholder="ชื่อร้าน"/>
+      <input style={{flex:1}} type="number" inputMode="decimal" value={vcost} onChange={e=>setVcost(e.target.value)} placeholder="บาท"/></div>
+    <label className="lbl">ช่างที่ช่วยซ่อม (ถ้ามี)</label>
+    <input value={helpers} onChange={e=>setHelpers(e.target.value)} placeholder="เช่น เอ, บี"/>
+    <label className="lbl">รูปหลังซ่อม</label>
+    <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
+    {err&&<div className="err">{err}</div>}
+    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
+    <button className="ghost" onClick={onCancel}>ย้อนกลับ</button>
+  </div>;
+}
+
+// ---------- รายละเอียดใบงาน ----------
+function JobDetail({id,me,onBack}){
+  const[req,setReq]=useState(null);const[events,setEvents]=useState([]);const[mode,setMode]=useState('');
+  const[note,setNote]=useState('');const[busy,setBusy]=useState(false);const[err,setErr]=useState('');
+  const load=async()=>{
+    const{data,error}=await SB.from('repair_requests').select('*').eq('id',id).single();
+    if(error){setErr('ไม่พบใบงาน: '+error.message);return;}
+    setReq(data);
+    const ev=await SB.from('repair_events').select('*').eq('request_id',id).order('at');
+    setEvents(ev.data||[]);
+  };
+  useEffect(()=>{load();},[id]);
+  if(err&&!req)return <div className="card"><div className="err">{err}</div><button className="ghost" onClick={onBack}>กลับ</button></div>;
+  if(!req)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
+  const u=URG[req.urgency]||URG.abnormal;
+  const act=async(patch,action,evNote,event)=>{
+    setBusy(true);setErr('');
+    const{data,error}=await SB.from('repair_requests').update({...patch,updated_at:new Date().toISOString()}).eq('id',req.id).select().single();
+    if(error){setBusy(false);setErr('ไม่สำเร็จ: '+error.message);return;}
+    await logEvent(req.id,me.name,action,evNote);
+    if(event)notify(event,data,{actor:me.name,note:evNote||''});
+    setReq(data);setMode('');setNote('');setBusy(false);
+    const ev=await SB.from('repair_events').select('*').eq('request_id',id).order('at');setEvents(ev.data||[]);
+  };
+  const now=new Date().toISOString();
+  const waitAdd=()=>req.waiting_since?Math.round((Date.now()-new Date(req.waiting_since).getTime())/60000):0;
+  if(mode==='done')return <DoneForm req={req} me={me} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
+  const endT=req.done_at?new Date(req.done_at).getTime():Date.now();
+  return <div>
+    <div className="card" style={{borderTop:'5px solid '+u.color}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+        <div style={{fontSize:13,color:'#8a7a68',fontWeight:700}}>{req.ticket_no}</div><Badge s={req.status}/>
+      </div>
+      <div style={{fontSize:20,fontWeight:800,marginTop:4}}>{req.asset_name}</div>
+      <div style={{fontSize:14,fontWeight:800,color:u.color,marginTop:2}}>{u.label}</div>
+      <div style={{fontSize:15.5,marginTop:10,whiteSpace:'pre-wrap'}}>{req.symptom}</div>
+      {req.photos&&req.photos.length>0&&<div className="photos" style={{marginTop:10}}>{req.photos.map((p,i)=><a key={i} href={p} target="_blank"><img className="ph" src={p}/></a>)}</div>}
+      <div style={{marginTop:12}}>
+        <div className="row"><span>แจ้งโดย</span><b>{req.reporter_name} ({req.reporter_dept})</b></div>
+        <div className="row"><span>เวลาแจ้ง</span><b>{fmtTime(req.reported_at)}</b></div>
+        {req.technician&&<div className="row"><span>ช่าง</span><b>{req.technician}{req.helpers?' + '+req.helpers:''}</b></div>}
+        {req.accepted_at&&<div className="row"><span>รับงานภายใน</span><b>{dur(new Date(req.accepted_at)-new Date(req.reported_at))}</b></div>}
+        <div className="row"><span>{req.done_at?'ใช้เวลาทั้งหมด':'ผ่านไปแล้ว'}</span><b>{dur(endT-new Date(req.reported_at).getTime())}</b></div>
+        {(req.waiting_minutes>0||req.status==='waiting_parts')&&<div className="row"><span>รออะไหล่</span><b>{dur(((req.waiting_minutes||0)+waitAdd())*60000)}</b></div>}
+      </div>
+    </div>
+
+    {req.done_at&&<div className="card">
+      <div className="card-title">🔧 ผลการซ่อม</div>
+      <div className="row"><span>สาเหตุ</span><b>{req.cause}</b></div>
+      <div style={{fontSize:14.5,padding:'8px 0',whiteSpace:'pre-wrap'}}>{req.work_done}</div>
+      {(req.parts||[]).map((p,i)=><div className="row" key={i}><span>{p.name} × {p.qty}</span><b>{baht(p.qty*p.price)} ฿</b></div>)}
+      {req.vendor&&<div className="row"><span>ร้าน {req.vendor}</span><b>{baht(req.vendor_cost)} ฿</b></div>}
+      {(req.parts_cost>0||req.vendor_cost>0)&&<div className="row"><span>รวมค่าใช้จ่าย</span><b>{baht((req.parts_cost||0)+(req.vendor_cost||0))} ฿</b></div>}
+      {req.after_photos&&req.after_photos.length>0&&<div className="photos" style={{marginTop:8}}>{req.after_photos.map((p,i)=><a key={i} href={p} target="_blank"><img className="ph" src={p}/></a>)}</div>}
+    </div>}
+
+    <div className="card">
+      {req.status==='open'&&<>
+        <button className="bigbtn blue" disabled={busy} onClick={()=>act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted')}>🙋 รับงานนี้ ({me.name})</button>
+        {mode!=='cancel'?<button className="ghost" onClick={()=>setMode('cancel')}>ยกเลิกใบแจ้ง (แจ้งผิด/ซ้ำ)</button>:<>
+          <label className="lbl">เหตุผลที่ยกเลิก</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น แจ้งซ้ำ"/>
+          <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>act({status:'cancelled',closed_at:now,close_note:note.trim(),closed_by:me.name},'ยกเลิก',note.trim(),'cancelled')}>ยืนยันยกเลิก</button></>}
+      </>}
+      {req.status==='accepted'&&<>
+        <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',started_at:req.started_at||now},'เริ่มซ่อม')}>▶️ เริ่มซ่อม</button>
+        <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จแล้ว (บันทึกเลย)</button>
+      </>}
+      {req.status==='in_progress'&&<>
+        <button className="bigbtn green" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
+        {mode!=='wait'?<button className="ghost" onClick={()=>setMode('wait')}>⏸ รออะไหล่</button>:<>
+          <label className="lbl">รออะไหล่อะไร</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ลูกปืน 6205 สั่งร้านแล้ว"/>
+          <button className="bigbtn" style={{background:'#b45309'}} disabled={busy||!note.trim()} onClick={()=>act({status:'waiting_parts',waiting_since:now},'รออะไหล่',note.trim(),'waiting_parts')}>⏸ ยืนยันรออะไหล่</button></>}
+      </>}
+      {req.status==='waiting_parts'&&<>
+        <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',waiting_since:null,waiting_minutes:(req.waiting_minutes||0)+waitAdd()},'ได้อะไหล่ ซ่อมต่อ')}>▶️ ได้อะไหล่แล้ว ซ่อมต่อ</button>
+        <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
+      </>}
+      {req.status==='done'&&<>
+        <div style={{fontSize:14,color:'#6b5b4a',marginBottom:4}}>ผู้แจ้ง/หัวหน้างาน ตรวจว่าใช้งานได้จริง แล้วกดปิดงาน</div>
+        <button className="bigbtn green" disabled={busy} onClick={()=>act({status:'closed',closed_at:now,closed_by:me.name},'ยืนยันใช้งานได้ ปิดงาน',null,'closed')}>👍 ใช้งานได้แล้ว ปิดงาน</button>
+        {mode!=='reopen'?<button className="ghost" onClick={()=>setMode('reopen')}>👎 ยังไม่หาย ส่งกลับให้ช่าง</button>:<>
+          <label className="lbl">อาการที่ยังเป็นอยู่</label><input value={note} onChange={e=>setNote(e.target.value)}/>
+          <button className="bigbtn red" disabled={busy||!note.trim()} onClick={()=>act({status:'accepted',done_at:null,reopen_count:(req.reopen_count||0)+1},'ยังไม่หาย ส่งกลับ',note.trim(),'reopened')}>ส่งกลับให้ช่าง</button></>}
+      </>}
+      {(req.status==='closed'||req.status==='cancelled')&&<div className="ok">{req.status==='closed'?'ปิดงานแล้ว โดย '+req.closed_by+' · '+fmtTime(req.closed_at):'ยกเลิกแล้ว: '+(req.close_note||'')}</div>}
+      {err&&<div className="err">{err}</div>}
+    </div>
+
+    <div className="card">
+      <div className="card-title">ประวัติ</div>
+      {events.map(e=><div className="tl" key={e.id}><b>{e.action}</b> — {e.actor} <small>{fmtTime(e.at)}</small>{e.note&&<div><small>{e.note}</small></div>}</div>)}
+    </div>
+    <button className="ghost" style={{margin:'12px 12px 0',width:'calc(100% - 24px)'}} onClick={onBack}>← กลับไปรายการ</button>
+  </div>;
+}
+
+// ---------- รายการงาน ----------
+function JobList({onOpen,reloadKey}){
+  const[rows,setRows]=useState(null);const[f,setF]=useState('active');
+  useEffect(()=>{
+    const since=new Date(Date.now()-45*864e5).toISOString();
+    SB.from('repair_requests').select('*').eq('site',SITE).or('status.in.(open,accepted,in_progress,waiting_parts,done),reported_at.gte.'+since)
+      .order('reported_at',{ascending:false}).limit(300).then(({data})=>setRows(data||[]));
+  },[reloadKey]);
+  if(!rows)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
+  const rank={stop:0,abnormal:1,normal:2};
+  const groups={active:rows.filter(r=>ACTIVE.includes(r.status)).sort((a,b)=>(rank[a.urgency]-rank[b.urgency])||(new Date(a.reported_at)-new Date(b.reported_at))),
+    done:rows.filter(r=>r.status==='done'),closed:rows.filter(r=>r.status==='closed'||r.status==='cancelled')};
+  const list=groups[f];
+  return <div>
+    <div className="filters">
+      {[['active','งานค้าง'],['done','รอยืนยัน'],['closed','ปิดแล้ว']].map(([k,l])=><button key={k} className={'chip'+(f===k?' on':'')} onClick={()=>setF(k)}>{l} ({groups[k].length})</button>)}
+    </div>
+    {list.length===0&&<div style={{textAlign:'center',color:'#8a7a68',padding:30}}>ไม่มีรายการ</div>}
+    {list.map(r=><div key={r.id} className={'job '+r.urgency} onClick={()=>onOpen(r.id)}>
+      <div className="t1"><span>{r.asset_name}</span><Badge s={r.status}/></div>
+      <div className="t2">{r.symptom}</div>
+      <div className="t2">{r.ticket_no} · {r.reporter_name} · แจ้ง {ago(r.reported_at)}{r.technician?' · ช่าง '+r.technician:''}</div>
+    </div>)}
+  </div>;
+}
+
+function App(){
+  const[me,setMe]=useState(loadMe());const[editMe,setEditMe]=useState(false);
+  const[tab,setTab]=useState(location.hash.replace('#','')?'jobs':'report');
+  const[openId,setOpenId]=useState(location.hash.replace('#','')||null);
+  const[assets,setAssets]=useState([]);const[done,setDone]=useState(null);const[reloadKey,setReloadKey]=useState(0);
+  useEffect(()=>{SB.from('repair_assets').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name').then(({data})=>setAssets(data||[]));},[]);
+  useEffect(()=>{const h=()=>{const id=location.hash.replace('#','');if(id){setOpenId(id);setTab('jobs');}};window.addEventListener('hashchange',h);return()=>window.removeEventListener('hashchange',h);},[]);
+  const open=id=>{location.hash=id;setOpenId(String(id));};
+  const back=()=>{history.replaceState(null,'',location.pathname+location.search);setOpenId(null);setReloadKey(k=>k+1);};
+  return <div className="wrap">
+    <div className="topbar">
+      <h1>🔧 แจ้งซ่อม — บางเลน</h1>
+      {me&&<div className="me">ผู้ใช้: {me.name} ({me.dept}) <button onClick={()=>setEditMe(true)}>เปลี่ยน</button></div>}
+      {me&&!editMe&&<div className="tabs">
+        <button className={'tab'+(tab==='report'?' on':'')} onClick={()=>{setTab('report');setDone(null);back();}}>➕ แจ้งซ่อม</button>
+        <button className={'tab'+(tab==='jobs'?' on':'')} onClick={()=>{setTab('jobs');back();}}>📋 งานซ่อม</button>
+      </div>}
+      {(!me||editMe)&&<div style={{height:12}}/>}
+    </div>
+    {(!me||editMe)?<MeSetup me={me} onSave={v=>{saveMe(v);setMe(v);setEditMe(false);}}/>:
+     tab==='report'?(done?<div className="card">
+        <div className="ok">แจ้งซ่อมแล้ว เลขที่ <b>{done.ticket_no}</b><br/>ระบบส่งเตือนช่างแล้ว</div>
+        <button className="bigbtn" onClick={()=>{setTab('jobs');open(done.id);}}>ดูใบงาน</button>
+        <button className="ghost" onClick={()=>setDone(null)}>แจ้งเรื่องอื่นต่อ</button>
+      </div>:<ReportForm me={me} assets={assets} onDone={d=>setDone(d)}/>):
+     openId?<JobDetail id={openId} me={me} onBack={back}/>:<JobList onOpen={open} reloadKey={reloadKey}/>}
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
