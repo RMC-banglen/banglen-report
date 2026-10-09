@@ -113,6 +113,7 @@ function repairReminderCheck() {
   var res = sb('get', 'repair_requests?site=eq.banglen&status=in.(open,done)'
     + '&select=id,ticket_no,asset_name,urgency,symptom,reporter_name,status,reported_at,done_at,last_alert_at,alert_count');
   if (res.getResponseCode() >= 300) { Logger.log('repairReminderCheck: ' + res.getContentText()); return; }
+  var heads = headTags();
   JSON.parse(res.getContentText() || '[]').forEach(function (r) {
     var since = r.status === 'done' ? new Date(r.done_at) : new Date(r.reported_at);
     var age = now - since, last = r.last_alert_at ? now - new Date(r.last_alert_at) : Infinity;
@@ -121,13 +122,13 @@ function repairReminderCheck() {
       if (!workHours) return;
       first = every = 24 * 3600e3;
       msg = '⏳ <b>ซ่อมเสร็จแล้ว ยังไม่มีคนยืนยันปิดงาน</b> (' + dur(age) + ')\n<b>' + esc(r.ticket_no) + '</b> · ' + esc(r.asset_name)
-          + '\n' + esc(r.reporter_name || 'ผู้แจ้ง') + ' ช่วยตรวจแล้วกดปิดงานด้วย';
+          + '\n' + esc(r.reporter_name || 'ผู้แจ้ง') + ' ช่วยตรวจแล้วกดปิดงานด้วย' + (heads ? '\n' + heads + ' (หัวหน้าปิดแทนได้)' : '');
     } else {
       if (r.urgency === 'stop') { first = every = 15 * 60e3; }
       else if (r.urgency === 'abnormal') { if (!workHours) return; first = every = 2 * 3600e3; }
       else { if (!workHours) return; first = every = 24 * 3600e3; }
       var n = (r.alert_count || 0) + 1;
-      msg = (r.urgency === 'stop' ? '🚨' : '⏰') + ' <b>ยังไม่มีช่างรับงาน</b> ' + dur(age) + (n >= 3 ? ' — ‼️ หัวหน้าช่างช่วยจัดคน' : '')
+      msg = (r.urgency === 'stop' ? '🚨' : '⏰') + ' <b>ยังไม่มีช่างรับงาน</b> ' + dur(age) + (n >= 3 ? ' — ‼️ หัวหน้าช่างช่วยจัดคน' + (heads ? ' ' + heads : '') : '')
           + '\n' + (URG[r.urgency] || '') + ' <b>' + esc(r.ticket_no) + '</b> · ' + esc(r.asset_name)
           + '\nอาการ: ' + esc(r.symptom || '-');
     }
@@ -137,6 +138,12 @@ function repairReminderCheck() {
   });
 }
 
+// @แท็กหัวหน้าช่าง (ตั้งชื่อผู้ใช้ Telegram ในแดชบอร์ด แท็บแจ้งซ่อม → รายชื่อช่าง) — แท็กแล้วมือถือหัวหน้าเด้งแม้ปิดเสียงกลุ่ม
+function headTags() {
+  var r = sb('get', 'repair_staff?site=eq.banglen&role=eq.head&active=eq.true&select=telegram');
+  if (r.getResponseCode() >= 300) return '';
+  return JSON.parse(r.getContentText() || '[]').filter(function (x) { return x.telegram; }).map(function (x) { return '@' + x.telegram; }).join(' ');
+}
 function sb(method, path, payload, returnRows) {
   var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
   if (returnRows) headers.Prefer = 'return=representation';

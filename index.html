@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09h';
+var APP_VERSION='2026-10-09i';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9002,6 +9002,9 @@ window.__dataReady.then(data => {
     const [showAll,setShowAll]=useState(false);
     const [histAsset,setHistAsset]=useState(null);
     const [fleet,setFleet]=useState({});
+    const [staff,setStaff]=useState([]);
+    const [staffMissing,setStaffMissing]=useState(false);
+    const [newStaff,setNewStaff]=useState({name:'',role:'tech',telegram:''});
     const yearCE=yearBE-543;
     // รถขนส่งบริษัท + คนขับปัจจุบัน จากงานขนส่ง (transport_vehicles / drivers / assignments)
     const loadFleet=async()=>{
@@ -9043,7 +9046,18 @@ window.__dataReady.then(data => {
         if(await syncFleet(as,fl,new Set((usedRows||[]).map(x=>x.asset_name))))as=await getAssets();
       }
       setAssets(as);
+      const st=await DB.from('repair_staff').select('*').eq('site','banglen').order('sort_order').order('name');
+      setStaffMissing(!!st.error);setStaff(st.data||[]);
     };
+    // รายชื่อช่าง/หัวหน้า — ชื่อต้องตรงกับที่ช่างเลือกในแอปแจ้งซ่อม
+    const addStaff=async()=>{
+      const name=newStaff.name.trim();if(!name)return;
+      const{error}=await DB.from('repair_staff').insert([{site:'banglen',name,role:newStaff.role,telegram:newStaff.telegram.trim().replace(/^@/,'')||null,sort_order:staff.length+1}]);
+      if(error){alert('เพิ่มไม่สำเร็จ: '+error.message);return;}
+      setNewStaff({name:'',role:'tech',telegram:''});load();
+    };
+    const updStaff=async(x,patch)=>{const{error}=await DB.from('repair_staff').update(patch).eq('id',x.id);if(error)alert('แก้ไม่สำเร็จ: '+error.message);load();};
+    const delStaff=async x=>{if(!confirm('ลบ '+x.name+' ออกจากรายชื่อช่าง?\n(ประวัติงานที่เคยทำยังอยู่)'))return;await DB.from('repair_staff').delete().eq('id',x.id);load();};
     useEffect(()=>{load();},[yearBE]);
     const link=location.origin+location.pathname.replace(/[^/]*$/,'')+'repair.html';
     const hrs=ms=>ms/3600000;
@@ -9208,6 +9222,27 @@ window.__dataReady.then(data => {
             <td style={td}>{canEdit&&<button onClick={()=>delReq(r)} title="ลบใบงานนี้" style={{padding:'3px 9px',border:'1px solid #fecaca',borderRadius:6,background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>🗑 ลบ</button>}</td>
           </tr>)}
         </tbody></table></div>}
+      </div>
+
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
+        <div style={{fontWeight:800,marginBottom:4}}>👷 รายชื่อช่าง / หัวหน้าช่าง ({staff.filter(x=>x.active).length})</div>
+        <div style={{fontSize:12,color:'#94a3b8',marginBottom:10}}>เฉพาะชื่อในรายการนี้ที่กดรับงาน/บันทึกการซ่อมได้ (ช่างเลือกชื่อตัวเองจากรายการตอนเข้าแอปครั้งแรก) · <b>หัวหน้า</b> = มอบหมายงานให้ช่างได้ + ถูก @แท็กใน Telegram ตอนงานค้างนาน (ใส่ชื่อผู้ใช้ Telegram) · ยังไม่ได้ตั้งรายชื่อ = ใครเลือกฝ่าย "ช่างซ่อมบำรุง" ก็รับงานได้</div>
+        {staffMissing?<div style={{color:'#b45309',fontSize:13}}>ยังไม่ได้รัน supabase-repair-staff.sql</div>:<>
+        {canEdit&&<div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
+          <input value={newStaff.name} onChange={e=>setNewStaff({...newStaff,name:e.target.value})} placeholder="ชื่อช่าง (ตามที่ใช้ในแอป)" style={{padding:'6px 10px',border:'1px solid #e2e8f0',borderRadius:6,fontFamily:'inherit'}}/>
+          <select value={newStaff.role} onChange={e=>setNewStaff({...newStaff,role:e.target.value})} style={{padding:'6px 10px',border:'1px solid #e2e8f0',borderRadius:6,fontFamily:'inherit'}}><option value="tech">ช่าง</option><option value="head">หัวหน้าช่าง</option></select>
+          <input value={newStaff.telegram} onChange={e=>setNewStaff({...newStaff,telegram:e.target.value})} placeholder="@ชื่อผู้ใช้ Telegram (หัวหน้า)" style={{padding:'6px 10px',border:'1px solid #e2e8f0',borderRadius:6,fontFamily:'inherit'}}/>
+          <button onClick={addStaff} style={{padding:'6px 12px',border:'none',borderRadius:6,background:'#b45309',color:'#fff',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>+ เพิ่ม</button>
+        </div>}
+        {staff.length===0?<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีรายชื่อ</div>:
+        <table style={{borderCollapse:'collapse',minWidth:420}}><tbody>{staff.map(x=><tr key={x.id} style={{opacity:x.active?1:.45}}>
+          <td style={{...td,textAlign:'left',fontWeight:700}}>{x.name}</td>
+          <td style={td}>{canEdit?<select value={x.role} onChange={e=>updStaff(x,{role:e.target.value})} style={{padding:'3px 6px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit'}}><option value="tech">ช่าง</option><option value="head">หัวหน้าช่าง</option></select>:(x.role==='head'?'หัวหน้าช่าง':'ช่าง')}</td>
+          <td style={td}>{canEdit?<input defaultValue={x.telegram?'@'+x.telegram:''} placeholder="@telegram" onBlur={e=>{const v=e.target.value.trim().replace(/^@/,'')||null;if(v!==(x.telegram||null))updStaff(x,{telegram:v});}} style={{padding:'3px 6px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit',width:140}}/>:(x.telegram?'@'+x.telegram:'–')}</td>
+          {canEdit&&<td style={td}><button onClick={()=>updStaff(x,{active:!x.active})} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>{x.active?'ปิดใช้งาน':'เปิดใช้งาน'}</button>{' '}
+            <button onClick={()=>delStaff(x)} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #fecaca',background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>ลบ</button></td>}
+        </tr>)}</tbody></table>}
+        </>}
       </div>
 
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>

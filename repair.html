@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09i';
+var APP_VERSION='2026-10-09j';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -163,6 +163,13 @@ async function uploadPhoto(file){
   return SB.storage.from('repair-photos').getPublicUrl(path).data.publicUrl;
 }
 // แจ้ง Apps Script ให้ส่ง Telegram (no-cors: ไม่ต้องรอคำตอบ)
+// รายชื่อช่าง/หัวหน้า (ตั้งในแดชบอร์ด) — ยังไม่ได้ตั้ง = ใช้ฝ่าย "ช่างซ่อมบำรุง" ตามที่เลือกตอนใส่ชื่อ
+let STAFF=[];
+function roleOf(me){
+  if(!me)return null;
+  if(STAFF.length){const st=STAFF.find(x=>x.name===me.name);return st?st.role:null;}
+  return me.dept==='ช่างซ่อมบำรุง'?'tech':null;
+}
 // รถขนส่ง/เครนรถ: ชื่อในระบบ = ทะเบียน (ไม่เปลี่ยน ประวัติซ่อมติดรถคันเดิม) · คนขับปัจจุบันดึงจากงานขนส่งมาแสดงต่อท้าย
 let FLEET={};
 async function loadFleet(){
@@ -257,6 +264,11 @@ function MeSetup({me,onSave}){
     <input value={name} onChange={e=>setName(e.target.value)} placeholder="เช่น สมชาย"/>
     <label className="lbl">ฝ่าย</label>
     <div className="chips">{DEPTS.map(d=><button key={d} className={'chip'+(dept===d?' on':'')} onClick={()=>setDept(d)}>{d}</button>)}</div>
+    {dept==='ช่างซ่อมบำรุง'&&STAFF.length>0&&<>
+      <label className="lbl">ช่าง: เลือกชื่อตัวเองจากรายชื่อ</label>
+      <div className="chips">{STAFF.map(x=><button key={x.id} className={'chip'+(name===x.name?' on':'')} onClick={()=>setName(x.name)}>{x.name}{x.role==='head'?' (หัวหน้า)':''}</button>)}</div>
+      {name&&!STAFF.some(x=>x.name===name)&&<div className="err">ชื่อนี้ไม่อยู่ในรายชื่อช่าง — จะกดรับงานไม่ได้ (เลือกชื่อจากรายการ หรือให้หัวหน้าเพิ่มชื่อในแดชบอร์ด)</div>}
+    </>}
     <button className="bigbtn" disabled={!name.trim()||!dept} onClick={()=>onSave({name:name.trim(),dept})}>บันทึก</button>
     <div style={{fontSize:12.5,color:'#8a7a68',marginTop:8}}>เครื่องนี้จะจำชื่อไว้ เปลี่ยนได้ที่ด้านบน</div>
   </div>;
@@ -406,19 +418,22 @@ function JobDetail({id,me,onBack}){
   if(err&&!req)return <div className="card"><div className="err">{err}</div><button className="ghost" onClick={onBack}>กลับ</button></div>;
   if(!req)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
   const u=URG[req.urgency]||URG.abnormal;
-  const act=async(patch,action,evNote,event)=>{
+  const act=async(patch,action,evNote,event,actorOverride)=>{
     setBusy(true);setErr('');
     const{data,error}=await SB.from('repair_requests').update({...patch,updated_at:new Date().toISOString()}).eq('id',req.id).select().single();
     if(error){setBusy(false);setErr('ไม่สำเร็จ: '+error.message);return;}
     await logEvent(req.id,me.name,action,evNote);
-    if(event)notify(event,data,{actor:me.name,note:evNote||''});
+    if(event)notify(event,data,{actor:actorOverride||me.name,note:evNote||''});
     setReq(data);setMode('');setNote('');setBusy(false);
     const ev=await SB.from('repair_events').select('*').eq('request_id',id).order('at');setEvents(ev.data||[]);
   };
   const now=new Date().toISOString();
   // สิทธิ์ตามฝ่าย: รับงาน/ซ่อม/รออะไหล่/บันทึกการซ่อม = ฝ่ายช่างซ่อมบำรุงเท่านั้น
   // ปิดงาน = ผู้แจ้ง/คนอื่น (ช่างที่ซ่อมเองกดยืนยันงานตัวเองไม่ได้ ยกเว้นเป็นคนแจ้งเอง) · ยกเลิก = ผู้แจ้ง หรือช่าง
-  const isTech=me.dept==='ช่างซ่อมบำรุง';
+  const role=roleOf(me),isTech=!!role,isHead=role==='head';
+  // หัวหน้ามอบหมายงาน: ใบที่ยังไม่มีคนรับ → กลายเป็น "รับงานแล้ว" ในชื่อช่างที่มอบให้
+  const assign=name=>act({technician:name,assigned_by:me.name,...(req.status==='open'?{status:'accepted',accepted_at:now}:{})},
+    'มอบหมายให้ '+name,null,'accepted',name+' (หัวหน้า '+me.name+' มอบหมาย)');
   const ownWork=req.technician&&req.technician===me.name&&req.reporter_name!==me.name;
   const canCancel=isTech||req.reporter_name===me.name;
   const techOnly=<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>🔧 รอช่างซ่อมบำรุงดำเนินการ{req.technician?' ('+req.technician+')':''} — ปุ่มรับงาน/บันทึกการซ่อม ใช้ได้เฉพาะฝ่ายช่างซ่อมบำรุง</div>;
@@ -437,7 +452,7 @@ function JobDetail({id,me,onBack}){
       <div style={{marginTop:12}}>
         <div className="row"><span>แจ้งโดย</span><b>{req.reporter_name} ({req.reporter_dept})</b></div>
         <div className="row"><span>เวลาแจ้ง</span><b>{fmtTime(req.reported_at)}</b></div>
-        {req.technician&&<div className="row"><span>ช่าง</span><b>{req.technician}{req.helpers?' + '+req.helpers:''}</b></div>}
+        {req.technician&&<div className="row"><span>ช่าง</span><b>{req.technician}{req.helpers?' + '+req.helpers:''}{req.assigned_by?' (มอบหมายโดย '+req.assigned_by+')':''}</b></div>}
         {req.accepted_at&&<div className="row"><span>รับงานภายใน</span><b>{dur(new Date(req.accepted_at)-new Date(req.reported_at))}</b></div>}
         <div className="row"><span>{req.done_at?'ใช้เวลาทั้งหมด':'ผ่านไปแล้ว'}</span><b>{dur(endT-new Date(req.reported_at).getTime())}</b></div>
         {(req.waiting_minutes>0||req.status==='waiting_parts')&&<div className="row"><span>รออะไหล่</span><b>{dur(((req.waiting_minutes||0)+waitAdd())*60000)}</b></div>}
@@ -485,6 +500,10 @@ function JobDetail({id,me,onBack}){
           <label className="lbl">อาการที่ยังเป็นอยู่</label><input value={note} onChange={e=>setNote(e.target.value)}/>
           <button className="bigbtn red" disabled={busy||!note.trim()} onClick={()=>act({status:'accepted',done_at:null,reopen_count:(req.reopen_count||0)+1},'ยังไม่หาย ส่งกลับ',note.trim(),'reopened')}>ส่งกลับให้ช่าง</button></>}
       </>}
+      {isHead&&ACTIVE.includes(req.status)&&STAFF.length>0&&<div style={{marginTop:12,paddingTop:10,borderTop:'1px dashed #e7ddd0'}}>
+        <label className="lbl" style={{marginTop:0}}>👷 มอบหมายงานให้ (หัวหน้าช่าง)</label>
+        <div className="chips">{STAFF.map(x=><button key={x.id} disabled={busy||req.technician===x.name} className={'chip'+(req.technician===x.name?' on':'')} onClick={()=>assign(x.name)}>{x.name}</button>)}</div>
+      </div>}
       {(req.status==='closed'||req.status==='cancelled')&&<div className="ok">{req.status==='closed'?'ปิดงานแล้ว โดย '+req.closed_by+' · '+fmtTime(req.closed_at):'ยกเลิกแล้ว: '+(req.close_note||'')}</div>}
       {err&&<div className="err">{err}</div>}
     </div>
@@ -501,8 +520,32 @@ function JobDetail({id,me,onBack}){
   </div>;
 }
 
+// ---------- งานของฉัน (บนสุดของแท็บงานซ่อม) ----------
+// ผู้แจ้ง: งานที่ซ่อมเสร็จรอฉันยืนยัน · ช่าง: งานรอรับ + งานที่ฉันรับไว้ · หัวหน้า: + งานรอยืนยันเกิน 1 วัน
+function myWork(me,jobs){
+  const role=roleOf(me);
+  const confirm=jobs.filter(r=>r.status==='done'&&r.reporter_name===me.name);
+  const waiting=role?jobs.filter(r=>r.status==='open'):[];
+  const mine=role?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts'].includes(r.status)):[];
+  const stale=role==='head'?jobs.filter(r=>r.status==='done'&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
+  return{role,confirm,waiting,mine,stale,count:confirm.length+waiting.length+mine.length};
+}
+function MyWork({me,jobs,onOpen}){
+  const w=myWork(me,jobs);
+  if(!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.stale.length)return null;
+  const row=(r,extra)=><div key={r.id} className="tl" style={{cursor:'pointer'}} onClick={()=>onOpen(r.id)}>
+    <b>{r.ticket_no}</b> · {assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''} <small>{extra||ago(r.reported_at)}</small></div>;
+  return <div className="card" style={{borderLeft:'5px solid #b45309'}}>
+    <div className="card-title">🔔 งานของฉัน</div>
+    {w.confirm.length>0&&<><div style={{fontWeight:800,color:'#0f766e',margin:'4px 0'}}>✅ ซ่อมเสร็จแล้ว รอคุณกดยืนยัน ({w.confirm.length})</div>{w.confirm.map(r=>row(r,'เสร็จ '+ago(r.done_at)))}</>}
+    {w.mine.length>0&&<><div style={{fontWeight:800,color:'#1d4ed8',margin:'8px 0 4px'}}>🔧 งานที่ฉันรับไว้ ({w.mine.length})</div>{w.mine.map(r=>row(r,(STATUS[r.status]||{}).label))}</>}
+    {w.waiting.length>0&&<><div style={{fontWeight:800,color:'#b91c1c',margin:'8px 0 4px'}}>🙋 รอช่างรับงาน ({w.waiting.length})</div>{w.waiting.map(r=>row(r))}</>}
+    {w.stale.length>0&&<><div style={{fontWeight:800,color:'#78716c',margin:'8px 0 4px'}}>⏳ ซ่อมเสร็จ ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน ({w.stale.length}) — หัวหน้ากดปิดแทนได้</div>{w.stale.map(r=>row(r,r.reporter_name))}</>}
+  </div>;
+}
+
 // ---------- รายการงาน ----------
-function JobList({onOpen,reloadKey}){
+function JobList({onOpen,reloadKey,me,jobs}){
   const[rows,setRows]=useState(null);const[f,setF]=useState('active');
   useEffect(()=>{
     const since=new Date(Date.now()-45*864e5).toISOString();
@@ -515,6 +558,7 @@ function JobList({onOpen,reloadKey}){
     done:rows.filter(r=>r.status==='done'),closed:rows.filter(r=>r.status==='closed'||r.status==='cancelled')};
   const list=groups[f];
   return <div>
+    {me&&<MyWork me={me} jobs={jobs||[]} onOpen={onOpen}/>}
     <div className="filters">
       {[['active','งานค้าง'],['done','รอยืนยัน'],['closed','ปิดแล้ว']].map(([k,l])=><button key={k} className={'chip'+(f===k?' on':'')} onClick={()=>setF(k)}>{l} ({groups[k].length})</button>)}
     </div>
@@ -533,6 +577,18 @@ function App(){
   const[tab,setTab]=useState(location.hash.replace('#','')&&!preAssetId?'jobs':'report');
   const[openId,setOpenId]=useState(location.hash.replace('#','')||null);
   const[assets,setAssets]=useState([]);const[done,setDone]=useState(null);const[reloadKey,setReloadKey]=useState(0);
+  const[jobs,setJobs]=useState([]);const[,setStaffTick]=useState(0);
+  useEffect(()=>{SB.from('repair_staff').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name')
+    .then(({data,error})=>{if(!error){STAFF=data||[];setStaffTick(t=>t+1);}});},[]);
+  // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 1 นาที และทุกครั้งที่กลับมาเปิดแอป
+  useEffect(()=>{
+    const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
+      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(data)setJobs(data);});
+    load();const iv=setInterval(()=>{if(!document.hidden)load();},60000);
+    const vis=()=>{if(!document.hidden)load();};document.addEventListener('visibilitychange',vis);
+    return()=>{clearInterval(iv);document.removeEventListener('visibilitychange',vis);};
+  },[reloadKey,openId]);
+  const badge=me?myWork(me,jobs).count:0;
   const[,setFleetTick]=useState(0);
   useEffect(()=>{loadFleet().then(()=>setFleetTick(t=>t+1)).catch(()=>{});},[]);
   useEffect(()=>{SB.from('repair_assets').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name').then(({data})=>setAssets(data||[]));},[]);
@@ -545,7 +601,7 @@ function App(){
       {me&&<div className="me">ผู้ใช้: {me.name} ({me.dept}) <button onClick={()=>setEditMe(true)}>เปลี่ยน</button></div>}
       {me&&!editMe&&<div className="tabs">
         <button className={'tab'+(tab==='report'?' on':'')} onClick={()=>{setTab('report');setDone(null);back();}}>➕ แจ้งซ่อม</button>
-        <button className={'tab'+(tab==='jobs'?' on':'')} onClick={()=>{setTab('jobs');back();}}>📋 งานซ่อม</button>
+        <button className={'tab'+(tab==='jobs'?' on':'')} onClick={()=>{setTab('jobs');back();}}>📋 งานซ่อม{badge>0&&<span style={{marginLeft:6,background:'#dc2626',color:'#fff',borderRadius:99,padding:'1px 7px',fontSize:12.5}}>{badge}</span>}</button>
       </div>}
       {(!me||editMe)&&<div style={{height:12}}/>}
     </div>
@@ -555,7 +611,7 @@ function App(){
         <button className="bigbtn" onClick={()=>{setTab('jobs');open(done.id);}}>ดูใบงาน</button>
         <button className="ghost" onClick={()=>setDone(null)}>แจ้งเรื่องอื่นต่อ</button>
       </div>:<ReportForm me={me} assets={assets} preAssetId={preAssetId} onDone={d=>setDone(d)}/>):
-     openId?<JobDetail id={openId} me={me} onBack={back}/>:<JobList onOpen={open} reloadKey={reloadKey}/>}
+     openId?<JobDetail id={openId} me={me} onBack={back}/>:<JobList onOpen={open} reloadKey={reloadKey} me={me} jobs={jobs}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
