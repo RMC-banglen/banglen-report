@@ -1727,13 +1727,13 @@ class App extends React.Component {
   // กรอกย้อนหลังเสร็จ → ล็อกงวด + เก็บสรุปไว้ให้กราฟแนวโน้ม (เหมือนตอนปิดเดือนปกติ แต่ไม่สร้างงวดถัดไปทับของเดิม)
   finishBackfillPeriod() {
     if (READONLY) return;
-    if (!confirm('กรอกงวด "' + this.state.periodLabel + '" เสร็จแล้ว ล็อกงวดนี้?')) return;
+    if (!confirm('ปิดงวด "' + periodName(this.state.periodLabel) + '"? (ล็อก + เก็บสรุปให้หน้าแนวโน้ม — งวดถัดไปมียอดยกมาอยู่แล้ว ไม่ต้องยกยอดซ้ำ)')) return;
     this.setState(s => ({ periodLocked: { ...s.periodLocked, [s.periodLabel]: true },
       periodSummaries: { ...s.periodSummaries, [s.periodLabel]: this.computePeriodSummary(s) } }));
   }
   closeMonthCarryForward() {
     if (READONLY) return;
-    if (this.isBackfillPeriod()) { alert('งวด "' + this.nextPeriodLabel() + '" มีข้อมูลอยู่แล้ว — ปิดเดือนจากงวดนี้จะทับข้อมูลเดิม — ถ้ากรอกย้อนหลังเสร็จ ให้กด "✓ กรอกเสร็จ ล็อกงวดนี้" แล้วเลือกงวดอื่นจากช่องด้านบน'); return; }
+    if (this.isBackfillPeriod()) { alert('งวด "' + this.nextPeriodLabel() + '" มีข้อมูลอยู่แล้ว — ปิดเดือนจากงวดนี้จะทับข้อมูลเดิม — ถ้ากรอกย้อนหลังเสร็จ ให้กด "🔒 ปิดงวดนี้" แล้วเลือกงวดอื่นจากช่องด้านบน'); return; }
     const curIdx = THAI_MONTHS.indexOf((this.state.periodLabel || '').split(' ')[0]);
     const curYear = parseInt((this.state.periodLabel || '').split(' ')[1], 10);
     let nextMonth = 0, nextYear = new Date().getFullYear() + 543;
@@ -1951,7 +1951,7 @@ class App extends React.Component {
                           <button onClick={() => this.pullOpeningFromPreviousPeriod()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #b9cdf0', background: '#eef3fc', color: '#244c9b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>⬇ ดึงยอดยกมาจากงวดก่อนหน้า</button>
                           {this.isBackfillPeriod() && <button onClick={() => this.pullClosingFromNextPeriod()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #b9cdf0', background: '#eef3fc', color: '#244c9b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>⬆ ดึงนับสต็อกจากยกมาของ {this.nextPeriodLabel()}</button>}
                           {this.isBackfillPeriod()
-                            ? (!s.periodLocked[s.periodLabel] && <button onClick={() => this.finishBackfillPeriod()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>✓ กรอกเสร็จ ล็อกงวดนี้</button>)
+                            ? (!s.periodLocked[s.periodLabel] && <button onClick={() => this.finishBackfillPeriod()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }} title={"งวดถัดไป (" + this.nextPeriodLabel() + ") มีข้อมูลยกมาแล้ว — ปิดงวดนี้แค่ล็อก + เก็บสรุปให้แนวโน้ม ไม่ต้องยกยอดซ้ำ"}>🔒 ปิดงวดนี้ (งวดถัดไปยกยอดไว้แล้ว)</button>)
                             : <button onClick={() => this.closeMonthCarryForward()} data-no-print="true" style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid #8fc17a', background: '#eaf7ea', color: '#3f7d2b', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>ปิดเดือน / ยกยอดไปเดือนถัดไป</button>}
                         </div>
                       )}
