@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-12a';
+var APP_VERSION='2026-10-12b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -8998,7 +8998,8 @@ window.__dataReady.then(data => {
     const [assets,setAssets]=useState([]);
     const [month,setMonth]=useState(0); // 0 = ทั้งปี
     const [newAsset,setNewAsset]=useState({name:'',category:''});
-    const [showAssets,setShowAssets]=useState(false);
+    const [showAssets,setShowAssets]=useState(true);
+    const [sub,setSub]=useState('overview'); // overview = ภาพรวม · settings = ตั้งค่า (รายชื่อช่าง/เครื่อง/QR)
     const [showAll,setShowAll]=useState(false);
     const [histAsset,setHistAsset]=useState(null);
     const [fleet,setFleet]=useState({});
@@ -9123,15 +9124,22 @@ window.__dataReady.then(data => {
       load();
     };
     return <div>
-      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13}}>
-        <span>ลิงก์แจ้งซ่อม (ส่งให้ทุกฝ่าย): <a href="repair.html" target="_blank" rel="noreferrer" style={{color:'#b45309',fontWeight:700}}>repair.html</a></span>
-        <button style={{padding:'3px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>{navigator.clipboard&&navigator.clipboard.writeText(link);alert('คัดลอกลิงก์แล้ว\n'+link);}}>คัดลอก</button>
-        <a href="repair-qr.html" target="_blank" rel="noreferrer" style={{padding:'3px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',color:'#1e293b',textDecoration:'none',fontWeight:700}}>🖨 พิมพ์สติกเกอร์ QR ติดเครื่อง</a>
+      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13}}>
+        <button onClick={()=>setSub('overview')} style={{padding:'7px 16px',borderRadius:20,border:'1.5px solid '+(sub==='overview'?'#b45309':'#e2e8f0'),background:sub==='overview'?'#b45309':'#fff',color:sub==='overview'?'#fff':'#334155',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:13}}>📊 ภาพรวม</button>
+        <button onClick={()=>setSub('settings')} style={{padding:'7px 16px',borderRadius:20,border:'1.5px solid '+(sub==='settings'?'#b45309':'#e2e8f0'),background:sub==='settings'?'#b45309':'#fff',color:sub==='settings'?'#fff':'#334155',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:13}}>⚙️ ตั้งค่า (รายชื่อช่าง · เครื่องจักร · QR)</button>
+        {sub==='overview'&&<>
         <span style={{marginLeft:'auto'}}>ช่วง: <select value={month} onChange={e=>setMonth(Number(e.target.value))} style={{padding:'5px 8px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit'}}>
           <option value={0}>ทั้งปี {yearBE}</option>{MO.map((m,i)=><option key={i} value={i+1}>{m} {yearBE}</option>)}</select></span>
         <button onClick={load} style={{padding:'4px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>🔄</button>
+        </>}
       </div>
+      {sub==='settings'&&<div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13,background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>
+        <span>ลิงก์แจ้งซ่อม (ส่งให้ทุกฝ่าย): <a href="repair.html" target="_blank" rel="noreferrer" style={{color:'#b45309',fontWeight:700}}>repair.html</a></span>
+        <button style={{padding:'3px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}} onClick={()=>{navigator.clipboard&&navigator.clipboard.writeText(link);alert('คัดลอกลิงก์แล้ว\n'+link);}}>คัดลอก</button>
+        <a href="repair-qr.html" target="_blank" rel="noreferrer" style={{padding:'3px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',color:'#1e293b',textDecoration:'none',fontWeight:700}}>🖨 พิมพ์สติกเกอร์ QR ติดเครื่อง</a>
+      </div>}
 
+      {sub==='overview'&&<>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:16}}>
         {card('งานค้างตอนนี้',open.length,open.filter(r=>r.urgency==='stop').length+' เครื่องหยุด · รอยืนยัน '+waitConfirm.length,open.length?'#b91c1c':'#15803d')}
         {card('แจ้งซ่อม',inPeriod.length+' ครั้ง',month?MO[month-1]:'ทั้งปี')}
@@ -9224,6 +9232,9 @@ window.__dataReady.then(data => {
         </tbody></table></div>}
       </div>
 
+      </>}
+
+      {sub==='settings'&&<>
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
         <div style={{fontWeight:800,marginBottom:4}}>👷 รายชื่อช่าง / หัวหน้าช่าง ({staff.filter(x=>x.active).length})</div>
         <div style={{fontSize:12,color:'#94a3b8',marginBottom:10}}>เฉพาะชื่อในรายการนี้ที่กดรับงาน/บันทึกการซ่อมได้ (ช่างเลือกชื่อตัวเองจากรายการตอนเข้าแอปครั้งแรก) · <b>หัวหน้าช่าง</b> = รับงาน + มอบหมายงาน + ปิดแทน + ถูก @แท็กใน Telegram ตอนงานค้างนาน · <b>หัวหน้าฝ่าย</b> (เช่น หัวหน้าฝ่ายผลิต) = มอบหมายงาน + ปิดแทน + ถูก @แท็ก แต่ไม่รับงานซ่อมเอง (เลือกชื่อตัวเองตอนเข้าแอป) · ยังไม่ได้ตั้งรายชื่อ = ใครเลือกฝ่าย "ช่างซ่อมบำรุง" ก็รับงานได้</div>
@@ -9269,6 +9280,7 @@ window.__dataReady.then(data => {
           </div>
         </div>}
       </div>
+      </>}
     </div>;
   }
 
