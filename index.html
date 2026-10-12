@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-12c';
+var APP_VERSION='2026-10-12b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4548,12 +4548,35 @@ window.__dataReady.then(data => {
     const pickSub=k=>{setSub(k);try{localStorage.setItem('q_subtab',k);}catch(e){}
       window.scrollTo({top:0,behavior:'smooth'});};
 
-    const COLORS=['#1a56db','#e02020','#f59e0b','#059669','#7c3aed','#ea580c','#0891b2','#be185d','#65a30d','#374151'];
+    // สีไม่ซ้ำเฉดกันเอง (เดิมมีส้ม 2 ตัวติดกัน แยกไม่ออก)
+    const COLORS=['#1a56db','#e02020','#f59e0b','#059669','#7c3aed','#0891b2','#be185d','#65a30d','#b45309','#374151'];
+    const SHAPES=['circle','square','triangle','diamond','star'];
     const FORMULA_COLORS={'NP335':'#059669','NP360':'#1a56db'};
     const FORMULA_SHAPES={'NP335':'circle','NP360':'square'};
-    const fColor=(name,idx)=>FORMULA_COLORS[name]||COLORS[idx%COLORS.length];
-    const fShape=(name,idx)=>FORMULA_SHAPES[name]||SHAPES[idx%SHAPES.length];
-    const SHAPES=['circle','square','triangle','diamond','star','circle','square','triangle','diamond','star'];
+
+    // เดิมสีกับรูปใช้ตัวหารเดียวกัน (หาร 10) และคิดจากลำดับในรายชื่อสูตรทั้งหมด 39 ตัว
+    // สูตรที่ห่างกัน 10 ลำดับจึงได้สีและรูปเหมือนกันเป๊ะ ของจริงเจอแล้ว
+    // NP325 (ลำดับ 12) กับ NP355 (ลำดับ 22) ออกมาเป็นสามเหลี่ยมส้มทั้งคู่ แยกไม่ออก
+    //
+    // แก้ด้วยการแจกสี/รูปจาก "เส้นที่จะวาดจริงในกราฟนั้น" ซึ่งมีไม่กี่เส้น
+    // และไล่ทั้งสีและรูปทีละขั้น ห้าเส้นแรกจึงต่างกันทั้งสีและรูป
+    // ดูออกแม้พิมพ์ขาวดำหรือตาแยกสีไม่ได้ ถ้าคู่ไหนยังชนก็ขยับไปคู่ว่างถัดไป
+    // ห้าเส้นแรกจึงต่างกันทั้งสีและรูป ดูออกแม้พิมพ์ขาวดำหรือตาแยกสีไม่ได้
+    const styleFor=names=>{
+      const used=new Set(), out={};
+      names.forEach((n,i)=>{
+        let c=FORMULA_COLORS[n]||COLORS[i%COLORS.length];
+        let s=FORMULA_SHAPES[n]||SHAPES[i%SHAPES.length];
+        if(used.has(c+'|'+s)){
+          for(let k=0;k<COLORS.length*SHAPES.length;k++){
+            const c2=COLORS[k%COLORS.length], s2=SHAPES[k%SHAPES.length];
+            if(!used.has(c2+'|'+s2)){c=c2;s=s2;break;}
+          }
+        }
+        used.add(c+'|'+s); out[n]={color:c,shape:s};
+      });
+      return out;
+    };
 
     const [materials,setMaterials]=useState([]);
 
@@ -4660,13 +4683,18 @@ window.__dataReady.then(data => {
     const TARGET_NORMAL={1:350,3:415,5:435,7:450};
     const TARGET_NP280={1:340,7:420};
 
+    // แจกสี/รูปจากรายการเส้นที่จะวาดจริง (สูตร × อายุ) ด้วยตัวเดียวกับกราฟอื่น
+    // เดิมคิด index เอง แล้วสีกับรูปชนกันได้เหมือนกราฟ Strength Curve
+    const c1Labels=[];
+    activeForms.forEach(f=>activeAges.forEach(a=>c1Labels.push(f+'|'+a)));
+    const c1Style=styleFor(c1Labels);
     const c1Series=[];
-    activeForms.forEach((f,fi)=>{
-      activeAges.forEach((a,ai)=>{
-        const ci=(fi*activeAges.length+ai)%COLORS.length;
+    activeForms.forEach(f=>{
+      activeAges.forEach(a=>{
+        const st=c1Style[f+'|'+a];
         const label=activeAges.length>1?`${f} Day${a}`:f;
         c1Series.push({
-          label, color:fColor(f,ci), shape:fShape(f,ci),
+          label, color:st.color, shape:st.shape,
           danger:(isNP280(f)?TARGET_NP280:TARGET_NORMAL)[a]??null,
           data:c1Dates.map(d=>{
             const rs=filt.filter(r=>sd(r)===d&&fm(r)===f&&ag(r)===a);
@@ -4684,8 +4712,13 @@ window.__dataReady.then(data => {
     const c2Forms=selFormulas2.length?selFormulas2:allFormulas;
     const curveAges=selSample&&rows.some(r=>sd(r)===selSample&&ag(r)===9&&ks(r)>0)
       ?[1,3,5,7,9]:BASE_AGES;
-    const c2DataSeries=selSample?c2Forms.map((f,fi)=>({
-      label:f, color:fColor(f,fi), shape:fShape(f,fi),
+    // แจกสี/รูปจากเฉพาะสูตรที่มีข้อมูลในวันนั้นจริง ไม่ใช่ลำดับในรายชื่อสูตรทั้งหมด 39 ตัว
+    // ไม่งั้นสองเส้นที่ขึ้นพร้อมกันมีสิทธิ์ได้สีและรูปเดียวกัน แยกไม่ออก
+    const c2Drawn=!selSample?[]:c2Forms.filter(f=>
+      curveAges.some(a=>rows.some(r=>sd(r)===selSample&&fm(r)===f&&ag(r)===a&&ks(r)>0)));
+    const c2Style=styleFor(c2Drawn);
+    const c2DataSeries=selSample?c2Drawn.map(f=>({
+      label:f, color:c2Style[f].color, shape:c2Style[f].shape,
       data:curveAges.map(a=>{
         const rs=rows.filter(r=>sd(r)===selSample&&fm(r)===f&&ag(r)===a);
         if(!rs.length) return null;
