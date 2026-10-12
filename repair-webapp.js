@@ -111,10 +111,11 @@ function repairReminderCheck() {
   var hour = Number(Utilities.formatDate(now, 'Asia/Bangkok', 'H'));
   var workHours = hour >= 7 && hour < 18;
   var res = sb('get', 'repair_requests?site=eq.banglen&status=in.(open,done)'
-    + '&select=id,ticket_no,asset_name,urgency,symptom,reporter_name,status,reported_at,done_at,last_alert_at,alert_count');
+    + '&select=id,ticket_no,asset_name,asset_category,urgency,symptom,reporter_name,status,reported_at,done_at,last_alert_at,alert_count');
   if (res.getResponseCode() >= 300) { Logger.log('repairReminderCheck: ' + res.getContentText()); return; }
-  var heads = headTags();
+  var headL = headList();
   JSON.parse(res.getContentText() || '[]').forEach(function (r) {
+    var heads = headTagsFor(headL, r.asset_category);
     var since = r.status === 'done' ? new Date(r.done_at) : new Date(r.reported_at);
     var age = now - since, last = r.last_alert_at ? now - new Date(r.last_alert_at) : Infinity;
     var first, every, msg;
@@ -139,10 +140,19 @@ function repairReminderCheck() {
 }
 
 // @แท็กหัวหน้าช่าง (ตั้งชื่อผู้ใช้ Telegram ในแดชบอร์ด แท็บแจ้งซ่อม → รายชื่อช่าง) — แท็กแล้วมือถือหัวหน้าเด้งแม้ปิดเสียงกลุ่ม
-function headTags() {
-  var r = sb('get', 'repair_staff?site=eq.banglen&role=in.(head,manager)&active=eq.true&select=telegram');
-  if (r.getResponseCode() >= 300) return '';
-  return JSON.parse(r.getContentText() || '[]').filter(function (x) { return x.telegram; }).map(function (x) { return '@' + x.telegram; }).join(' ');
+// หัวหน้าฝ่ายที่ตั้งหมวดไว้ ถูกแท็กเฉพาะงานในหมวดนั้น (fleet = รถขนส่ง+เครนรถ · factory = อื่นๆ) · หัวหน้าช่างถูกแท็กทุกงาน
+function headList() {
+  var r = sb('get', 'repair_staff?site=eq.banglen&role=in.(head,manager)&active=eq.true&select=telegram,role,scope');
+  if (r.getResponseCode() >= 300) r = sb('get', 'repair_staff?site=eq.banglen&role=in.(head,manager)&active=eq.true&select=telegram,role');
+  if (r.getResponseCode() >= 300) return [];
+  return JSON.parse(r.getContentText() || '[]').filter(function (x) { return x.telegram; });
+}
+function headTagsFor(list, cat) {
+  var fleet = cat === 'รถขนส่ง' || cat === 'เครนรถขนส่ง';
+  return list.filter(function (x) {
+    if (x.role !== 'manager' || !x.scope || x.scope === 'all') return true;
+    return x.scope === 'fleet' ? fleet : !fleet;
+  }).map(function (x) { return '@' + x.telegram; }).join(' ');
 }
 function sb(method, path, payload, returnRows) {
   var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };

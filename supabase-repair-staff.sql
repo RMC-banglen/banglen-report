@@ -18,3 +18,6 @@ create policy "allow all" on repair_staff for all using (true) with check (true)
 
 -- ใครเป็นคนมอบหมายงาน (หัวหน้า) — ว่าง = ช่างกดรับเอง
 alter table repair_requests add column if not exists assigned_by text;
+
+-- หัวหน้าฝ่ายดูแลเฉพาะหมวด: all = ทุกหมวด · fleet = รถขนส่ง+เครนรถขนส่ง · factory = เครื่องจักรในโรงงาน (นอกจากรถขนส่ง)
+alter table repair_staff add column if not exists scope text default 'all';

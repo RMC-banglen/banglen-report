@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-12a';
+var APP_VERSION='2026-10-12b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -171,6 +171,14 @@ async function uploadPhoto(file){
 // แจ้ง Apps Script ให้ส่ง Telegram (no-cors: ไม่ต้องรอคำตอบ)
 // รายชื่อช่าง/หัวหน้า (ตั้งในแดชบอร์ด) — role: tech ช่าง · head หัวหน้าช่าง · manager หัวหน้าฝ่ายอื่น (จัดการ/มอบหมาย/ปิดแทน แต่ไม่รับงานซ่อมเอง) — ยังไม่ได้ตั้ง = ใช้ฝ่าย "ช่างซ่อมบำรุง" ตามที่เลือกตอนใส่ชื่อ
 let STAFF=[];
+// หัวหน้าฝ่ายดูแลเฉพาะหมวด: fleet = รถขนส่ง+เครนรถ · factory = เครื่องจักรในโรงงาน · all/ว่าง = ทุกหมวด (หัวหน้าช่าง/ช่าง = ทุกหมวดเสมอ)
+const FLEET_CATS=['รถขนส่ง','เครนรถขนส่ง'];
+function inScope(me,cat){
+  const st=STAFF.find(x=>x.name===me.name);
+  if(!st||st.role!=='manager'||!st.scope||st.scope==='all')return true;
+  const fleet=FLEET_CATS.includes(cat);
+  return st.scope==='fleet'?fleet:!fleet;
+}
 function roleOf(me){
   if(!me)return null;
   if(STAFF.length){const st=STAFF.find(x=>x.name===me.name);return st?st.role:null;}
@@ -510,7 +518,7 @@ function JobDetail({id,me,onBack,tick}){
           <label className="lbl">อาการที่ยังเป็นอยู่</label><input value={note} onChange={e=>setNote(e.target.value)}/>
           <button className="bigbtn red" disabled={busy||!note.trim()} onClick={()=>act({status:'accepted',done_at:null,reopen_count:(req.reopen_count||0)+1},'ยังไม่หาย ส่งกลับ',note.trim(),'reopened')}>ส่งกลับให้ช่าง</button></>}
       </>}
-      {isHead&&ACTIVE.includes(req.status)&&STAFF.length>0&&<div style={{marginTop:12,paddingTop:10,borderTop:'1px dashed #e7ddd0'}}>
+      {isHead&&inScope(me,req.asset_category)&&ACTIVE.includes(req.status)&&STAFF.length>0&&<div style={{marginTop:12,paddingTop:10,borderTop:'1px dashed #e7ddd0'}}>
         <label className="lbl" style={{marginTop:0}}>👷 มอบหมายงานให้ช่าง ({role==='manager'?'หัวหน้าฝ่าย':'หัวหน้าช่าง'})</label>
         <div className="chips">{STAFF.filter(x=>x.role!=='manager').map(x=><button key={x.id} disabled={busy||req.technician===x.name} className={'chip'+(req.technician===x.name?' on':'')} onClick={()=>assign(x.name)}>{x.name}</button>)}</div>
       </div>}
@@ -535,11 +543,11 @@ function JobDetail({id,me,onBack,tick}){
 function myWork(me,jobs){
   const role=roleOf(me);
   const confirm=jobs.filter(r=>r.status==='done'&&r.reporter_name===me.name);
-  const waiting=role?jobs.filter(r=>r.status==='open'):[];
+  const waiting=role?jobs.filter(r=>r.status==='open'&&inScope(me,r.asset_category)):[];
   const mine=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts'].includes(r.status)):[];
   // งานที่ฉันแจ้งที่ยังไม่เสร็จ (ไว้ติดตามสถานะ ไม่นับเป็นงานที่ต้องทำ)
   const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','accepted','in_progress','waiting_parts'].includes(r.status));
-  const stale=(role==='head'||role==='manager')?jobs.filter(r=>r.status==='done'&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
+  const stale=(role==='head'||role==='manager')?jobs.filter(r=>r.status==='done'&&inScope(me,r.asset_category)&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
   return{role,confirm,waiting,mine,stale,reported,count:confirm.length+waiting.length+mine.length};
 }
 function MyWork({me,jobs,onOpen}){
@@ -596,7 +604,7 @@ function App(){
     .then(({data,error})=>{if(!error){STAFF=data||[];setStaffTick(t=>t+1);}});},[]);
   // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
-    const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
+    const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,asset_category,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
       .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(!data)return;setJobs(data);
         // โหลดรายการงาน/ใบงานใหม่ เฉพาะเมื่อมีงานเปลี่ยน (ใบใหม่ / สถานะเปลี่ยน / ปิดไป) — ไม่เปลี่ยน = ไม่ดึงซ้ำ ประหยัดโควตา
         const sig=data.map(r=>r.id+':'+r.status+':'+(r.technician||'')).sort().join(',');
