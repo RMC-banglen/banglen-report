@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-09p';
+var APP_VERSION='2026-10-12a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -169,7 +169,7 @@ async function uploadPhoto(file){
   return SB.storage.from('repair-photos').getPublicUrl(path).data.publicUrl;
 }
 // แจ้ง Apps Script ให้ส่ง Telegram (no-cors: ไม่ต้องรอคำตอบ)
-// รายชื่อช่าง/หัวหน้า (ตั้งในแดชบอร์ด) — ยังไม่ได้ตั้ง = ใช้ฝ่าย "ช่างซ่อมบำรุง" ตามที่เลือกตอนใส่ชื่อ
+// รายชื่อช่าง/หัวหน้า (ตั้งในแดชบอร์ด) — role: tech ช่าง · head หัวหน้าช่าง · manager หัวหน้าฝ่ายอื่น (จัดการ/มอบหมาย/ปิดแทน แต่ไม่รับงานซ่อมเอง) — ยังไม่ได้ตั้ง = ใช้ฝ่าย "ช่างซ่อมบำรุง" ตามที่เลือกตอนใส่ชื่อ
 let STAFF=[];
 function roleOf(me){
   if(!me)return null;
@@ -270,9 +270,13 @@ function MeSetup({me,onSave}){
     <input value={name} onChange={e=>setName(e.target.value)} placeholder="เช่น สมชาย"/>
     <label className="lbl">ฝ่าย</label>
     <div className="chips">{DEPTS.map(d=><button key={d} className={'chip'+(dept===d?' on':'')} onClick={()=>setDept(d)}>{d}</button>)}</div>
+    {dept&&dept!=='ช่างซ่อมบำรุง'&&STAFF.some(x=>x.role==='manager')&&<>
+      <label className="lbl">ถ้าเป็นหัวหน้าฝ่าย: เลือกชื่อตัวเอง (คนทั่วไปข้ามได้)</label>
+      <div className="chips">{STAFF.filter(x=>x.role==='manager').map(x=><button key={x.id} className={'chip'+(name===x.name?' on':'')} onClick={()=>setName(x.name)}>{x.name}</button>)}</div>
+    </>}
     {dept==='ช่างซ่อมบำรุง'&&STAFF.length>0&&<>
       <label className="lbl">ช่าง: เลือกชื่อตัวเองจากรายชื่อ</label>
-      <div className="chips">{STAFF.map(x=><button key={x.id} className={'chip'+(name===x.name?' on':'')} onClick={()=>setName(x.name)}>{x.name}{x.role==='head'?' (หัวหน้า)':''}</button>)}</div>
+      <div className="chips">{STAFF.filter(x=>x.role!=='manager').map(x=><button key={x.id} className={'chip'+(name===x.name?' on':'')} onClick={()=>setName(x.name)}>{x.name}{x.role==='head'?' (หัวหน้า)':''}</button>)}</div>
       {name&&!STAFF.some(x=>x.name===name)&&<div className="err">ชื่อนี้ไม่อยู่ในรายชื่อช่าง — จะกดรับงานไม่ได้ (เลือกชื่อจากรายการ หรือให้หัวหน้าเพิ่มชื่อในแดชบอร์ด)</div>}
     </>}
     <button className="bigbtn" disabled={!name.trim()||!dept} onClick={()=>onSave({name:name.trim(),dept})}>บันทึก</button>
@@ -436,7 +440,7 @@ function JobDetail({id,me,onBack,tick}){
   const now=new Date().toISOString();
   // สิทธิ์ตามฝ่าย: รับงาน/ซ่อม/รออะไหล่/บันทึกการซ่อม = ฝ่ายช่างซ่อมบำรุงเท่านั้น
   // ปิดงาน = ผู้แจ้ง/คนอื่น (ช่างที่ซ่อมเองกดยืนยันงานตัวเองไม่ได้ ยกเว้นเป็นคนแจ้งเอง) · ยกเลิก = ผู้แจ้ง หรือช่าง
-  const role=roleOf(me),isTech=!!role,isHead=role==='head';
+  const role=roleOf(me),isTech=role==='tech'||role==='head',isHead=role==='head'||role==='manager';
   // หัวหน้ามอบหมายงาน: ใบที่ยังไม่มีคนรับ → กลายเป็น "รับงานแล้ว" ในชื่อช่างที่มอบให้
   const assign=name=>act({technician:name,assigned_by:me.name,...(req.status==='open'?{status:'accepted',accepted_at:now}:{})},
     'มอบหมายให้ '+name,null,'accepted',name+' (หัวหน้า '+me.name+' มอบหมาย)');
@@ -507,8 +511,8 @@ function JobDetail({id,me,onBack,tick}){
           <button className="bigbtn red" disabled={busy||!note.trim()} onClick={()=>act({status:'accepted',done_at:null,reopen_count:(req.reopen_count||0)+1},'ยังไม่หาย ส่งกลับ',note.trim(),'reopened')}>ส่งกลับให้ช่าง</button></>}
       </>}
       {isHead&&ACTIVE.includes(req.status)&&STAFF.length>0&&<div style={{marginTop:12,paddingTop:10,borderTop:'1px dashed #e7ddd0'}}>
-        <label className="lbl" style={{marginTop:0}}>👷 มอบหมายงานให้ (หัวหน้าช่าง)</label>
-        <div className="chips">{STAFF.map(x=><button key={x.id} disabled={busy||req.technician===x.name} className={'chip'+(req.technician===x.name?' on':'')} onClick={()=>assign(x.name)}>{x.name}</button>)}</div>
+        <label className="lbl" style={{marginTop:0}}>👷 มอบหมายงานให้ช่าง ({role==='manager'?'หัวหน้าฝ่าย':'หัวหน้าช่าง'})</label>
+        <div className="chips">{STAFF.filter(x=>x.role!=='manager').map(x=><button key={x.id} disabled={busy||req.technician===x.name} className={'chip'+(req.technician===x.name?' on':'')} onClick={()=>assign(x.name)}>{x.name}</button>)}</div>
       </div>}
       {(req.status==='closed'||req.status==='cancelled')&&<div className="ok">{req.status==='closed'?'ปิดงานแล้ว โดย '+req.closed_by+' · '+fmtTime(req.closed_at):'ยกเลิกแล้ว: '+(req.close_note||'')}</div>}
       {err&&<div className="err">{err}</div>}
@@ -532,10 +536,10 @@ function myWork(me,jobs){
   const role=roleOf(me);
   const confirm=jobs.filter(r=>r.status==='done'&&r.reporter_name===me.name);
   const waiting=role?jobs.filter(r=>r.status==='open'):[];
-  const mine=role?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts'].includes(r.status)):[];
+  const mine=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts'].includes(r.status)):[];
   // งานที่ฉันแจ้งที่ยังไม่เสร็จ (ไว้ติดตามสถานะ ไม่นับเป็นงานที่ต้องทำ)
   const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','accepted','in_progress','waiting_parts'].includes(r.status));
-  const stale=role==='head'?jobs.filter(r=>r.status==='done'&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
+  const stale=(role==='head'||role==='manager')?jobs.filter(r=>r.status==='done'&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
   return{role,confirm,waiting,mine,stale,reported,count:confirm.length+waiting.length+mine.length};
 }
 function MyWork({me,jobs,onOpen}){
@@ -544,13 +548,13 @@ function MyWork({me,jobs,onOpen}){
   const row=(r,extra)=><div key={r.id} className="tl" style={{cursor:'pointer'}} onClick={()=>onOpen(r.id)}>
     <b>{r.ticket_no}</b> · {assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''} <small>{extra||ago(r.reported_at)}</small></div>;
   return <div className="card" style={{borderLeft:'5px solid #b45309'}}>
-    <div className="card-title">🔔 งานของฉัน <span style={{fontWeight:400,fontSize:12.5,color:'#8a7a68'}}>({me.name}{w.role==='head'?' · หัวหน้าช่าง':w.role?' · ช่าง':''})</span></div>
+    <div className="card-title">🔔 งานของฉัน <span style={{fontWeight:400,fontSize:12.5,color:'#8a7a68'}}>({me.name}{w.role==='head'?' · หัวหน้าช่าง':w.role==='manager'?' · หัวหน้าฝ่าย':w.role?' · ช่าง':''})</span></div>
     {empty&&<div style={{fontSize:14,color:'#15803d'}}>✓ ไม่มีงานที่ต้องทำตอนนี้{w.role?'':' — งานที่คุณแจ้ง พอช่างซ่อมเสร็จจะขึ้นที่นี่ให้กดยืนยัน'}</div>}
     {w.confirm.length>0&&<><div style={{fontWeight:800,color:'#0f766e',margin:'4px 0'}}>✅ ซ่อมเสร็จแล้ว รอคุณกดยืนยัน ({w.confirm.length})</div>{w.confirm.map(r=>row(r,'เสร็จ '+ago(r.done_at)))}</>}
     {w.mine.length>0&&<><div style={{fontWeight:800,color:'#1d4ed8',margin:'8px 0 4px'}}>🔧 งานที่ฉันรับไว้ ({w.mine.length})</div>{w.mine.map(r=>row(r,(STATUS[r.status]||{}).label))}</>}
     {w.waiting.length>0&&<><div style={{fontWeight:800,color:'#b91c1c',margin:'8px 0 4px'}}>🙋 รอช่างรับงาน ({w.waiting.length})</div>{w.waiting.map(r=>row(r))}</>}
     {w.reported.length>0&&<><div style={{fontWeight:800,color:'#6b5b4a',margin:'8px 0 4px'}}>📝 งานที่ฉันแจ้ง กำลังดำเนินการ ({w.reported.length})</div>{w.reported.map(r=>row(r,(STATUS[r.status]||{}).label+(r.technician?' · ช่าง'+r.technician.replace(/^ช่าง/,''):'')))}</>}
-    {w.stale.length>0&&<><div style={{fontWeight:800,color:'#78716c',margin:'8px 0 4px'}}>⏳ ซ่อมเสร็จ ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน ({w.stale.length}) — หัวหน้ากดปิดแทนได้</div>{w.stale.map(r=>row(r,r.reporter_name))}</>}
+    {w.stale.length>0&&<><div style={{fontWeight:800,color:'#78716c',margin:'8px 0 4px'}}>⏳ ซ่อมเสร็จ ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน ({w.stale.length}) — หัวหน้ากดเข้าไปปิดแทนได้</div>{w.stale.map(r=>row(r,r.reporter_name))}</>}
   </div>;
 }
 

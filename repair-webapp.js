@@ -140,7 +140,7 @@ function repairReminderCheck() {
 
 // @แท็กหัวหน้าช่าง (ตั้งชื่อผู้ใช้ Telegram ในแดชบอร์ด แท็บแจ้งซ่อม → รายชื่อช่าง) — แท็กแล้วมือถือหัวหน้าเด้งแม้ปิดเสียงกลุ่ม
 function headTags() {
-  var r = sb('get', 'repair_staff?site=eq.banglen&role=eq.head&active=eq.true&select=telegram');
+  var r = sb('get', 'repair_staff?site=eq.banglen&role=in.(head,manager)&active=eq.true&select=telegram');
   if (r.getResponseCode() >= 300) return '';
   return JSON.parse(r.getContentText() || '[]').filter(function (x) { return x.telegram; }).map(function (x) { return '@' + x.telegram; }).join(' ');
 }
