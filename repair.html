@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15f';
+var APP_VERSION='2026-10-15g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -605,7 +605,7 @@ function PdfExport({ids}){
 
 function JobDetail({id,me,onBack,tick,assets}){
   const[req,setReq]=useState(null);const[events,setEvents]=useState([]);const[mode,setMode]=useState('');
-  const[note,setNote]=useState('');const[busy,setBusy]=useState(false);const[err,setErr]=useState('');const[pdfBusy,setPdfBusy]=useState(false);
+  const[note,setNote]=useState('');const[busy,setBusy]=useState(false);const[err,setErr]=useState('');const[pdfBusy,setPdfBusy]=useState(false);const[takeover,setTakeover]=useState(false);
   const load=async()=>{
     const{data,error}=await SB.from('repair_requests').select('*').eq('id',id).single();
     if(error){setErr('ไม่พบใบงาน: '+error.message);return;}
@@ -630,6 +630,8 @@ function JobDetail({id,me,onBack,tick,assets}){
   // สิทธิ์ตามฝ่าย: รับงาน/ซ่อม/รออะไหล่/บันทึกการซ่อม = ฝ่ายช่างซ่อมบำรุงเท่านั้น
   // ปิดงาน = ผู้แจ้ง/คนอื่น (ช่างที่ซ่อมเองกดยืนยันงานตัวเองไม่ได้ ยกเว้นเป็นคนแจ้งเอง) · ยกเลิก = ผู้แจ้ง หรือช่าง
   const role=roleOf(me),isTech=role==='tech'||role==='head',isHead=role==='head'||role==='manager';
+  // ปุ่มทำงาน (เริ่มซ่อม/รออะไหล่/ซ่อมเสร็จ/ส่งซ่อมนอก) เฉพาะช่างเจ้าของงาน · หัวหน้าช่างกด "ทำแทน" ได้
+  const canWork=isTech&&(!req.technician||req.technician===me.name||takeover);
   // หัวหน้ามอบหมายงาน: ใบที่ยังไม่มีคนรับ → กลายเป็น "รับงานแล้ว" ในชื่อช่างที่มอบให้
   const assign=name=>act({technician:name,assigned_by:me.name,...(req.status==='open'?{status:'accepted',accepted_at:now}:{})},
     'มอบหมายให้ '+name,null,'accepted',name+' (หัวหน้า '+me.name+' มอบหมาย)');
@@ -694,25 +696,28 @@ function JobDetail({id,me,onBack,tick,assets}){
           <label className="lbl">เหตุผลที่ยกเลิก</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น แจ้งซ้ำ"/>
           <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>act({status:'cancelled',closed_at:now,close_note:note.trim(),closed_by:me.name},'ยกเลิก',note.trim(),'cancelled')}>ยืนยันยกเลิก</button></>}
       </>}
+      {['accepted','in_progress','waiting_parts','outsourced'].includes(req.status)&&isTech&&!canWork&&<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>
+        🔧 งานนี้ของ <b>{req.technician||'ช่างที่รับงาน'}</b>{req.assigned_by?' (มอบหมายโดย '+req.assigned_by+')':''} — ให้ช่างเจ้าของงานเป็นคนกดอัปเดต
+        {role==='head'&&<button className="chip" style={{marginLeft:8}} onClick={()=>setTakeover(true)}>↪ ทำแทน {req.technician||''}</button>}</div>}
       {req.status==='accepted'&&!isTech&&techOnly}
-      {req.status==='accepted'&&isTech&&<>
+      {req.status==='accepted'&&canWork&&<>
         <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',started_at:req.started_at||now},'เริ่มซ่อม')}>▶️ เริ่มซ่อม</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จแล้ว (บันทึกเลย)</button>
         <button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>
       </>}
       {(req.status==='in_progress'||req.status==='waiting_parts'||req.status==='outsourced')&&!isTech&&techOnly}
-      {req.status==='in_progress'&&isTech&&<>
+      {req.status==='in_progress'&&canWork&&<>
         <button className="bigbtn green" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
         {mode!=='wait'?<button className="ghost" onClick={()=>setMode('wait')}>⏸ รออะไหล่</button>:<>
           <label className="lbl">รออะไหล่อะไร</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ลูกปืน 6205 สั่งร้านแล้ว"/>
           <button className="bigbtn" style={{background:'#b45309'}} disabled={busy||!note.trim()} onClick={()=>act({status:'waiting_parts',waiting_since:now},'รออะไหล่',note.trim(),'waiting_parts')}>⏸ ยืนยันรออะไหล่</button></>}
       </>}
-      {req.status==='in_progress'&&isTech&&<button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>}
-      {req.status==='outsourced'&&isTech&&<>
+      {req.status==='in_progress'&&canWork&&<button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>}
+      {req.status==='outsourced'&&canWork&&<>
         <button className="bigbtn green" onClick={()=>setMode('done')}>✅ รับรถคืนแล้ว (บันทึกผลซ่อม)</button>
         <button className="ghost" disabled={busy} onClick={()=>act({status:'in_progress'},'ยกเลิกส่งซ่อมนอก กลับมาซ่อมเอง')}>↩ ยกเลิกส่งซ่อมนอก (ซ่อมเอง)</button>
       </>}
-      {req.status==='waiting_parts'&&isTech&&<>
+      {req.status==='waiting_parts'&&canWork&&<>
         <button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>
         <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',waiting_since:null,waiting_minutes:(req.waiting_minutes||0)+waitAdd()},'ได้อะไหล่ ซ่อมต่อ')}>▶️ ได้อะไหล่แล้ว ซ่อมต่อ</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
