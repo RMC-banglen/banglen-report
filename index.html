@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15g';
+var APP_VERSION='2026-10-15h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9102,7 +9102,7 @@ window.__dataReady.then(data => {
     const updCause=async(c,patch)=>{const{error}=await DB.from('repair_causes').update(patch).eq('id',c.id);if(error)alert('แก้ไม่สำเร็จ: '+error.message);load();};
     const delCause=async c=>{if(!confirm('ลบสาเหตุ "'+c.name+'" ออกจากตัวเลือก?\n(ใบงานเก่าที่เลือกไว้ยังคงอยู่ในสถิติ)'))return;await DB.from('repair_causes').delete().eq('id',c.id);load();};
     // รายการรายงาน "อื่นๆ: ..." ที่ช่างพิมพ์เอง (ทั้งปี) ซ้ำกี่ครั้ง → เสนอให้เพิ่มเป็นตัวเลือกประจำ
-    const otherAll={};rows.forEach(r=>{if(/^อื่นๆ:/.test(r.cause||'')){const d=r.cause.replace(/^อื่นๆ:\s*/,'').trim();if(d)otherAll[d]=(otherAll[d]||0)+1;}});
+    const otherAll={};(rows||[]).forEach(r=>{if(/^อื่นๆ:/.test(r.cause||'')){const d=r.cause.replace(/^อื่นๆ:\s*/,'').trim();if(d)otherAll[d]=(otherAll[d]||0)+1;}});
     const otherSuggest=Object.entries(otherAll).filter(([d])=>!causeDefs.some(c=>c.name===d)).sort((a,b)=>b[1]-a[1]);
     // รายชื่อช่าง/หัวหน้า — ชื่อต้องตรงกับที่ช่างเลือกในแอปแจ้งซ่อม
     const addStaff=async()=>{
