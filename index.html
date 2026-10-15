@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-12b';
+var APP_VERSION='2026-10-15a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9129,7 +9129,7 @@ window.__dataReady.then(data => {
     const repeats=inPeriod.filter(r=>repeatIds.has(r.id)).length+inPeriod.reduce((s,r)=>s+(r.reopen_count||0),0);
     // ตารางรายเครื่อง
     const assetNames=[...new Set([...assets.filter(a=>a.active).map(a=>a.name),...inYear.map(r=>r.asset_name)])];
-    const catOf=n=>(assets.find(a=>a.name===n)||{}).category||(inYear.find(r=>r.asset_name===n)||{}).asset_category||'อื่นๆ';
+    const catOf=n=>{const c=(assets.find(a=>a.name===n)||{}).category||(inYear.find(r=>r.asset_name===n)||{}).asset_category;return c&&c!=='__other'?c:'อื่นๆ';};
     const periodHours=month?new Date(yearCE,month,0).getDate()*24:((new Date(yearCE,11,31)>new Date()?Math.ceil((Date.now()-new Date(yearCE,0,1))/864e5):365)*24);
     const perAsset=assetNames.map(n=>{
       const list=inPeriod.filter(r=>r.asset_name===n);
@@ -9157,6 +9157,47 @@ window.__dataReady.then(data => {
       if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}
       load();
     };
+    // ส่งออก PDF: เปิดหน้ารายงานแบบพิมพ์ (A4 แนวนอน) แล้วสั่งพิมพ์ → เลือก "บันทึกเป็น PDF"
+    const exportPdf=()=>{
+      const E=v=>String(v==null?'':v).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+      const period=month?MO[month-1]+' '+yearBE:'ทั้งปี '+yearBE;
+      const dt=d=>d?new Date(d).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit',timeZone:'Asia/Bangkok'}):'';
+      const kpis=[['แจ้งซ่อม',inPeriod.length+' ครั้ง'],['เครื่องหยุดรวม',fmtH(downtime)],['ซ่อมเสร็จเฉลี่ย',fmtH(mttr)],['ช่างรับงานเฉลี่ย',fmtH(resp)],
+        ['ซ่อมซ้ำ',repeats+' ครั้ง'],['ค่าอะไหล่+จ้างนอก',baht(cost)+' ฿'],['PM / บำรุงรักษา',pmPeriod.filter(x=>x.done_at).length+' / '+pmPeriod.length],['งานค้างตอนนี้',open.length+' ใบ']];
+      const withData=used.filter(a=>a.fails||a.mo.some(v=>v>0));
+      const tickets=[...inPeriod,...pmPeriod].sort((a,b)=>new Date(a.reported_at)-new Date(b.reported_at));
+      const html='<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานแจ้งซ่อม '+E(period)+'</title>'
+        +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap" rel="stylesheet">'
+        +'<style>@page{size:A4 landscape;margin:10mm}body{font-family:Sarabun,sans-serif;font-size:10.5pt;color:#1e293b;margin:0}'
+        +'h1{font-size:16pt;margin:0}h2{font-size:12pt;margin:14px 0 6px;color:#b45309;border-bottom:1.5px solid #b45309;padding-bottom:2px}'
+        +'.sub{color:#64748b;font-size:9.5pt}.k{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.k div{border:1px solid #e2e8f0;border-radius:6px;padding:5px 10px;min-width:110px}'
+        +'.k b{display:block;font-size:12.5pt}table{border-collapse:collapse;width:100%}th,td{border:1px solid #cbd5e1;padding:3px 5px;vertical-align:top}'
+        +'th{background:#fff7ed;font-weight:700}td.n{text-align:right;white-space:nowrap}tr{page-break-inside:avoid}.muted{color:#94a3b8}</style></head><body>'
+        +'<h1>รายงานแจ้งซ่อมเครื่องจักร / รถ — ร่วมมิตรคอนกรีต (บางเลน)</h1>'
+        +'<div class="sub">ช่วง: <b>'+E(period)+'</b> · พิมพ์เมื่อ '+E(new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'}))+'</div>'
+        +'<div class="k">'+kpis.map(k=>'<div>'+E(k[0])+'<b>'+E(k[1])+'</b></div>').join('')+'</div>'
+        +'<h2>งานค้างตอนนี้ ('+(open.length+waitConfirm.length)+')</h2>'
+        +([...open,...waitConfirm].length?'<table><tr><th>เลขที่</th><th>เครื่อง/รถ</th><th>ประเภท</th><th>อาการ</th><th>สถานะ</th><th>ช่าง</th><th>ผ่านไป</th></tr>'
+          +[...open,...waitConfirm].map(x=>'<tr><td>'+E(x.ticket_no)+'</td><td>'+E(dn(x.asset_name))+'</td><td>'+E(isPM(x)?(x.pm_item_id?'PM ตามรอบ':'บำรุงรักษา'):(URG[x.urgency]||{}).t)+'</td><td>'+E(x.symptom)+'</td><td>'+E((ST[x.status]||[])[0])+'</td><td>'+E(x.technician||'–')+'</td><td class="n">'+E(fmtH(hrs(now-new Date(x.reported_at))))+'</td></tr>').join('')+'</table>'
+          :'<div class="muted">ไม่มีงานค้าง</div>')
+        +'<h2>เวลาเครื่องหยุด รายเครื่อง รายเดือน (ชม.) — ปี '+yearBE+'</h2>'
+        +(withData.length?'<table><tr><th>เครื่อง/รถ</th>'+MO.map(m=>'<th>'+m+'</th>').join('')+'<th>รวม</th><th>ครั้ง</th><th>ซ่อมเฉลี่ย</th><th>เสียทุกๆ</th><th>ค่าใช้จ่าย</th></tr>'
+          +withData.map(a=>'<tr><td>'+E(dn(a.n))+'</td>'+a.mo.map(v=>'<td class="n">'+(v?v.toFixed(1):'<span class="muted">–</span>')+'</td>').join('')
+            +'<td class="n"><b>'+(a.mo.some(v=>v>0)?a.mo.reduce((s2,v)=>s2+v,0).toFixed(1):'–')+'</b></td><td class="n">'+(a.fails||'–')+'</td><td class="n">'+E(fmtH(a.mttr))+'</td><td class="n">'+E(a.mtbf!=null?fmtH(a.mtbf):'–')+'</td><td class="n">'+(a.cost?baht(a.cost):'–')+'</td></tr>').join('')+'</table>'
+          +'<div class="sub">แสดงเฉพาะเครื่องที่มีการแจ้งซ่อมในปีนี้ · เครื่องหยุด = งานที่แจ้งว่า "เครื่องหยุด" นับจากแจ้งจนซ่อมเสร็จ</div>'
+          :'<div class="muted">ยังไม่มีการแจ้งซ่อมในปีนี้</div>')
+        +(causeList.length?'<h2>สาเหตุ</h2><table style="width:auto">'+causeList.map(c=>'<tr><td>'+E(c[0])+'</td><td class="n">'+c[1]+' ครั้ง</td></tr>').join('')+'</table>':'')
+        +'<h2>รายการใบงาน ('+E(period)+') — '+tickets.length+' ใบ</h2>'
+        +(tickets.length?'<table><tr><th>เลขที่</th><th>วันที่แจ้ง</th><th>เครื่อง/รถ</th><th>อาการ</th><th>ผู้แจ้ง</th><th>สถานะ</th><th>ช่าง</th><th>สาเหตุ / สิ่งที่ทำ</th><th>อะไหล่</th><th>ค่าใช้จ่าย</th><th>ใช้เวลา</th></tr>'
+          +tickets.map(x=>'<tr><td>'+E(x.ticket_no)+(isPM(x)?'<br><span class="muted">'+(x.pm_item_id?'PM':'บำรุงรักษา')+'</span>':'')+'</td><td>'+E(dt(x.reported_at))+'</td><td>'+E(dn(x.asset_name))+'</td><td>'+E(x.symptom)+'</td><td>'+E(x.reporter_name)+'</td><td>'+E((ST[x.status]||[])[0])+'</td><td>'+E(x.technician||'–')
+            +'</td><td>'+(x.done_at?'<b>'+E(x.cause||'')+'</b> '+E(x.work_done||''):'<span class="muted">–</span>')+'</td><td>'+E((x.parts||[]).map(p=>p.name+' ×'+p.qty).join(', ')+(x.vendor?(x.parts&&x.parts.length?' · ':'')+'ร้าน '+x.vendor:''))
+            +'</td><td class="n">'+(costOf(x)?baht(costOf(x)):'–')+'</td><td class="n">'+(x.done_at?E(fmtH(hrs(new Date(x.done_at)-new Date(x.reported_at)))):'–')+'</td></tr>').join('')+'</table>'
+          :'<div class="muted">ไม่มีใบงานในช่วงนี้</div>')
+        +'<script>window.onload=function(){setTimeout(function(){window.print();},600);};<\/script></body></html>';
+      const w=window.open('','_blank');
+      if(!w){alert('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต popup แล้วกดอีกครั้ง');return;}
+      w.document.open();w.document.write(html);w.document.close();
+    };
     return <div>
       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13}}>
         <button onClick={()=>setSub('overview')} style={{padding:'7px 16px',borderRadius:20,border:'1.5px solid '+(sub==='overview'?'#b45309':'#e2e8f0'),background:sub==='overview'?'#b45309':'#fff',color:sub==='overview'?'#fff':'#334155',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:13}}>📊 ภาพรวม</button>
@@ -9165,6 +9206,7 @@ window.__dataReady.then(data => {
         <span style={{marginLeft:'auto'}}>ช่วง: <select value={month} onChange={e=>setMonth(Number(e.target.value))} style={{padding:'5px 8px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit'}}>
           <option value={0}>ทั้งปี {yearBE}</option>{MO.map((m,i)=><option key={i} value={i+1}>{m} {yearBE}</option>)}</select></span>
         <button onClick={load} style={{padding:'4px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>🔄</button>
+        <button onClick={exportPdf} style={{padding:'4px 12px',border:'1px solid #b45309',borderRadius:6,background:'#fff7ed',color:'#b45309',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>📄 ส่งออก PDF</button>
         </>}
       </div>
       {sub==='settings'&&<div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13,background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>

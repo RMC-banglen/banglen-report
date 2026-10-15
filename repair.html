@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-12b';
+var APP_VERSION='2026-10-15a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -316,7 +316,7 @@ function ReportForm({me,assets,onDone,preAssetId}){
     const a=assets.find(x=>x.name===assetName);
     // บำรุงรักษานอกรอบ = kind pm (ไม่นับเป็นเครื่องเสีย) · ช่างแจ้งเอง = รับงานให้เลย
     const selfTech=maint&&me.dept==='ช่างซ่อมบำรุง';
-    const row={site:SITE,asset_name:assetName,asset_category:a?a.category:(cat||'อื่นๆ'),urgency:maint?'normal':urg,symptom:symptom.trim(),
+    const row={site:SITE,asset_name:assetName,asset_category:a?a.category:(cat&&cat!=='__other'?cat:'อื่นๆ'),urgency:maint?'normal':urg,symptom:symptom.trim(),
       reporter_name:me.name,reporter_dept:me.dept,photos,status:selfTech?'accepted':'open',kind:maint?'pm':'repair',
       ...(selfTech?{technician:me.name,accepted_at:new Date().toISOString()}:{})};
     const{data,error}=await SB.from('repair_requests').insert([row]).select().single();
