@@ -73,6 +73,14 @@ function notifyRepair(d) {
   } else if (d.event === 'waiting_parts') {
     L.push('⏸ <b>รออะไหล่</b> — ' + head);
     if (d.note) L.push('รอ: ' + esc(d.note));
+  } else if (d.event === 'outsourced') {
+    L.push('🚚 <b>ส่งซ่อมนอก</b> — ' + head);
+    L.push('ร้าน: <b>' + esc(r.outsource_vendor || '-') + '</b>');
+    if (r.outsource_eta) L.push('คาดว่าเสร็จ: ' + thDate(r.outsource_eta));
+    if (r.outsource_est) L.push('ประเมิน: ' + Number(r.outsource_est).toLocaleString() + ' บาท');
+    L.push('ช่าง: ' + esc(r.technician || d.actor || '-') + (d.note ? ' · ' + esc(d.note) : ''));
+    var hh = headTagsFor(headList(), r.asset_category);
+    if (hh) L.push(hh + ' (รับทราบการส่งซ่อมนอก)');
   } else if (d.event === 'done' && r.kind === 'pm') {
     L.push('✅ <b>ทำ PM เสร็จ</b> — ' + head);
     L.push('ช่าง: ' + esc(r.technician || '-') + (r.helpers ? ' + ' + esc(r.helpers) : ''));
@@ -110,12 +118,25 @@ function repairReminderCheck() {
   var now = new Date();
   var hour = Number(Utilities.formatDate(now, 'Asia/Bangkok', 'H'));
   var workHours = hour >= 7 && hour < 18;
-  var res = sb('get', 'repair_requests?site=eq.banglen&status=in.(open,done)'
+  var res = sb('get', 'repair_requests?site=eq.banglen&status=in.(open,done,outsourced)'
+    + '&select=id,ticket_no,asset_name,asset_category,urgency,symptom,reporter_name,status,reported_at,done_at,last_alert_at,alert_count,outsource_vendor,outsource_eta');
+  if (res.getResponseCode() >= 300) res = sb('get', 'repair_requests?site=eq.banglen&status=in.(open,done)'
     + '&select=id,ticket_no,asset_name,asset_category,urgency,symptom,reporter_name,status,reported_at,done_at,last_alert_at,alert_count');
   if (res.getResponseCode() >= 300) { Logger.log('repairReminderCheck: ' + res.getContentText()); return; }
   var headL = headList();
   JSON.parse(res.getContentText() || '[]').forEach(function (r) {
     var heads = headTagsFor(headL, r.asset_category);
+    if (r.status === 'outsourced') {
+      // รถอยู่ร้านนอก: เตือนเฉพาะเมื่อเลยวันคาดเสร็จ (วันละครั้ง ช่วงเวลาทำงาน) — ตามช่างให้ไปถามร้าน
+      var today = Utilities.formatDate(now, 'Asia/Bangkok', 'yyyy-MM-dd');
+      if (!workHours || !r.outsource_eta || String(r.outsource_eta).slice(0, 10) >= today) return;
+      if (r.last_alert_at && now - new Date(r.last_alert_at) < 24 * 3600e3) return;
+      var late = Math.round((new Date(today + 'T00:00:00Z') - new Date(String(r.outsource_eta).slice(0, 10) + 'T00:00:00Z')) / 864e5);
+      sendTelegram('🚚⏰ <b>รถอยู่ร้านนอกเลยกำหนด ' + late + ' วัน</b>\n<b>' + esc(r.ticket_no) + '</b> · ' + esc(r.asset_name) + ' — ร้าน ' + esc(r.outsource_vendor || '-')
+        + '\nคาดว่าเสร็จ ' + thDate(r.outsource_eta) + ' — ช่างช่วยโทรถามร้าน' + (heads ? '\n' + heads : '') + jobLink(r.id));
+      sb('patch', 'repair_requests?id=eq.' + r.id, { last_alert_at: now.toISOString(), alert_count: (r.alert_count || 0) + 1 });
+      return;
+    }
     var since = r.status === 'done' ? new Date(r.done_at) : new Date(r.reported_at);
     var age = now - since, last = r.last_alert_at ? now - new Date(r.last_alert_at) : Infinity;
     var first, every, msg;
@@ -217,13 +238,13 @@ function createPmTicket(x, days) {
 function weeklySummary() {
   var now = new Date(), since = new Date(now.getTime() - 7 * 864e5);
   var res = sb('get', 'repair_requests?site=eq.banglen&status=neq.cancelled&or=(reported_at.gte.' + since.toISOString() + ',done_at.gte.' + since.toISOString()
-    + ',status.in.(open,accepted,in_progress,waiting_parts,done))&select=*');
+    + ',status.in.(open,accepted,in_progress,waiting_parts,outsourced,done))&select=*');
   if (res.getResponseCode() >= 300) { Logger.log('weeklySummary: ' + res.getContentText()); return; }
   var rows = JSON.parse(res.getContentText() || '[]');
   var isPm = function (r) { return r.kind === 'pm'; };
   var newR = rows.filter(function (r) { return !isPm(r) && new Date(r.reported_at) >= since; });
   var doneR = rows.filter(function (r) { return !isPm(r) && r.done_at && new Date(r.done_at) >= since; });
-  var openR = rows.filter(function (r) { return ['open', 'accepted', 'in_progress', 'waiting_parts'].indexOf(r.status) >= 0; });
+  var openR = rows.filter(function (r) { return ['open', 'accepted', 'in_progress', 'waiting_parts', 'outsourced'].indexOf(r.status) >= 0; });
   var waitR = rows.filter(function (r) { return r.status === 'done'; });
   var pmDone = rows.filter(function (r) { return isPm(r) && r.done_at && new Date(r.done_at) >= since; }).length;
   // เครื่องหยุด: เฉพาะช่วง 7 วันนี้ ของงานที่แจ้งว่า "เครื่องหยุด"

@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15e';
+var APP_VERSION='2026-10-15f';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -129,12 +129,13 @@ const STATUS={
   accepted:{label:'ช่างรับงานแล้ว',color:'#1d4ed8',bg:'#dbeafe'},
   in_progress:{label:'กำลังซ่อม',color:'#7c3aed',bg:'#ede9fe'},
   waiting_parts:{label:'รออะไหล่',color:'#b45309',bg:'#fef3c7'},
+  outsourced:{label:'🚚 ซ่อมนอก',color:'#9333ea',bg:'#f3e8ff'},
   done:{label:'ซ่อมเสร็จ รอยืนยัน',color:'#0f766e',bg:'#ccfbf1'},
   closed:{label:'ปิดงานแล้ว',color:'#15803d',bg:'#dcfce7'},
   cancelled:{label:'ยกเลิก',color:'#78716c',bg:'#f5f5f4'},
 };
 const CAUSES=['สึกหรอตามอายุ','ใช้งานผิดวิธี','ขาดการบำรุงรักษา','ระบบไฟฟ้า','ไฮดรอลิก/ลม','เครื่องกล/เกียร์/ลูกปืน','อุบัติเหตุ/ชน','ยาง/ช่วงล่าง (รถ)','เครื่องยนต์ (รถ)','อื่นๆ'];
-const ACTIVE=['open','accepted','in_progress','waiting_parts'];
+const ACTIVE=['open','accepted','in_progress','waiting_parts','outsourced'];
 const PM_CAUSE='บำรุงรักษาตามรอบ (PM)';
 
 const fmtTime=t=>t?new Date(t).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'}):'-';
@@ -362,7 +363,8 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
       .then(({data})=>{const m={};(data||[]).forEach(r=>(r.parts||[]).forEach(p=>{if(p&&p.name&&!(p.name in m))m[p.name]=p.price;}));setCatalog(m);});
   },[]);const[work,setWork]=useState(req.work_done||'');
   const[parts,setParts]=useState(req.parts&&req.parts.length?req.parts:[{name:'',qty:'',price:''}]);
-  const[vendor,setVendor]=useState(req.vendor||'');const[vcost,setVcost]=useState(req.vendor_cost||'');
+  const outs=req.status==='outsourced';
+  const[vendor,setVendor]=useState(req.vendor||req.outsource_vendor||'');const[vcost,setVcost]=useState(req.vendor_cost||(outs?req.outsource_est:'')||'');
   const[helpers,setHelpers]=useState(req.helpers||'');const[photos,setPhotos]=useState(req.after_photos||[]);
   const[saving,setSaving]=useState(false);const[err,setErr]=useState('');
   const setPart=(i,k,v)=>setParts(parts.map((p,j)=>{
@@ -402,7 +404,8 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
     setSaving(false);onSaved(data);
   };
   return <div className="card">
-    <div className="card-title">{editMode?'✏️ แก้ไขผลการซ่อม':'✅ บันทึกการซ่อม'}</div>
+    <div className="card-title">{editMode?'✏️ แก้ไขผลการซ่อม':outs?'✅ รับรถคืนจากร้าน — บันทึกผลซ่อม':'✅ บันทึกการซ่อม'}</div>
+    {outs&&<div style={{fontSize:13,color:'#9333ea',marginBottom:6}}>ร้าน {req.outsource_vendor||'-'} · ใส่ <b>ค่าใช้จ่ายจริง</b> ตามใบเสร็จ (ช่อง "จ้างร้านภายนอก") และถ่ายรูปใบเสร็จ/งานที่เสร็จในช่องรูปหลังซ่อม</div>}
     <label className="lbl">สาเหตุ</label>
     <div className="chips">{(isPM?[PM_CAUSE,...CAUSES]:CAUSES).map(c=><button key={c} className={'chip'+(cause===c?' on':'')} onClick={()=>setCause(c)}>{c}</button>)}</div>
     <label className="lbl">สิ่งที่ทำ / วิธีแก้</label>
@@ -424,8 +427,47 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
     <label className="lbl">รูปหลังซ่อม</label>
     <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
     {err&&<div className="err">{err}</div>}
-    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':editMode?'💾 บันทึกการแก้ไข':isPM?(req.pm_item_id?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ทำเสร็จ ปิดงาน'):'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
+    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':editMode?'💾 บันทึกการแก้ไข':outs?'✅ รับรถคืนแล้ว แจ้งผู้แจ้งยืนยัน':isPM?(req.pm_item_id?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ทำเสร็จ ปิดงาน'):'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
     <button className="ghost" onClick={onCancel}>ย้อนกลับ</button>
+  </div>;
+}
+
+// ---------- ส่งซ่อมนอก (ช่างซ่อมเองไม่ได้ → ส่งร้านภายนอก) ----------
+function OutsourceForm({req,me,onSaved,onCancel}){
+  const[vendor,setVendor]=useState('');const[eta,setEta]=useState('');const[est,setEst]=useState('');const[note,setNote]=useState('');
+  const[known,setKnown]=useState([]);const[saving,setSaving]=useState(false);const[err,setErr]=useState('');
+  // ร้านที่เคยใช้ (เสนอให้เลือก ชื่อเขียนเหมือนกันทุกครั้ง)
+  useEffect(()=>{SB.from('repair_requests').select('vendor').not('vendor','is',null).order('id',{ascending:false}).limit(200)
+    .then(({data})=>setKnown([...new Set((data||[]).map(r=>r.vendor).filter(Boolean))]));},[]);
+  const save=async()=>{
+    if(!vendor.trim()){setErr('ใส่ชื่อร้าน/อู่ที่ส่งซ่อม');return;}
+    setSaving(true);setErr('');
+    const now=new Date();
+    let waiting=req.waiting_minutes||0;
+    if(req.status==='waiting_parts'&&req.waiting_since)waiting+=Math.round((now-new Date(req.waiting_since))/60000);
+    const patch={status:'outsourced',outsource_vendor:vendor.trim(),outsource_sent_at:now.toISOString(),outsource_eta:eta||null,outsource_est:Number(est)||null,outsource_note:note.trim()||null,
+      waiting_since:null,waiting_minutes:waiting,started_at:req.started_at||req.accepted_at||now.toISOString(),technician:req.technician||me.name,updated_at:now.toISOString()};
+    const{data,error}=await SB.from('repair_requests').update(patch).eq('id',req.id).select().single();
+    if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message+(/outsource/.test(error.message)?' (ยังไม่ได้รัน supabase-repair-outsource.sql)':''));return;}
+    await logEvent(req.id,me.name,'ส่งซ่อมนอก','ร้าน '+vendor.trim()+(eta?' · คาดเสร็จ '+eta:'')+(est?' · ประเมิน '+baht(est)+' ฿':'')+(note.trim()?' · '+note.trim():''));
+    notify('outsourced',data,{actor:me.name,note:note.trim()});
+    setSaving(false);onSaved(data);
+  };
+  return <div className="card">
+    <div className="card-title">🚚 ส่งซ่อมนอก — {assetLabel(req.asset_name)}</div>
+    <div style={{fontSize:13,color:'#8a7a68',marginBottom:4}}>ช่างซ่อมเองไม่ได้ → ส่งร้านภายนอก ระบบจะแจ้งกลุ่มช่าง (หัวหน้าถูกแท็ก) และเตือนถ้าเลยวันคาดเสร็จแล้วยังไม่รับรถคืน เวลาเครื่องหยุดยังนับต่อ</div>
+    <label className="lbl">ร้าน / อู่ที่ส่งซ่อม</label>
+    <input list="vendor-list" value={vendor} onChange={e=>setVendor(e.target.value)} placeholder="เช่น อู่สมชาย / บริษัท ABC"/>
+    <datalist id="vendor-list">{known.map(v=><option key={v} value={v}/>)}</datalist>
+    <label className="lbl">วันที่คาดว่าจะซ่อมเสร็จ</label>
+    <input type="date" value={eta} onChange={e=>setEta(e.target.value)}/>
+    <label className="lbl">ราคาประเมิน (บาท) <span style={{fontWeight:400,color:'#8a7a68'}}>ถ้ามี</span></label>
+    <input type="number" inputMode="decimal" value={est} onChange={e=>setEst(e.target.value)} placeholder="0"/>
+    <label className="lbl">หมายเหตุ (ซ่อมอะไร / ใครรับ-ส่ง)</label>
+    <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ส่งเปลี่ยนเกียร์ ลากรถไปวันนี้"/>
+    {err&&<div className="err">{err}</div>}
+    <button className="bigbtn" style={{background:'#9333ea'}} disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':'🚚 ยืนยันส่งซ่อมนอก'}</button>
+    <button className="ghost" onClick={onCancel}>ยกเลิก</button>
   </div>;
 }
 
@@ -600,6 +642,7 @@ function JobDetail({id,me,onBack,tick,assets}){
   const isOwner=req.reporter_name===me.name;
   const canEditReport=req.status!=='cancelled'&&(isHead||(isOwner&&req.status==='open'));
   const canEditResult=!!req.done_at&&req.status!=='cancelled'&&(isHead||(!closedLike&&isTech&&req.technician===me.name));
+  if(mode==='outsource')return <OutsourceForm req={req} me={me} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
   if(mode==='done')return <DoneForm req={req} me={me} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
   if(mode==='editResult')return <DoneForm req={req} me={me} editMode onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
   if(mode==='editReport')return <EditReport req={req} me={me} assets={assets||[]} silent={isOwner&&req.status==='open'} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
@@ -623,6 +666,15 @@ function JobDetail({id,me,onBack,tick,assets}){
       </div>
     </div>
 
+    {req.outsource_vendor&&req.status!=='cancelled'&&<div className="card" style={{borderLeft:'5px solid #9333ea'}}>
+      <div className="card-title">🚚 ส่งซ่อมนอก</div>
+      <div className="row"><span>ร้าน</span><b>{req.outsource_vendor}</b></div>
+      <div className="row"><span>ส่งเมื่อ</span><b>{fmtTime(req.outsource_sent_at)}</b></div>
+      {req.outsource_eta&&<div className="row"><span>คาดว่าเสร็จ</span><b style={{color:req.status==='outsourced'&&req.outsource_eta<new Date(Date.now()+7*3600e3).toISOString().slice(0,10)?'#dc2626':'inherit'}}>{req.outsource_eta.split('-').reverse().join('/')}{req.status==='outsourced'&&req.outsource_eta<new Date(Date.now()+7*3600e3).toISOString().slice(0,10)?' ⚠️ เลยกำหนด':''}</b></div>}
+      {req.outsource_est>0&&<div className="row"><span>ราคาประเมิน</span><b>{baht(req.outsource_est)} ฿</b></div>}
+      {req.outsource_sent_at&&<div className="row"><span>{req.status==='outsourced'?'อยู่ร้านมาแล้ว':'ใช้เวลาที่ร้าน'}</span><b>{dur((req.status==='outsourced'?Date.now():new Date(req.done_at||Date.now()).getTime())-new Date(req.outsource_sent_at).getTime())}</b></div>}
+      {req.outsource_note&&<div style={{fontSize:14,paddingTop:6,color:'#4a3d30'}}>{req.outsource_note}</div>}
+    </div>}
     {canEditReport&&<div style={{margin:'8px 12px 0',display:'flex',gap:8}}>
       <button className="chip" onClick={()=>setMode('editReport')}>✏️ แก้ไขข้อมูลที่แจ้ง{!isOwner||req.status!=='open'?' (หัวหน้า)':''}</button></div>}
     {req.done_at&&<div className="card">
@@ -646,15 +698,22 @@ function JobDetail({id,me,onBack,tick,assets}){
       {req.status==='accepted'&&isTech&&<>
         <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',started_at:req.started_at||now},'เริ่มซ่อม')}>▶️ เริ่มซ่อม</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จแล้ว (บันทึกเลย)</button>
+        <button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>
       </>}
-      {(req.status==='in_progress'||req.status==='waiting_parts')&&!isTech&&techOnly}
+      {(req.status==='in_progress'||req.status==='waiting_parts'||req.status==='outsourced')&&!isTech&&techOnly}
       {req.status==='in_progress'&&isTech&&<>
         <button className="bigbtn green" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
         {mode!=='wait'?<button className="ghost" onClick={()=>setMode('wait')}>⏸ รออะไหล่</button>:<>
           <label className="lbl">รออะไหล่อะไร</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ลูกปืน 6205 สั่งร้านแล้ว"/>
           <button className="bigbtn" style={{background:'#b45309'}} disabled={busy||!note.trim()} onClick={()=>act({status:'waiting_parts',waiting_since:now},'รออะไหล่',note.trim(),'waiting_parts')}>⏸ ยืนยันรออะไหล่</button></>}
       </>}
+      {req.status==='in_progress'&&isTech&&<button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>}
+      {req.status==='outsourced'&&isTech&&<>
+        <button className="bigbtn green" onClick={()=>setMode('done')}>✅ รับรถคืนแล้ว (บันทึกผลซ่อม)</button>
+        <button className="ghost" disabled={busy} onClick={()=>act({status:'in_progress'},'ยกเลิกส่งซ่อมนอก กลับมาซ่อมเอง')}>↩ ยกเลิกส่งซ่อมนอก (ซ่อมเอง)</button>
+      </>}
       {req.status==='waiting_parts'&&isTech&&<>
+        <button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>
         <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',waiting_since:null,waiting_minutes:(req.waiting_minutes||0)+waitAdd()},'ได้อะไหล่ ซ่อมต่อ')}>▶️ ได้อะไหล่แล้ว ซ่อมต่อ</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
       </>}
@@ -694,9 +753,9 @@ function myWork(me,jobs){
   const role=roleOf(me);
   const confirm=jobs.filter(r=>r.status==='done'&&r.reporter_name===me.name);
   const waiting=role?jobs.filter(r=>r.status==='open'&&inScope(me,r.asset_category)):[];
-  const mine=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts'].includes(r.status)):[];
+  const mine=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts','outsourced'].includes(r.status)):[];
   // งานที่ฉันแจ้งที่ยังไม่เสร็จ (ไว้ติดตามสถานะ ไม่นับเป็นงานที่ต้องทำ)
-  const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','accepted','in_progress','waiting_parts'].includes(r.status));
+  const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','accepted','in_progress','waiting_parts','outsourced'].includes(r.status));
   const stale=(role==='head'||role==='manager')?jobs.filter(r=>r.status==='done'&&inScope(me,r.asset_category)&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
   return{role,confirm,waiting,mine,stale,reported,count:confirm.length+waiting.length+mine.length};
 }
@@ -721,7 +780,7 @@ function JobList({onOpen,reloadKey,me,jobs,tick}){
   const[rows,setRows]=useState(null);const[f,setF]=useState('active');
   useEffect(()=>{
     const since=new Date(Date.now()-45*864e5).toISOString();
-    SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at').eq('site',SITE).or('status.in.(open,accepted,in_progress,waiting_parts,done),reported_at.gte.'+since)
+    SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at').eq('site',SITE).or('status.in.(open,accepted,in_progress,waiting_parts,outsourced,done),reported_at.gte.'+since)
       .order('reported_at',{ascending:false}).limit(300).then(({data})=>setRows(data||[]));
   },[reloadKey,tick]);
   if(!rows)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
@@ -757,7 +816,7 @@ function App(){
   // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
     const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,asset_category,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
-      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','done']).then(({data})=>{if(!data)return;setJobs(data);
+      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','outsourced','done']).then(({data})=>{if(!data)return;setJobs(data);
         // โหลดรายการงาน/ใบงานใหม่ เฉพาะเมื่อมีงานเปลี่ยน (ใบใหม่ / สถานะเปลี่ยน / ปิดไป) — ไม่เปลี่ยน = ไม่ดึงซ้ำ ประหยัดโควตา
         const sig=data.map(r=>r.id+':'+r.status+':'+(r.technician||'')).sort().join(',');
         if(sig!==sigRef.current){sigRef.current=sig;setTick(t=>t+1);}});

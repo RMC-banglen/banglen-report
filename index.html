@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15b';
+var APP_VERSION='2026-10-15c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9025,8 +9025,8 @@ window.__dataReady.then(data => {
   function RepairWorkOrders({yearBE,canEdit}){
     const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const URG={stop:{t:'🔴 เครื่องหยุด',c:'#dc2626'},abnormal:{t:'🟠 ผิดปกติ',c:'#ea580c'},normal:{t:'🟢 ไม่ด่วน',c:'#16a34a'}};
-    const ST={open:['รอช่างรับ','#b91c1c','#fee2e2'],accepted:['รับงานแล้ว','#1d4ed8','#dbeafe'],in_progress:['กำลังซ่อม','#7c3aed','#ede9fe'],waiting_parts:['รออะไหล่','#b45309','#fef3c7'],done:['รอยืนยัน','#0f766e','#ccfbf1'],closed:['ปิดแล้ว','#15803d','#dcfce7'],cancelled:['ยกเลิก','#78716c','#f5f5f4']};
-    const ACTIVE=['open','accepted','in_progress','waiting_parts'];
+    const ST={open:['รอช่างรับ','#b91c1c','#fee2e2'],accepted:['รับงานแล้ว','#1d4ed8','#dbeafe'],in_progress:['กำลังซ่อม','#7c3aed','#ede9fe'],waiting_parts:['รออะไหล่','#b45309','#fef3c7'],outsourced:['ซ่อมนอก','#9333ea','#f3e8ff'],done:['รอยืนยัน','#0f766e','#ccfbf1'],closed:['ปิดแล้ว','#15803d','#dcfce7'],cancelled:['ยกเลิก','#78716c','#f5f5f4']};
+    const ACTIVE=['open','accepted','in_progress','waiting_parts','outsourced'];
     const [rows,setRows]=useState(null);
     const [assets,setAssets]=useState([]);
     const [month,setMonth]=useState(0); // 0 = ทั้งปี
@@ -9144,6 +9144,9 @@ window.__dataReady.then(data => {
     const usedCats=[...new Set(used.map(a=>a.cat))];
     const causes={};inPeriod.filter(r=>r.cause).forEach(r=>{causes[r.cause]=(causes[r.cause]||0)+1;});
     const causeList=Object.entries(causes).sort((a,b)=>b[1]-a[1]);
+    // ร้านภายนอก: จำนวนครั้ง + ค่าใช้จ่ายรวม (ตามช่วงที่เลือก)
+    const vendors={};inPeriod.filter(r=>r.vendor||r.outsource_vendor).forEach(r=>{const k=r.vendor||r.outsource_vendor;const v=vendors[k]||(vendors[k]={n:0,cost:0,days:0,k});v.n++;v.cost+=Number(r.vendor_cost)||0;if(r.outsource_sent_at)v.days+=((r.done_at?new Date(r.done_at).getTime():now)-new Date(r.outsource_sent_at).getTime())/864e5;});
+    const vendorList=Object.values(vendors).sort((a,b)=>b.cost-a.cost||b.n-a.n);
     const th={padding:'8px 10px',fontSize:12.5,color:'#64748b',textAlign:'right',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'};
     const td={padding:'7px 10px',fontSize:13,textAlign:'right',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap'};
     const addAsset=async()=>{if(!newAsset.name.trim())return;const{error}=await DB.from('repair_assets').insert([{site:'banglen',name:newAsset.name.trim(),category:newAsset.category.trim()||'อื่นๆ',sort_order:999}]);
@@ -9267,6 +9270,9 @@ window.__dataReady.then(data => {
             <div style={{width:150}}>{c}</div><div style={{flex:1,background:'#f1f5f9',borderRadius:4,height:14}}><div style={{width:(n/causeList[0][1]*100)+'%',background:'#b45309',height:14,borderRadius:4}}/></div><b style={{width:30,textAlign:'right'}}>{n}</b></div>)}
         </div>
         <div style={{flex:'1 1 300px',background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>
+          {vendorList.length>0&&<><div style={{fontWeight:800,marginBottom:6}}>🚚 ร้านภายนอก</div>
+            {vendorList.map(v=><div key={v.k} style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:13,padding:'3px 0',borderBottom:'1px solid #f1f5f9'}}><span><b>{v.k}</b> · {v.n} ครั้ง{v.days>0?' · อยู่ร้านรวม '+v.days.toFixed(1)+' วัน':''}</span><b>{v.cost?baht(v.cost)+' ฿':'–'}</b></div>)}
+            <div style={{height:12}}/></>}
           <div style={{fontWeight:800,marginBottom:8}}>ปิดงานล่าสุด</div>
           {inPeriod.filter(r=>r.status==='closed').slice(-8).reverse().map(r=><div key={r.id} style={{fontSize:13,padding:'5px 0',borderBottom:'1px solid #f1f5f9'}}>
             <a href={'repair.html#'+r.id} target="_blank" rel="noreferrer" style={{fontWeight:700,color:'#1e293b'}}>{r.asset_name}</a> — {r.cause||'-'} · {r.technician||'-'}{costOf(r)?' · '+baht(costOf(r))+' ฿':''}
