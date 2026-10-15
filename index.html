@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15a';
+var APP_VERSION='2026-10-15b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9293,7 +9293,9 @@ window.__dataReady.then(data => {
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div style={{fontWeight:800}}>ใบงานทั้งหมดในช่วงนี้ ({rows.filter(r=>month?bkk(r.reported_at).getUTCFullYear()===yearCE&&bkk(r.reported_at).getUTCMonth()+1===month:bkk(r.reported_at).getUTCFullYear()===yearCE).length})</div>
-          <button onClick={()=>setShowAll(!showAll)} style={{padding:'4px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>{showAll?'ซ่อน':'ดูทั้งหมด'}</button>
+          <span style={{display:'flex',gap:6}}>{(()=>{const ids=rows.filter(r=>{const d=bkk(r.reported_at);return d.getUTCFullYear()===yearCE&&(!month||d.getUTCMonth()+1===month);}).map(r=>r.id);
+            return ids.length>0&&<a href={'repair.html?pdf='+ids.join(',')} target="_blank" rel="noreferrer" title="ใบงานทั้งหมดในช่วงนี้ รวมเป็นไฟล์เดียว 1 หน้าต่อ 1 ใบ" style={{padding:'4px 10px',border:'1px solid #b45309',borderRadius:6,background:'#fff7ed',color:'#b45309',textDecoration:'none',fontWeight:700,fontSize:13}}>📄 ใบงานทั้งหมดเป็น PDF ({ids.length})</a>;})()}
+          <button onClick={()=>setShowAll(!showAll)} style={{padding:'4px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>{showAll?'ซ่อน':'ดูทั้งหมด'}</button></span>
         </div>
         {showAll&&<div style={{overflowX:'auto',marginTop:10}}><table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
           {rows.filter(r=>{const d=bkk(r.reported_at);return d.getUTCFullYear()===yearCE&&(!month||d.getUTCMonth()+1===month);}).slice().reverse().map(r=><tr key={r.id}>
@@ -9303,7 +9305,7 @@ window.__dataReady.then(data => {
             <td style={{...td,textAlign:'left',whiteSpace:'normal',maxWidth:260}}>{r.symptom}</td>
             <td style={td}><span style={{padding:'2px 8px',borderRadius:99,fontSize:12,fontWeight:700,color:(ST[r.status]||[])[1],background:(ST[r.status]||[])[2]}}>{(ST[r.status]||[])[0]}</span></td>
             <td style={td}>{r.reporter_name}</td>
-            <td style={td}>{canEdit&&<button onClick={()=>delReq(r)} title="ลบใบงานนี้" style={{padding:'3px 9px',border:'1px solid #fecaca',borderRadius:6,background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>🗑 ลบ</button>}</td>
+            <td style={td}><a href={'repair.html?pdf='+r.id} target="_blank" rel="noreferrer" title="ดาวน์โหลดใบงานเป็น PDF" style={{padding:'3px 9px',border:'1px solid #fed7aa',borderRadius:6,background:'#fff7ed',color:'#b45309',textDecoration:'none',fontSize:12,fontWeight:700,marginRight:6}}>📄 PDF</a>{canEdit&&<button onClick={()=>delReq(r)} title="ลบใบงานนี้" style={{padding:'3px 9px',border:'1px solid #fecaca',borderRadius:6,background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>🗑 ลบ</button>}</td>
           </tr>)}
         </tbody></table></div>}
       </div>

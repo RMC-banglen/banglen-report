@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15a';
+var APP_VERSION='2026-10-15c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -422,9 +422,102 @@ function DoneForm({req,me,onSaved,onCancel}){
 }
 
 // ---------- รายละเอียดใบงาน ----------
+// ---------- PDF ใบงาน (ดาวน์โหลดในมือถือได้) ----------
+// วาดใบงานเป็นหน้า A4 ใน DOM → html2canvas เป็นรูป → jsPDF (ภาษาไทยไม่เพี้ยน เพราะเป็นภาพ) · โหลดไลบรารีตอนกดเท่านั้น
+function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector('script[src="'+src+'"]'))return res();const el=document.createElement('script');el.src=src;el.onload=res;el.onerror=()=>rej(new Error('โหลดไม่ได้: '+src));document.head.appendChild(el);});}
+function buildJobBox(req,events){
+  const E=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const u=URG[req.urgency]||{};
+  const type=req.kind==='pm'?(req.pm_item_id?'บำรุงรักษาตามรอบ (PM)':'บำรุงรักษา (เครื่องไม่ได้เสีย)'):u.label;
+  const total=(Number(req.parts_cost)||0)+(Number(req.vendor_cost)||0);
+  const row=(k,v)=>'<tr><td style="width:150px;color:#6b5b4a;padding:5px 8px;border-bottom:1px solid #eee">'+E(k)+'</td><td style="padding:5px 8px;border-bottom:1px solid #eee;font-weight:600">'+v+'</td></tr>';
+  const imgs=a=>(a||[]).map(p=>'<img crossorigin="anonymous" src="'+E(p)+'" style="width:180px;height:135px;object-fit:cover;border-radius:6px;border:1px solid #ddd;margin:0 8px 8px 0"/>').join('');
+  const box=document.createElement('div');
+  box.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;color:#1f1a14;font-family:Sarabun,sans-serif;font-size:14px;padding:36px 40px;box-sizing:border-box';
+  box.innerHTML=
+    '<div style="display:flex;align-items:center;gap:14px;border-bottom:3px solid #b45309;padding-bottom:10px">'
+    +'<img src="logo.png" style="height:44px"/><div style="flex:1"><div style="font-size:20px;font-weight:800">ใบแจ้งซ่อม / ใบสั่งงานซ่อม</div>'
+    +'<div style="color:#6b5b4a">ร่วมมิตรคอนกรีต (บางเลน)</div></div>'
+    +'<div style="text-align:right"><div style="font-size:18px;font-weight:800">'+E(req.ticket_no)+'</div><div style="color:#6b5b4a">'+E((STATUS[req.status]||{}).label)+'</div></div></div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-top:12px">'
+    +row('เครื่องจักร / รถ',E(assetLabel(req.asset_name))+(req.asset_category?' <span style="color:#8a7a68;font-weight:400">('+E(req.asset_category)+')</span>':''))
+    +row('ประเภท',E(type))
+    +row('อาการ',E(req.symptom))
+    +row('ผู้แจ้ง',E(req.reporter_name)+' ('+E(req.reporter_dept)+')')
+    +row('วันเวลาแจ้ง',E(fmtTime(req.reported_at)))
+    +(req.technician?row('ช่าง',E(req.technician)+(req.helpers?' + '+E(req.helpers):'')+(req.assigned_by?' <span style="color:#8a7a68;font-weight:400">(มอบหมายโดย '+E(req.assigned_by)+')</span>':'')):'')
+    +(req.accepted_at?row('รับงาน',E(fmtTime(req.accepted_at))+' (ภายใน '+E(dur(new Date(req.accepted_at)-new Date(req.reported_at)))+')'):'')
+    +(req.done_at?row('ซ่อมเสร็จ',E(fmtTime(req.done_at))+' (ใช้เวลารวม '+E(dur(new Date(req.done_at)-new Date(req.reported_at)))+')'):'')
+    +(req.waiting_minutes>0?row('รออะไหล่',E(dur(req.waiting_minutes*60000))):'')
+    +(req.closed_at?row(req.status==='cancelled'?'ยกเลิก':'ปิดงาน',E(fmtTime(req.closed_at))+(req.closed_by?' โดย '+E(req.closed_by):'')+(req.close_note?' — '+E(req.close_note):'')):'')
+    +'</table>'
+    +(req.done_at?'<div style="font-size:16px;font-weight:800;margin:16px 0 6px;color:#b45309">ผลการซ่อม</div><table style="width:100%;border-collapse:collapse">'
+      +row('สาเหตุ',E(req.cause))+row('สิ่งที่ทำ',E(req.work_done).replace(/\n/g,'<br/>'))+'</table>'
+      +((req.parts||[]).length||req.vendor?'<table style="width:100%;border-collapse:collapse;margin-top:8px"><tr style="background:#fff7ed"><th style="text-align:left;padding:5px 8px">อะไหล่ / รายการ</th><th style="padding:5px 8px;text-align:right">จำนวน</th><th style="padding:5px 8px;text-align:right">ราคา/หน่วย</th><th style="padding:5px 8px;text-align:right">รวม</th></tr>'
+        +(req.parts||[]).map(p=>'<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">'+E(p.name)+'</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee">'+E(p.qty)+'</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee">'+E(baht(p.price))+'</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee">'+E(baht(p.qty*p.price))+'</td></tr>').join('')
+        +(req.vendor?'<tr><td style="padding:4px 8px" colspan="3">จ้างร้าน '+E(req.vendor)+'</td><td style="padding:4px 8px;text-align:right">'+E(baht(req.vendor_cost))+'</td></tr>':'')
+        +'<tr><td colspan="3" style="padding:6px 8px;text-align:right;font-weight:800">รวมค่าใช้จ่าย</td><td style="padding:6px 8px;text-align:right;font-weight:800">'+E(baht(total))+' บาท</td></tr></table>':''):'')
+    +((req.photos||[]).length?'<div style="font-weight:800;margin:14px 0 6px">รูปตอนแจ้ง</div>'+imgs(req.photos):'')
+    +((req.after_photos||[]).length?'<div style="font-weight:800;margin:6px 0 6px">รูปหลังซ่อม</div>'+imgs(req.after_photos):'')
+    +((events||[]).length?'<div style="font-size:16px;font-weight:800;margin:14px 0 6px;color:#b45309">ประวัติ</div>'+(events||[]).map(e=>'<div style="padding:3px 0;border-bottom:1px dashed #eee"><b>'+E(e.action)+'</b> — '+E(e.actor)+' <span style="color:#8a7a68">'+E(fmtTime(e.at))+'</span>'+(e.note?'<div style="color:#6b5b4a;font-size:13px">'+E(e.note)+'</div>':'')+'</div>').join(''):'')
+    +'<div style="display:flex;gap:30px;margin-top:40px">'+['ผู้แจ้ง','ช่างผู้ซ่อม','หัวหน้างาน'].map(t=>'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid #999;height:36px"></div><div style="margin-top:4px;color:#6b5b4a">'+t+'</div><div style="color:#aaa;font-size:12px">วันที่ ........../........../..........</div></div>').join('')+'</div>'
+    +'<div style="margin-top:18px;color:#aaa;font-size:11px;text-align:right">พิมพ์จากระบบแจ้งซ่อม · '+E(fmtTime(new Date().toISOString()))+'</div>';
+  return box;
+}
+// วาดใบงานลง pdf (ใบใหม่ขึ้นหน้าใหม่เสมอ · ยาวเกินหน้าตัดต่อหน้าถัดไป)
+async function drawBox(pdf,box,first){
+  document.body.appendChild(box);
+  try{
+    await Promise.all([...box.querySelectorAll('img')].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r;})));
+    const canvas=await html2canvas(box,{scale:2,useCORS:true,backgroundColor:'#fff'});
+    const W=210,H=297,pagePx=canvas.width*H/W;
+    let y=0;
+    while(y<canvas.height){
+      const part=document.createElement('canvas');part.width=canvas.width;part.height=Math.min(pagePx,canvas.height-y);
+      part.getContext('2d').drawImage(canvas,0,y,canvas.width,part.height,0,0,canvas.width,part.height);
+      if(!(first&&y===0))pdf.addPage();
+      pdf.addImage(part.toDataURL('image/jpeg',0.9),'JPEG',0,0,W,part.height*W/canvas.width);
+      y+=pagePx;
+    }
+  }finally{box.remove();}
+}
+// list = [{req,events}] → ไฟล์เดียว 1 ใบต่อหน้า
+async function downloadJobsPdf(list,filename,onProgress){
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+  for(let i=0;i<list.length;i++){if(onProgress)onProgress(i+1,list.length);await drawBox(pdf,buildJobBox(list[i].req,list[i].events),i===0);}
+  pdf.save(filename);
+}
+async function downloadJobPdf(req,events){await downloadJobsPdf([{req,events}],(req.ticket_no||'ใบงาน')+'.pdf');}
+
+// เปิดจากแดชบอร์ด: repair.html?pdf=12,13,14 → ดาวน์โหลดใบงานเป็น PDF ให้เลย (ไม่ต้องใส่ชื่อ)
+function PdfExport({ids}){
+  const[msg,setMsg]=useState('กำลังโหลดข้อมูล...');const[done,setDone]=useState(false);
+  const run=async()=>{
+    setDone(false);
+    try{
+      const{data:reqs,error}=await SB.from('repair_requests').select('*').in('id',ids);
+      if(error)throw error;
+      const{data:evs}=await SB.from('repair_events').select('*').in('request_id',ids).order('at');
+      const list=ids.map(id=>(reqs||[]).find(r=>String(r.id)===String(id))).filter(Boolean)
+        .map(r=>({req:r,events:(evs||[]).filter(e=>e.request_id===r.id)}));
+      if(!list.length)throw new Error('ไม่พบใบงาน');
+      const name=list.length===1?list[0].req.ticket_no+'.pdf':'ใบงานแจ้งซ่อม-'+list.length+'ใบ.pdf';
+      await downloadJobsPdf(list,name,(i,n)=>setMsg('กำลังสร้าง PDF ใบที่ '+i+' / '+n+' ...'));
+      setMsg('ดาวน์โหลดแล้ว: '+name);setDone(true);
+    }catch(e){setMsg('สร้าง PDF ไม่สำเร็จ: '+(e.message||e));setDone(true);}
+  };
+  useEffect(()=>{loadFleet().catch(()=>{}).then(run);},[]);
+  return <div className="card"><div className="card-title">📄 ส่งออกใบงานเป็น PDF ({ids.length} ใบ)</div>
+    <div style={{fontSize:15}}>{!done&&<span className="spinner" style={{width:20,height:20,borderWidth:3,verticalAlign:'middle',marginRight:8}}/>}{msg}</div>
+    {done&&<button className="ghost" onClick={run}>⟳ สร้างใหม่อีกครั้ง</button>}
+    <div style={{fontSize:12.5,color:'#8a7a68',marginTop:10}}>ถ้าไฟล์ไม่ดาวน์โหลดเอง ให้กด "สร้างใหม่อีกครั้ง"</div></div>;
+}
+
 function JobDetail({id,me,onBack,tick}){
   const[req,setReq]=useState(null);const[events,setEvents]=useState([]);const[mode,setMode]=useState('');
-  const[note,setNote]=useState('');const[busy,setBusy]=useState(false);const[err,setErr]=useState('');
+  const[note,setNote]=useState('');const[busy,setBusy]=useState(false);const[err,setErr]=useState('');const[pdfBusy,setPdfBusy]=useState(false);
   const load=async()=>{
     const{data,error}=await SB.from('repair_requests').select('*').eq('id',id).single();
     if(error){setErr('ไม่พบใบงาน: '+error.message);return;}
@@ -534,6 +627,8 @@ function JobDetail({id,me,onBack,tick}){
       <div className="card-title">ประวัติใบงานนี้</div>
       {events.map(e=><div className="tl" key={e.id}><b>{e.action}</b> — {e.actor} <small>{fmtTime(e.at)}</small>{e.note&&<div><small>{e.note}</small></div>}</div>)}
     </div>
+    <button className="ghost" style={{margin:'12px 12px 0',width:'calc(100% - 24px)',borderColor:'#b45309',color:'#b45309'}} disabled={pdfBusy}
+      onClick={async()=>{setPdfBusy(true);try{await downloadJobPdf(req,events);}catch(e){alert('สร้าง PDF ไม่สำเร็จ: '+(e.message||e));}setPdfBusy(false);}}>{pdfBusy?'กำลังสร้าง PDF...':'📄 ดาวน์โหลด PDF ใบงาน'}</button>
     <button className="ghost" style={{margin:'12px 12px 0',width:'calc(100% - 24px)'}} onClick={onBack}>← กลับไปรายการ</button>
   </div>;
 }
@@ -596,6 +691,8 @@ function JobList({onOpen,reloadKey,me,jobs,tick}){
 function App(){
   const[me,setMe]=useState(loadMe());const[editMe,setEditMe]=useState(false);
   const preAssetId=new URLSearchParams(location.search).get('a');
+  const pdfIds=(new URLSearchParams(location.search).get('pdf')||'').split(',').filter(Boolean);
+  const pdfMode=pdfIds.length?pdfIds:null;
   const[tab,setTab]=useState(location.hash.replace('#','')&&!preAssetId?'jobs':'report');
   const[openId,setOpenId]=useState(location.hash.replace('#','')||null);
   const[assets,setAssets]=useState([]);const[done,setDone]=useState(null);const[reloadKey,setReloadKey]=useState(0);
@@ -631,7 +728,7 @@ function App(){
       </div>}
       {(!me||editMe)&&<div style={{height:12}}/>}
     </div>
-    {(!me||editMe)?<MeSetup me={me} onSave={v=>{saveMe(v);setMe(v);setEditMe(false);}}/>:
+    {pdfMode?<PdfExport ids={pdfMode}/>:(!me||editMe)?<MeSetup me={me} onSave={v=>{saveMe(v);setMe(v);setEditMe(false);}}/>:
      tab==='report'?(done?<div className="card">
         <div className="ok">แจ้งซ่อมแล้ว เลขที่ <b>{done.ticket_no}</b><br/>ระบบส่งเตือนช่างแล้ว</div>
         <button className="bigbtn" onClick={()=>{setTab('jobs');open(done.id);}}>ดูใบงาน</button>
