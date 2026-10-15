@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15i';
+var APP_VERSION='2026-10-15j';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -137,6 +137,19 @@ const STATUS={
 };
 const CAUSES=['สึกหรอตามอายุ','ใช้งานผิดวิธี','ขาดการบำรุงรักษา','ระบบไฟฟ้า','ไฮดรอลิก/ลม','เครื่องกล/เกียร์/ลูกปืน','อุบัติเหตุ/ชน','ยาง/ช่วงล่าง (รถ)','เครื่องยนต์ (รถ)','อื่นๆ'];
 const ACTIVE=['open','assigned','accepted','in_progress','waiting_parts','outsourced'];
+// สาเหตุการซ่อม: แยกตามประเภทเครื่อง (รถ / เครน / เครื่องจักร) — รายการจริงตั้งในแดชบอร์ด (ตาราง repair_causes) ที่นี่คือค่าเริ่มต้นสำรอง
+function causeGroup(cat){
+  if(['รถขนส่ง','รถในโรงงาน'].includes(cat))return 'vehicle';
+  if(['เครน','เครนรถขนส่ง'].includes(cat))return 'crane';
+  return 'machine';
+}
+const appliesTo=(c,grp)=>{const a=String(c.applies||'all');return a==='all'||a.split(',').includes(grp);};
+const DEFAULT_CAUSES=[
+  {name:'สึกหรอตามอายุ',applies:'all'},{name:'ใช้งานผิดวิธี',applies:'all'},{name:'ขาดการบำรุงรักษา',applies:'all'},{name:'ระบบไฟฟ้า',applies:'all'},{name:'อุบัติเหตุ/ชน',applies:'all'},
+  {name:'ยาง/ช่วงล่าง',applies:'vehicle'},{name:'เครื่องยนต์/เกียร์',applies:'vehicle'},{name:'ระบบเบรก/ลม',applies:'vehicle'},
+  {name:'สลิง/รอก',applies:'crane'},{name:'ลิมิตสวิตช์/เซนเซอร์',applies:'crane'},{name:'มอเตอร์/เกียร์ยก',applies:'crane'},
+  {name:'ไฮดรอลิก/ลม',applies:'crane,machine'},{name:'เครื่องกล/เกียร์/ลูกปืน',applies:'crane,machine'},{name:'สายพาน/โซ่',applies:'machine'},
+];
 const PM_CAUSE='บำรุงรักษาตามรอบ (PM)';
 
 const fmtTime=t=>t?new Date(t).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'}):'-';
@@ -360,6 +373,12 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
   const[cause,setCause]=useState(/^อื่นๆ/.test(oldCause)?'อื่นๆ':oldCause);
   const[causeOther,setCauseOther]=useState(/^อื่นๆ/.test(oldCause)?oldCause.replace(/^อื่นๆ:?\s*/,''):'');
   const causeFinal=cause==='อื่นๆ'?('อื่นๆ: '+causeOther.trim()):cause;
+  // รายการสาเหตุตามประเภทเครื่อง (จากแดชบอร์ด · ถ้ายังไม่ตั้ง/ตารางไม่มี ใช้ค่าเริ่มต้น) · "อื่นๆ" ท้ายสุดเสมอ · สาเหตุเดิมในใบเก่าที่ไม่อยู่ในรายการ ยังโชว์ให้เห็น
+  const[causeDefs,setCauseDefs]=useState([]);
+  useEffect(()=>{SB.from('repair_causes').select('*').eq('site',SITE).eq('active',true).order('sort_order').then(({data,error})=>{if(!error&&data)setCauseDefs(data);});},[]);
+  const grp=causeGroup(req.asset_category);
+  const baseNames=(causeDefs.length?causeDefs:DEFAULT_CAUSES).filter(c=>appliesTo(c,grp)).map(c=>c.name).filter(n=>n!=='อื่นๆ');
+  const chipsList=[...new Set([...(isPM?[PM_CAUSE]:[]),...baseNames,...(cause&&cause!=='อื่นๆ'?[cause]:[]),'อื่นๆ'])];
   // ชื่ออะไหล่ที่เคยใช้ + ราคาล่าสุด → เสนอให้เลือก พิมพ์น้อยลง ชื่อเขียนเหมือนกันทุกครั้ง
   const[catalog,setCatalog]=useState({});
   useEffect(()=>{
@@ -412,7 +431,7 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
     <div className="card-title">{editMode?'✏️ แก้ไขผลการซ่อม':outs?'✅ รับรถคืนจากร้าน — บันทึกผลซ่อม':'✅ บันทึกการซ่อม'}</div>
     {outs&&<div style={{fontSize:13,color:'#9333ea',marginBottom:6}}>ร้าน {req.outsource_vendor||'-'} · ใส่ <b>ค่าใช้จ่ายจริง</b> ตามใบเสร็จ (ช่อง "จ้างร้านภายนอก") และถ่ายรูปใบเสร็จ/งานที่เสร็จในช่องรูปหลังซ่อม</div>}
     <label className="lbl">สาเหตุ</label>
-    <div className="chips">{(isPM?[PM_CAUSE,...CAUSES]:CAUSES).map(c=><button key={c} className={'chip'+(cause===c?' on':'')} onClick={()=>setCause(c)}>{c}</button>)}</div>
+    <div className="chips">{chipsList.map(c=><button key={c} className={'chip'+(cause===c?' on':'')} onClick={()=>setCause(c)}>{c}</button>)}</div>
     {cause==='อื่นๆ'&&<input autoFocus value={causeOther} onChange={e=>setCauseOther(e.target.value)} placeholder="พิมพ์ระบุสาเหตุ เช่น หนูกัดสายไฟ / น้ำเข้าตู้ควบคุม" style={{marginTop:8,borderColor:causeOther.trim()?undefined:'#f59e0b'}}/>}
     <label className="lbl">สิ่งที่ทำ / วิธีแก้</label>
     <textarea value={work} onChange={e=>setWork(e.target.value)} placeholder="เช่น เปลี่ยนลูกปืนมอเตอร์ยก อัดจาระบี"/>

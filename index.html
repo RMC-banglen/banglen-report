@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15f';
+var APP_VERSION='2026-10-15g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9038,6 +9038,9 @@ window.__dataReady.then(data => {
     const [histAsset,setHistAsset]=useState(null);
     const [fleet,setFleet]=useState({});
     const [staff,setStaff]=useState([]);
+    const [causeDefs,setCauseDefs]=useState([]);
+    const [causeMissing,setCauseMissing]=useState(false);
+    const [newCause,setNewCause]=useState({name:'',applies:'all'});
     const [staffMissing,setStaffMissing]=useState(false);
     const [newStaff,setNewStaff]=useState({name:'',role:'tech',telegram:'',scope:'all'});
     const yearCE=yearBE-543;
@@ -9083,7 +9086,24 @@ window.__dataReady.then(data => {
       setAssets(as);
       const st=await DB.from('repair_staff').select('*').eq('site','banglen').order('sort_order').order('name');
       setStaffMissing(!!st.error);setStaff(st.data||[]);
+      const cs=await DB.from('repair_causes').select('*').eq('site','banglen').order('sort_order').order('id');
+      setCauseMissing(!!cs.error);setCauseDefs(cs.data||[]);
     };
+    // รายการสาเหตุการซ่อม — แยกตามประเภทเครื่อง (vehicle รถ · crane เครน · machine เครื่องจักร/รถไฟ)
+    const CAUSE_GROUPS=[['vehicle','🚛 รถ'],['crane','🏗 เครน'],['machine','⚙️ เครื่องจักร']];
+    const toggleApplies=(cur,k)=>{if(k==='all')return 'all';const set=new Set(cur==='all'||!cur?[]:String(cur).split(',').filter(Boolean));set.has(k)?set.delete(k):set.add(k);return set.size===0||set.size===3?'all':[...set].join(',');};
+    const addCause=async(name,applies)=>{
+      name=String(name||'').trim();if(!name)return;
+      if(name==='อื่นๆ'){alert('"อื่นๆ" มีให้ท้ายรายการอยู่แล้ว');return;}
+      const{error}=await DB.from('repair_causes').insert([{site:'banglen',name,applies:applies||'all',sort_order:(causeDefs.reduce((m,x)=>Math.max(m,x.sort_order||0),0))+1}]);
+      if(error){alert('เพิ่มไม่สำเร็จ: '+(error.message.includes('duplicate')?'มีสาเหตุนี้อยู่แล้ว':error.message));return;}
+      setNewCause({name:'',applies:'all'});load();
+    };
+    const updCause=async(c,patch)=>{const{error}=await DB.from('repair_causes').update(patch).eq('id',c.id);if(error)alert('แก้ไม่สำเร็จ: '+error.message);load();};
+    const delCause=async c=>{if(!confirm('ลบสาเหตุ "'+c.name+'" ออกจากตัวเลือก?\n(ใบงานเก่าที่เลือกไว้ยังคงอยู่ในสถิติ)'))return;await DB.from('repair_causes').delete().eq('id',c.id);load();};
+    // รายการรายงาน "อื่นๆ: ..." ที่ช่างพิมพ์เอง (ทั้งปี) ซ้ำกี่ครั้ง → เสนอให้เพิ่มเป็นตัวเลือกประจำ
+    const otherAll={};rows.forEach(r=>{if(/^อื่นๆ:/.test(r.cause||'')){const d=r.cause.replace(/^อื่นๆ:\s*/,'').trim();if(d)otherAll[d]=(otherAll[d]||0)+1;}});
+    const otherSuggest=Object.entries(otherAll).filter(([d])=>!causeDefs.some(c=>c.name===d)).sort((a,b)=>b[1]-a[1]);
     // รายชื่อช่าง/หัวหน้า — ชื่อต้องตรงกับที่ช่างเลือกในแอปแจ้งซ่อม
     const addStaff=async()=>{
       const name=newStaff.name.trim();if(!name)return;
@@ -9271,7 +9291,10 @@ window.__dataReady.then(data => {
           <div style={{fontWeight:800,marginBottom:8}}>สาเหตุที่พบบ่อย</div>
           {causeList.length===0?<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีข้อมูล</div>:causeList.map(([c,n])=><div key={c} style={{display:'flex',alignItems:'center',gap:8,margin:'5px 0',fontSize:13}}>
             <div style={{width:150}}>{c}</div><div style={{flex:1,background:'#f1f5f9',borderRadius:4,height:14}}><div style={{width:(n/causeList[0][1]*100)+'%',background:'#b45309',height:14,borderRadius:4}}/></div><b style={{width:30,textAlign:'right'}}>{n}</b></div>)}
-          {(causeOther['อื่นๆ']||[]).length>0&&<div style={{fontSize:12,color:'#64748b',marginTop:6}}>อื่นๆ คือ: {causeOther['อื่นๆ'].join(' · ')}</div>}
+          {causeList.length>0&&(()=>{const tot=causeList.reduce((a,x)=>a+x[1],0),on=causes['อื่นๆ']||0,pc=tot?Math.round(on/tot*100):0,warn=pc>20&&tot>=5;
+            return on>0&&<div style={{fontSize:12.5,marginTop:8,padding:'6px 10px',borderRadius:8,background:warn?'#fff7ed':'#f8fafc',color:warn?'#b45309':'#64748b'}}>
+              อื่นๆ {on}/{tot} ใบ ({pc}%){warn?' ⚠️ เกินเกณฑ์ 20% — รายการสาเหตุอาจไม่ตรงงานจริง ไปเพิ่มสาเหตุประจำที่ ⚙️ ตั้งค่า':''}
+              {(causeOther['อื่นๆ']||[]).length>0&&<div style={{marginTop:3}}>อื่นๆ คือ: {causeOther['อื่นๆ'].join(' · ')}</div>}</div>;})()}
         </div>
         <div style={{flex:'1 1 300px',background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>
           {vendorList.length>0&&<><div style={{fontWeight:800,marginBottom:6}}>🚚 ร้านภายนอก</div>
@@ -9346,6 +9369,31 @@ window.__dataReady.then(data => {
           {canEdit&&<td style={td}><button onClick={()=>updStaff(x,{active:!x.active})} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>{x.active?'ปิดใช้งาน':'เปิดใช้งาน'}</button>{' '}
             <button onClick={()=>delStaff(x)} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #fecaca',background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>ลบ</button></td>}
         </tr>)}</tbody></table>}
+        </>}
+      </div>
+
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
+        <div style={{fontWeight:800,marginBottom:4}}>🧩 รายการสาเหตุการซ่อม ({causeDefs.filter(x=>x.active).length})</div>
+        <div style={{fontSize:12,color:'#94a3b8',marginBottom:10}}>ตัวเลือกที่ช่างเห็นตอนบันทึกการซ่อม — เลือกว่าแต่ละสาเหตุขึ้นให้ประเภทไหน (รถ / เครน / เครื่องจักร) ช่างจะเห็นเฉพาะที่เกี่ยวกับเครื่องนั้น · "อื่นๆ" มีท้ายรายการเสมอ พร้อมช่องพิมพ์ระบุ · ถ้า "อื่นๆ" เกิน 20% ของใบงาน ควรเพิ่มสาเหตุประจำ</div>
+        {causeMissing?<div style={{color:'#b45309',fontSize:13}}>ยังไม่ได้รัน supabase-repair-causes.sql (ตอนนี้ใช้รายการเริ่มต้นในแอป)</div>:<>
+        {canEdit&&<div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
+          <input value={newCause.name} onChange={e=>setNewCause({...newCause,name:e.target.value})} placeholder="ชื่อสาเหตุ เช่น หนูกัดสายไฟ" style={{padding:'6px 10px',border:'1px solid #e2e8f0',borderRadius:6,fontFamily:'inherit',minWidth:220}}/>
+          <span style={{display:'flex',gap:4}}>{[['all','ทุกประเภท'],...CAUSE_GROUPS].map(([k,l])=>{const on=k==='all'?newCause.applies==='all':newCause.applies!=='all'&&newCause.applies.split(',').includes(k);
+            return <button key={k} onClick={()=>setNewCause({...newCause,applies:toggleApplies(newCause.applies,k)})} style={{padding:'4px 10px',borderRadius:99,border:'1px solid '+(on?'#b45309':'#e2e8f0'),background:on?'#fff7ed':'#fff',color:on?'#b45309':'#64748b',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:12}}>{l}</button>;})}</span>
+          <button onClick={()=>addCause(newCause.name,newCause.applies)} style={{padding:'6px 12px',border:'none',borderRadius:6,background:'#b45309',color:'#fff',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>+ เพิ่ม</button>
+        </div>}
+        {causeDefs.length===0?<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีรายการ (ใช้ค่าเริ่มต้นในแอป)</div>:
+        <table style={{borderCollapse:'collapse',width:'100%'}}><tbody>{causeDefs.map(x=><tr key={x.id} style={{opacity:x.active?1:.45}}>
+          <td style={{...td,textAlign:'left',fontWeight:700}}>{x.name}</td>
+          <td style={{...td,textAlign:'left'}}><span style={{display:'flex',gap:4,flexWrap:'wrap'}}>{[['all','ทุกประเภท'],...CAUSE_GROUPS].map(([k,l])=>{const on=k==='all'?x.applies==='all':x.applies!=='all'&&String(x.applies).split(',').includes(k);
+            return <button key={k} disabled={!canEdit} onClick={()=>updCause(x,{applies:toggleApplies(x.applies,k)})} style={{padding:'2px 9px',borderRadius:99,border:'1px solid '+(on?'#b45309':'#e2e8f0'),background:on?'#fff7ed':'#fff',color:on?'#b45309':'#94a3b8',fontWeight:700,cursor:canEdit?'pointer':'default',fontFamily:'inherit',fontSize:11.5}}>{l}</button>;})}</span></td>
+          {canEdit&&<td style={td}><button onClick={()=>updCause(x,{active:!x.active})} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>{x.active?'ซ่อน':'แสดง'}</button>{' '}
+            <button onClick={()=>delCause(x)} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #fecaca',background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>ลบ</button></td>}
+        </tr>)}</tbody></table>}
+        {otherSuggest.length>0&&<div style={{marginTop:12,padding:10,background:'#f8fafc',borderRadius:8}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>💡 ที่ช่างพิมพ์เองในช่อง "อื่นๆ" (ทั้งปี) — เพิ่มเป็นสาเหตุประจำได้</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{otherSuggest.map(([d,n])=><span key={d} style={{display:'inline-flex',gap:6,alignItems:'center',padding:'3px 4px 3px 10px',borderRadius:99,border:'1px solid #e2e8f0',background:'#fff',fontSize:12.5}}>{d} <b style={{color:'#b45309'}}>×{n}</b>
+            {canEdit&&<button onClick={()=>addCause(d,'all')} style={{padding:'1px 8px',borderRadius:99,border:'none',background:'#b45309',color:'#fff',cursor:'pointer',fontFamily:'inherit',fontSize:11.5,fontWeight:700}}>+ เพิ่ม</button>}</span>)}</div></div>}
         </>}
       </div>
 
