@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15c';
+var APP_VERSION='2026-10-15e';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -352,7 +352,7 @@ function ReportForm({me,assets,onDone,preAssetId}){
 }
 
 // ---------- ฟอร์มช่างปิดงานซ่อม ----------
-function DoneForm({req,me,onSaved,onCancel}){
+function DoneForm({req,me,onSaved,onCancel,editMode}){
   const isPM=req.kind==='pm';
   const[cause,setCause]=useState(req.cause||(isPM?PM_CAUSE:''));
   // ชื่ออะไหล่ที่เคยใช้ + ราคาล่าสุด → เสนอให้เลือก พิมพ์น้อยลง ชื่อเขียนเหมือนกันทุกครั้ง
@@ -378,6 +378,14 @@ function DoneForm({req,me,onSaved,onCancel}){
     if(!cause){setErr('เลือกสาเหตุ');return;}
     if(!work.trim()){setErr('บอกสิ่งที่ทำ');return;}
     setSaving(true);setErr('');
+    if(editMode){
+      // แก้ผลซ่อมที่บันทึกไว้แล้ว: เปลี่ยนเฉพาะรายละเอียด สถานะ/เวลาเดิม · ลงประวัติว่าใครแก้ · ไม่แจ้ง Telegram ซ้ำ
+      const{data,error}=await SB.from('repair_requests').update({cause,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
+        vendor:vendor.trim()||null,vendor_cost:Number(vcost)||0,helpers:helpers.trim()||null,after_photos:photos,updated_at:new Date().toISOString()}).eq('id',req.id).select().single();
+      if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+      await logEvent(req.id,me.name,'แก้ไขผลการซ่อม',cause+' · '+work.trim());
+      setSaving(false);onSaved(data);return;
+    }
     const now=new Date();
     let waiting=req.waiting_minutes||0;
     if(req.status==='waiting_parts'&&req.waiting_since)waiting+=Math.round((now-new Date(req.waiting_since))/60000);
@@ -394,7 +402,7 @@ function DoneForm({req,me,onSaved,onCancel}){
     setSaving(false);onSaved(data);
   };
   return <div className="card">
-    <div className="card-title">✅ บันทึกการซ่อม</div>
+    <div className="card-title">{editMode?'✏️ แก้ไขผลการซ่อม':'✅ บันทึกการซ่อม'}</div>
     <label className="lbl">สาเหตุ</label>
     <div className="chips">{(isPM?[PM_CAUSE,...CAUSES]:CAUSES).map(c=><button key={c} className={'chip'+(cause===c?' on':'')} onClick={()=>setCause(c)}>{c}</button>)}</div>
     <label className="lbl">สิ่งที่ทำ / วิธีแก้</label>
@@ -416,8 +424,46 @@ function DoneForm({req,me,onSaved,onCancel}){
     <label className="lbl">รูปหลังซ่อม</label>
     <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
     {err&&<div className="err">{err}</div>}
-    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':isPM?(req.pm_item_id?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ทำเสร็จ ปิดงาน'):'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
+    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':editMode?'💾 บันทึกการแก้ไข':isPM?(req.pm_item_id?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ทำเสร็จ ปิดงาน'):'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
     <button className="ghost" onClick={onCancel}>ย้อนกลับ</button>
+  </div>;
+}
+
+// ---------- แก้ข้อมูลที่แจ้ง (อาการ / ความเร่งด่วน / รูป) ----------
+function EditReport({req,me,assets,onSaved,onCancel,silent}){
+  const[symptom,setSymptom]=useState(req.symptom||'');const[urg,setUrg]=useState(req.urgency||'abnormal');
+  const[photos,setPhotos]=useState(req.photos||[]);const[asset,setAsset]=useState(req.asset_name);
+  const[saving,setSaving]=useState(false);const[err,setErr]=useState('');
+  const isPm=req.kind==='pm';
+  const save=async()=>{
+    if(!symptom.trim()){setErr('บอกอาการ');return;}
+    setSaving(true);setErr('');
+    const a=assets.find(x=>x.name===asset);
+    const patch={symptom:symptom.trim(),photos,asset_name:asset,...(a?{asset_category:a.category}:{}),...(isPm?{}:{urgency:urg}),updated_at:new Date().toISOString()};
+    const{data,error}=await SB.from('repair_requests').update(patch).eq('id',req.id).select().single();
+    if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    if(!silent){
+      const diff=[req.symptom!==patch.symptom?'อาการ':'',req.asset_name!==asset?'เครื่อง':'',!isPm&&req.urgency!==urg?'ความเร่งด่วน':'',JSON.stringify(req.photos||[])!==JSON.stringify(photos)?'รูป':''].filter(Boolean).join(', ');
+      await logEvent(req.id,me.name,'แก้ไขข้อมูลที่แจ้ง',diff||null);
+    }
+    setSaving(false);onSaved(data);
+  };
+  return <div className="card">
+    <div className="card-title">✏️ แก้ไขข้อมูลที่แจ้ง</div>
+    <label className="lbl">เครื่องจักร / รถ</label>
+    <select value={asset} onChange={e=>setAsset(e.target.value)}>
+      {!assets.some(x=>x.name===req.asset_name)&&<option value={req.asset_name}>{req.asset_name}</option>}
+      {[...new Set(assets.map(x=>x.category||'อื่นๆ'))].map(c=><optgroup key={c} label={c}>{assets.filter(x=>(x.category||'อื่นๆ')===c).map(x=><option key={x.id} value={x.name}>{assetLabel(x.name)}</option>)}</optgroup>)}
+    </select>
+    {!isPm&&<><label className="lbl">ความเร่งด่วน</label>
+      <div className="urg">{Object.entries(URG).map(([k,v])=><button key={k} className={(urg===k?'on ':'')+k} onClick={()=>setUrg(k)}><div>{v.label}<small>{v.sub}</small></div></button>)}</div></>}
+    <label className="lbl">อาการ</label>
+    <textarea value={symptom} onChange={e=>setSymptom(e.target.value)}/>
+    <label className="lbl">รูป</label>
+    <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
+    {err&&<div className="err">{err}</div>}
+    <button className="bigbtn" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':'💾 บันทึกการแก้ไข'}</button>
+    <button className="ghost" onClick={onCancel}>ยกเลิก</button>
   </div>;
 }
 
@@ -515,7 +561,7 @@ function PdfExport({ids}){
     <div style={{fontSize:12.5,color:'#8a7a68',marginTop:10}}>ถ้าไฟล์ไม่ดาวน์โหลดเอง ให้กด "สร้างใหม่อีกครั้ง"</div></div>;
 }
 
-function JobDetail({id,me,onBack,tick}){
+function JobDetail({id,me,onBack,tick,assets}){
   const[req,setReq]=useState(null);const[events,setEvents]=useState([]);const[mode,setMode]=useState('');
   const[note,setNote]=useState('');const[busy,setBusy]=useState(false);const[err,setErr]=useState('');const[pdfBusy,setPdfBusy]=useState(false);
   const load=async()=>{
@@ -549,7 +595,14 @@ function JobDetail({id,me,onBack,tick}){
   const canCancel=isTech||req.reporter_name===me.name;
   const techOnly=<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>🔧 รอช่างซ่อมบำรุงดำเนินการ{req.technician?' ('+req.technician+')':''} — ปุ่มรับงาน/บันทึกการซ่อม ใช้ได้เฉพาะฝ่ายช่างซ่อมบำรุง</div>;
   const waitAdd=()=>req.waiting_since?Math.round((Date.now()-new Date(req.waiting_since).getTime())/60000):0;
+  // สิทธิ์แก้ไข: ข้อมูลที่แจ้ง = ผู้แจ้ง (ก่อนช่างรับงาน) · หัวหน้า (ทุกสถานะ) | ผลซ่อม = ช่างที่ซ่อม · หัวหน้า | ใบที่ปิดแล้ว = หัวหน้าเท่านั้น
+  const closedLike=req.status==='closed'||req.status==='cancelled';
+  const isOwner=req.reporter_name===me.name;
+  const canEditReport=req.status!=='cancelled'&&(isHead||(isOwner&&req.status==='open'));
+  const canEditResult=!!req.done_at&&req.status!=='cancelled'&&(isHead||(!closedLike&&isTech&&req.technician===me.name));
   if(mode==='done')return <DoneForm req={req} me={me} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
+  if(mode==='editResult')return <DoneForm req={req} me={me} editMode onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
+  if(mode==='editReport')return <EditReport req={req} me={me} assets={assets||[]} silent={isOwner&&req.status==='open'} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
   const endT=req.done_at?new Date(req.done_at).getTime():Date.now();
   return <div>
     <div className="card" style={{borderTop:'5px solid '+u.color}}>
@@ -570,8 +623,10 @@ function JobDetail({id,me,onBack,tick}){
       </div>
     </div>
 
+    {canEditReport&&<div style={{margin:'8px 12px 0',display:'flex',gap:8}}>
+      <button className="chip" onClick={()=>setMode('editReport')}>✏️ แก้ไขข้อมูลที่แจ้ง{!isOwner||req.status!=='open'?' (หัวหน้า)':''}</button></div>}
     {req.done_at&&<div className="card">
-      <div className="card-title">🔧 ผลการซ่อม</div>
+      <div className="card-title" style={{display:'flex',alignItems:'center'}}>🔧 ผลการซ่อม{canEditResult&&<button className="chip" style={{marginLeft:'auto',padding:'4px 10px',fontSize:13}} onClick={()=>setMode('editResult')}>✏️ แก้ไข</button>}</div>
       <div className="row"><span>สาเหตุ</span><b>{req.cause}</b></div>
       <div style={{fontSize:14.5,padding:'8px 0',whiteSpace:'pre-wrap'}}>{req.work_done}</div>
       {(req.parts||[]).map((p,i)=><div className="row" key={i}><span>{p.name} × {p.qty}</span><b>{baht(p.qty*p.price)} ฿</b></div>)}
@@ -739,7 +794,7 @@ function App(){
           <span style={{fontSize:26}}>🔔</span><div style={{flex:1}}><b>มีงานรอคุณ {badge} งาน</b><div style={{fontSize:13,color:'#8a7a68'}}>{(()=>{const w=myWork(me,jobs);return [w.confirm.length?'รอยืนยัน '+w.confirm.length:'',w.waiting.length?'รอรับงาน '+w.waiting.length:'',w.mine.length?'งานที่รับไว้ '+w.mine.length:''].filter(Boolean).join(' · ');})()}</div></div><b style={{color:'#b45309'}}>ดู ›</b>
         </div>}
         <ReportForm me={me} assets={assets} preAssetId={preAssetId} onDone={d=>setDone(d)}/></>):
-     openId?<JobDetail id={openId} me={me} onBack={back} tick={tick}/>:<JobList onOpen={open} reloadKey={reloadKey} me={me} jobs={jobs} tick={tick}/>}
+     openId?<JobDetail id={openId} me={me} onBack={back} tick={tick} assets={assets}/>:<JobList onOpen={open} reloadKey={reloadKey} me={me} jobs={jobs} tick={tick}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
