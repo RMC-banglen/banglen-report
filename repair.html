@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15h';
+var APP_VERSION='2026-10-15i';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -356,7 +356,10 @@ function ReportForm({me,assets,onDone,preAssetId}){
 // ---------- ฟอร์มช่างปิดงานซ่อม ----------
 function DoneForm({req,me,onSaved,onCancel,editMode}){
   const isPM=req.kind==='pm';
-  const[cause,setCause]=useState(req.cause||(isPM?PM_CAUSE:''));
+  const oldCause=req.cause||(isPM?PM_CAUSE:'');
+  const[cause,setCause]=useState(/^อื่นๆ/.test(oldCause)?'อื่นๆ':oldCause);
+  const[causeOther,setCauseOther]=useState(/^อื่นๆ/.test(oldCause)?oldCause.replace(/^อื่นๆ:?\s*/,''):'');
+  const causeFinal=cause==='อื่นๆ'?('อื่นๆ: '+causeOther.trim()):cause;
   // ชื่ออะไหล่ที่เคยใช้ + ราคาล่าสุด → เสนอให้เลือก พิมพ์น้อยลง ชื่อเขียนเหมือนกันทุกครั้ง
   const[catalog,setCatalog]=useState({});
   useEffect(()=>{
@@ -379,27 +382,28 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
   const partsCost=cleanParts.reduce((s,p)=>s+p.qty*p.price,0);
   const save=async()=>{
     if(!cause){setErr('เลือกสาเหตุ');return;}
+    if(cause==='อื่นๆ'&&!causeOther.trim()){setErr('พิมพ์ระบุสาเหตุ (เลือก อื่นๆ ต้องบอกว่าเป็นอะไร)');return;}
     if(!work.trim()){setErr('บอกสิ่งที่ทำ');return;}
     setSaving(true);setErr('');
     if(editMode){
       // แก้ผลซ่อมที่บันทึกไว้แล้ว: เปลี่ยนเฉพาะรายละเอียด สถานะ/เวลาเดิม · ลงประวัติว่าใครแก้ · ไม่แจ้ง Telegram ซ้ำ
-      const{data,error}=await SB.from('repair_requests').update({cause,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
+      const{data,error}=await SB.from('repair_requests').update({cause:causeFinal,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
         vendor:vendor.trim()||null,vendor_cost:Number(vcost)||0,helpers:helpers.trim()||null,after_photos:photos,updated_at:new Date().toISOString()}).eq('id',req.id).select().single();
       if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
-      await logEvent(req.id,me.name,'แก้ไขผลการซ่อม',cause+' · '+work.trim());
+      await logEvent(req.id,me.name,'แก้ไขผลการซ่อม',causeFinal+' · '+work.trim());
       setSaving(false);onSaved(data);return;
     }
     const now=new Date();
     let waiting=req.waiting_minutes||0;
     if(req.status==='waiting_parts'&&req.waiting_since)waiting+=Math.round((now-new Date(req.waiting_since))/60000);
     // PM ไม่ต้องรอผู้แจ้งยืนยัน (ระบบเป็นคนเปิด) → ช่างกดเสร็จ = ปิดงานเลย
-    const patch={status:isPM?'closed':'done',done_at:now.toISOString(),...(isPM?{closed_at:now.toISOString(),closed_by:me.name}:{}),cause,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
+    const patch={status:isPM?'closed':'done',done_at:now.toISOString(),...(isPM?{closed_at:now.toISOString(),closed_by:me.name}:{}),cause:causeFinal,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
       vendor:vendor.trim()||null,vendor_cost:Number(vcost)||0,helpers:helpers.trim()||null,after_photos:photos,
       waiting_since:null,waiting_minutes:waiting,started_at:req.started_at||req.accepted_at||now.toISOString(),
       technician:req.technician||me.name,updated_at:now.toISOString()};
     const{data,error}=await SB.from('repair_requests').update(patch).eq('id',req.id).select().single();
     if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
-    await logEvent(req.id,me.name,isPM?'ทำเสร็จ ปิดงาน':'ซ่อมเสร็จ',cause+' · '+work.trim());
+    await logEvent(req.id,me.name,isPM?'ทำเสร็จ ปิดงาน':'ซ่อมเสร็จ',causeFinal+' · '+work.trim());
     if(isPM){try{await updatePmItem(data);}catch(e){}}
     notify('done',data);
     setSaving(false);onSaved(data);
@@ -409,6 +413,7 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
     {outs&&<div style={{fontSize:13,color:'#9333ea',marginBottom:6}}>ร้าน {req.outsource_vendor||'-'} · ใส่ <b>ค่าใช้จ่ายจริง</b> ตามใบเสร็จ (ช่อง "จ้างร้านภายนอก") และถ่ายรูปใบเสร็จ/งานที่เสร็จในช่องรูปหลังซ่อม</div>}
     <label className="lbl">สาเหตุ</label>
     <div className="chips">{(isPM?[PM_CAUSE,...CAUSES]:CAUSES).map(c=><button key={c} className={'chip'+(cause===c?' on':'')} onClick={()=>setCause(c)}>{c}</button>)}</div>
+    {cause==='อื่นๆ'&&<input autoFocus value={causeOther} onChange={e=>setCauseOther(e.target.value)} placeholder="พิมพ์ระบุสาเหตุ เช่น หนูกัดสายไฟ / น้ำเข้าตู้ควบคุม" style={{marginTop:8,borderColor:causeOther.trim()?undefined:'#f59e0b'}}/>}
     <label className="lbl">สิ่งที่ทำ / วิธีแก้</label>
     <textarea value={work} onChange={e=>setWork(e.target.value)} placeholder="เช่น เปลี่ยนลูกปืนมอเตอร์ยก อัดจาระบี"/>
     <label className="lbl">อะไหล่ที่ใช้ (ชื่อ · จำนวน · ราคา/ชิ้น)</label>

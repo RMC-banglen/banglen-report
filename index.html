@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15e';
+var APP_VERSION='2026-10-15f';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9143,7 +9143,8 @@ window.__dataReady.then(data => {
     // แสดงทุกเครื่องทุกเดือน (แบบไฟล์ Excel) — ไม่มีเครื่องหยุด = ขีด · จัดกลุ่มตามหมวด เรียงตามรายชื่อ
     const used=perAsset;
     const usedCats=[...new Set(used.map(a=>a.cat))];
-    const causes={};inPeriod.filter(r=>r.cause).forEach(r=>{causes[r.cause]=(causes[r.cause]||0)+1;});
+    const causes={},causeOther={};inPeriod.filter(r=>r.cause).forEach(r=>{const k=String(r.cause).split(':')[0].trim();causes[k]=(causes[k]||0)+1;
+      const d=String(r.cause).includes(':')?String(r.cause).split(':').slice(1).join(':').trim():'';if(d)(causeOther[k]=causeOther[k]||[]).push(d);});
     const causeList=Object.entries(causes).sort((a,b)=>b[1]-a[1]);
     // ร้านภายนอก: จำนวนครั้ง + ค่าใช้จ่ายรวม (ตามช่วงที่เลือก)
     const vendors={};inPeriod.filter(r=>r.vendor||r.outsource_vendor).forEach(r=>{const k=r.vendor||r.outsource_vendor;const v=vendors[k]||(vendors[k]={n:0,cost:0,days:0,k});v.n++;v.cost+=Number(r.vendor_cost)||0;if(r.outsource_sent_at)v.days+=((r.done_at?new Date(r.done_at).getTime():now)-new Date(r.outsource_sent_at).getTime())/864e5;});
@@ -9270,6 +9271,7 @@ window.__dataReady.then(data => {
           <div style={{fontWeight:800,marginBottom:8}}>สาเหตุที่พบบ่อย</div>
           {causeList.length===0?<div style={{color:'#94a3b8',fontSize:13}}>ยังไม่มีข้อมูล</div>:causeList.map(([c,n])=><div key={c} style={{display:'flex',alignItems:'center',gap:8,margin:'5px 0',fontSize:13}}>
             <div style={{width:150}}>{c}</div><div style={{flex:1,background:'#f1f5f9',borderRadius:4,height:14}}><div style={{width:(n/causeList[0][1]*100)+'%',background:'#b45309',height:14,borderRadius:4}}/></div><b style={{width:30,textAlign:'right'}}>{n}</b></div>)}
+          {(causeOther['อื่นๆ']||[]).length>0&&<div style={{fontSize:12,color:'#64748b',marginTop:6}}>อื่นๆ คือ: {causeOther['อื่นๆ'].join(' · ')}</div>}
         </div>
         <div style={{flex:'1 1 300px',background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>
           {vendorList.length>0&&<><div style={{fontWeight:800,marginBottom:6}}>🚚 ร้านภายนอก</div>
