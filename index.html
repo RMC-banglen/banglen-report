@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15d';
+var APP_VERSION='2026-10-15e';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9034,6 +9034,7 @@ window.__dataReady.then(data => {
     const [showAssets,setShowAssets]=useState(true);
     const [sub,setSub]=useState('overview'); // overview = ภาพรวม · settings = ตั้งค่า (รายชื่อช่าง/เครื่อง/QR)
     const [showAll,setShowAll]=useState(false);
+    const [tkFilter,setTkFilter]=useState('all');
     const [histAsset,setHistAsset]=useState(null);
     const [fleet,setFleet]=useState({});
     const [staff,setStaff]=useState([]);
@@ -9204,12 +9205,13 @@ window.__dataReady.then(data => {
     return <div>
       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13}}>
         <button onClick={()=>setSub('overview')} style={{padding:'7px 16px',borderRadius:20,border:'1.5px solid '+(sub==='overview'?'#b45309':'#e2e8f0'),background:sub==='overview'?'#b45309':'#fff',color:sub==='overview'?'#fff':'#334155',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:13}}>📊 ภาพรวม</button>
+        <button onClick={()=>setSub('tickets')} style={{padding:'7px 16px',borderRadius:20,border:'1.5px solid '+(sub==='tickets'?'#b45309':'#e2e8f0'),background:sub==='tickets'?'#b45309':'#fff',color:sub==='tickets'?'#fff':'#334155',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:13}}>📋 ใบงานทั้งหมด</button>
         <button onClick={()=>setSub('settings')} style={{padding:'7px 16px',borderRadius:20,border:'1.5px solid '+(sub==='settings'?'#b45309':'#e2e8f0'),background:sub==='settings'?'#b45309':'#fff',color:sub==='settings'?'#fff':'#334155',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:13}}>⚙️ ตั้งค่า (รายชื่อช่าง · เครื่องจักร · QR)</button>
-        {sub==='overview'&&<>
+        {(sub==='overview'||sub==='tickets')&&<>
         <span style={{marginLeft:'auto'}}>ช่วง: <select value={month} onChange={e=>setMonth(Number(e.target.value))} style={{padding:'5px 8px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit'}}>
           <option value={0}>ทั้งปี {yearBE}</option>{MO.map((m,i)=><option key={i} value={i+1}>{m} {yearBE}</option>)}</select></span>
         <button onClick={load} style={{padding:'4px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>🔄</button>
-        <button onClick={exportPdf} style={{padding:'4px 12px',border:'1px solid #b45309',borderRadius:6,background:'#fff7ed',color:'#b45309',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>📄 ส่งออก PDF</button>
+        {sub==='overview'&&<button onClick={exportPdf} style={{padding:'4px 12px',border:'1px solid #b45309',borderRadius:6,background:'#fff7ed',color:'#b45309',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>📄 ส่งออก PDF</button>}
         </>}
       </div>
       {sub==='settings'&&<div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:14,fontSize:13,background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14}}>
@@ -9296,15 +9298,19 @@ window.__dataReady.then(data => {
         </div>
       </div>}
 
+
+      </>}
+
+      {sub==='tickets'&&<>
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:14,marginBottom:16}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div style={{fontWeight:800}}>ใบงานทั้งหมดในช่วงนี้ ({rows.filter(r=>month?bkk(r.reported_at).getUTCFullYear()===yearCE&&bkk(r.reported_at).getUTCMonth()+1===month:bkk(r.reported_at).getUTCFullYear()===yearCE).length})</div>
           <span style={{display:'flex',gap:6}}>{(()=>{const ids=rows.filter(r=>{const d=bkk(r.reported_at);return d.getUTCFullYear()===yearCE&&(!month||d.getUTCMonth()+1===month);}).map(r=>r.id);
-            return ids.length>0&&<a href={'repair.html?pdf='+ids.join(',')} target="_blank" rel="noreferrer" title="ใบงานทั้งหมดในช่วงนี้ รวมเป็นไฟล์เดียว 1 หน้าต่อ 1 ใบ" style={{padding:'4px 10px',border:'1px solid #b45309',borderRadius:6,background:'#fff7ed',color:'#b45309',textDecoration:'none',fontWeight:700,fontSize:13}}>📄 ใบงานทั้งหมดเป็น PDF ({ids.length})</a>;})()}
-          <button onClick={()=>setShowAll(!showAll)} style={{padding:'4px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>{showAll?'ซ่อน':'ดูทั้งหมด'}</button></span>
+            return ids.length>0&&<a href={'repair.html?pdf='+ids.join(',')} target="_blank" rel="noreferrer" title="ใบงานทั้งหมดในช่วงนี้ รวมเป็นไฟล์เดียว 1 หน้าต่อ 1 ใบ" style={{padding:'4px 10px',border:'1px solid #b45309',borderRadius:6,background:'#fff7ed',color:'#b45309',textDecoration:'none',fontWeight:700,fontSize:13}}>📄 ใบงานทั้งหมดเป็น PDF ({ids.length})</a>;})()}</span>
         </div>
-        {showAll&&<div style={{overflowX:'auto',marginTop:10}}><table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
-          {rows.filter(r=>{const d=bkk(r.reported_at);return d.getUTCFullYear()===yearCE&&(!month||d.getUTCMonth()+1===month);}).slice().reverse().map(r=><tr key={r.id}>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',margin:'10px 0 4px'}}>{[['all','ทั้งหมด'],['active','งานค้าง'],['wait','รอยืนยัน'],['closed','ปิดแล้ว/ยกเลิก']].map(([k,l])=><button key={k} onClick={()=>setTkFilter(k)} style={{padding:'4px 12px',borderRadius:99,border:'1px solid '+(tkFilter===k?'#b45309':'#e2e8f0'),background:tkFilter===k?'#b45309':'#fff',color:tkFilter===k?'#fff':'#334155',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:12.5}}>{l}</button>)}</div>
+        <div style={{overflowX:'auto',marginTop:6}}><table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
+          {rows.filter(r=>{const d=bkk(r.reported_at);return d.getUTCFullYear()===yearCE&&(!month||d.getUTCMonth()+1===month);}).filter(r=>tkFilter==='all'||(tkFilter==='active'&&ACTIVE.includes(r.status))||(tkFilter==='wait'&&r.status==='done')||(tkFilter==='closed'&&(r.status==='closed'||r.status==='cancelled'))).slice().reverse().map(r=><tr key={r.id}>
             <td style={{...td,textAlign:'left'}}><a href={'repair.html#'+r.id} target="_blank" rel="noreferrer" style={{color:'#1e293b',fontWeight:700}}>{r.ticket_no}</a></td>
             <td style={{...td,textAlign:'left'}}>{new Date(r.reported_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',timeZone:'Asia/Bangkok'})}</td>
             <td style={{...td,textAlign:'left',fontWeight:700}}>{dn(r.asset_name)}</td>
@@ -9313,9 +9319,8 @@ window.__dataReady.then(data => {
             <td style={td}>{r.reporter_name}</td>
             <td style={td}><a href={'repair.html?pdf='+r.id} target="_blank" rel="noreferrer" title="ดาวน์โหลดใบงานเป็น PDF" style={{padding:'3px 9px',border:'1px solid #fed7aa',borderRadius:6,background:'#fff7ed',color:'#b45309',textDecoration:'none',fontSize:12,fontWeight:700,marginRight:6}}>📄 PDF</a>{canEdit&&<button onClick={()=>delReq(r)} title="ลบใบงานนี้" style={{padding:'3px 9px',border:'1px solid #fecaca',borderRadius:6,background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>🗑 ลบ</button>}</td>
           </tr>)}
-        </tbody></table></div>}
+        </tbody></table></div>
       </div>
-
       </>}
 
       {sub==='settings'&&<>
