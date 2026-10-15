@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15g';
+var APP_VERSION='2026-10-15h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -129,13 +129,14 @@ const STATUS={
   accepted:{label:'ช่างรับงานแล้ว',color:'#1d4ed8',bg:'#dbeafe'},
   in_progress:{label:'กำลังซ่อม',color:'#7c3aed',bg:'#ede9fe'},
   waiting_parts:{label:'รออะไหล่',color:'#b45309',bg:'#fef3c7'},
+  assigned:{label:'👷 มอบหมายแล้ว รอช่างกดรับ',color:'#0369a1',bg:'#e0f2fe'},
   outsourced:{label:'🚚 ซ่อมนอก',color:'#9333ea',bg:'#f3e8ff'},
   done:{label:'ซ่อมเสร็จ รอยืนยัน',color:'#0f766e',bg:'#ccfbf1'},
   closed:{label:'ปิดงานแล้ว',color:'#15803d',bg:'#dcfce7'},
   cancelled:{label:'ยกเลิก',color:'#78716c',bg:'#f5f5f4'},
 };
 const CAUSES=['สึกหรอตามอายุ','ใช้งานผิดวิธี','ขาดการบำรุงรักษา','ระบบไฟฟ้า','ไฮดรอลิก/ลม','เครื่องกล/เกียร์/ลูกปืน','อุบัติเหตุ/ชน','ยาง/ช่วงล่าง (รถ)','เครื่องยนต์ (รถ)','อื่นๆ'];
-const ACTIVE=['open','accepted','in_progress','waiting_parts','outsourced'];
+const ACTIVE=['open','assigned','accepted','in_progress','waiting_parts','outsourced'];
 const PM_CAUSE='บำรุงรักษาตามรอบ (PM)';
 
 const fmtTime=t=>t?new Date(t).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'}):'-';
@@ -633,8 +634,8 @@ function JobDetail({id,me,onBack,tick,assets}){
   // ปุ่มทำงาน (เริ่มซ่อม/รออะไหล่/ซ่อมเสร็จ/ส่งซ่อมนอก) เฉพาะช่างเจ้าของงาน · หัวหน้าช่างกด "ทำแทน" ได้
   const canWork=isTech&&(!req.technician||req.technician===me.name||takeover);
   // หัวหน้ามอบหมายงาน: ใบที่ยังไม่มีคนรับ → กลายเป็น "รับงานแล้ว" ในชื่อช่างที่มอบให้
-  const assign=name=>act({technician:name,assigned_by:me.name,...(req.status==='open'?{status:'accepted',accepted_at:now}:{})},
-    'มอบหมายให้ '+name,null,'accepted',name+' (หัวหน้า '+me.name+' มอบหมาย)');
+  const assign=name=>act({technician:name,assigned_by:me.name,...(req.status==='open'||req.status==='assigned'?{status:'assigned'}:{})},
+    'มอบหมายให้ '+name,null,'assigned');
   const ownWork=req.technician&&req.technician===me.name&&req.reporter_name!==me.name;
   const canCancel=isTech||req.reporter_name===me.name;
   const techOnly=<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>🔧 รอช่างซ่อมบำรุงดำเนินการ{req.technician?' ('+req.technician+')':''} — ปุ่มรับงาน/บันทึกการซ่อม ใช้ได้เฉพาะฝ่ายช่างซ่อมบำรุง</div>;
@@ -696,9 +697,17 @@ function JobDetail({id,me,onBack,tick,assets}){
           <label className="lbl">เหตุผลที่ยกเลิก</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น แจ้งซ้ำ"/>
           <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>act({status:'cancelled',closed_at:now,close_note:note.trim(),closed_by:me.name},'ยกเลิก',note.trim(),'cancelled')}>ยืนยันยกเลิก</button></>}
       </>}
-      {['accepted','in_progress','waiting_parts','outsourced'].includes(req.status)&&isTech&&!canWork&&<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>
+      {req.status==='assigned'&&canWork&&<>
+        <div style={{fontSize:14,color:'#0369a1',marginBottom:4}}>👷 {req.assigned_by||'หัวหน้า'} มอบหมายงานนี้ให้{req.technician===me.name?'คุณ':' '+req.technician}</div>
+        <button className="bigbtn blue" disabled={busy} onClick={()=>act({status:'accepted',accepted_at:now},'รับงาน (ที่ถูกมอบหมาย)',null,'accepted',req.technician)}>🙋 รับงานนี้{req.technician!==me.name?' แทน '+req.technician:''}</button>
+        {mode!=='decline'?<button className="ghost" onClick={()=>setMode('decline')}>↩ ส่งคืน (รับไม่ได้)</button>:<>
+          <label className="lbl">เหตุผลที่รับไม่ได้</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ติดงานอื่นอยู่ / ไม่ถนัดงานนี้"/>
+          <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>act({status:'open',technician:null,assigned_by:null},'ส่งคืนงานที่ถูกมอบหมาย',note.trim(),'declined')}>ยืนยันส่งคืนให้หัวหน้า</button></>}
+      </>}
+      {['assigned','accepted','in_progress','waiting_parts','outsourced'].includes(req.status)&&isTech&&!canWork&&<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>
         🔧 งานนี้ของ <b>{req.technician||'ช่างที่รับงาน'}</b>{req.assigned_by?' (มอบหมายโดย '+req.assigned_by+')':''} — ให้ช่างเจ้าของงานเป็นคนกดอัปเดต
         {role==='head'&&<button className="chip" style={{marginLeft:8}} onClick={()=>setTakeover(true)}>↪ ทำแทน {req.technician||''}</button>}</div>}
+      {req.status==='assigned'&&!isTech&&techOnly}
       {req.status==='accepted'&&!isTech&&techOnly}
       {req.status==='accepted'&&canWork&&<>
         <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',started_at:req.started_at||now},'เริ่มซ่อม')}>▶️ เริ่มซ่อม</button>
@@ -759,20 +768,22 @@ function myWork(me,jobs){
   const confirm=jobs.filter(r=>r.status==='done'&&r.reporter_name===me.name);
   const waiting=role?jobs.filter(r=>r.status==='open'&&inScope(me,r.asset_category)):[];
   const mine=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts','outsourced'].includes(r.status)):[];
+  const assigned=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&r.status==='assigned'):[];
   // งานที่ฉันแจ้งที่ยังไม่เสร็จ (ไว้ติดตามสถานะ ไม่นับเป็นงานที่ต้องทำ)
-  const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','accepted','in_progress','waiting_parts','outsourced'].includes(r.status));
+  const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','assigned','accepted','in_progress','waiting_parts','outsourced'].includes(r.status));
   const stale=(role==='head'||role==='manager')?jobs.filter(r=>r.status==='done'&&inScope(me,r.asset_category)&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
-  return{role,confirm,waiting,mine,stale,reported,count:confirm.length+waiting.length+mine.length};
+  return{role,confirm,waiting,mine,assigned,stale,reported,count:confirm.length+waiting.length+mine.length+assigned.length};
 }
 function MyWork({me,jobs,onOpen}){
   const w=myWork(me,jobs);
-  const empty=!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.stale.length&&!w.reported.length;
+  const empty=!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.assigned.length&&!w.stale.length&&!w.reported.length;
   const row=(r,extra)=><div key={r.id} className="tl" style={{cursor:'pointer'}} onClick={()=>onOpen(r.id)}>
     <b>{r.ticket_no}</b> · {assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''} <small>{extra||ago(r.reported_at)}</small></div>;
   return <div className="card" style={{borderLeft:'5px solid #b45309'}}>
     <div className="card-title">🔔 งานของฉัน <span style={{fontWeight:400,fontSize:12.5,color:'#8a7a68'}}>({me.name}{w.role==='head'?' · หัวหน้าช่าง':w.role==='manager'?' · หัวหน้าฝ่าย':w.role?' · ช่าง':''})</span></div>
     {empty&&<div style={{fontSize:14,color:'#15803d'}}>✓ ไม่มีงานที่ต้องทำตอนนี้{w.role?'':' — งานที่คุณแจ้ง พอช่างซ่อมเสร็จจะขึ้นที่นี่ให้กดยืนยัน'}</div>}
     {w.confirm.length>0&&<><div style={{fontWeight:800,color:'#0f766e',margin:'4px 0'}}>✅ ซ่อมเสร็จแล้ว รอคุณกดยืนยัน ({w.confirm.length})</div>{w.confirm.map(r=>row(r,'เสร็จ '+ago(r.done_at)))}</>}
+    {w.assigned.length>0&&<><div style={{fontWeight:800,color:'#0369a1',margin:'8px 0 4px'}}>👷 หัวหน้ามอบหมายให้คุณ — กดรับงาน ({w.assigned.length})</div>{w.assigned.map(r=>row(r,'รอคุณกดรับ'))}</>}
     {w.mine.length>0&&<><div style={{fontWeight:800,color:'#1d4ed8',margin:'8px 0 4px'}}>🔧 งานที่ฉันรับไว้ ({w.mine.length})</div>{w.mine.map(r=>row(r,(STATUS[r.status]||{}).label))}</>}
     {w.waiting.length>0&&<><div style={{fontWeight:800,color:'#b91c1c',margin:'8px 0 4px'}}>🙋 รอช่างรับงาน ({w.waiting.length})</div>{w.waiting.map(r=>row(r))}</>}
     {w.reported.length>0&&<><div style={{fontWeight:800,color:'#6b5b4a',margin:'8px 0 4px'}}>📝 งานที่ฉันแจ้ง กำลังดำเนินการ ({w.reported.length})</div>{w.reported.map(r=>row(r,(STATUS[r.status]||{}).label+(r.technician?' · ช่าง'+r.technician.replace(/^ช่าง/,''):'')))}</>}
@@ -785,7 +796,7 @@ function JobList({onOpen,reloadKey,me,jobs,tick}){
   const[rows,setRows]=useState(null);const[f,setF]=useState('active');
   useEffect(()=>{
     const since=new Date(Date.now()-45*864e5).toISOString();
-    SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at').eq('site',SITE).or('status.in.(open,accepted,in_progress,waiting_parts,outsourced,done),reported_at.gte.'+since)
+    SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at').eq('site',SITE).or('status.in.(open,assigned,accepted,in_progress,waiting_parts,outsourced,done),reported_at.gte.'+since)
       .order('reported_at',{ascending:false}).limit(300).then(({data})=>setRows(data||[]));
   },[reloadKey,tick]);
   if(!rows)return <div style={{textAlign:'center',padding:40}}><div className="spinner"/></div>;
@@ -821,7 +832,7 @@ function App(){
   // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
     const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,asset_category,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
-      .eq('site',SITE).in('status',['open','accepted','in_progress','waiting_parts','outsourced','done']).then(({data})=>{if(!data)return;setJobs(data);
+      .eq('site',SITE).in('status',['open','assigned','accepted','in_progress','waiting_parts','outsourced','done']).then(({data})=>{if(!data)return;setJobs(data);
         // โหลดรายการงาน/ใบงานใหม่ เฉพาะเมื่อมีงานเปลี่ยน (ใบใหม่ / สถานะเปลี่ยน / ปิดไป) — ไม่เปลี่ยน = ไม่ดึงซ้ำ ประหยัดโควตา
         const sig=data.map(r=>r.id+':'+r.status+':'+(r.technician||'')).sort().join(',');
         if(sig!==sigRef.current){sigRef.current=sig;setTick(t=>t+1);}});
@@ -855,7 +866,7 @@ function App(){
       </div>:<>
         {/* หน้าแรก: มีงานรอคุณ → แถบเตือน กดไปดูได้เลย */}
         {badge>0&&<div className="card" style={{background:'#fff7ed',border:'1.5px solid #f59e0b',cursor:'pointer',display:'flex',alignItems:'center',gap:10}} onClick={()=>{setTab('jobs');back();}}>
-          <span style={{fontSize:26}}>🔔</span><div style={{flex:1}}><b>มีงานรอคุณ {badge} งาน</b><div style={{fontSize:13,color:'#8a7a68'}}>{(()=>{const w=myWork(me,jobs);return [w.confirm.length?'รอยืนยัน '+w.confirm.length:'',w.waiting.length?'รอรับงาน '+w.waiting.length:'',w.mine.length?'งานที่รับไว้ '+w.mine.length:''].filter(Boolean).join(' · ');})()}</div></div><b style={{color:'#b45309'}}>ดู ›</b>
+          <span style={{fontSize:26}}>🔔</span><div style={{flex:1}}><b>มีงานรอคุณ {badge} งาน</b><div style={{fontSize:13,color:'#8a7a68'}}>{(()=>{const w=myWork(me,jobs);return [w.confirm.length?'รอยืนยัน '+w.confirm.length:'',w.assigned.length?'มอบหมายให้คุณ '+w.assigned.length:'',w.waiting.length?'รอรับงาน '+w.waiting.length:'',w.mine.length?'งานที่รับไว้ '+w.mine.length:''].filter(Boolean).join(' · ');})()}</div></div><b style={{color:'#b45309'}}>ดู ›</b>
         </div>}
         <ReportForm me={me} assets={assets} preAssetId={preAssetId} onDone={d=>setDone(d)}/></>):
      openId?<JobDetail id={openId} me={me} onBack={back} tick={tick} assets={assets}/>:<JobList onOpen={open} reloadKey={reloadKey} me={me} jobs={jobs} tick={tick}/>}
