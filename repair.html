@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='v10-16a';
+var APP_VERSION='v10-16b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -786,7 +786,25 @@ function JobDetail({id,me,onBack,tick,assets}){
       </>}
       {isHead&&inScope(me,req.asset_category)&&ACTIVE.includes(req.status)&&STAFF.length>0&&<div style={{marginTop:12,paddingTop:10,borderTop:'1px dashed #e7ddd0'}}>
         <label className="lbl" style={{marginTop:0}}>👷 มอบหมายงานให้ช่าง ({role==='manager'?'หัวหน้าฝ่าย':'หัวหน้าช่าง'})</label>
-        <div className="chips">{STAFF.filter(x=>x.role!=='manager').map(x=><button key={x.id} disabled={busy||req.technician===x.name} className={'chip'+(req.technician===x.name?' on':'')} onClick={()=>assign(x.name)}>{x.name}</button>)}</div>
+        {(()=>{
+          // เรียงช่างที่ถนัดหมวดนี้ขึ้นก่อน พร้อมติดดาว จะได้ไม่ต้องจำเองว่างานรถให้ใคร
+          // เป็นแค่ตัวช่วย ไม่ได้ล็อก ช่างคนอื่นยังกดรับได้ถ้าคนถนัดไม่ว่าง
+          const cat=req.asset_category||'';
+          const techs=STAFF.filter(x=>x.role!=='manager');
+          const fits=x=>{const s=(x.skills||'').split(',').map(v=>v.trim()).filter(Boolean);
+            return s.length>0&&cat&&s.includes(cat);};
+          const sorted=[...techs].sort((a,b)=>(fits(b)?1:0)-(fits(a)?1:0));
+          const names=techs.filter(fits).map(x=>x.name);
+          return <>
+            {names.length>0&&<div style={{fontSize:12.5,color:'#6b5b4a',marginBottom:6}}>
+              ⭐ ถนัดงานหมวด <b>{cat}</b>: {names.join(', ')}
+            </div>}
+            <div className="chips">{sorted.map(x=>
+              <button key={x.id} disabled={busy||req.technician===x.name}
+                className={'chip'+(req.technician===x.name?' on':'')} onClick={()=>assign(x.name)}>
+                {fits(x)?'⭐ ':''}{x.name}</button>)}</div>
+          </>;
+        })()}
       </div>}
       {(req.status==='closed'||req.status==='cancelled')&&<div className="ok">{req.status==='closed'?'ปิดงานแล้ว โดย '+req.closed_by+' · '+fmtTime(req.closed_at):'ยกเลิกแล้ว: '+(req.close_note||'')}</div>}
       {err&&<div className="err">{err}</div>}

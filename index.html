@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-16a';
+var APP_VERSION='2026-10-16b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -9139,6 +9139,14 @@ window.__dataReady.then(data => {
     };
     const updStaff=async(x,patch)=>{const{error}=await DB.from('repair_staff').update(patch).eq('id',x.id);if(error)alert('แก้ไม่สำเร็จ: '+error.message);load();};
     const SCOPES=[['all','ดูแลทุกหมวด'],['fleet','ดูแล: รถขนส่ง + เครนรถ'],['factory','ดูแล: เครื่องจักรในโรงงาน']];
+    // ความถนัดของช่าง — ใช้เรียงช่างที่ถนัดขึ้นก่อนตอนมอบหมายงานในแอปแจ้งซ่อม
+    // ไม่ได้ล็อกสิทธิ์ ช่างคนอื่นยังรับงานข้ามหมวดได้ถ้าคนถนัดไม่ว่าง · ไม่เลือกเลย = ถนัดทุกหมวด
+    const SKILL_CATS=['รถขนส่ง','เครนรถขนส่ง','รถในโรงงาน','รถไฟ','เครน','เครื่องจักร'];
+    const toggleSkill=(x,c)=>{
+      const cur=(x.skills||'').split(',').map(v=>v.trim()).filter(Boolean);
+      const next=cur.includes(c)?cur.filter(v=>v!==c):[...cur,c];
+      updStaff(x,{skills:next.length?next.join(','):null});
+    };
     const delStaff=async x=>{if(!confirm('ลบ '+x.name+' ออกจากรายชื่อช่าง?\n(ประวัติงานที่เคยทำยังอยู่)'))return;await DB.from('repair_staff').delete().eq('id',x.id);load();};
     useEffect(()=>{load();},[yearBE]);
     const link=location.origin+location.pathname.replace(/[^/]*$/,'')+'repair.html';
@@ -9391,6 +9399,7 @@ window.__dataReady.then(data => {
           <td style={{...td,textAlign:'left',fontWeight:700}}>{x.name}</td>
           <td style={td}>{canEdit?<select value={x.role} onChange={e=>updStaff(x,{role:e.target.value})} style={{padding:'3px 6px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit'}}><option value="tech">ช่าง</option><option value="head">หัวหน้าช่าง</option><option value="manager">หัวหน้าฝ่าย (ไม่ใช่ช่าง)</option></select>:(x.role==='head'?'หัวหน้าช่าง':x.role==='manager'?'หัวหน้าฝ่าย':'ช่าง')}</td>
           <td style={td}>{x.role==='manager'?(canEdit?<select value={x.scope||'all'} onChange={e=>updStaff(x,{scope:e.target.value})} style={{padding:'3px 6px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit'}}>{SCOPES.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>:(SCOPES.find(s2=>s2[0]===(x.scope||'all'))||[])[1]):<span style={{color:'#94a3b8',fontSize:12}}>ทุกหมวด</span>}</td>
+          <td style={{...td,textAlign:'left'}}>{x.role==='manager'?<span style={{color:'#94a3b8',fontSize:12}}>–</span>:(()=>{const cur=(x.skills||'').split(',').map(v=>v.trim()).filter(Boolean);if(!canEdit)return <span style={{fontSize:12}}>{cur.length?cur.join(', '):'ทุกหมวด'}</span>;return <span style={{display:'inline-flex',gap:4,flexWrap:'wrap',maxWidth:320}}>{SKILL_CATS.map(c=>{const on=cur.includes(c);return <button key={c} onClick={()=>toggleSkill(x,c)} style={{padding:'2px 7px',borderRadius:99,fontSize:11.5,fontFamily:'inherit',cursor:'pointer',border:'1px solid '+(on?'#b45309':'#e2e8f0'),background:on?'#fff7ed':'#fff',color:on?'#b45309':'#94a3b8',fontWeight:on?700:400}}>{c}</button>;})}{cur.length===0&&<span style={{fontSize:11.5,color:'#94a3b8',alignSelf:'center'}}>= ทุกหมวด</span>}</span>;})()}</td>
           <td style={td}>{canEdit?<input defaultValue={x.telegram?'@'+x.telegram:''} placeholder="@telegram" onBlur={e=>{const v=e.target.value.trim().replace(/^@/,'')||null;if(v!==(x.telegram||null))updStaff(x,{telegram:v});}} style={{padding:'3px 6px',borderRadius:6,border:'1px solid #e2e8f0',fontFamily:'inherit',width:140}}/>:(x.telegram?'@'+x.telegram:'–')}</td>
           {canEdit&&<td style={td}><button onClick={()=>updStaff(x,{active:!x.active})} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>{x.active?'ปิดใช้งาน':'เปิดใช้งาน'}</button>{' '}
             <button onClick={()=>delStaff(x)} style={{padding:'3px 8px',borderRadius:6,border:'1px solid #fecaca',background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontFamily:'inherit',fontSize:12}}>ลบ</button></td>}
