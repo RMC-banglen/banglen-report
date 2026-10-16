@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='v10-16b';
+var APP_VERSION='v10-16c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -371,6 +371,12 @@ function ReportForm({me,assets,onDone,preAssetId}){
 // ---------- ฟอร์มช่างปิดงานซ่อม ----------
 function DoneForm({req,me,onSaved,onCancel,editMode}){
   const isPM=req.kind==='pm';
+  // ช่างมักซ่อมเสร็จแล้วค่อยมากดบันทึกทีหลัง ถ้าใช้เวลาตอนกดเป็นเวลาซ่อม
+  // ตัวเลขเวลาตอบสนอง/เวลาซ่อมเฉลี่ยจะเพี้ยนหมด จึงให้ใส่เวลาจริงย้อนหลังได้
+  const toLocal=d=>{const t=new Date(d);t.setMinutes(t.getMinutes()-t.getTimezoneOffset());return t.toISOString().slice(0,16);};
+  const[back,setBack]=useState(false);
+  const[startAt,setStartAt]=useState(()=>toLocal(req.started_at||req.accepted_at||Date.now()));
+  const[endAt,setEndAt]=useState(()=>toLocal(Date.now()));
   const oldCause=req.cause||(isPM?PM_CAUSE:'');
   const[cause,setCause]=useState(/^อื่นๆ/.test(oldCause)?'อื่นๆ':oldCause);
   const[causeOther,setCauseOther]=useState(/^อื่นๆ/.test(oldCause)?oldCause.replace(/^อื่นๆ:?\s*/,''):'');
@@ -415,16 +421,31 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
       setSaving(false);onSaved(data);return;
     }
     const now=new Date();
+    // บันทึกย้อนหลัง: ใช้เวลาที่ช่างกรอก แทนเวลาตอนกด
+    let sAt=null,eAt=null;
+    if(back){
+      sAt=new Date(startAt);eAt=new Date(endAt);
+      if(isNaN(sAt)||isNaN(eAt)){setErr('กรอกเวลาให้ครบ');return;}
+      if(eAt<sAt){setErr('เวลาซ่อมเสร็จต้องไม่ก่อนเวลาเริ่มซ่อม');return;}
+      if(eAt>now){setErr('เวลาซ่อมเสร็จเป็นอนาคตไม่ได้');return;}
+      if(sAt<new Date(req.reported_at)){setErr('เวลาเริ่มซ่อมก่อนเวลาที่แจ้งไม่ได้ ('+fmtTime(req.reported_at)+')');return;}
+    }
+    const doneT=eAt||now;
     let waiting=req.waiting_minutes||0;
     if(req.status==='waiting_parts'&&req.waiting_since)waiting+=Math.round((now-new Date(req.waiting_since))/60000);
     // PM ไม่ต้องรอผู้แจ้งยืนยัน (ระบบเป็นคนเปิด) → ช่างกดเสร็จ = ปิดงานเลย
-    const patch={status:isPM?'closed':'done',done_at:now.toISOString(),...(isPM?{closed_at:now.toISOString(),closed_by:me.name}:{}),cause:causeFinal,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
+    const patch={status:isPM?'closed':'done',done_at:doneT.toISOString(),...(isPM?{closed_at:doneT.toISOString(),closed_by:me.name}:{}),cause:causeFinal,work_done:work.trim(),parts:cleanParts,parts_cost:partsCost,
       vendor:vendor.trim()||null,vendor_cost:Number(vcost)||0,helpers:helpers.trim()||null,after_photos:photos,
-      waiting_since:null,waiting_minutes:waiting,started_at:req.started_at||req.accepted_at||now.toISOString(),
+      waiting_since:null,waiting_minutes:waiting,
+      started_at:sAt?sAt.toISOString():(req.started_at||req.accepted_at||now.toISOString()),
+      // ยังไม่เคยกดรับงาน (ทำไปเลยแล้วมาบันทึกทีหลัง) ถือว่ารับงานตอนเริ่มซ่อมจริง
+      ...(!req.accepted_at?{accepted_at:(sAt||now).toISOString()}:{}),
       technician:req.technician||me.name,updated_at:now.toISOString()};
     const{data,error}=await SB.from('repair_requests').update(patch).eq('id',req.id).select().single();
     if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
-    await logEvent(req.id,me.name,isPM?'ทำเสร็จ ปิดงาน':'ซ่อมเสร็จ',causeFinal+' · '+work.trim());
+    // บันทึกย้อนหลังต้องเห็นในประวัติว่าเวลาจริงกับเวลาที่กดต่างกัน จะได้ตรวจสอบย้อนได้
+    const backNote=back?(' · ⏱ บันทึกย้อนหลัง: ทำจริง '+fmtTime(sAt)+' – '+fmtTime(eAt)+' (กดบันทึกตอน '+fmtTime(now)+')'):'';
+    await logEvent(req.id,me.name,isPM?'ทำเสร็จ ปิดงาน':'ซ่อมเสร็จ',causeFinal+' · '+work.trim()+backNote);
     if(isPM){try{await updatePmItem(data);}catch(e){}}
     notify('done',data);
     setSaving(false);onSaved(data);
@@ -451,6 +472,22 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
       <input style={{flex:1}} type="number" inputMode="decimal" value={vcost} onChange={e=>setVcost(e.target.value)} placeholder="บาท"/></div>
     <label className="lbl">ช่างที่ช่วยซ่อม (ถ้ามี)</label>
     <input value={helpers} onChange={e=>setHelpers(e.target.value)} placeholder="เช่น เอ, บี"/>
+
+    {!editMode&&<>
+      <label style={{display:'flex',alignItems:'center',gap:8,marginTop:14,fontSize:14,cursor:'pointer'}}>
+        <input type="checkbox" checked={back} onChange={e=>setBack(e.target.checked)} style={{width:18,height:18}}/>
+        <span>⏱ ซ่อมเสร็จไปแล้วก่อนหน้านี้ (ใส่เวลาจริง)</span>
+      </label>
+      {back&&<div style={{marginTop:8,padding:'10px 12px',borderRadius:10,background:'#f8fafc',border:'1px solid #e2e8f0'}}>
+        <div style={{fontSize:12.5,color:'#6b5b4a',marginBottom:8,lineHeight:1.7}}>
+          ถ้าไม่ใส่ ระบบจะนับเวลาตอนกดบันทึกเป็นเวลาซ่อมเสร็จ ทำให้เวลาซ่อมเฉลี่ยยาวเกินจริง
+        </div>
+        <label className="lbl" style={{marginTop:0}}>เริ่มซ่อมจริง</label>
+        <input type="datetime-local" value={startAt} onChange={e=>setStartAt(e.target.value)}/>
+        <label className="lbl">ซ่อมเสร็จจริง</label>
+        <input type="datetime-local" value={endAt} onChange={e=>setEndAt(e.target.value)}/>
+      </div>}
+    </>}
     <label className="lbl">รูปหลังซ่อม</label>
     <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
     {err&&<div className="err">{err}</div>}
