@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15j';
+var APP_VERSION='v10-16a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -79,6 +79,8 @@ input:focus,textarea:focus{border-color:#b45309;box-shadow:0 0 0 3px rgba(180,83
 .photos .add span{font-size:26px;}
 .job{background:#fff;border-radius:12px;padding:12px 14px;margin:10px 12px 0;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;border-left:5px solid #ddd;}
 .job.stop{border-left-color:#dc2626;}.job.abnormal{border-left-color:#ea580c;}.job.normal{border-left-color:#16a34a;}
+/* ใบบำรุงรักษาใช้สีน้ำเงินตามประเภทงาน ไม่ใช่สีความเร่งด่วน จะได้ไม่ขึ้นแถบแดงทั้งที่เครื่องไม่ได้เสีย */
+.job.pm{border-left-color:#1d4ed8;}
 .job .t1{display:flex;justify-content:space-between;gap:8px;font-weight:800;font-size:15.5px;}
 .job .t2{font-size:13px;color:#6b5b4a;margin-top:3px;}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap;}
@@ -501,16 +503,23 @@ function EditReport({req,me,assets,onSaved,onCancel,silent}){
   const[symptom,setSymptom]=useState(req.symptom||'');const[urg,setUrg]=useState(req.urgency||'abnormal');
   const[photos,setPhotos]=useState(req.photos||[]);const[asset,setAsset]=useState(req.asset_name);
   const[saving,setSaving]=useState(false);const[err,setErr]=useState('');
-  const isPm=req.kind==='pm';
+  // เลือกประเภทงานผิดตั้งแต่แจ้งแล้วแก้ไม่ได้ ต้องยกเลิกแล้วแจ้งใหม่ทั้งใบ
+  // ให้สลับได้ ยกเว้นใบที่เปิดจากรอบงานประจำ (ผูกกับรอบอยู่ สลับแล้วรอบจะเพี้ยน)
+  const lockedPm=req.kind==='pm'&&!!req.pm_item_id;
+  const[kind,setKind]=useState(req.kind||'repair');
+  const isPm=kind==='pm';
   const save=async()=>{
     if(!symptom.trim()){setErr('บอกอาการ');return;}
     setSaving(true);setErr('');
     const a=assets.find(x=>x.name===asset);
-    const patch={symptom:symptom.trim(),photos,asset_name:asset,...(a?{asset_category:a.category}:{}),...(isPm?{}:{urgency:urg}),updated_at:new Date().toISOString()};
+    const patch={symptom:symptom.trim(),photos,asset_name:asset,...(a?{asset_category:a.category}:{}),
+      ...(lockedPm?{}:{kind}),...(isPm?{}:{urgency:urg}),updated_at:new Date().toISOString()};
     const{data,error}=await SB.from('repair_requests').update(patch).eq('id',req.id).select().single();
     if(error){setSaving(false);setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
     if(!silent){
-      const diff=[req.symptom!==patch.symptom?'อาการ':'',req.asset_name!==asset?'เครื่อง':'',!isPm&&req.urgency!==urg?'ความเร่งด่วน':'',JSON.stringify(req.photos||[])!==JSON.stringify(photos)?'รูป':''].filter(Boolean).join(', ');
+      const diff=[req.symptom!==patch.symptom?'อาการ':'',req.asset_name!==asset?'เครื่อง':'',
+        !lockedPm&&req.kind!==kind?('ประเภทงาน → '+(isPm?'บำรุงรักษา':'แจ้งซ่อม')):'',
+        !isPm&&req.urgency!==urg?'ความเร่งด่วน':'',JSON.stringify(req.photos||[])!==JSON.stringify(photos)?'รูป':''].filter(Boolean).join(', ');
       await logEvent(req.id,me.name,'แก้ไขข้อมูลที่แจ้ง',diff||null);
     }
     setSaving(false);onSaved(data);
@@ -522,6 +531,16 @@ function EditReport({req,me,assets,onSaved,onCancel,silent}){
       {!assets.some(x=>x.name===req.asset_name)&&<option value={req.asset_name}>{req.asset_name}</option>}
       {[...new Set(assets.map(x=>x.category||'อื่นๆ'))].map(c=><optgroup key={c} label={c}>{assets.filter(x=>(x.category||'อื่นๆ')===c).map(x=><option key={x.id} value={x.name}>{assetLabel(x.name)}</option>)}</optgroup>)}
     </select>
+    {!lockedPm&&<><label className="lbl">ประเภทงาน</label>
+      <div className="urg">
+        <button className={kind==='repair'?'on stop':''} onClick={()=>setKind('repair')}>
+          <div>🔧 แจ้งซ่อม<small>เครื่องเสีย/มีอาการ — นับเป็นเครื่องเสีย</small></div></button>
+        <button className={kind==='pm'?'on normal':''} onClick={()=>setKind('pm')}>
+          <div>🔧 บำรุงรักษา<small>เครื่องไม่ได้เสีย — ไม่นับเป็นเครื่องเสีย</small></div></button>
+      </div></>}
+    {lockedPm&&<div style={{fontSize:13,color:'#6b5b4a',marginTop:10}}>
+      🗓 ใบนี้เปิดจากรอบงานประจำ เปลี่ยนประเภทงานไม่ได้ (ผูกกับรอบอยู่)
+    </div>}
     {!isPm&&<><label className="lbl">ความเร่งด่วน</label>
       <div className="urg">{Object.entries(URG).map(([k,v])=><button key={k} className={(urg===k?'on ':'')+k} onClick={()=>setUrg(k)}><div>{v.label}<small>{v.sub}</small></div></button>)}</div></>}
     <label className="lbl">อาการ</label>
@@ -675,7 +694,9 @@ function JobDetail({id,me,onBack,tick,assets}){
   if(mode==='editReport')return <EditReport req={req} me={me} assets={assets||[]} silent={isOwner&&req.status==='open'} onSaved={d=>{setReq(d);setMode('');load();}} onCancel={()=>setMode('')}/>;
   const endT=req.done_at?new Date(req.done_at).getTime():Date.now();
   return <div>
-    <div className="card" style={{borderTop:'5px solid '+u.color}}>
+    {/* ใบบำรุงรักษาใช้สีน้ำเงินตามประเภทงาน ไม่ใช่สีความเร่งด่วน
+        เดิมขอบบนเป็นสีแดงได้ทั้งที่ข้างในเขียนว่าบำรุงรักษา อ่านแล้วขัดกัน */}
+    <div className="card" style={{borderTop:'5px solid '+(req.kind==='pm'?'#1d4ed8':u.color)}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
         <div style={{fontSize:13,color:'#8a7a68',fontWeight:700}}>{req.ticket_no}</div><Badge s={req.status}/>
       </div>
@@ -834,7 +855,7 @@ function JobList({onOpen,reloadKey,me,jobs,tick}){
       {[['active','งานค้าง'],['done','รอยืนยัน'],['closed','ปิดแล้ว']].map(([k,l])=><button key={k} className={'chip'+(f===k?' on':'')} onClick={()=>setF(k)}>{l} ({groups[k].length})</button>)}
     </div>
     {list.length===0&&<div style={{textAlign:'center',color:'#8a7a68',padding:30}}>ไม่มีรายการ</div>}
-    {list.map(r=><div key={r.id} className={'job '+r.urgency} onClick={()=>onOpen(r.id)}>
+    {list.map(r=><div key={r.id} className={'job '+(r.kind==='pm'?'pm':r.urgency)} onClick={()=>onOpen(r.id)}>
       <div className="t1"><span>{r.kind==='pm'?(r.pm_item_id?'🗓 ':'🔧 '):''}{assetLabel(r.asset_name)}</span><Badge s={r.status}/></div>
       <div className="t2">{r.symptom}</div>
       <div className="t2">{r.ticket_no} · {r.reporter_name} · แจ้ง {ago(r.reported_at)}{r.technician?' · ช่าง '+r.technician:''}</div>
