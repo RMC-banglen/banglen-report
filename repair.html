@@ -903,7 +903,7 @@ function MyWork({me,jobs,onOpen}){
 
 // ---------- รายการงาน ----------
 function JobList({onOpen,reloadKey,me,jobs,tick}){
-  const[rows,setRows]=useState(null);const[f,setF]=useState('active');
+  const[rows,setRows]=useState(null);const[f,setF]=useState('active');const[who,setWho]=useState('');
   useEffect(()=>{
     const since=new Date(Date.now()-45*864e5).toISOString();
     SB.from('repair_requests').select('id,ticket_no,asset_name,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at').eq('site',SITE).or('status.in.(open,assigned,accepted,in_progress,waiting_parts,outsourced,done),reported_at.gte.'+since)
@@ -913,12 +913,21 @@ function JobList({onOpen,reloadKey,me,jobs,tick}){
   const rank={stop:0,abnormal:1,normal:2};
   const groups={active:rows.filter(r=>ACTIVE.includes(r.status)).sort((a,b)=>(rank[a.urgency]-rank[b.urgency])||(new Date(a.reported_at)-new Date(b.reported_at))),
     done:rows.filter(r=>r.status==='done'),closed:rows.filter(r=>r.status==='closed'||r.status==='cancelled')};
-  const list=groups[f];
+  const base=groups[f];
+  // แยกตามช่าง: หัวหน้าจะได้เห็นว่าใครมีงานค้างกี่ใบ ก่อนจะมอบหมายงานใหม่ให้
+  const techs=[];base.forEach(r=>{const n=r.technician||'';if(!techs.some(t=>t[0]===n))techs.push([n,0]);techs.find(t=>t[0]===n)[1]++;});
+  techs.sort((a,b)=>(a[0]===''?1:b[0]===''?-1:b[1]-a[1]));
+  const list=who===''?base:base.filter(r=>(r.technician||'')===(who==='-'?'':who));
   return <div>
     {me&&<MyWork me={me} jobs={jobs||[]} onOpen={onOpen}/>}
     <div className="filters">
-      {[['active','งานค้าง'],['done','รอยืนยัน'],['closed','ปิดแล้ว']].map(([k,l])=><button key={k} className={'chip'+(f===k?' on':'')} onClick={()=>setF(k)}>{l} ({groups[k].length})</button>)}
+      {[['active','งานค้าง'],['done','รอยืนยัน'],['closed','ปิดแล้ว']].map(([k,l])=><button key={k} className={'chip'+(f===k?' on':'')} onClick={()=>{setF(k);setWho('');}}>{l} ({groups[k].length})</button>)}
     </div>
+    {techs.length>1&&<div className="filters" style={{marginTop:-4}}>
+      <button className={'chip'+(who===''?' on':'')} onClick={()=>setWho('')}>ทุกคน ({base.length})</button>
+      {techs.map(([n,c])=><button key={n||'-'} className={'chip'+(who===(n||'-')?' on':'')} onClick={()=>setWho(n||'-')}>
+        {n?'🔧 '+n.replace(/^ช่าง/,'ช่าง'):'🙋 ยังไม่มีช่าง'} ({c})</button>)}
+    </div>}
     {list.length===0&&<div style={{textAlign:'center',color:'#8a7a68',padding:30}}>ไม่มีรายการ</div>}
     {list.map(r=><div key={r.id} className={'job '+(r.kind==='pm'?'pm':r.urgency)} onClick={()=>onOpen(r.id)}>
       <div className="t1"><span>{r.kind==='pm'?(r.pm_item_id?'🗓 ':'🔧 '):''}{assetLabel(r.asset_name)}</span><Badge s={r.status}/></div>
