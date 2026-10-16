@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-15h';
+var APP_VERSION='2026-10-16a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -734,13 +734,23 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       </g>)}
       {boxEls}
       {hover!=null&&<line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t+iH} stroke={PALETTE.axis} strokeDasharray="3 3" opacity="0.5"/>}
-      {categories.map((cat,ci)=>{
-        const anchor=ci===0?'start':ci===categories.length-1?'end':'middle';
-        const spIdx=cat.search(/\s(?=[^\s]*$)/);
-        if(spIdx>-1){const p1=cat.slice(0,spIdx),p2=cat.slice(spIdx+1);
-          return <text key={ci} x={x(ci)} y={H-pad.b+14} textAnchor={anchor} className="ax-lbl"><tspan x={x(ci)} dy="0">{p1}</tspan><tspan x={x(ci)} dy="13">{p2}</tspan></text>;}
-        return <text key={ci} x={x(ci)} y={H-pad.b+18} textAnchor={anchor} className="ax-lbl">{cat}</text>;
-      })}
+      {/* จุดเยอะ ๆ ป้ายวันที่จะทับกันจนอ่านไม่ออก เว้นให้ห่างกันอย่างน้อย 46px
+          โดยยังโชว์จุดแรกกับจุดสุดท้ายเสมอ จะได้รู้ช่วงเวลาของกราฟ */}
+      {(()=>{
+        const maxLbl=Math.max(2,Math.floor(iW/46));
+        const step=Math.max(1,Math.ceil(categories.length/maxLbl));
+        return categories.map((cat,ci)=>{
+          const last=ci===categories.length-1;
+          if(step>1&&ci%step!==0&&!last&&ci!==0) return null;
+          // จุดรองสุดท้ายอาจชนกับจุดสุดท้าย ถ้าใกล้กันเกินไปให้ข้าม
+          if(step>1&&!last&&ci!==0&&categories.length-1-ci<step*0.6) return null;
+          const anchor=ci===0?'start':last?'end':'middle';
+          const spIdx=cat.search(/\s(?=[^\s]*$)/);
+          if(spIdx>-1){const p1=cat.slice(0,spIdx),p2=cat.slice(spIdx+1);
+            return <text key={ci} x={x(ci)} y={H-pad.b+14} textAnchor={anchor} className="ax-lbl"><tspan x={x(ci)} dy="0">{p1}</tspan><tspan x={x(ci)} dy="13">{p2}</tspan></text>;}
+          return <text key={ci} x={x(ci)} y={H-pad.b+18} textAnchor={anchor} className="ax-lbl">{cat}</text>;
+        });
+      })()}
     </svg>
     {hover!=null&&<Tooltip tip={{x:Math.min(x(hover)+12,W-150),y:pad.t+4,title:categories[hover],rows:series.map(s=>({color:s.color,label:s.label,value:s.data[hover]==null?'–':fmt(s.data[hover],decimals)+(unit?' '+unit:'')}))}}/>}
   </div>;
@@ -6455,6 +6465,9 @@ window.__dataReady.then(data => {
     const db=DB;
     // รายการนี้ยาว ปกติไม่ได้ดูทุกครั้ง จึงย่อไว้ก่อนเสมอ กดเปิดเมื่อต้องการดู
     const [warnOpen,setWarnOpen]=useState(false);
+    // กราฟแนวโน้มดูกี่ครั้งล่าสุด — จำไว้ในเครื่อง เปิดครั้งหน้าจะได้เหมือนเดิม
+    const [fmN,setFmNRaw]=useState(()=>{try{return localStorage.getItem('fm_trend_n')||'20';}catch(e){return '20';}});
+    const setFmN=v=>{setFmNRaw(v);try{localStorage.setItem('fm_trend_n',v);}catch(e){}};
     const [tests,setTests]=useState([]);
     const [loading,setLoading]=useState(true);
     const [showForm,setShowForm]=useState(false);
@@ -6662,14 +6675,27 @@ window.__dataReady.then(data => {
       })()}
 
       {/* แนวโน้ม FM */}
-      {tests.length>1&&<ChartCard span="wide" title="แนวโน้มค่า FM" subtitle={`เส้นประ = ขอบเกณฑ์ ${FM_MIN} และ ${FM_MAX}`}>
-        <LineChart
-          categories={[...tests].reverse().map(t=>String(t.test_date).slice(5,10))}
-          unit="" decimals={2} showValues boxedLabels
-          series={[{label:'FM',color:'#1a56db',data:[...tests].reverse().map(t=>t.fm!=null?Number(t.fm):calcFM(t).fm)}]}
-          targets={[{value:FM_MAX,color:'#d13438',label:'สูงสุด'},{value:FM_MIN,color:'#d13438',label:'ต่ำสุด'}]}
-          height={280} padRight={130}/>
-      </ChartCard>}
+      {tests.length>1&&(()=>{
+        // ทดสอบราว 2-3 ครั้ง/สัปดาห์ 20 ครั้งจึงเท่ากับราว 2 เดือน พอเห็นแนวโน้มโดยไม่แน่นจนอ่านไม่ออก
+        const chrono=[...tests].reverse();
+        const shown=fmN==='all'?chrono:chrono.slice(-Number(fmN));
+        const btn=v=>({padding:'4px 12px',borderRadius:6,cursor:'pointer',fontSize:13,fontWeight:600,
+          fontFamily:'inherit',border:'1px solid '+(String(fmN)===String(v)?'#1a56db':'#d6d8e0'),
+          background:String(fmN)===String(v)?'#eff6ff':'#fff',color:String(fmN)===String(v)?'#1a56db':'#555'});
+        return <ChartCard span="wide" title="แนวโน้มค่า FM"
+          subtitle={`เส้นประ = ขอบเกณฑ์ ${FM_MIN} และ ${FM_MAX} · แสดง ${shown.length} จาก ${chrono.length} ครั้ง`}
+          right={<div style={{display:'flex',gap:6}}>
+            {[['20','20 ครั้งล่าสุด'],['40','40 ครั้งล่าสุด'],['all','ทั้งหมด']].map(([v,l])=>
+              <button key={v} style={btn(v)} onClick={()=>setFmN(v)}>{l}</button>)}
+          </div>}>
+          <LineChart
+            categories={shown.map(t=>String(t.test_date).slice(5,10))}
+            unit="" decimals={2} showValues boxedLabels
+            series={[{label:'FM',color:'#1a56db',data:shown.map(t=>t.fm!=null?Number(t.fm):calcFM(t).fm)}]}
+            targets={[{value:FM_MAX,color:'#d13438',label:'สูงสุด'},{value:FM_MIN,color:'#d13438',label:'ต่ำสุด'}]}
+            height={280} padRight={130}/>
+        </ChartCard>;
+      })()}
 
       {/* ฟอร์มบันทึก */}
       {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(20,22,30,.55)',zIndex:9999,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'32px 16px',overflowY:'auto'}}>
