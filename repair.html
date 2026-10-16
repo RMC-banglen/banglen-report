@@ -89,6 +89,12 @@ input:focus,textarea:focus{border-color:#b45309;box-shadow:0 0 0 3px rgba(180,83
 .row:last-child{border-bottom:none;}
 .row b{text-align:right;}
 .tl{font-size:13px;color:#4a3d30;padding:5px 0 5px 12px;border-left:2px solid #e7ddd0;margin-left:4px;}
+/* หัวข้อกลุ่มในหน้าของฉัน — ต้องอ่านปราดเดียวรู้ว่ากลุ่มนี้ต้องทำอะไร */
+.grp{margin:22px 12px 0;font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:7px;}
+.grp:first-child{margin-top:12px;}
+.grp .n{background:#e7ddd0;color:#4a3d30;border-radius:999px;padding:0 9px;font-size:12.5px;}
+.grp .hint{font-weight:500;font-size:12.5px;color:#8a7a68;}
+.job .big{font-size:16.5px;}
 .tl small{color:#8a7a68;}
 .part{display:flex;gap:6px;margin-bottom:6px;}
 .part input{padding:9px;font-size:15px;}
@@ -887,17 +893,27 @@ function myWork(me,jobs){
 function MyWork({me,jobs,onOpen}){
   const w=myWork(me,jobs);
   const empty=!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.assigned.length&&!w.stale.length&&!w.reported.length;
-  const row=(r,extra)=><div key={r.id} className="tl" style={{cursor:'pointer'}} onClick={()=>onOpen(r.id)}>
-    <b>{r.ticket_no}</b> · {assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''} <small>{extra||ago(r.reported_at)}</small></div>;
-  return <div className="card" style={{borderLeft:'5px solid #b45309'}}>
-    <div className="card-title">🔔 งานของฉัน <span style={{fontWeight:400,fontSize:12.5,color:'#8a7a68'}}>({me.name}{w.role==='head'?' · หัวหน้าช่าง':w.role==='manager'?' · หัวหน้าฝ่าย':w.role?' · ช่าง':''})</span></div>
-    {empty&&<div style={{fontSize:14,color:'#15803d'}}>✓ ไม่มีงานที่ต้องทำตอนนี้{w.role?'':' — งานที่คุณแจ้ง พอช่างซ่อมเสร็จจะขึ้นที่นี่ให้กดยืนยัน'}</div>}
-    {w.confirm.length>0&&<><div style={{fontWeight:800,color:'#0f766e',margin:'4px 0'}}>✅ ซ่อมเสร็จแล้ว รอคุณกดยืนยัน ({w.confirm.length})</div>{w.confirm.map(r=>row(r,'เสร็จ '+ago(r.done_at)))}</>}
-    {w.assigned.length>0&&<><div style={{fontWeight:800,color:'#0369a1',margin:'8px 0 4px'}}>👷 หัวหน้ามอบหมายให้คุณ — กดรับงาน ({w.assigned.length})</div>{w.assigned.map(r=>row(r,'รอคุณกดรับ'))}</>}
-    {w.mine.length>0&&<><div style={{fontWeight:800,color:'#1d4ed8',margin:'8px 0 4px'}}>🔧 งานที่ฉันรับไว้ ({w.mine.length})</div>{w.mine.map(r=>row(r,(STATUS[r.status]||{}).label))}</>}
-    {w.waiting.length>0&&<><div style={{fontWeight:800,color:'#b91c1c',margin:'8px 0 4px'}}>🙋 รอช่างรับงาน ({w.waiting.length})</div>{w.waiting.map(r=>row(r))}</>}
-    {w.reported.length>0&&<><div style={{fontWeight:800,color:'#6b5b4a',margin:'8px 0 4px'}}>📝 งานที่ฉันแจ้ง กำลังดำเนินการ ({w.reported.length})</div>{w.reported.map(r=>row(r,(STATUS[r.status]||{}).label+(r.technician?' · ช่าง'+r.technician.replace(/^ช่าง/,''):'')))}</>}
-    {w.stale.length>0&&<><div style={{fontWeight:800,color:'#78716c',margin:'8px 0 4px'}}>⏳ ซ่อมเสร็จ ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน ({w.stale.length}) — หัวหน้ากดเข้าไปปิดแทนได้</div>{w.stale.map(r=>row(r,r.reporter_name))}</>}
+  // ใบงานเป็นการ์ดใบใหญ่เหมือนหน้ารายการ นิ้วกดง่าย ไม่ใช่บรรทัดเล็ก ๆ ติดกัน
+  const row=(r,extra)=><div key={r.id} className={'job '+(r.kind==='pm'?'pm':r.urgency)} onClick={()=>onOpen(r.id)}>
+    <div className="t1"><span className="big">{r.kind==='pm'?(r.pm_item_id?'🗓 ':'🔧 '):''}{assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''}</span><Badge s={r.status}/></div>
+    <div className="t2">{r.symptom}</div>
+    <div className="t2">{r.ticket_no} · {extra}</div>
+  </div>;
+  // แต่ละกลุ่มมีหัวข้อของตัวเอง เว้นช่องว่างให้เห็นว่าคนละเรื่องกัน
+  const grp=(icon,label,color,hint,arr,extra)=>arr.length>0&&<React.Fragment key={label}>
+    <div className="grp" style={{color}}>{icon} {label} <span className="n">{arr.length}</span>
+      {hint&&<span className="hint">{hint}</span>}</div>
+    {arr.map(r=>row(r,extra(r)))}</React.Fragment>;
+  if(empty)return <div className="card" style={{borderLeft:'5px solid #16a34a'}}>
+    <div style={{fontSize:14.5,color:'#15803d',fontWeight:700}}>✓ ไม่มีงานที่ต้องทำตอนนี้</div>
+    {!w.role&&<div style={{fontSize:13,color:'#8a7a68',marginTop:4}}>งานที่คุณแจ้ง พอช่างซ่อมเสร็จจะขึ้นที่นี่ให้กดยืนยัน</div>}</div>;
+  return <div>
+    {grp('✅','ซ่อมเสร็จแล้ว รอคุณยืนยัน','#0f766e','กดเข้าไปตรวจแล้วปิดงาน',w.confirm,r=>'เสร็จ '+ago(r.done_at))}
+    {grp('👷','หัวหน้ามอบหมายให้คุณ','#0369a1','กดเข้าไปรับงาน',w.assigned,()=>'รอคุณกดรับ')}
+    {grp('🔧','งานที่ฉันรับไว้','#1d4ed8','',w.mine,r=>'แจ้ง '+ago(r.reported_at))}
+    {grp('🙋','รอช่างรับงาน','#b91c1c','ยังไม่มีใครรับ',w.waiting,r=>'แจ้ง '+ago(r.reported_at))}
+    {grp('📝','งานที่ฉันแจ้งไว้','#6b5b4a','ติดตามสถานะ',w.reported,r=>(STATUS[r.status]||{}).label+(r.technician?' · ช่าง'+r.technician.replace(/^ช่าง/,''):''))}
+    {grp('⏳','เสร็จแล้ว ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน','#78716c','หัวหน้าปิดแทนได้',w.stale,r=>'ผู้แจ้ง '+r.reporter_name)}
   </div>;
 }
 
@@ -969,7 +985,7 @@ function App(){
     }});},[]);
   // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
-    const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,asset_category,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
+    const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,asset_category,status,urgency,kind,pm_item_id,symptom,reporter_name,technician,reported_at,done_at')
       .eq('site',SITE).in('status',['open','assigned','accepted','in_progress','waiting_parts','outsourced','done']).then(({data})=>{if(!data)return;setJobs(data);
         // โหลดรายการงาน/ใบงานใหม่ เฉพาะเมื่อมีงานเปลี่ยน (ใบใหม่ / สถานะเปลี่ยน / ปิดไป) — ไม่เปลี่ยน = ไม่ดึงซ้ำ ประหยัดโควตา
         const sig=data.map(r=>r.id+':'+r.status+':'+(r.technician||'')).sort().join(',');
