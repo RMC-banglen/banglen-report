@@ -777,7 +777,11 @@ function JobDetail({id,me,onBack,tick,assets}){
         {isTech?<button className="bigbtn blue" disabled={busy} onClick={()=>act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted')}>🙋 รับงานนี้ ({me.name})</button>:techOnly}
         {!canCancel?null:mode!=='cancel'?<button className="ghost" onClick={()=>setMode('cancel')}>ยกเลิกใบแจ้ง (แจ้งผิด/ซ้ำ)</button>:<>
           <label className="lbl">เหตุผลที่ยกเลิก</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น แจ้งซ้ำ"/>
-          <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>act({status:'cancelled',closed_at:now,close_note:note.trim(),closed_by:me.name},'ยกเลิก',note.trim(),'cancelled')}>ยืนยันยกเลิก</button></>}
+          {/* ถามย้ำก่อนจริง ๆ เพราะยกเลิกแล้วใบจะออกจากคิวงานทันที */}
+          <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>{
+            if(!window.confirm('ยกเลิกใบ '+req.ticket_no+' ('+assetLabel(req.asset_name)+') ?\n\nเหตุผล: '+note.trim()+'\n\nใบจะออกจากคิวงาน หัวหน้ากู้คืนได้ภายหลัง'))return;
+            act({status:'cancelled',closed_at:now,close_note:note.trim(),closed_by:me.name},'ยกเลิก',note.trim(),'cancelled');
+          }}>ยืนยันยกเลิก</button></>}
       </>}
       {req.status==='assigned'&&canWork&&<>
         <div style={{fontSize:14,color:'#0369a1',marginBottom:4}}>👷 {req.assigned_by||'หัวหน้า'} มอบหมายงานนี้ให้{req.technician===me.name?'คุณ':' '+req.technician}</div>
@@ -844,6 +848,12 @@ function JobDetail({id,me,onBack,tick,assets}){
         })()}
       </div>}
       {(req.status==='closed'||req.status==='cancelled')&&<div className="ok">{req.status==='closed'?'ปิดงานแล้ว โดย '+req.closed_by+' · '+fmtTime(req.closed_at):'ยกเลิกแล้ว: '+(req.close_note||'')}</div>}
+      {/* ยกเลิกผิดใบแล้วเดิมกู้ไม่ได้เลย ต้องแจ้งใหม่ทั้งใบ ประวัติก็ขาด
+          ให้หัวหน้ากู้กลับมาได้ ใบที่เคยมีช่างอยู่แล้วกลับไปเป็น "มอบหมายแล้ว" */}
+      {req.status==='cancelled'&&isHead&&<button className="ghost" disabled={busy} onClick={()=>{
+        if(!window.confirm('กู้คืนใบ '+req.ticket_no+' กลับมาที่คิวงาน?'))return;
+        act({status:req.technician?'assigned':'open',closed_at:null,close_note:null,closed_by:null},'กู้คืนใบงาน',null,null);
+      }}>↩️ กู้คืนใบงานนี้ (หัวหน้า)</button>}
       {err&&<div className="err">{err}</div>}
     </div>
 
