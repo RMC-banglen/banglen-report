@@ -868,12 +868,27 @@ function App(){
   const preAssetId=new URLSearchParams(location.search).get('a');
   const pdfIds=(new URLSearchParams(location.search).get('pdf')||'').split(',').filter(Boolean);
   const pdfMode=pdfIds.length?pdfIds:null;
-  const[tab,setTab]=useState(location.hash.replace('#','')&&!preAssetId?'jobs':'report');
+  // ช่างเปิดแอปมาเพื่อดูงานที่ต้องทำ ไม่ใช่มาแจ้งซ่อม จึงเปิดหน้างานซ่อมให้เลย
+  // ส่วนฝ่ายอื่นเปิดมาเพื่อแจ้ง ก็เปิดหน้าแจ้งซ่อมเหมือนเดิม
+  // ยกเว้นสแกน QR ที่ตัวเครื่อง (?a=) อันนั้นตั้งใจมาแจ้งงานของเครื่องนั้น ไม่ว่าจะเป็นใคร
+  const techFirst=m=>{const r=roleOf(m);return r==='tech'||r==='head';};
+  const[tab,setTab]=useState(()=>{
+    if(location.hash.replace('#','')&&!preAssetId)return 'jobs';
+    if(preAssetId)return 'report';
+    return techFirst(me)?'jobs':'report';
+  });
+  // STAFF โหลดทีหลัง ตอนตั้งค่าข้างบนจึงยังไม่รู้ว่าใครเป็นหัวหน้าช่าง
+  // พอรู้แล้วค่อยสลับให้ แต่เฉพาะตอนที่ผู้ใช้ยังไม่ได้กดแท็บเอง จะได้ไม่ดึงหน้าหนีระหว่างพิมพ์
+  const userPicked=useRef(false);
+  const pickTab=t=>{userPicked.current=true;setTab(t);};
   const[openId,setOpenId]=useState(location.hash.replace('#','')||null);
   const[assets,setAssets]=useState([]);const[done,setDone]=useState(null);const[reloadKey,setReloadKey]=useState(0);
   const[jobs,setJobs]=useState([]);const[tick,setTick]=useState(0);const sigRef=useRef('');const[,setStaffTick]=useState(0);
   useEffect(()=>{SB.from('repair_staff').select('*').eq('site',SITE).eq('active',true).order('sort_order').order('name')
-    .then(({data,error})=>{if(!error){STAFF=data||[];setStaffTick(t=>t+1);}});},[]);
+    .then(({data,error})=>{if(!error){STAFF=data||[];setStaffTick(t=>t+1);
+      // เพิ่งรู้ตัวว่าเป็นช่าง/หัวหน้าช่าง ถ้ายังไม่ได้กดแท็บเองก็พาไปหน้างานซ่อม
+      if(!userPicked.current&&!location.hash.replace('#','')&&!preAssetId&&techFirst(me))setTab('jobs');
+    }});},[]);
   // งานที่ยังไม่ปิด — ใช้ทำ "งานของฉัน" + ตัวเลขแดงบนแท็บ · เช็กใหม่ทุก 2 นาที และทุกครั้งที่กลับมาเปิดแอป
   useEffect(()=>{
     const load=()=>SB.from('repair_requests').select('id,ticket_no,asset_name,asset_category,status,urgency,kind,pm_item_id,reporter_name,technician,reported_at,done_at')
@@ -898,19 +913,19 @@ function App(){
         <button onClick={()=>hardReload()} title="โหลดใหม่ / อัปเดตแอป" style={{marginLeft:'auto',background:'rgba(255,255,255,.18)',border:'none',color:'#fff',borderRadius:8,padding:'4px 10px',fontFamily:'inherit',fontSize:12.5,fontWeight:700,cursor:'pointer'}}>⟳ v{APP_VERSION.slice(5)}</button></h1>
       {me&&<div className="me">ผู้ใช้: {me.name} ({me.dept}) <button onClick={()=>setEditMe(true)}>เปลี่ยน</button></div>}
       {me&&!editMe&&<div className="tabs">
-        <button className={'tab'+(tab==='report'?' on':'')} onClick={()=>{setTab('report');setDone(null);back();}}>➕ แจ้งซ่อม</button>
-        <button className={'tab'+(tab==='jobs'?' on':'')} onClick={()=>{setTab('jobs');back();}}>📋 งานซ่อม{badge>0&&<span style={{marginLeft:6,background:'#dc2626',color:'#fff',borderRadius:99,padding:'1px 7px',fontSize:12.5}}>{badge}</span>}</button>
+        <button className={'tab'+(tab==='report'?' on':'')} onClick={()=>{pickTab('report');setDone(null);back();}}>➕ แจ้งซ่อม</button>
+        <button className={'tab'+(tab==='jobs'?' on':'')} onClick={()=>{pickTab('jobs');back();}}>📋 งานซ่อม{badge>0&&<span style={{marginLeft:6,background:'#dc2626',color:'#fff',borderRadius:99,padding:'1px 7px',fontSize:12.5}}>{badge}</span>}</button>
       </div>}
       {(!me||editMe)&&<div style={{height:12}}/>}
     </div>
     {pdfMode?<PdfExport ids={pdfMode}/>:(!me||editMe)?<MeSetup me={me} onSave={v=>{saveMe(v);setMe(v);setEditMe(false);}}/>:
      tab==='report'?(done?<div className="card">
         <div className="ok">แจ้งซ่อมแล้ว เลขที่ <b>{done.ticket_no}</b><br/>ระบบส่งเตือนช่างแล้ว</div>
-        <button className="bigbtn" onClick={()=>{setTab('jobs');open(done.id);}}>ดูใบงาน</button>
+        <button className="bigbtn" onClick={()=>{pickTab('jobs');open(done.id);}}>ดูใบงาน</button>
         <button className="ghost" onClick={()=>setDone(null)}>แจ้งเรื่องอื่นต่อ</button>
       </div>:<>
         {/* หน้าแรก: มีงานรอคุณ → แถบเตือน กดไปดูได้เลย */}
-        {badge>0&&<div className="card" style={{background:'#fff7ed',border:'1.5px solid #f59e0b',cursor:'pointer',display:'flex',alignItems:'center',gap:10}} onClick={()=>{setTab('jobs');back();}}>
+        {badge>0&&<div className="card" style={{background:'#fff7ed',border:'1.5px solid #f59e0b',cursor:'pointer',display:'flex',alignItems:'center',gap:10}} onClick={()=>{pickTab('jobs');back();}}>
           <span style={{fontSize:26}}>🔔</span><div style={{flex:1}}><b>มีงานรอคุณ {badge} งาน</b><div style={{fontSize:13,color:'#8a7a68'}}>{(()=>{const w=myWork(me,jobs);return [w.confirm.length?'รอยืนยัน '+w.confirm.length:'',w.assigned.length?'มอบหมายให้คุณ '+w.assigned.length:'',w.waiting.length?'รอรับงาน '+w.waiting.length:'',w.mine.length?'งานที่รับไว้ '+w.mine.length:''].filter(Boolean).join(' · ');})()}</div></div><b style={{color:'#b45309'}}>ดู ›</b>
         </div>}
         <ReportForm me={me} assets={assets} preAssetId={preAssetId} onDone={d=>setDone(d)}/></>):
