@@ -202,11 +202,19 @@ function inScope(me,cat){
   const fleet=FLEET_CATS.includes(cat);
   return st.scope==='fleet'?fleet:!fleet;
 }
-// งานหมวดนี้ตรงกับที่ช่างคนนี้ถนัดไหม — ไม่ได้ตั้งความถนัดไว้ = รับได้ทุกหมวด
+// งานหมวดนี้ตรงกับที่ช่างคนนี้ดูแลไหม
+// หัวหน้าช่าง/หัวหน้าฝ่าย = เห็นและทำได้ทุกหมวดเสมอ ต่อให้ติ๊กความถนัดไว้ก็ตาม
+// ช่างที่ไม่ได้ตั้งความถนัด = ทุกหมวด (ยังไม่ได้แบ่งงาน ก็ไม่ควรกันใครออก)
 function fitsSkill(me,cat){
   const st=STAFF.find(x=>x.name===me.name);
-  const s=((st||{}).skills||'').split(',').map(v=>v.trim()).filter(Boolean);
+  if(!st||st.role==='head'||st.role==='manager')return true;
+  const s=(st.skills||'').split(',').map(v=>v.trim()).filter(Boolean);
   return s.length===0||!cat||s.includes(cat);
+}
+// ช่างที่ดูแลหมวดนี้ มีใครบ้าง (ไว้บอกคนที่กดไม่ได้ว่าต้องไปหาใคร)
+function skillOwners(cat){
+  if(!cat)return[];
+  return STAFF.filter(x=>x.role==='tech'&&(x.skills||'').split(',').map(v=>v.trim()).includes(cat)).map(x=>x.name);
 }
 function roleOf(me){
   if(!me)return null;
@@ -790,9 +798,13 @@ function JobDetail({id,me,onBack,tick,assets}){
 
     <div className="card">
       {req.status==='open'&&<>
-        {isTech?<button className="bigbtn blue" disabled={busy} onClick={()=>{
+        {/* ช่างนอกหมวด ไม่ให้กดรับเอง · หัวหน้ามอบหมายให้ค่อยทำได้ */}
+        {!isTech?techOnly:!fitsSkill(me,req.asset_category)?<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>
+          🔒 งานหมวด <b>{req.asset_category||'-'}</b> ไม่ใช่หมวดที่คุณดูแล{skillOwners(req.asset_category).length>0?<> — เป็นของ <b>{skillOwners(req.asset_category).join(', ')}</b></>:''}
+          <div style={{fontSize:12.5,color:'#8a7a68',marginTop:3}}>ถ้าต้องให้คุณทำ ให้หัวหน้าช่างมอบหมายงานนี้ให้</div>
+        </div>:<button className="bigbtn blue" disabled={busy} onClick={()=>{
           if(!window.confirm('รับงาน '+req.ticket_no+' — '+assetLabel(req.asset_name)+' ?\n\nงานจะมาอยู่ในชื่อคุณ'))return;
-          act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted');}}>🙋 รับงานนี้ ({me.name})</button>:techOnly}
+          act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted');}}>🙋 รับงานนี้ ({me.name})</button>}
         {!canCancel?null:mode!=='cancel'?<button className="ghost" onClick={()=>setMode('cancel')}>ยกเลิกใบแจ้ง (แจ้งผิด/ซ้ำ)</button>:<>
           <label className="lbl">เหตุผลที่ยกเลิก</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น แจ้งซ้ำ"/>
           {/* ถามย้ำก่อนจริง ๆ เพราะยกเลิกแล้วใบจะออกจากคิวงานทันที */}
@@ -910,21 +922,19 @@ function JobDetail({id,me,onBack,tick,assets}){
 function myWork(me,jobs){
   const role=roleOf(me);
   const confirm=jobs.filter(r=>r.status==='done'&&r.reporter_name===me.name);
-  // งานรอรับ: แยกตามความถนัด งานหมวดที่ตัวเองถนัดขึ้นก่อน หมวดอื่นแยกไปกลุ่มล่าง
-  // ไม่ซ่อนทิ้ง เพราะถ้าคนถนัดลา ต้องมีคนอื่นเห็นและรับแทนได้
-  const openJobs=role?jobs.filter(r=>r.status==='open'&&inScope(me,r.asset_category)):[];
-  const waiting=openJobs.filter(r=>fitsSkill(me,r.asset_category));
-  const waitingOther=openJobs.filter(r=>!fitsSkill(me,r.asset_category));
+  // งานรอรับ: เห็นเฉพาะหมวดที่ตัวเองถนัด หมวดอื่นไม่ขึ้นเลย
+  // ช่างที่ไม่ได้ตั้งความถนัด (รวมหัวหน้าช่าง) ยังเห็นทุกหมวด = งานไม่มีทางตกหล่น
+  const waiting=role?jobs.filter(r=>r.status==='open'&&inScope(me,r.asset_category)&&fitsSkill(me,r.asset_category)):[];
   const mine=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&['accepted','in_progress','waiting_parts','outsourced'].includes(r.status)):[];
   const assigned=(role==='tech'||role==='head')?jobs.filter(r=>r.technician===me.name&&r.status==='assigned'):[];
   // งานที่ฉันแจ้งที่ยังไม่เสร็จ (ไว้ติดตามสถานะ ไม่นับเป็นงานที่ต้องทำ)
   const reported=jobs.filter(r=>r.reporter_name===me.name&&['open','assigned','accepted','in_progress','waiting_parts','outsourced'].includes(r.status));
   const stale=(role==='head'||role==='manager')?jobs.filter(r=>r.status==='done'&&inScope(me,r.asset_category)&&r.done_at&&Date.now()-new Date(r.done_at)>864e5&&r.reporter_name!==me.name):[];
-  return{role,confirm,waiting,waitingOther,mine,assigned,stale,reported,count:confirm.length+waiting.length+mine.length+assigned.length};
+  return{role,confirm,waiting,mine,assigned,stale,reported,count:confirm.length+waiting.length+mine.length+assigned.length};
 }
 function MyWork({me,jobs,onOpen}){
   const w=myWork(me,jobs);
-  const empty=!w.confirm.length&&!w.waiting.length&&!(w.waitingOther||[]).length&&!w.mine.length&&!w.assigned.length&&!w.stale.length&&!w.reported.length;
+  const empty=!w.confirm.length&&!w.waiting.length&&!w.mine.length&&!w.assigned.length&&!w.stale.length&&!w.reported.length;
   // ใบงานเป็นการ์ดใบใหญ่เหมือนหน้ารายการ นิ้วกดง่าย ไม่ใช่บรรทัดเล็ก ๆ ติดกัน
   const row=(r,extra)=><div key={r.id} className={'job '+(r.kind==='pm'?'pm':r.urgency)} onClick={()=>onOpen(r.id)}>
     <div className="t1"><span className="big">{r.kind==='pm'?(r.pm_item_id?'🗓 ':'🔧 '):''}{assetLabel(r.asset_name)}{r.urgency==='stop'&&r.kind!=='pm'?' 🔴':''}</span><Badge s={r.status}/></div>
@@ -943,8 +953,7 @@ function MyWork({me,jobs,onOpen}){
     {grp('✅','ซ่อมเสร็จแล้ว รอคุณยืนยัน','#0f766e','กดเข้าไปตรวจแล้วปิดงาน',w.confirm,r=>'เสร็จ '+ago(r.done_at))}
     {grp('👷','หัวหน้ามอบหมายให้คุณ','#0369a1','กดเข้าไปรับงาน',w.assigned,()=>'รอคุณกดรับ')}
     {grp('🔧','งานที่ฉันรับไว้','#1d4ed8','',w.mine,r=>'แจ้ง '+ago(r.reported_at))}
-    {grp('🙋','รอช่างรับงาน','#b91c1c','หมวดที่คุณถนัด',w.waiting,r=>'แจ้ง '+ago(r.reported_at))}
-    {grp('🧰','งานรอรับ หมวดอื่น','#a8a29e','ไม่ใช่หมวดที่คุณถนัด รับได้ถ้าคนถนัดไม่ว่าง',w.waitingOther,r=>(r.asset_category||'')+' · แจ้ง '+ago(r.reported_at))}
+    {grp('🙋','รอช่างรับงาน','#b91c1c','ยังไม่มีใครรับ',w.waiting,r=>'แจ้ง '+ago(r.reported_at))}
     {grp('📝','งานที่ฉันแจ้งไว้','#6b5b4a','ติดตามสถานะ',w.reported,r=>(STATUS[r.status]||{}).label+(r.technician?' · ช่าง'+r.technician.replace(/^ช่าง/,''):''))}
     {grp('⏳','เสร็จแล้ว ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน','#78716c','หัวหน้าปิดแทนได้',w.stale,r=>'ผู้แจ้ง '+r.reporter_name)}
   </div>;
