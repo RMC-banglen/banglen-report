@@ -497,7 +497,9 @@ function DoneForm({req,me,onSaved,onCancel,editMode}){
     <label className="lbl">รูปหลังซ่อม</label>
     <PhotoPicker urls={photos} setUrls={setPhotos} max={3}/>
     {err&&<div className="err">{err}</div>}
-    <button className="bigbtn green" disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':editMode?'💾 บันทึกการแก้ไข':outs?'✅ รับรถคืนแล้ว แจ้งผู้แจ้งยืนยัน':isPM?(req.pm_item_id?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ทำเสร็จ ปิดงาน'):'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
+    <button className="bigbtn green" disabled={saving} onClick={()=>{
+      if(!editMode&&!window.confirm((isPM?'บันทึกว่าทำเสร็จ ':'บันทึกว่าซ่อมเสร็จ ')+assetLabel(req.asset_name)+' ?\n\n'+(isPM?'ใบนี้จะปิดเลย':'ระบบจะแจ้ง '+(req.reporter_name||'ผู้แจ้ง')+' ให้มาตรวจและกดปิดงาน')))return;
+      save();}}>{saving?'กำลังบันทึก...':editMode?'💾 บันทึกการแก้ไข':outs?'✅ รับรถคืนแล้ว แจ้งผู้แจ้งยืนยัน':isPM?(req.pm_item_id?'✅ ทำ PM เสร็จ ปิดงาน':'✅ ทำเสร็จ ปิดงาน'):'✅ ซ่อมเสร็จ แจ้งผู้แจ้งยืนยัน'}</button>
     <button className="ghost" onClick={onCancel}>ย้อนกลับ</button>
   </div>;
 }
@@ -536,7 +538,9 @@ function OutsourceForm({req,me,onSaved,onCancel}){
     <label className="lbl">หมายเหตุ (ซ่อมอะไร / ใครรับ-ส่ง)</label>
     <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ส่งเปลี่ยนเกียร์ ลากรถไปวันนี้"/>
     {err&&<div className="err">{err}</div>}
-    <button className="bigbtn" style={{background:'#9333ea'}} disabled={saving} onClick={save}>{saving?'กำลังบันทึก...':'🚚 ยืนยันส่งซ่อมนอก'}</button>
+    <button className="bigbtn" style={{background:'#9333ea'}} disabled={saving} onClick={()=>{
+      if(!window.confirm('ส่ง '+assetLabel(req.asset_name)+' ซ่อมนอกที่ร้าน '+(vendor.trim()||'-')+' ?\n\nระบบจะแจ้งกลุ่มช่างและแท็กหัวหน้า'))return;
+      save();}}>{saving?'กำลังบันทึก...':'🚚 ยืนยันส่งซ่อมนอก'}</button>
     <button className="ghost" onClick={onCancel}>ยกเลิก</button>
   </div>;
 }
@@ -780,7 +784,9 @@ function JobDetail({id,me,onBack,tick,assets}){
 
     <div className="card">
       {req.status==='open'&&<>
-        {isTech?<button className="bigbtn blue" disabled={busy} onClick={()=>act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted')}>🙋 รับงานนี้ ({me.name})</button>:techOnly}
+        {isTech?<button className="bigbtn blue" disabled={busy} onClick={()=>{
+          if(!window.confirm('รับงาน '+req.ticket_no+' — '+assetLabel(req.asset_name)+' ?\n\nงานจะมาอยู่ในชื่อคุณ'))return;
+          act({status:'accepted',accepted_at:now,technician:me.name},'รับงาน',null,'accepted');}}>🙋 รับงานนี้ ({me.name})</button>:techOnly}
         {!canCancel?null:mode!=='cancel'?<button className="ghost" onClick={()=>setMode('cancel')}>ยกเลิกใบแจ้ง (แจ้งผิด/ซ้ำ)</button>:<>
           <label className="lbl">เหตุผลที่ยกเลิก</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น แจ้งซ้ำ"/>
           {/* ถามย้ำก่อนจริง ๆ เพราะยกเลิกแล้วใบจะออกจากคิวงานทันที */}
@@ -791,7 +797,9 @@ function JobDetail({id,me,onBack,tick,assets}){
       </>}
       {req.status==='assigned'&&canWork&&<>
         <div style={{fontSize:14,color:'#0369a1',marginBottom:4}}>👷 {req.assigned_by||'หัวหน้า'} มอบหมายงานนี้ให้{req.technician===me.name?'คุณ':' '+req.technician}</div>
-        <button className="bigbtn blue" disabled={busy} onClick={()=>act({status:'accepted',accepted_at:now},'รับงาน (ที่ถูกมอบหมาย)',null,'accepted',req.technician)}>🙋 รับงานนี้{req.technician!==me.name?' แทน '+req.technician:''}</button>
+        <button className="bigbtn blue" disabled={busy} onClick={()=>{
+          if(!window.confirm('รับงาน '+req.ticket_no+' — '+assetLabel(req.asset_name)+' ?'))return;
+          act({status:'accepted',accepted_at:now},'รับงาน (ที่ถูกมอบหมาย)',null,'accepted',req.technician);}}>🙋 รับงานนี้{req.technician!==me.name?' แทน '+req.technician:''}</button>
         {mode!=='decline'?<button className="ghost" onClick={()=>setMode('decline')}>↩ ส่งคืน (รับไม่ได้)</button>:<>
           <label className="lbl">เหตุผลที่รับไม่ได้</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ติดงานอื่นอยู่ / ไม่ถนัดงานนี้"/>
           <button className="bigbtn gray" disabled={busy||!note.trim()} onClick={()=>act({status:'open',technician:null,assigned_by:null},'ส่งคืนงานที่ถูกมอบหมาย',note.trim(),'declined')}>ยืนยันส่งคืนให้หัวหน้า</button></>}
@@ -802,7 +810,10 @@ function JobDetail({id,me,onBack,tick,assets}){
       {req.status==='assigned'&&!isTech&&techOnly}
       {req.status==='accepted'&&!isTech&&techOnly}
       {req.status==='accepted'&&canWork&&<>
-        <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',started_at:req.started_at||now},'เริ่มซ่อม')}>▶️ เริ่มซ่อม</button>
+        {/* เริ่มซ่อมคือจุดเริ่มจับเวลา กดพลาดแล้วเวลาซ่อมเพี้ยน */}
+        <button className="bigbtn" disabled={busy} onClick={()=>{
+          if(!window.confirm('เริ่มซ่อม '+assetLabel(req.asset_name)+' ตอนนี้ ?\n\nระบบจะเริ่มจับเวลาซ่อมตั้งแต่ตอนนี้'))return;
+          act({status:'in_progress',started_at:req.started_at||now},'เริ่มซ่อม');}}>▶️ เริ่มซ่อม</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จแล้ว (บันทึกเลย)</button>
         <button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>
       </>}
@@ -812,21 +823,32 @@ function JobDetail({id,me,onBack,tick,assets}){
         {mode!=='wait'?<button className="ghost" onClick={()=>setMode('wait')}>⏸ รออะไหล่</button>:<>
           <label className="lbl">รออะไหล่อะไร</label><input value={note} onChange={e=>setNote(e.target.value)} placeholder="เช่น ลูกปืน 6205 สั่งร้านแล้ว"/>
           <button className="bigbtn" style={{background:'#b45309'}} disabled={busy||!note.trim()} onClick={()=>act({status:'waiting_parts',waiting_since:now},'รออะไหล่',note.trim(),'waiting_parts')}>⏸ ยืนยันรออะไหล่</button></>}
+        {/* เผื่อกดเริ่มซ่อมพลาด — ถอยกลับได้ ไม่ต้องให้เวลาซ่อมเพี้ยนทั้งใบ */}
+        <button className="ghost" disabled={busy} style={{borderColor:'#a8a29e',color:'#78716c'}} onClick={()=>{
+          if(!window.confirm('ยังไม่ได้เริ่มซ่อมจริง ย้อนกลับไปสถานะรับงานแล้ว ?\n\nเวลาเริ่มซ่อมที่บันทึกไว้จะถูกล้าง'))return;
+          act({status:'accepted',started_at:null},'ย้อนกลับ (กดเริ่มซ่อมพลาด)');}}>↩ กดเริ่มซ่อมพลาด ย้อนกลับ</button>
       </>}
       {req.status==='in_progress'&&canWork&&<button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>}
       {req.status==='outsourced'&&canWork&&<>
         <button className="bigbtn green" onClick={()=>setMode('done')}>✅ รับรถคืนแล้ว (บันทึกผลซ่อม)</button>
-        <button className="ghost" disabled={busy} onClick={()=>act({status:'in_progress'},'ยกเลิกส่งซ่อมนอก กลับมาซ่อมเอง')}>↩ ยกเลิกส่งซ่อมนอก (ซ่อมเอง)</button>
+        <button className="ghost" disabled={busy} onClick={()=>{
+          if(!window.confirm('ยกเลิกส่งซ่อมนอก กลับมาซ่อมเอง ?\n\nร้าน '+(req.outsource_vendor||'-')))return;
+          act({status:'in_progress'},'ยกเลิกส่งซ่อมนอก กลับมาซ่อมเอง');}}>↩ ยกเลิกส่งซ่อมนอก (ซ่อมเอง)</button>
       </>}
       {req.status==='waiting_parts'&&canWork&&<>
         <button className="ghost" style={{borderColor:'#9333ea',color:'#9333ea'}} onClick={()=>setMode('outsource')}>🚚 ส่งซ่อมนอก</button>
-        <button className="bigbtn" disabled={busy} onClick={()=>act({status:'in_progress',waiting_since:null,waiting_minutes:(req.waiting_minutes||0)+waitAdd()},'ได้อะไหล่ ซ่อมต่อ')}>▶️ ได้อะไหล่แล้ว ซ่อมต่อ</button>
+        <button className="bigbtn" disabled={busy} onClick={()=>{
+          if(!window.confirm('ได้อะไหล่แล้ว กลับมาซ่อมต่อ ?'))return;
+          act({status:'in_progress',waiting_since:null,waiting_minutes:(req.waiting_minutes||0)+waitAdd()},'ได้อะไหล่ ซ่อมต่อ');}}>▶️ ได้อะไหล่แล้ว ซ่อมต่อ</button>
         <button className="ghost" onClick={()=>setMode('done')}>✅ ซ่อมเสร็จ</button>
       </>}
       {req.status==='done'&&ownWork&&<div style={{fontSize:14,color:'#6b5b4a',padding:'6px 0'}}>รอ {req.reporter_name||'ผู้แจ้ง'} หรือหัวหน้างาน ตรวจแล้วกดปิดงาน (ช่างที่ซ่อมยืนยันงานตัวเองไม่ได้)</div>}
       {req.status==='done'&&!ownWork&&<>
         <div style={{fontSize:14,color:'#6b5b4a',marginBottom:4}}>ผู้แจ้ง/หัวหน้างาน ตรวจว่าใช้งานได้จริง แล้วกดปิดงาน</div>
-        <button className="bigbtn green" disabled={busy} onClick={()=>act({status:'closed',closed_at:now,closed_by:me.name},'ยืนยันใช้งานได้ ปิดงาน',null,'closed')}>👍 ใช้งานได้แล้ว ปิดงาน</button>
+        {/* ปิดงานแล้วใบจบ แก้ไม่ได้อีก */}
+        <button className="bigbtn green" disabled={busy} onClick={()=>{
+          if(!window.confirm('ปิดงาน '+req.ticket_no+' — '+assetLabel(req.asset_name)+' ?\n\nยืนยันว่าตรวจแล้วใช้งานได้จริง ปิดแล้วใบจบ'))return;
+          act({status:'closed',closed_at:now,closed_by:me.name},'ยืนยันใช้งานได้ ปิดงาน',null,'closed');}}>👍 ใช้งานได้แล้ว ปิดงาน</button>
         {mode!=='reopen'?<button className="ghost" onClick={()=>setMode('reopen')}>👎 ยังไม่หาย ส่งกลับให้ช่าง</button>:<>
           <label className="lbl">อาการที่ยังเป็นอยู่</label><input value={note} onChange={e=>setNote(e.target.value)}/>
           <button className="bigbtn red" disabled={busy||!note.trim()} onClick={()=>act({status:'accepted',done_at:null,reopen_count:(req.reopen_count||0)+1},'ยังไม่หาย ส่งกลับ',note.trim(),'reopened')}>ส่งกลับให้ช่าง</button></>}
