@@ -143,3 +143,39 @@ function removeRaftPullTrigger() {
   });
   Logger.log('ลบ trigger แล้ว');
 }
+
+// ============================================================
+// เมนูในชีท: กดดึงยอดจากแดชบอร์ดได้เลย ไม่ต้องเข้า Apps Script
+//
+// ไม่ใช้ชื่อ onOpen เพราะไฟล์เดิมมี onOpen สร้างเมนู "Sync Dashboard" อยู่แล้ว
+// ถ้าซ้ำกัน เมนูเดิมอาจหาย — ใช้ trigger แบบติดตั้งที่เรียกฟังก์ชันชื่ออื่นแทน
+// ทั้งสองเมนูอยู่ด้วยกันได้ ไม่ชนกัน
+//
+// ติดตั้ง: เลือกฟังก์ชัน installRaftMenu แล้วกดเรียกใช้ 1 ครั้ง แล้วรีเฟรชชีท
+// ============================================================
+function addRaftMenu() {
+  SpreadsheetApp.getUi()
+    .createMenu('📥 ดึงจากแดชบอร์ด')
+    .addItem('ดึงยอดแพรายวัน + ตัวเลขรายเดือน มาเติมชีท', 'pullRaftFromDaily')
+    .addToUi();
+}
+
+function installRaftMenu() {
+  var ss = SpreadsheetApp.openById(SS_MAIN_ID);
+  var existing = ScriptApp.getProjectTriggers().filter(function (t) {
+    return t.getHandlerFunction() === 'addRaftMenu';
+  });
+  if (existing.length) {
+    Logger.log('มีเมนูตั้งไว้แล้ว — ไม่สร้างซ้ำ (รีเฟรชชีทเพื่อดูเมนู)');
+    return;
+  }
+  ScriptApp.newTrigger('addRaftMenu').forSpreadsheet(ss).onOpen().create();
+  Logger.log('✅ ติดตั้งเมนู "📥 ดึงจากแดชบอร์ด" แล้ว — รีเฟรชชีท (F5) เพื่อให้เมนูขึ้น');
+}
+
+function removeRaftMenu() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'addRaftMenu') ScriptApp.deleteTrigger(t);
+  });
+  Logger.log('ลบเมนูแล้ว');
+}

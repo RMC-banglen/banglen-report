@@ -25,7 +25,8 @@
       "Bash(cp gas-pull-raft-daily.gs /tmp/g.js)",
       "Bash(node --check /tmp/g.js)",
       "Bash(git commit -q -m 'สคริปต์ดึงยอดรายวัน: คำนวณ % ผลิต/ส่วนต่างสต็อคในชีทต่อเองหลังเติมตัวเลข *)",
-      "Bash(git commit -q -m 'ตัวเลขรายเดือน: เอาช่องคิวสั่งผลิตออก *)"
+      "Bash(git commit -q -m 'ตัวเลขรายเดือน: เอาช่องคิวสั่งผลิตออก *)",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',c=>s+=c\\).on\\('end',\\(\\)=>console.log\\('pour_daily ต.ค.:',JSON.parse\\(s\\).length,'วัน'\\)\\);\")"
     ]
   }
 }
