@@ -9241,8 +9241,8 @@ window.__dataReady.then(data => {
           :'<div class="muted">ไม่มีงานค้าง</div>')
         +'<h2>เวลาเครื่องหยุด รายเครื่อง รายเดือน (ชม.) — ปี '+yearBE+'</h2>'
         +(withData.length?'<table><tr><th>เครื่อง/รถ</th>'+MO.map(m=>'<th>'+m+'</th>').join('')+'<th>รวม</th><th>ครั้ง</th><th>ซ่อมเฉลี่ย</th><th>เสียทุกๆ</th><th>ค่าใช้จ่าย</th></tr>'
-          +withData.map(a=>'<tr><td>'+E(dn(a.n))+'</td>'+a.mo.map(v=>'<td class="n">'+(v?v.toFixed(1):'<span class="muted">–</span>')+'</td>').join('')
-            +'<td class="n"><b>'+(a.mo.some(v=>v>0)?a.mo.reduce((s2,v)=>s2+v,0).toFixed(1):'–')+'</b></td><td class="n">'+(a.fails||'–')+'</td><td class="n">'+E(fmtH(a.mttr))+'</td><td class="n">'+E(a.mtbf!=null?fmtH(a.mtbf):'–')+'</td><td class="n">'+(a.cost?baht(a.cost):'–')+'</td></tr>').join('')+'</table>'
+          +withData.map(a=>'<tr><td>'+E(dn(a.n))+'</td>'+a.mo.map(v=>'<td class="n">'+(v?E(fmtH(v)):'<span class="muted">–</span>')+'</td>').join('')
+            +'<td class="n"><b>'+(a.mo.some(v=>v>0)?E(fmtH(a.mo.reduce((s2,v)=>s2+v,0))):'–')+'</b></td><td class="n">'+(a.fails||'–')+'</td><td class="n">'+E(fmtH(a.mttr))+'</td><td class="n">'+E(a.mtbf!=null?fmtH(a.mtbf):'–')+'</td><td class="n">'+(a.cost?baht(a.cost):'–')+'</td></tr>').join('')+'</table>'
           +'<div class="sub">แสดงเฉพาะเครื่องที่มีการแจ้งซ่อมในปีนี้ · เครื่องหยุด = งานที่แจ้งว่า "เครื่องหยุด" นับจากแจ้งจนซ่อมเสร็จ</div>'
           :'<div class="muted">ยังไม่มีการแจ้งซ่อมในปีนี้</div>')
         +(causeList.length?'<h2>สาเหตุ</h2><table style="width:auto">'+causeList.map(c=>'<tr><td>'+E(c[0])+'</td><td class="n">'+c[1]+' ครั้ง</td></tr>').join('')+'</table>':'')
@@ -9313,8 +9313,9 @@ window.__dataReady.then(data => {
             <tr key={'h-'+cat}><td colSpan={MO.length+6} style={{padding:'6px 10px',fontSize:12.5,fontWeight:800,color:'#b45309',background:'#fff7ed'}}>{cat}</td></tr>,
             ...used.filter(a=>a.cat===cat).map(a=><tr key={a.n}>
             <td style={{...td,textAlign:'left',fontWeight:700,cursor:'pointer'}} onClick={()=>setHistAsset(a.n)} title="ดูประวัติซ่อม"><span style={{color:'#1d4ed8',textDecoration:'underline'}}>{dn(a.n)}</span> 📜</td>
-            {a.mo.map((v,i)=><td key={i} style={{...td,color:v?'#1e293b':'#cbd5e1',background:v>8?'#fee2e2':v>2?'#fef3c7':'transparent'}}>{v?v.toFixed(1):'–'}</td>)}
-            <td style={{...td,fontWeight:800,color:a.mo.some(v=>v>0)?'#b45309':'#cbd5e1'}}>{a.mo.some(v=>v>0)?a.mo.reduce((s,v)=>s+v,0).toFixed(1):'–'}</td>
+            {/* งานสั้นๆ ไม่ถึงชั่วโมง ปัดเป็น 0.0 แล้วดูเหมือนไม่เคยหยุด — ใช้หน่วยเดียวกับช่องซ่อมเฉลี่ย */}
+            {a.mo.map((v,i)=><td key={i} style={{...td,color:v?'#1e293b':'#cbd5e1',background:v>8?'#fee2e2':v>2?'#fef3c7':'transparent'}}>{v?fmtH(v):'–'}</td>)}
+            <td style={{...td,fontWeight:800,color:a.mo.some(v=>v>0)?'#b45309':'#cbd5e1'}}>{a.mo.some(v=>v>0)?fmtH(a.mo.reduce((s,v)=>s+v,0)):'–'}</td>
             <td style={td}>{a.fails||'–'}</td><td style={td}>{fmtH(a.mttr)}</td><td style={td}>{a.mtbf!=null?fmtH(a.mtbf):'–'}</td><td style={td}>{a.cost?baht(a.cost):'–'}</td>
           </tr>)])}</tbody>
         </table></div>}

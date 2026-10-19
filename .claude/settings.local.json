@@ -9,7 +9,10 @@
       "Bash(ls scripts *)",
       "Bash(rm -f _dump_re.txt _dump_stock.txt)",
       "Bash(ls *.txt)",
-      "PowerShell($n = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($n\\) { node --version } else { Write-Output \"no-node\" })"
+      "PowerShell($n = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($n\\) { node --version } else { Write-Output \"no-node\" })",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'ซ่อมบำรุง: ชั่วโมงเครื่องหยุด งานสั้นกว่า 1 ชม. ขึ้นเป็นนาที *)",
+      "Bash(git push *)"
     ]
   }
 }
