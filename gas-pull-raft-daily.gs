@@ -114,9 +114,39 @@ function pullRaftFromDaily() {
     catch (e) { Logger.log('คำนวณ % ในชีทไม่สำเร็จ: ' + e.message); }
   }
 
-  var msg = changed.length
+  // ส่งขึ้นแดชบอร์ดต่อเอง — เขียนชีทด้วยสคริปต์ไม่ปลุก onEdit จึงไม่มีอะไร sync ให้
+  // ส่งเมื่อ (ก) เพิ่งแก้ตัวเลขในชีท หรือ (ข) มีเดือนที่ชีทมีคิวผลิตจริงแล้ว แต่แดชบอร์ดยังไม่มีเดือนนั้น
+  // ใช้ syncMonthly ตัวเดียว (เบา แตะแค่ตารางรายเดือน) ไม่ใช่ sync ทั้งระบบ ประหยัดโควต้า
+  var needSync = changed.length > 0;
+  var syncNote = '';
+  if (!needSync) {
+    var pm = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/production_monthly?select=year,month',
+      { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, muteHttpExceptions: true });
+    if (pm.getResponseCode() === 200) {
+      var have = {};
+      JSON.parse(pm.getContentText()).forEach(function (r) { have[r.year + '-' + r.month] = 1; });
+      var fresh = sheet.getDataRange().getValues();
+      var qCol = col['คิวผลิตจริง'];
+      for (var j = 1; j < fresh.length; j++) {
+        var fy = Number(fresh[j][col['ปี']]), fm = Number(fresh[j][col['เดือน']]);
+        if (fy && fm && qCol !== undefined && Number(fresh[j][qCol]) > 0 && !have[fy + '-' + fm]) {
+          needSync = true; syncNote = '\n(เดือน ' + fy + '/' + fm + ' ยังไม่อยู่บนแดชบอร์ด → ส่งขึ้นให้)';
+          break;
+        }
+      }
+    }
+  }
+  if (needSync) {
+    try {
+      var got = withScriptLock(function () { syncMonthly(ss); }, 2000);
+      if (!got) syncNote += '\n⏳ มี sync อื่นทำงานอยู่ ไว้รอบหน้า';
+      else if (!syncNote) syncNote = '\n📤 ส่งขึ้นแดชบอร์ดแล้ว';
+    } catch (e) { Logger.log('ส่งขึ้นแดชบอร์ดไม่สำเร็จ: ' + e.message); syncNote += '\n⚠️ ส่งขึ้นแดชบอร์ดไม่สำเร็จ: ' + e.message; }
+  }
+
+  var msg = (changed.length
     ? '✅ อัปเดต ' + changed.length + ' เดือน\n' + changed.join('\n')
-    : '✅ ตัวเลขตรงกันอยู่แล้ว ไม่มีอะไรต้องแก้';
+    : '✅ ตัวเลขในชีทตรงกับแดชบอร์ดแล้ว') + syncNote;
   Logger.log(msg);
   try { SpreadsheetApp.getUi().alert(msg); } catch (e) {}   // รันจาก trigger จะไม่มี UI
   return msg;
