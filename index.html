@@ -1090,7 +1090,7 @@ window.__dataReady.then(data => {
     };
 
     // ── ตัวเลขรายเดือน: กรอกที่นี่ที่เดียว แล้วให้ชีทดึงไปคำนวณ % ผลิต / ส่วนต่างสต็อค ต่อเอง
-    const M_FIELDS=[['order_qty','คิวสั่งผลิต'],['produced','คิวผลิตจริง'],['transport','คิวขนส่ง'],['stock','สต็อคคงเหลือ']];
+    const M_FIELDS=[['produced','คิวผลิตจริง'],['transport','คิวขนส่ง'],['stock','สต็อคคงเหลือ']];
     const mKey=year+'-'+mon;
     const mVal=f=>{
       if(mDraft[f]!==undefined)return mDraft[f];
