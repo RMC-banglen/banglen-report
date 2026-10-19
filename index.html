@@ -423,8 +423,17 @@ window.__dataReady = (async function loadData() {
     (miRes && !miRes.error ? miRes.data || [] : []).forEach(r => { mIn[r.year + '-' + r.month] = r; });
     // ยอดแพรายเดือนจากหน้า "รายงานการผลิต–เวลาเทเสร็จ" (กรอกรายวัน) — เดือนไหนมีข้อมูลรายวัน ใช้ยอดรวมรายวันแทนตัวเลขที่พิมพ์ในชีท Google
     const pourMonth = {};
-    (pRes && !pRes.error ? pRes.data || [] : []).forEach(r => {
-      const [gy, gm] = String(r.d).split('-').map(Number); if (!gy || !gm) return;
+    const pourRows = pRes && !pRes.error ? pRes.data || [] : [];
+    // เดือนที่ยังกรอกไม่ถึงวันสุดท้าย นับแค่วันที่ 1–15 (รอบรายงานครึ่งเดือน) — ครบเดือนแล้วค่อยนับทั้งเดือน
+    // ไม่งั้นกรอกถึงวันที่ 18 ยอดจะเป็น 18 วัน ปนกับรอบรายงานที่ตัดที่ 15
+    const monthComplete = {};
+    pourRows.forEach(r => {
+      const [yy, mm, dd] = String(r.d).split('-').map(Number); if (!yy || !mm) return;
+      if (dd === new Date(yy, mm, 0).getDate()) monthComplete[yy + '-' + mm] = true;
+    });
+    pourRows.forEach(r => {
+      const [gy, gm, gd] = String(r.d).split('-').map(Number); if (!gy || !gm) return;
+      if (!monthComplete[gy + '-' + gm] && gd > 15) return;
       const k = (gy + 543) + '-' + gm;
       const o = pourMonth[k] || (pourMonth[k] = { order:0, produced:0, cancel:0, workDays:0, holidays:0, typed:false });
       o.order += Number(r.raft_order) || 0; o.produced += Number(r.raft_produced) || 0; o.cancel += Number(r.raft_cancel) || 0;
@@ -1053,6 +1062,10 @@ window.__dataReady.then(data => {
     const cancelOf=k=>{const o=Number(val(k,'raft_order'))||0,p=Number(val(k,'raft_produced'))||0;return o-p;};
     const sumCancel=monthRows.reduce((a,r)=>a+((Number(r.raft_order)||0)-(Number(r.raft_produced)||0)),0);
     const periodLabel=view==='h1'?'1–15 '+M_TH[mon-1]:'เต็มเดือน '+M_TH[mon-1];
+    // เดือนที่ยังไม่กรอกถึงวันสุดท้าย รายงานรายเดือน (กราฟ/ชีท) นับแค่วันที่ 1–15
+    const monthDone=!!byDate[key(daysInMonth)];
+    const lateDays=allDays.filter(d=>d>15&&byDate[key(d)]).length;
+    const cutNotice=!monthDone&&lateDays>0;
 
     // มีคอลัมน์สาเหตุในฐานข้อมูลแล้วหรือยัง (ต้องรัน SQL เพิ่ม cancel_cause) — ยังไม่มีก็บันทึกช่องอื่นได้ตามปกติ
     const hasCauseCol=rows.some(r=>'cancel_cause' in r);
@@ -1170,6 +1183,11 @@ window.__dataReady.then(data => {
             background:'#1a56db',color:'#fff',cursor:saving?'default':'pointer'}}>
           {saving?'กำลังบันทึก…':'บันทึกเลย'}
         </button>
+      </div>}
+
+      {cutNotice&&<div style={{marginBottom:12,padding:'9px 14px',borderRadius:10,background:'#eff6ff',border:'1px solid #bfdbfe',fontSize:13.5,color:'#1e40af'}}>
+        ℹ️ กรอกถึงวันที่ {Math.max(...allDays.filter(d=>byDate[key(d)]))} แล้ว แต่ยอดรายเดือนในกราฟและชีท<b> นับแค่วันที่ 1–15 </b>
+        จนกว่าจะกรอกถึงวันที่ {daysInMonth} จึงจะนับทั้งเดือน (ตารางด้านล่างยังกรอกและดูได้ครบทุกวัน)
       </div>}
 
       {/* กรอกตัวเลขรายเดือนที่นี่ที่เดียว ไม่ต้องไปพิมพ์ในชีทอีก — ชีทดึงไปคำนวณ % ผลิต/ส่วนต่างสต็อค ต่อเอง */}

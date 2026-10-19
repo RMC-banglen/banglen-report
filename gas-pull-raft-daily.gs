@@ -38,10 +38,21 @@ function pullRaftFromDaily() {
 
   // รวมยอดรายเดือน — key = "ปีพ.ศ.-เดือน"
   var agg = {};
+
+  // เดือนที่ยังกรอกไม่ถึงวันสุดท้าย นับแค่วันที่ 1–15 (รอบรายงานครึ่งเดือน) — ครบเดือนแล้วค่อยนับทั้งเดือน
+  // กติกาเดียวกับแดชบอร์ด ชีทกับกราฟจะได้ตรงกัน
+  var complete = {};
+  daily.forEach(function (r) {
+    var q = String(r.d).split('-');
+    var y0 = Number(q[0]), m0 = Number(q[1]), d0 = Number(q[2]);
+    if (y0 && m0 && d0 === new Date(y0, m0, 0).getDate()) complete[y0 + '-' + m0] = true;
+  });
+
   daily.forEach(function (r) {
     var p = String(r.d).split('-');
-    var ce = Number(p[0]), mo = Number(p[1]);
+    var ce = Number(p[0]), mo = Number(p[1]), dd = Number(p[2]);
     if (!ce || !mo) return;
+    if (!complete[ce + '-' + mo] && dd > 15) return;
     var k = (ce + 543) + '-' + mo;
     var o = agg[k] || (agg[k] = { order: 0, produced: 0, cancel: 0, workDays: 0, holidays: 0, typed: false });
     o.order += Number(r.raft_order) || 0;
