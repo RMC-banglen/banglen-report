@@ -16,7 +16,10 @@
       "Bash(node chk.js \"D:\\\\claude AI\\\\Pro\\\\index.html\")",
       "Bash(node -e \"const http=require\\('http'\\),fs=require\\('fs'\\),p=require\\('path'\\);http.createServer\\(\\(q,s\\)=>{const u=q.url.split\\('?'\\)[0];const f=p.join\\(process.cwd\\(\\),u==='/'?'/index.html':u\\);try{const b=fs.readFileSync\\(f\\);s.writeHead\\(200,{'Content-Type':/\\\\.png$/.test\\(u\\)?'image/png':'text/html; charset=utf-8'}\\);s.end\\(b\\);}catch\\(e\\){s.writeHead\\(404\\);s.end\\(\\);}}\\).listen\\(8791\\);\")",
       "Bash(powershell -NoProfile -Command 'Get-NetTCPConnection -LocalPort 8791 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }')",
-      "Bash(git commit -q -m 'ภาพรวมการผลิต: แยกวันหยุดบริษัท ออกจากวันที่หยุดเอง *)"
+      "Bash(git commit -q -m 'ภาพรวมการผลิต: แยกวันหยุดบริษัท ออกจากวันที่หยุดเอง *)",
+      "Bash(node -e \"const http=require\\('http'\\),fs=require\\('fs'\\),p=require\\('path'\\);http.createServer\\(\\(q,s\\)=>{const u=q.url.split\\('?'\\)[0];const f=p.join\\(process.cwd\\(\\),u==='/'?'/index.html':u\\);try{s.writeHead\\(200,{'Content-Type':'text/html; charset=utf-8'}\\);s.end\\(fs.readFileSync\\(f\\)\\);}catch\\(e\\){s.writeHead\\(404\\);s.end\\(\\);}}\\).listen\\(8792\\);\")",
+      "Bash(powershell -NoProfile -Command 'Get-NetTCPConnection -LocalPort 8792 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }')",
+      "Bash(git commit -q -m 'ภาพรวมการผลิต: เตือนก่อน ไม่ให้ที่กรอกค้างหายตอนรีโหลด *)"
     ]
   }
 }

@@ -979,6 +979,13 @@ window.__dataReady.then(data => {
     };
     const setVal=(k,f,v)=>setDraft(d=>({...d,[k]:{...(d[k]||{}),[f]:v}}));
     const dirty=Object.keys(draft).length>0;
+    // กรอกค้างแล้วรีโหลด/ปิดแท็บ = หายหมดแบบเงียบๆ เคยเจอมาแล้ว ให้เบราว์เซอร์ถามก่อน
+    useEffect(()=>{
+      if(!dirty)return;
+      const h=e=>{e.preventDefault();e.returnValue='';};
+      window.addEventListener('beforeunload',h);
+      return()=>window.removeEventListener('beforeunload',h);
+    },[dirty]);
 
     // เวลา "16:59" → 16.98 ไว้หาค่าเฉลี่ย/วาดกราฟ
     const toHours=t=>{
@@ -1100,6 +1107,17 @@ window.__dataReady.then(data => {
 
       {msg&&<div style={{marginBottom:10,fontSize:14,color:msg.startsWith('✅')?'#059669':'#c0392b'}}>{msg}</div>}
 
+      {/* เตือนให้เห็นชัดๆ ว่ายังไม่ได้บันทึก ปุ่มบันทึกอยู่มุมขวาบน มองข้ามง่าย */}
+      {dirty&&canEdit&&<div style={{marginBottom:12,padding:'10px 14px',borderRadius:10,background:'#fffbeb',border:'1.5px solid #fcd34d',
+        display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',fontSize:14,color:'#92400e'}}>
+        <span>⚠️ แก้ไว้ {Object.keys(draft).length} วัน <b>ยังไม่ได้บันทึก</b> — ออกจากหน้านี้หรือรีโหลดแล้วจะหาย</span>
+        <button onClick={save} disabled={saving}
+          style={{padding:'7px 16px',borderRadius:8,border:'none',fontSize:14,fontWeight:700,fontFamily:'inherit',
+            background:'#1a56db',color:'#fff',cursor:saving?'default':'pointer'}}>
+          {saving?'กำลังบันทึก…':'บันทึกเลย'}
+        </button>
+      </div>}
+
       <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:14}}>
         {[['วันที่บันทึก',monthRows.length+' วัน','#1a56db',
             nHoliday||nSelfStop?'ใช้หาร % '+nWork+' วัน'+(nHoliday?' · หยุดบริษัท '+nHoliday:'')+(nSelfStop?' · หยุดเอง '+nSelfStop:''):null],
@@ -1163,7 +1181,8 @@ window.__dataReady.then(data => {
                 ))}
                 {/* ยกเลิก/ค้างเท = แพสั่งผลิต - แพผลิต คำนวณให้อัตโนมัติ ไม่ต้องพิมพ์เอง — เป็น 0 ไม่ต้องขึ้นแดง */}
                 <td style={{padding:'4px 6px',textAlign:'center',fontSize:13.5,fontWeight:cancel?700:400,color:cancel?'#c0392b':'inherit'}}>
-                  {has||edited?fmtN(cancel):'–'}
+                  {/* ยังไม่ได้กรอกยอดเลย (เช่น เพิ่งติ๊กว่าเป็นวันหยุด) ขึ้นขีด ไม่ใช่ 0 ที่ดูเหมือนกรอกแล้ว */}
+                  {(has||edited)&&!(val(k,'raft_order')===''&&val(k,'raft_produced')==='')?fmtN(cancel):'–'}
                   {/* มีแพค้าง -> เลือกสาเหตุ (นับเข้ากราฟ "สาเหตุจำนวนแพ ค้าง-ยกเลิก" บนแดชบอร์ดให้เอง) */}
                   {cancel>0&&(canEdit
                     ?<select value={val(k,'cancel_cause')} onChange={e=>setVal(k,'cancel_cause',e.target.value)}
