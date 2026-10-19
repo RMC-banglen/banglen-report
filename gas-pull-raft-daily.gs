@@ -63,7 +63,8 @@ function pullRaftFromDaily() {
     Logger.log('ข้ามตัวเลขรายเดือน: ' + mRes.getContentText());
   }
 
-  var sheet = SpreadsheetApp.openById(SS_MAIN_ID).getSheetByName('รายเดือน');
+  var ss = SpreadsheetApp.openById(SS_MAIN_ID);
+  var sheet = ss.getSheetByName('รายเดือน');
   if (!sheet) { Logger.log('ไม่พบชีท "รายเดือน"'); return; }
 
   var values = sheet.getDataRange().getValues();
@@ -104,6 +105,13 @@ function pullRaftFromDaily() {
       if (Math.abs(old - w[1]) > 0.001) { cell.setValue(w[1]); diff.push(values[0][w[0]] + ' ' + old + '→' + w[1]); }
     });
     if (diff.length) changed.push(yr + '/' + mo + ': ' + diff.join(' · '));
+  }
+
+  // สคริปต์เขียนชีทไม่ปลุก onEdit ช่อง % ผลิต/ส่วนต่างสต็อคเลยไม่คำนวณใหม่เอง
+  // สั่งคำนวณต่อให้ที่นี่ (ฟังก์ชันนี้อยู่ในไฟล์เดิม ไม่ต้องแก้) — พังก็ไม่ให้ลากการเติมตัวเลขล้มไปด้วย
+  if (changed.length) {
+    try { writeComputedColumns(ss); }
+    catch (e) { Logger.log('คำนวณ % ในชีทไม่สำเร็จ: ' + e.message); }
   }
 
   var msg = changed.length

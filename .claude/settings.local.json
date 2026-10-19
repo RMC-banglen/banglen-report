@@ -21,7 +21,10 @@
       "Bash(powershell -NoProfile -Command 'Get-NetTCPConnection -LocalPort 8792 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }')",
       "Bash(git commit -q -m 'ภาพรวมการผลิต: เตือนก่อน ไม่ให้ที่กรอกค้างหายตอนรีโหลด *)",
       "Bash(python -)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(cp gas-pull-raft-daily.gs /tmp/g.js)",
+      "Bash(node --check /tmp/g.js)",
+      "Bash(git commit -q -m 'สคริปต์ดึงยอดรายวัน: คำนวณ % ผลิต/ส่วนต่างสต็อคในชีทต่อเองหลังเติมตัวเลข *)"
     ]
   }
 }
