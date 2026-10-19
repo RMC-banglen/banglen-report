@@ -521,6 +521,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📊 Sync Dashboard')
     .addItem('🔄 Sync ทันที', 'syncAll')
+    .addItem('📥 ดึงยอดจากแดชบอร์ด', 'pullRaftFromDaily')
     .addItem('🔽 ตั้ง Dropdown ประเภท', 'setupTypeDropdowns')
     .addItem('👷 ตั้ง Dropdown ชื่อพนักงาน (เสาร้าว)', 'setupCrackWorkerDropdown')
     .addSeparator()
