@@ -951,7 +951,7 @@ window.__dataReady.then(data => {
   // หยุดเอง = โรงงานเปิดแต่ไม่ได้ผลิต (ไม่มีคิว/ตัดสินใจหยุด) ยังนับเป็นวันทำงาน ผลิต 0 ก็ต้องรับไป
   const DAY_TYPES=[['0','ผลิตปกติ','#334155'],['1','วันหยุดบริษัท','#0f766e'],['2','หยุดเอง','#c0392b']];
   const dayTypeOf=r=>String(r&&r.day_type!=null?r.day_type:0);
-  function PourDailySection({year,canEdit,avgQueuePerDay,avgQueueDays,avgQueueMonthNum}){
+  function PourDailySection({year,canEdit,monthlyList}){
     const db=DB;
     const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const [rows,setRows]=useState([]);
@@ -1066,6 +1066,15 @@ window.__dataReady.then(data => {
     const monthDone=!!byDate[key(daysInMonth)];
     const lateDays=allDays.filter(d=>d>15&&byDate[key(d)]).length;
     const cutNotice=!monthDone&&lateDays>0;
+    const qMonth=(monthlyList||[]).find(x=>x.m===mon);
+    const qTotal=qMonth&&qMonth.produced>0?qMonth.produced:0;
+    // วันผลิตจริงของรอบรายงาน (ใช้หารเฉลี่ยคิว) — ตัดทั้งหยุดบริษัทและหยุดเอง ต่างจากตัวหาร % ผลิตที่นับหยุดเอง
+    // เพราะเฉลี่ยคิวไว้เทียบกับเวลาเท ซึ่งมีเฉพาะวันที่ได้ผลิต
+    const prodDays=allDays.filter(d=>monthDone||d<=15).map(d=>key(d))
+      .filter(k=>(byDate[k]||draft[k])&&typeAt(k)==='0').length;
+    const qAvg=qTotal>0&&prodDays>0?qTotal/prodDays:null;
+    // ดูแบบเต็มเดือนแต่เดือนยังไม่ครบ: การ์ดคิวนับแค่ 1–15 ไม่ตรงกับช่วงที่ตารางกำลังโชว์ บอกให้ชัด
+    const qNote=cutNotice&&view==='all'?' · นับแค่ 1–15 ไม่ตรงกับช่วงที่ดูอยู่ (กดปุ่ม 1–15 เพื่อเทียบ)':'';
 
     // มีคอลัมน์สาเหตุในฐานข้อมูลแล้วหรือยัง (ต้องรัน SQL เพิ่ม cancel_cause) — ยังไม่มีก็บันทึกช่องอื่นได้ตามปกติ
     const hasCauseCol=rows.some(r=>'cancel_cause' in r);
@@ -1221,10 +1230,12 @@ window.__dataReady.then(data => {
           ['เวลาเทเสร็จเฉลี่ย',hhmm(avgTime),'#7c3aed'],
           ['แพผลิตรวม',fmtN(sumOf('raft_produced'))+' แพ','#0f766e'],
           ['แพค้างเท/ยกเลิก',fmtN(sumCancel)+' แพ','#d97706'],
-          // เทียบกับ "เฉลี่ยคิว/วัน (เดือนล่าสุด)" ได้ก็ต่อเมื่อจำนวนวันที่กำลังดูอยู่ในตารางนี้ ตรงกับ
-          // จำนวนวันผลิตที่ใช้คิดค่าเฉลี่ยนั้นเป๊ะ (กันเทียบมั่ว เช่น กด "ทุกวัน" ทั้งเดือนแต่ค่าเฉลี่ยคิดจากไม่กี่วัน)
-          ...(avgQueueDays!=null&&mon===avgQueueMonthNum&&shownDays.length===avgQueueDays
-            ?[['เฉลี่ยคิว/วัน (เดือนล่าสุด)',fmtN(avgQueuePerDay)+' m³','#7b61c4']]:[])
+          // คิวผลิตจริงรวมของเดือน วางคู่กับเวลาเทเสร็จ ไว้ดูว่าเดือนที่ผลิตเยอะ เทเสร็จช้าลงแค่ไหน
+          // ใช้ตัวเลขเดียวกับกราฟและชีท (รอบรายงาน: ยังไม่ครบเดือนนับถึงวันที่ 15)
+          ['คิวผลิตจริงรวม',qTotal>0?fmtN(qTotal,0)+' m³':'–','#2f5fd0',
+            qTotal>0?'รอบรายงาน '+(monthDone?'เต็มเดือน':'1–15')+qNote:'ยังไม่มีคิวผลิตจริงของเดือนนี้ — กรอกช่องด้านบน'],
+          ['เฉลี่ยคิว/วันผลิต',qAvg!=null?fmtN(qAvg,1)+' m³':'–','#7b61c4',
+            qAvg!=null?fmtN(qTotal,0)+' ÷ '+prodDays+' วันผลิต (ไม่นับหยุดบริษัท/หยุดเอง)'+qNote:'ต้องมีคิวผลิตจริงและวันผลิต'],
           ].map(([l,v,c,sub])=>(
           <div key={l} style={{flex:'1 1 140px',border:'1px solid #e6e8ee',borderRadius:12,padding:'11px 15px'}}>
             <div style={{fontSize:12.5,color:'#5f6470',marginBottom:3}}>{l}</div>
@@ -1370,7 +1381,7 @@ window.__dataReady.then(data => {
       {/* ส่งเฉลี่ยคิว/วัน(เดือนล่าสุด)+จำนวนวันผลิตที่ใช้คิดเฉลี่ยลงไปด้วย เพื่อเทียบกับตารางเทเสร็จรายวัน
           — เทียบได้ก็ต่อเมื่อ "จำนวนวันที่กำลังดูอยู่" ในตารางเทเสร็จ ตรงกับจำนวนวันผลิตนี้เป๊ะ (กันเทียบมั่ว เช่น
           ดู "ทุกวัน" ทั้งเดือนแต่จำนวนวันผลิตจริงมีแค่บางวัน) */}
-      <PourDailySection year={year} canEdit={canEdit} avgQueuePerDay={apd} avgQueueDays={lm.days} avgQueueMonthNum={lm.m}/>
+      <PourDailySection year={year} canEdit={canEdit} monthlyList={yd.months}/>
       <StockStatusCard current={latestStock} prev={stock.length>1?stock[stock.length-2]:null} label={cats[cats.length-1]} year={year} stockDiff={stockDiff[stockDiff.length-1]} stockDiffMonths={null}/>
       <ChartCard title="สต็อคคิวคงเหลือรายเดือน" subtitle="ปริมาณคงเหลือปลายเดือน (m³)">
         <LineChart categories={cats} unit="m³" area showValues series={[{label:'สต็อคคงเหลือ',color:PALETTE.stock,data:stock}]} height={260}/>
