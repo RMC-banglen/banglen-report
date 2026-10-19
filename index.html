@@ -417,8 +417,12 @@ window.__dataReady = (async function loadData() {
     (pRes && !pRes.error ? pRes.data || [] : []).forEach(r => {
       const [gy, gm] = String(r.d).split('-').map(Number); if (!gy || !gm) return;
       const k = (gy + 543) + '-' + gm;
-      const o = pourMonth[k] || (pourMonth[k] = { order:0, produced:0, cancel:0 });
+      const o = pourMonth[k] || (pourMonth[k] = { order:0, produced:0, cancel:0, workDays:0, holidays:0, typed:false });
       o.order += Number(r.raft_order) || 0; o.produced += Number(r.raft_produced) || 0; o.cancel += Number(r.raft_cancel) || 0;
+      // ตัวหารของ % ผลิตได้จริง: วันหยุดบริษัทไม่นับ · หยุดเองนับ (โรงงานเปิดแต่ไม่ได้ผลิต)
+      const dt = Number(r.day_type) || 0;
+      if (dt !== 0) o.typed = true;
+      if (dt === 1) o.holidays += 1; else o.workDays += 1;
       // สาเหตุที่เลือกรายวัน: นับตามจำนวนแพค้างของวันนั้น
       const c = Number(r.raft_cancel) || 0;
       if (c > 0 && r.cancel_cause != null && r.cancel_cause !== '') {
@@ -442,7 +446,11 @@ window.__dataReady = (async function loadData() {
       const pd = pourMonth[y + '-' + r.month];
       yearGroups[y].months.push({
         m:r.month, order:+r.order_qty, produced:+r.produced, cancel:+r.cancel,
-        days:r.days, perDay:+r.per_day, transport:+r.transport, stock:+r.stock,
+        // เดือนที่เริ่มระบุประเภทวันแล้ว ใช้วันทำงานจากรายงานรายวัน (ตัดวันหยุดบริษัทออก นับวันหยุดเอง)
+        // เดือนที่ยังไม่ได้ระบุ ใช้ "วันที่มีผลิต" จากชีทรายเดือนเหมือนเดิม ตัวเลขเก่าไม่ขยับเอง
+        days:(pd && pd.typed && pd.workDays>0) ? pd.workDays : r.days,
+        daysFromDaily:!!(pd && pd.typed && pd.workDays>0), holidays:pd?pd.holidays:0,
+        perDay:+r.per_day, transport:+r.transport, stock:+r.stock,
         raftOrder:pd ? pd.order : +r.raft_order, raftProduced:pd ? pd.produced : +r.raft_produced, raftCancel:pd ? pd.cancel : +r.raft_cancel,
         raftFromDaily: !!pd,
       });
@@ -915,6 +923,11 @@ window.__dataReady.then(data => {
   // ── รายงานการผลิต–เวลาเทเสร็จ (รายวัน) กรอกในตารางได้เลยทีละช่อง
   // สาเหตุแพค้าง ลำดับตรงกับชีท "สาเหตุค้าง" (cause_index 0–9)
   const POUR_CAUSES=['แพล้นเสีย','ที่ดึงหินทรายเสีย','เครนเสีย','รถไฟขนเสาเข็มเสีย','รถไฟขนคอนกรีตเสีย','รถขนส่งเข้าเยอะ','ผู้รับเหมาผลิตไม่ได้','สต็อคเต็ม','ซ่อมแพผลิต','ฝ่ายผลิตยกเลิกเอง'];
+  // ประเภทวัน — ตัวหารของ % ผลิตได้จริง
+  // หยุดบริษัท = โรงงานปิด ไม่ใช่ความผิดของการผลิต ตัดออกจากตัวหาร
+  // หยุดเอง = โรงงานเปิดแต่ไม่ได้ผลิต (ไม่มีคิว/ตัดสินใจหยุด) ยังนับเป็นวันทำงาน ผลิต 0 ก็ต้องรับไป
+  const DAY_TYPES=[['0','ผลิตปกติ','#334155'],['1','วันหยุดบริษัท','#0f766e'],['2','หยุดเอง','#c0392b']];
+  const dayTypeOf=r=>String(r&&r.day_type!=null?r.day_type:0);
   function PourDailySection({year,canEdit,avgQueuePerDay,avgQueueDays,avgQueueMonthNum}){
     const db=DB;
     const M_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -989,6 +1002,14 @@ window.__dataReady.then(data => {
     const hhmm=h=>h==null?'–':pad(Math.floor(h))+':'+pad(Math.round((h-Math.floor(h))*60));
 
     const monthRows=allDays.map(d=>byDate[key(d)]).filter(Boolean);
+    // วันทำงานที่ใช้เป็นตัวหารของ % ผลิตได้จริง = วันที่กรอกทั้งหมด ลบวันหยุดบริษัท
+    // นับรวมช่องที่เพิ่งแก้แต่ยังไม่บันทึกด้วย จะได้เห็นผลทันทีตอนเลือก ไม่ต้องกดบันทึกก่อนถึงจะรู้
+    const dayKeys=allDays.map(d=>key(d)).filter(k=>byDate[k]||draft[k]);
+    const typeAt=k=>{const v=draft[k]&&draft[k].day_type!==undefined?draft[k].day_type:(byDate[k]||{}).day_type;
+      return String(v==null||v===''?0:v);};
+    const nHoliday=dayKeys.filter(k=>typeAt(k)==='1').length;
+    const nSelfStop=dayKeys.filter(k=>typeAt(k)==='2').length;
+    const nWork=dayKeys.length-nHoliday;
     const times=monthRows.map(r=>toHours(r.finish_time)).filter(v=>v!=null);
     const avgTime=times.length?times.reduce((a,b)=>a+b,0)/times.length:null;
     const sumOf=f=>monthRows.reduce((a,r)=>a+(Number(r[f])||0),0);
@@ -998,6 +1019,7 @@ window.__dataReady.then(data => {
 
     // มีคอลัมน์สาเหตุในฐานข้อมูลแล้วหรือยัง (ต้องรัน SQL เพิ่ม cancel_cause) — ยังไม่มีก็บันทึกช่องอื่นได้ตามปกติ
     const hasCauseCol=rows.some(r=>'cancel_cause' in r);
+    const hasDayTypeCol=rows.some(r=>'day_type' in r);
     const save=()=>{
       const recs=Object.keys(draft).map(k=>{
         const cur=byDate[k]||{};
@@ -1012,13 +1034,19 @@ window.__dataReady.then(data => {
           const c=g('cancel_cause');
           rec.cancel_cause=rec.raft_cancel>0&&c!==''&&c!=null?Number(c):null;
         }
+        if(hasDayTypeCol||draft[k].day_type!==undefined){
+          const t=Number(g('day_type'))||0;
+          rec.day_type=t;
+        }
         return rec;
       });
       if(!recs.length) return;
       setSaving(true);setMsg('');
       db.from('pour_daily').upsert(recs,{onConflict:'d'}).then(({error})=>{
         setSaving(false);
-        if(error){setMsg('❌ '+error.message+(/cancel_cause/.test(error.message)?' — ต้องรัน SQL เพิ่มคอลัมน์สาเหตุก่อน: alter table pour_daily add column if not exists cancel_cause smallint;':''));return;}
+        if(error){setMsg('❌ '+error.message
+          +(/cancel_cause/.test(error.message)?' — ต้องรัน SQL เพิ่มคอลัมน์สาเหตุก่อน: alter table pour_daily add column if not exists cancel_cause smallint;':'')
+          +(/day_type/.test(error.message)?' — ต้องรันไฟล์ supabase-pour-daytype.sql ก่อน':''));return;}
         setDraft({});setMsg('✅ บันทึกแล้ว '+recs.length+' วัน');load();
         setTimeout(()=>setMsg(''),4000);
       }).catch(e=>{setSaving(false);setMsg('❌ '+(e.message||e));});
@@ -1073,7 +1101,8 @@ window.__dataReady.then(data => {
       {msg&&<div style={{marginBottom:10,fontSize:14,color:msg.startsWith('✅')?'#059669':'#c0392b'}}>{msg}</div>}
 
       <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:14}}>
-        {[['วันที่บันทึก',monthRows.length+' วัน','#1a56db'],
+        {[['วันที่บันทึก',monthRows.length+' วัน','#1a56db',
+            nHoliday||nSelfStop?'ใช้หาร % '+nWork+' วัน'+(nHoliday?' · หยุดบริษัท '+nHoliday:'')+(nSelfStop?' · หยุดเอง '+nSelfStop:''):null],
           ['เวลาเทเสร็จเฉลี่ย',hhmm(avgTime),'#7c3aed'],
           ['แพผลิตรวม',fmtN(sumOf('raft_produced'))+' แพ','#0f766e'],
           ['แพค้างเท/ยกเลิก',fmtN(sumCancel)+' แพ','#d97706'],
@@ -1081,10 +1110,11 @@ window.__dataReady.then(data => {
           // จำนวนวันผลิตที่ใช้คิดค่าเฉลี่ยนั้นเป๊ะ (กันเทียบมั่ว เช่น กด "ทุกวัน" ทั้งเดือนแต่ค่าเฉลี่ยคิดจากไม่กี่วัน)
           ...(avgQueueDays!=null&&mon===avgQueueMonthNum&&shownDays.length===avgQueueDays
             ?[['เฉลี่ยคิว/วัน (เดือนล่าสุด)',fmtN(avgQueuePerDay)+' m³','#7b61c4']]:[])
-          ].map(([l,v,c])=>(
+          ].map(([l,v,c,sub])=>(
           <div key={l} style={{flex:'1 1 140px',border:'1px solid #e6e8ee',borderRadius:12,padding:'11px 15px'}}>
             <div style={{fontSize:12.5,color:'#5f6470',marginBottom:3}}>{l}</div>
             <div style={{fontSize:21,fontWeight:800,color:c,lineHeight:1.2}}>{v}</div>
+            {sub&&<div style={{fontSize:11.5,color:'#78839A',marginTop:3}}>{sub}</div>}
           </div>
         ))}
       </div>
@@ -1093,6 +1123,7 @@ window.__dataReady.then(data => {
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr style={{background:'#f4f6fa'}}>
             <th style={{...th,textAlign:'left'}}>วันที่</th>
+            <th style={th}>ประเภทวัน</th>
             <th style={th}>แพสั่งผลิต</th><th style={th}>แพผลิต</th><th style={th}>ยกเลิก/ค้างเท</th>
             <th style={th}>เวลาเทเสร็จ</th>
             <th style={{...th,textAlign:'left',minWidth:260}}>รายงานการผลิตที่ไม่เป็นไปตามกำหนด</th>
@@ -1104,12 +1135,25 @@ window.__dataReady.then(data => {
               const isToday=k===todayKey, edited=!!draft[k], has=!!byDate[k];
               const missed=!has&&!edited&&!isToday&&k<todayKey;   // วันผ่านไปแล้วแต่ยังไม่ได้กรอก
               const cancel=cancelOf(k);
+              const dt=val(k,'day_type')===''?'0':String(val(k,'day_type'));
+              const isHoliday=dt==='1';
               return <tr key={k} style={{borderBottom:'1px solid #eef0f5',
-                background:edited?'#fffbeb':isToday?'#f0f9ff':missed?'#fdf6f6':'transparent'}}>
+                background:edited?'#fffbeb':isHoliday?'#f0fdfa':isToday?'#f0f9ff':missed?'#fdf6f6':'transparent'}}>
                 <td style={{padding:'6px 8px',fontSize:13.5,fontWeight:700,whiteSpace:'nowrap'}}>
                   {d}/{mon}/{year}
                   {isToday&&<span style={{marginLeft:6,fontSize:11,color:'#1a56db'}}>วันนี้</span>}
                   {missed&&<span style={{marginLeft:6,fontSize:11,color:'#c0392b'}}>ยังไม่กรอก</span>}
+                </td>
+                <td style={{padding:'4px 6px',textAlign:'center'}}>
+                  {canEdit
+                    ?<select value={dt} onChange={e=>setVal(k,'day_type',e.target.value)}
+                        style={{padding:'4px 6px',borderRadius:6,fontSize:12.5,fontFamily:'inherit',background:'#fff',
+                          border:'1px solid '+(dt==='0'?'#d6d8e0':dt==='1'?'#99f6e4':'#f5b7b1'),
+                          color:(DAY_TYPES.find(t=>t[0]===dt)||[])[2],fontWeight:dt==='0'?400:700}}>
+                        {DAY_TYPES.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                      </select>
+                    :<span style={{fontSize:12.5,color:(DAY_TYPES.find(t=>t[0]===dt)||[])[2],fontWeight:dt==='0'?400:700}}>
+                        {(DAY_TYPES.find(t=>t[0]===dt)||[])[1]}</span>}
                 </td>
                 {[['raft_order',62],['raft_produced',62]].map(([f,w])=>(
                   <td key={f} style={{padding:'4px 6px',textAlign:'center'}}>
@@ -1148,7 +1192,7 @@ window.__dataReady.then(data => {
                 </td>}
               </tr>;
             })}
-            {!shownDays.length&&<tr><td colSpan={canEdit?7:6} style={{padding:18,textAlign:'center',color:'#94a3b8',fontSize:14}}>
+            {!shownDays.length&&<tr><td colSpan={canEdit?8:7} style={{padding:18,textAlign:'center',color:'#94a3b8',fontSize:14}}>
               ยังไม่มีข้อมูลเดือนนี้ — กด “1–15” หรือ “ทุกวัน” เพื่อเริ่มกรอก
             </td></tr>}
           </tbody>
@@ -1160,6 +1204,12 @@ window.__dataReady.then(data => {
         ช่องที่แก้แล้วยังไม่บันทึกจะเป็น<span style={{background:'#fffbeb',padding:'1px 5px',borderRadius:4}}>พื้นเหลือง</span> ·
         ช่องเวลาพิมพ์ตัวเลขติดกันได้เลย เช่น <b>1658</b> → กด Enter หรือคลิกออกจะกลายเป็น <b>16:58</b> เอง ·
         <b style={{color:'#c0392b'}}>ยกเลิก/ค้างเท</b> คำนวณอัตโนมัติจาก แพสั่งผลิต − แพผลิต ไม่ต้องกรอกเอง
+        <div style={{marginTop:6}}>
+          <b>ประเภทวัน</b> มีผลกับ % ผลิตได้จริง ·
+          <b style={{color:'#0f766e'}}> วันหยุดบริษัท</b> โรงงานปิด ตัดออกจากตัวหาร ไม่ทำให้ % ตก ·
+          <b style={{color:'#c0392b'}}> หยุดเอง</b> โรงงานเปิดแต่ไม่ได้ผลิต (ไม่มีคิว/ตัดสินใจหยุด) ยังนับเป็นวันทำงาน ผลิต 0 แล้ว % ตกตามจริง ·
+          เดือนที่ยังไม่ได้ระบุประเภทวันเลย ใช้จำนวนวันผลิตจากชีทรายเดือนเหมือนเดิม
+        </div>
       </div>
     </ChartCard>;
   }
