@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-16b';
+var APP_VERSION='2026-10-20a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -4827,6 +4827,10 @@ window.__dataReady.then(data => {
       }).catch(e=>{setSyncMsg('❌ ดึงข้อมูลไม่ได้: '+e.message);setSyncing(false);});
     };
 
+    // ค่าแอมป์เฉพาะรอบที่ QC เก็บก้อนลูกปูน (ติ๊กจากหน้า plant.html) — เอามาเทียบกับกำลังอัดใต้กราฟ (ค่าแอมป์ระหว่างวันอื่นไม่เกี่ยว)
+    const [cubeAmp,setCubeAmp]=useState([]);
+    useEffect(()=>{DB.from('plant_amp_readings').select('d,formula,amp,read_at').eq('for_cube',true).order('d').limit(2000)
+      .then(({data,error})=>setCubeAmp(error?[]:(data||[]))).catch(()=>setCubeAmp([]));},[]);
     useEffect(()=>{ loadFromSupabase(); },[]);
 
     if(loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
@@ -4890,6 +4894,15 @@ window.__dataReady.then(data => {
           })
         });
       });
+    });
+
+    // แอมป์รอบเก็บก้อน ต่อ (วันเก็บ × สูตร) — หลายรอบในวันเดียวกันใช้ค่าเฉลี่ย · สี/รูปเดียวกับเส้นกำลังอัดของสูตรนั้น
+    const nf=s=>String(s||'').trim().toUpperCase();
+    const c1AmpSeries=activeForms.filter(f=>cubeAmp.some(a=>nf(a.formula)===nf(f)&&c1Dates.includes(String(a.d).slice(0,10)))).map(f=>{
+      const st=c1Style[f+'|'+activeAges[0]]||{};
+      return{label:f+' แอมป์',color:st.color||'#0f766e',shape:st.shape,
+        data:c1Dates.map(d=>{const v=cubeAmp.filter(a=>String(a.d).slice(0,10)===d&&nf(a.formula)===nf(f)).map(a=>Number(a.amp)).filter(x=>x>0);
+          return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length*10)/10:null;})};
     });
 
     // chart 2 — dynamic ages: base [1,3,5,7], add 9 if any formula has day9 on that date
@@ -5077,6 +5090,17 @@ window.__dataReady.then(data => {
               </span>)}
             </div>
             <LineChart categories={c1Dates.map(shortDate)} unit="KSC" decimals={0} showValues boxedLabels series={c1Series.filter(s=>s.data.some(v=>v!=null))} targets={c1Targets} dangerBelow={c1Danger} height={320}/>
+            {/* แอมป์รอบที่เก็บก้อน — แกนวันที่เดียวกับกราฟด้านบน (จัดขอบให้ตรงกัน) เทียบกำลังอัดกับแอมป์ของก้อนเดียวกันได้ */}
+            {(()=>{
+              const tMax=c1Targets.reduce((mx,t)=>{if(!t.label)return mx;return Math.max(mx,`${t.label} ${fmt(t.value,0)}`.length);},0);
+              const rPad=c1Targets.length?Math.max(130,tMax*7+18):52;
+              return <div style={{marginTop:4,borderTop:'1px dashed #cbd5e1',paddingTop:8}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#0f766e',marginLeft:62}}>⚡ ค่าแอมป์ <span style={{fontWeight:400,color:'#64748b'}}>เฉพาะรอบที่ QC เก็บก้อนลูกปูน (ตรงกับวันเก็บด้านบน) · หน่วย A</span></div>
+                {c1AmpSeries.length>0
+                  ?<LineChart categories={c1Dates.map(shortDate)} unit="A" decimals={1} showValues series={c1AmpSeries} height={170} padRight={rPad}/>
+                  :<div style={{fontSize:12.5,color:'#94a3b8',margin:'8px 0 4px 62px'}}>ยังไม่มีค่าแอมป์ที่ติ๊ก "🧱 รอบนี้ QC เก็บก้อนลูกปูน" ในช่วง/สูตรที่เลือก — ให้คนแพล้นท์ติ๊กตอนถ่ายมิเตอร์ในรอบที่ QC มาเก็บก้อน (หรือ QC ติ๊กย้อนหลังในตารางแอมป์)</div>}
+              </div>;
+            })()}
           </>
         }
       </div>
@@ -5317,6 +5341,9 @@ window.__dataReady.then(data => {
     });
     const moistPts=list.filter(r=>r.sand_moisture_pct!=null).map(r=>({x:Number(r.sand_moisture_pct),y:Number(r.amp),color:out(r)?'#ef4444':'#0f766e',tip:sd(String(r.d))+' '+r.formula+' · ความชื้น '+Number(r.sand_moisture_pct).toFixed(2)+'% · '+r.amp+' A'}));
     const recent=[...list].reverse().slice(0,15);
+    // รอบที่ QC เก็บก้อนลูกปูน (for_cube) — คนแพล้นท์ติ๊กตอนถ่าย · QC ติ๊ก/ยกเลิกย้อนหลังได้ที่นี่ · ค่าชุดนี้ขึ้นเทียบในกราฟกำลังอัด
+    const toggleCube=async r=>{const{error}=await DB.from('plant_amp_readings').update({for_cube:!r.for_cube}).eq('id',r.id);
+      if(error){alert('บันทึกไม่ได้: '+(/for_cube/.test(error.message)?'ยังไม่ได้รัน supabase-plant-amp-cube.sql':error.message));return;}load();};
     const allAvg=avg(list.map(r=>Number(r.amp)));
     const btn={padding:'5px 11px',borderRadius:6,border:'1px solid #d6d8e0',background:'#fff',cursor:'pointer',fontSize:12.5,color:'#475569'};
     const plantUrl=location.origin+location.pathname.replace(/[^/]*$/,'')+'plant.html';
@@ -5361,7 +5388,7 @@ window.__dataReady.then(data => {
         <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',margin:'16px 0 6px'}}>รอบล่าสุด</div>
         <div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
-            <thead><tr style={{background:'#f4f6fa',color:'#475569'}}>{['วันที่','เวลา','สูตร','แอมป์','ความชื้นทราย','น้ำที่เติม','หมายเหตุ'].map((h,i)=><th key={h} style={{padding:'6px 10px',textAlign:i>=3&&i<=5?'right':'left',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+            <thead><tr style={{background:'#f4f6fa',color:'#475569'}}>{['วันที่','เวลา','สูตร','แอมป์','ความชื้นทราย','น้ำที่เติม','หมายเหตุ','🧱 เก็บก้อน'].map((h,i)=><th key={h} style={{padding:'6px 10px',textAlign:i>=3&&i<=5?'right':'left',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
             <tbody>{recent.map(r=><tr key={r.id} style={{borderTop:'1px solid #f1f3f7',background:out(r)?'#fef2f2':undefined}}>
               <td style={{padding:'5px 10px'}}>{sd(String(r.d))}</td>
               <td style={{padding:'5px 10px'}}>{new Date(r.read_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'})}</td>
@@ -5374,6 +5401,7 @@ window.__dataReady.then(data => {
                 fontWeight:Number(r.water_l)>0?800:400,color:Number(r.water_l)>0?'#b45309':'#1f2937'}}>
                 {Number(r.water_l)>0?'+'+r.water_l+' ล.':r.water_l!=null?'0':'–'}</td>
               <td style={{padding:'5px 10px',color:'#64748b'}}>{r.note||''}</td>
+              <td style={{padding:'5px 10px',textAlign:'center'}}><input type="checkbox" checked={!!r.for_cube} disabled={!canEdit} onChange={()=>toggleCube(r)} title="รอบที่ QC เก็บก้อนลูกปูน — ใช้เทียบกับกำลังอัด" style={{width:17,height:17,accentColor:'#0f766e',cursor:canEdit?'pointer':'default'}}/></td>
             </tr>)}</tbody>
           </table>
         </div>

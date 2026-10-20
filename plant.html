@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-07e';
+var APP_VERSION='2026-10-20a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -138,6 +138,7 @@ function App(){
   const[water,setWater]=useState('');
   const[time,setTime]=useState(nowHHMM());
   const[note,setNote]=useState('');
+  const[forCube,setForCube]=useState(false);   // รอบนี้ QC เก็บก้อนลูกปูน → ค่านี้ขึ้นเทียบกับกำลังอัดในแดชบอร์ด
   const[moist,setMoist]=useState(null);       // ผลความชื้นทรายล่าสุดวันนี้จาก QC
   const[spec,setSpec]=useState({});
   // สูตรคอนกรีต ใช้บอกว่าสูตรที่เลือกตั้งน้ำไว้เท่าไหร่ จะได้รู้ว่า "เติมเพิ่ม" คือเพิ่มจากอะไร
@@ -190,10 +191,10 @@ function App(){
     // อ่านไม่ชัด → ติดป้ายในหมายเหตุ ให้ QC รู้ว่าค่านี้ควรตรวจซ้ำ
     const tag=sure===false?'[รูปไม่ชัด] ':'';
     const rec={d,read_at:at.toISOString(),formula,amp:ampN,water_l:water!==''?Number(water):null,
-      sand_moisture_pct:moist,note:(tag+(note||'')).trim()||null};
+      sand_moisture_pct:moist,note:(tag+(note||'')).trim()||null,...(forCube?{for_cube:true}:{})};
     const{error}=await SB.from('plant_amp_readings').insert([rec]);
     setSaving(false);
-    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
+    if(error){setErr('บันทึกไม่สำเร็จ: '+error.message+(/for_cube/.test(error.message)?' (แจ้งผู้ดูแลระบบ: ยังไม่ได้รัน SQL ช่อง เก็บก้อน)':''));return;}
     try{localStorage.setItem('plant_formula',formula);}catch(e){}
     const round=today.length+1;
     // ให้ GAS ส่ง Telegram เข้ากลุ่ม QC (หน้านี้ไม่มีโทเคน) — คนแพล้นท์ไม่ได้อยู่ในกลุ่มนั้น
@@ -210,7 +211,7 @@ function App(){
         sand_moisture_pct:moist,note:note||''})});}catch(e){}
     }
     setMsg('✅ บันทึกรอบที่ '+round+' แล้ว — '+formula+' · '+ampN+' A'+(outLow||outHigh?' (นอกช่วงปกติ แจ้ง QC แล้ว)':''));
-    setImg(null);setAmp('');setSure(null);setOthers([]);setWater('');setNote('');setTime(nowHHMM());
+    setImg(null);setAmp('');setSure(null);setOthers([]);setWater('');setNote('');setForCube(false);setTime(nowHHMM());
     loadToday();window.scrollTo({top:0,behavior:'smooth'});
   };
 
@@ -310,13 +311,19 @@ function App(){
 
       <div className="card">
         {err&&<div className="err">{err}</div>}
+        <label style={{display:'flex',gap:12,alignItems:'center',padding:'12px 14px',borderRadius:12,border:'2px solid '+(forCube?'#0f766e':'#d3dcdb'),background:forCube?'#ecfdf5':'#fff',cursor:'pointer',marginBottom:12}}>
+          <input type="checkbox" checked={forCube} onChange={e=>setForCube(e.target.checked)} style={{width:28,height:28,flexShrink:0,accentColor:'#0f766e'}}/>
+          <span><b style={{fontSize:16}}>🧱 รอบนี้ QC เก็บก้อนลูกปูน</b><br/><span style={{fontSize:12.5,color:'#6b7a78'}}>ติ๊กเฉพาะรอบที่ QC มาเก็บตัวอย่างก้อน — ค่าแอมป์รอบนี้จะขึ้นเทียบกับกำลังอัดในแดชบอร์ด (รอบอื่นไม่ต้องติ๊ก)</span></span>
+        </label>
         <button className="bigbtn" disabled={saving||reading} onClick={save}>{saving?'กำลังบันทึก…':'💾 บันทึกรอบที่ '+(today.length+1)}</button>
       </div>
 
       {today.length>0&&<div className="card">
         <div className="card-title">วันนี้ ({today.length} รอบ)</div>
         {[...today].reverse().map((r,i)=><div className="row" key={r.id}>
-          <span><b>รอบ {today.length-i}</b> · {hhmm(r.read_at)} · {r.formula}</span>
+          <span><b>รอบ {today.length-i}</b> · {hhmm(r.read_at)} · {r.formula}
+            <button onClick={async()=>{const{error}=await SB.from('plant_amp_readings').update({for_cube:!r.for_cube}).eq('id',r.id);if(error){setErr('แก้ไม่ได้: '+error.message);return;}loadToday();}}
+              style={{marginLeft:8,padding:'2px 8px',borderRadius:99,border:'1px solid '+(r.for_cube?'#0f766e':'#d3dcdb'),background:r.for_cube?'#ecfdf5':'#fff',color:r.for_cube?'#0f766e':'#9aa8a6',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>🧱 {r.for_cube?'เก็บก้อน':'ไม่เก็บ'}</button></span>
           <span style={{display:'flex',alignItems:'center',gap:10}}>
             <b style={{fontSize:18,color:(lo!=null&&r.amp<lo)||(hi!=null&&r.amp>hi)?'#c0392b':'#0f766e'}}>{Number(r.amp)} A</b>
             <button onClick={()=>del(r)} style={{border:'none',background:'none',color:'#c0392b',fontSize:18,cursor:'pointer'}}>✕</button>
