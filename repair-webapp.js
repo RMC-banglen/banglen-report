@@ -615,7 +615,7 @@ var PileParse = (function () {
     });
     function step(l) { let m;
       const setLast = (k, v) => { if (d.items.length) d.items[d.items.length - 1][k] = v; else pend[k] = v; };
-      if (/^(สล|สลัก|เหล็กเดือย|dowel)/i.test(l) && (m = l.match(/(\d+)\s*-?\s*(DB|RB)\s*(\d+)\s*(?:mm\.?)?\s*(?:[x×*]\s*(\d+(?:\.\d+)?))?/i))) { setLast('dowel', `${m[1]}${m[2].toUpperCase()}${m[3]}${m[4] ? '×' + parseFloat(m[4]).toFixed(2) + ' ม.' : ''}`); return; }
+      if (/^(สล|สลัก|เหล็กเดือย|เสริมเหล็ก|เสริม|dowel)/i.test(l) && (m = l.match(/(\d+)\s*-?\s*(DB|RB)\s*(\d+)\s*(?:mm\.?)?\s*(?:[x×*]\s*(\d+(?:\.\d+)?))?/i))) { setLast('dowel', `${m[1]}${m[2].toUpperCase()}${m[3]}${m[4] ? '×' + parseFloat(m[4]).toFixed(2) + ' ม.' : ''}`); return; }
       if ((m = l.match(/ตุ้ม\D*?(\d+(?:\.\d+)?)/))) { setLast('hammer', m[1]); return; }
       if (/^(ยก|ระยะยก)/.test(l) && (m = l.match(/(\d+(?:\.\d+)?)/))) { setLast('drop', m[1]); return; }
       if (/^Qa/i.test(l) && (m = l.match(/Qa\.?\s*[=:]?\s*(\d+(?:\.\d+)?)/i))) { setLast('qa', m[1]); return; }
