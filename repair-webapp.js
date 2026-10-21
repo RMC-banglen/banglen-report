@@ -322,16 +322,28 @@ var PILE_MSG = {
   cancel:   ['🚫', 'ยกเลิกงาน', function () { return ''; }]
 };
 var PILE_STL = { received: 'รับคำขอแล้ว', drawn: 'เขียนแบบ/คำนวณเสร็จ', sent: 'ส่ง zip ให้ สย. แล้ว', pdf_back: 'ได้ PDF กลับแล้ว', pdf_ok: 'ตรวจ PDF ผ่าน', revise: 'ส่งแก้กลับ สย.', original: 'ได้เอกสารตัวจริงแล้ว', cancel: 'ยกเลิก' };
-function sendPile(text, replyTo) {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_PILE) { Logger.log('ยังไม่ได้ใส่ TELEGRAM_TOKEN / TELEGRAM_CHAT_PILE'); return; }
-  var body = { chat_id: TELEGRAM_CHAT_PILE, text: text, parse_mode: 'HTML', disable_web_page_preview: true };
+function pileChat() {
+  return PropertiesService.getScriptProperties().getProperty('PILE_CHAT_ID') || TELEGRAM_CHAT_PILE;
+}
+function sendPile(text, replyTo, retried) {
+  var chat = pileChat();
+  if (!TELEGRAM_TOKEN || !chat) { Logger.log('ยังไม่ได้ใส่ TELEGRAM_TOKEN / TELEGRAM_CHAT_PILE'); return; }
+  var body = { chat_id: chat, text: text, parse_mode: 'HTML', disable_web_page_preview: true };
   if (replyTo) { body.reply_to_message_id = replyTo; body.allow_sending_without_reply = true; }
-  UrlFetchApp.fetch('https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage', {
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage', {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(body),
     muteHttpExceptions: true
   });
+  // กลุ่มถูกอัปเกรดเป็นซูเปอร์กรุ๊ป ไอดีเปลี่ยน → Telegram บอกไอดีใหม่ ปรับตามแล้วส่งซ้ำ
+  try {
+    var j = JSON.parse(res.getContentText() || '{}');
+    if (!j.ok && j.parameters && j.parameters.migrate_to_chat_id && !retried) {
+      PropertiesService.getScriptProperties().setProperty('PILE_CHAT_ID', String(j.parameters.migrate_to_chat_id));
+      sendPile(text, null, true);
+    }
+  } catch (e) {}
 }
 function pileLine(e) {
   return '• <b>' + esc(e.code || 'ยังไม่มีรหัส') + '</b> ' + esc(e.project || '-')
@@ -422,7 +434,7 @@ function pileSendChunks(lines) {
 }
 // 08:00 (จันทร์–เสาร์): สรุปสถานะงานที่ยังไม่จบทั้งหมด — แยกตามขั้นตอน + ทำเครื่องหมายงานที่เกินกำหนด
 function pileCalcDaily(force) {
-  if (!TELEGRAM_CHAT_PILE) return;
+  if (!pileChat()) return;
   var now = Date.now(), d0 = new Date(now);
   var hour = Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'H'));
   var dow = Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'u'));   // 1=จันทร์ … 7=อาทิตย์
@@ -456,7 +468,7 @@ function pileCalcDaily(force) {
 // 15:00 เตือนก่อนครบ 16:00 · 16:00 เตือนงานที่เลยกำหนด (ยังไม่เขียนแบบ/คำนวณเสร็จ) — วันละครั้ง/ช่วง, จันทร์–เสาร์
 // ผูกกับรอบ 10 นาทีเดิม (ช่วงเวลากว้าง 30 นาที กันรอบที่พลาด)
 function pileCalcDeadlineCheck(forceSlot) {
-  if (!TELEGRAM_CHAT_PILE) return;
+  if (!pileChat()) return;
   var now = Date.now(), d0 = new Date(now);
   var mins = Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'H')) * 60 + Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'm'));
   var dow = Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'u'));
@@ -648,7 +660,7 @@ function pileKey(project, items) {
   return String(project || '').replace(/\s+/g, '').toLowerCase() + '|' + items.map(function (i) { return [i.section, Number(i.size), Number(i.length)].join('/'); }).join(',');
 }
 function pileTelegramPoll() {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_PILE) return;
+  if (!TELEGRAM_TOKEN || !pileChat()) return;
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return;
   try {
@@ -665,13 +677,16 @@ function pileTelegramPoll() {
       try { handlePileMessage(u.message); } catch (err) {
         Logger.log('handlePileMessage: ' + err.message + ' @ ' + (err.stack || ''));
         var mm = u.message;
-        if (mm && mm.chat && String(mm.chat.id) === String(TELEGRAM_CHAT_PILE)) sendPile('⚠️ <b>ระบบรับคำขอขัดข้อง ยังไม่ได้บันทึก</b>\nสาเหตุ: ' + esc(err.message) + '\nลองส่งข้อความใหม่อีกครั้ง ถ้ายังไม่ได้ให้แจ้งผู้ดูแลระบบ', mm.message_id);
+        if (mm && mm.chat && String(mm.chat.id) === String(pileChat())) sendPile('⚠️ <b>ระบบรับคำขอขัดข้อง ยังไม่ได้บันทึก</b>\nสาเหตุ: ' + esc(err.message) + '\nลองส่งข้อความใหม่อีกครั้ง ถ้ายังไม่ได้ให้แจ้งผู้ดูแลระบบ', mm.message_id);
       }
     });
   } finally { lock.releaseLock(); }
 }
 function handlePileMessage(m) {
-  if (!m || !m.chat || String(m.chat.id) !== String(TELEGRAM_CHAT_PILE)) return;   // รับเฉพาะกลุ่มคำนวณเสาเข็ม
+  if (m && m.migrate_from_chat_id && String(m.migrate_from_chat_id) === String(pileChat())) {   // กลุ่มถูกอัปเกรดเป็นซูเปอร์กรุ๊ป → ใช้ไอดีใหม่
+    PropertiesService.getScriptProperties().setProperty('PILE_CHAT_ID', String(m.chat.id)); return;
+  }
+  if (!m || !m.chat || String(m.chat.id) !== String(pileChat())) return;   // รับเฉพาะกลุ่มคำนวณเสาเข็ม
   if (m.from && m.from.is_bot) return;
   var text = String(m.text || m.caption || '').trim();
   if (!text || text.charAt(0) === '/') return;
