@@ -130,6 +130,7 @@ function repairReminderCheck() {
   try { pileCalcDaily(); } catch (err) { Logger.log('pileCalcDaily: ' + err.message); }
   try { pileCalcDeadlineCheck(); } catch (err) { Logger.log('pileCalcDeadlineCheck: ' + err.message); }
   try { pileTelegramPoll(); } catch (err) { Logger.log('pileTelegramPoll: ' + err.message); }
+  try { pileCleanupPdf(); } catch (err) { Logger.log('pileCleanupPdf: ' + err.message); }
   var now = new Date();
   var hour = Number(Utilities.formatDate(now, 'Asia/Bangkok', 'H'));
   var workHours = hour >= 7 && hour < 18;
@@ -494,6 +495,60 @@ function testPileCalc() {
   pileCalcDeadlineCheck('OVER');
 }
 
+
+// ── ลบไฟล์ PDF ของงานที่จบแล้ว (ประหยัดพื้นที่ Supabase) ─────────────────
+// งานที่จบ = สถานะ "ได้เอกสารตัวจริงแล้ว"/"ยกเลิก" · เก็บไฟล์ PDF ไว้ PILE_KEEP_DAYS วันนับจากวันที่จบ แล้วลบ
+// ลบเฉพาะไฟล์ PDF — ตัวคำขอ/ผลตรวจ PDF ยังอยู่ (ทำเครื่องหมาย pdfDeleted) · งานที่ยังไม่จบไม่ถูกลบเด็ดขาด
+// ทำงานเองวันละครั้งช่วงตี 2 (ผูกกับรอบ 10 นาทีเดิม) · ทดลองดูก่อนลบ: Run testPileCleanup
+var PILE_KEEP_DAYS = 15;
+var PILE_BUCKET = 'pile-calc-pdf';
+function pileStorage(method, path, payload) {
+  var opts = { method: method, headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, muteHttpExceptions: true };
+  if (payload) opts.payload = JSON.stringify(payload);
+  return UrlFetchApp.fetch(SUPABASE_URL + '/storage/v1/' + path, opts);
+}
+function pileCleanupPdf(mode) {   // mode: 'dry' = แค่รายงานว่าจะลบอะไร · 'force' = ลบเลยไม่รอเวลา · ไม่ใส่ = รอบอัตโนมัติ
+  var now = Date.now(), d0 = new Date(now);
+  var day = Utilities.formatDate(d0, 'Asia/Bangkok', 'yyyy-MM-dd');
+  var props = PropertiesService.getScriptProperties();
+  if (!mode) {
+    if (Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'H')) !== 2) return;
+    if (props.getProperty('PILECLEAN_LAST') === day) return;
+  }
+  var res = sb('get', 'pile_calc_requests?select=data');
+  if (res.getResponseCode() >= 300) { Logger.log('pileCleanupPdf: ' + res.getContentText()); return; }
+  var limit = now - PILE_KEEP_DAYS * 864e5;
+  var old = JSON.parse(res.getContentText() || '[]').map(function (x) { return x.data || {}; }).filter(function (r) {
+    return (r.status === 'original' || r.status === 'cancel') && !r.pdfDeleted && r.history && r.history.length
+      && r.history[r.history.length - 1].t <= limit;
+  });
+  if (!mode) props.setProperty('PILECLEAN_LAST', day);
+  if (!old.length) { if (mode) sendPile('🧹 (ทดสอบ) ไม่มีงานที่จบเกิน ' + PILE_KEEP_DAYS + ' วัน — ไม่มี PDF ที่ต้องลบ'); return; }
+  var lr = pileStorage('post', 'object/list/' + PILE_BUCKET, { prefix: '', limit: 1000, offset: 0 });
+  if (lr.getResponseCode() >= 300) { Logger.log('pileCleanupPdf list: ' + lr.getContentText()); return; }
+  var size = {};
+  (JSON.parse(lr.getContentText() || '[]') || []).forEach(function (f) { size[f.name] = (f.metadata && f.metadata.size) || 0; });
+  var targets = old.filter(function (r) { return size[r.id + '.pdf'] != null; });
+  var names = targets.map(function (r) { return r.id + '.pdf'; });
+  var mb = names.reduce(function (a, n) { return a + size[n]; }, 0) / 1048576;
+  if (mode === 'dry') {
+    sendPile('🧹 (ทดสอบ ยังไม่ได้ลบ) จะลบ PDF ของงานที่จบเกิน ' + PILE_KEEP_DAYS + ' วัน: ' + names.length + ' ไฟล์ (' + mb.toFixed(1) + ' MB) จากงาน ' + old.length + ' งาน\n'
+      + old.slice(0, 15).map(function (r) { return '• ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-'); }).join('\n'));
+    return;
+  }
+  if (names.length) {
+    var dr = pileStorage('delete', 'object/' + PILE_BUCKET, { prefixes: names });
+    if (dr.getResponseCode() >= 300) { Logger.log('pileCleanupPdf delete: ' + dr.getContentText()); sendPile('⚠️ ลบ PDF ที่เก่าเกิน ' + PILE_KEEP_DAYS + ' วันไม่สำเร็จ (' + dr.getResponseCode() + ')'); return; }
+  }
+  // ทำเครื่องหมายว่าลบไฟล์แล้ว (รวมงานที่ไม่มีไฟล์ในที่เก็บ) จะได้ไม่ตรวจซ้ำ
+  old.forEach(function (r) {
+    r.pdfDeleted = true; r.pdfDeletedAt = now;
+    sb('patch', 'pile_calc_requests?id=eq.' + encodeURIComponent(r.id), { data: r, updated_at: new Date().toISOString(), updated_by: 'ระบบลบไฟล์เก่า' });
+  });
+  if (names.length) sendPile('🧹 ลบไฟล์ PDF ของงานที่จบเกิน ' + PILE_KEEP_DAYS + ' วันแล้ว ' + names.length + ' ไฟล์ (' + mb.toFixed(1) + ' MB) · ตัวคำขอและผลตรวจยังอยู่ในระบบ');
+}
+// ทดลอง: ดูว่า "จะลบอะไร" โดยยังไม่ลบจริง (ส่งสรุปเข้ากลุ่ม)
+function testPileCleanup() { pileCleanupPdf('dry'); }
 
 // ── ส่งข้อความเข้ากลุ่ม → ระบบสร้างคำขอให้เอง ─────────────────────
 // คนในกลุ่มวางข้อความคำขอ (รูปแบบเดียวกับที่วางในหน้า "รับคำขอใหม่") → บอทอ่าน แยกข้อมูล บันทึกเข้าฐานข้อมูล แล้วตอบกลับสรุปให้ตรวจ
