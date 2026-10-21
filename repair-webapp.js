@@ -14,7 +14,7 @@
 
 var TELEGRAM_TOKEN = '';        // โทเคนบอท (ตัวเดียวกับบอทแจ้งเตือนเดิม)
 var TELEGRAM_CHAT_REPAIR = '';  // ไอดีกลุ่ม "Rmc ซ่อมบำรุงบางเลน"
-var TELEGRAM_CHAT_QC = '';      // ไอดีกลุ่ม QC — แจ้งเตือน "ขอรายการคำนวณเสาเข็ม" (ถ้าว่าง = ไม่ส่ง)
+var TELEGRAM_CHAT_PILE = '';    // ไอดีกลุ่ม "Rmc คำนวณเสาเข็ม" — แจ้งเตือน "ขอรายการคำนวณเสาเข็ม" (ถ้าว่าง = ไม่ส่ง)
 
 var SUPABASE_URL = 'https://npxzerdirspwunuckcqr.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weHplcmRpcnNwd3VudWNrY3FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUxMjIsImV4cCI6MjA5NTcwMTEyMn0.4C1MucMeqPozXSfErLM44at7dykfzfFQvpVnoqmrMQI';
@@ -305,7 +305,7 @@ function thDate(v) {
   return p.length === 3 ? Number(p[2]) + '/' + Number(p[1]) + '/' + (Number(p[0]) + 543) : '-';
 }
 
-// ── ขอรายการคำนวณเสาเข็ม → กลุ่ม QC ──────────────────────────
+// ── ขอรายการคำนวณเสาเข็ม → กลุ่ม Rmc คำนวณเสาเข็ม ──────────────────────────
 // หน้า pile-calc-request.html ส่งเหตุการณ์ (งานใหม่/เปลี่ยนสถานะ) มาที่ doPost · เตือนงานเกินกำหนดทุกเช้า 08:00 (จันทร์–เสาร์)
 var PILE_SLA = { draw: 1, send: 1, pdf: 2, original: 7 };  // วัน — ให้ตรงกับค่าตั้งในหน้า pile-calc-request
 var PILE_MSG = {
@@ -318,12 +318,12 @@ var PILE_MSG = {
   original: ['🏁', 'ได้เอกสารตัวจริงแล้ว — จบงาน', function () { return ''; }],
   cancel:   ['🚫', 'ยกเลิกงาน', function () { return ''; }]
 };
-function sendQc(text) {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_QC) { Logger.log('ยังไม่ได้ใส่ TELEGRAM_TOKEN / TELEGRAM_CHAT_QC'); return; }
+function sendPile(text) {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_PILE) { Logger.log('ยังไม่ได้ใส่ TELEGRAM_TOKEN / TELEGRAM_CHAT_PILE'); return; }
   UrlFetchApp.fetch('https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage', {
     method: 'post',
     contentType: 'application/json',
-    payload: JSON.stringify({ chat_id: TELEGRAM_CHAT_QC, text: text, parse_mode: 'HTML', disable_web_page_preview: true }),
+    payload: JSON.stringify({ chat_id: TELEGRAM_CHAT_PILE, text: text, parse_mode: 'HTML', disable_web_page_preview: true }),
     muteHttpExceptions: true
   });
 }
@@ -351,7 +351,7 @@ function notifyPileCalc(d) {
     var hint = m[2](); if (hint) L.push('\n' + hint);
     if (by) L.push('โดย ' + esc(by));
     L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม (เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)</a>');
-    sendQc(L.join('\n'));
+    sendPile(L.join('\n'));
   });
 }
 // กฎเกินกำหนด: ตรงกับ overdue() ในหน้า pile-calc-request  [วัน, เหตุผล, ใครต้องทำ]
@@ -366,7 +366,7 @@ function pileOverdueRule(st) {
   }[st];
 }
 function pileCalcDaily(force) {
-  if (!TELEGRAM_CHAT_QC) return;
+  if (!TELEGRAM_CHAT_PILE) return;
   var now = new Date();
   var hour = Number(Utilities.formatDate(now, 'Asia/Bangkok', 'H'));
   var dow = Number(Utilities.formatDate(now, 'Asia/Bangkok', 'u'));   // 1=จันทร์ … 7=อาทิตย์
@@ -388,17 +388,17 @@ function pileCalcDaily(force) {
     (rule[2] === 'f' ? fac : syy).push(it);
   });
   if (force !== true) props.setProperty('PILECALC_LAST', day);
-  if (!fac.length && !syy.length) { if (force === true) sendQc('✅ ไม่มีงานคำนวณเสาเข็มค้างเกินกำหนด'); return; }
+  if (!fac.length && !syy.length) { if (force === true) sendPile('✅ ไม่มีงานคำนวณเสาเข็มค้างเกินกำหนด'); return; }
   var byDays = function (a, b) { return b.days - a.days; };
   var L = ['⏰ <b>งานคำนวณเสาเข็มเกินกำหนด</b> ' + (fac.length + syy.length) + ' งาน'];
   if (fac.length) { L.push('\n🏭 <b>ฝั่งโรงงาน/ฝ่ายผลิต (ต้องเร่ง)</b>'); fac.sort(byDays).slice(0, 12).forEach(function (x) { L.push(x.line); }); }
   if (syy.length) { L.push('\n📮 <b>รอ สย.</b>'); syy.sort(byDays).slice(0, 12).forEach(function (x) { L.push(x.line); }); }
   L.push('\n<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม (เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)</a>');
-  sendQc(L.join('\n'));
+  sendPile(L.join('\n'));
 }
-// ทดสอบ: กด Run ฟังก์ชันนี้ → ส่งสรุปงานเกินกำหนดเข้ากลุ่ม QC ทันที (ไม่นับเป็นรอบของวัน)
+// ทดสอบ: กด Run ฟังก์ชันนี้ → ส่งสรุปงานเกินกำหนดเข้ากลุ่ม Rmc คำนวณเสาเข็ม ทันที (ไม่นับเป็นรอบของวัน)
 function testPileCalc() {
-  sendQc('✅ ทดสอบ: แจ้งเตือนขอรายการคำนวณเสาเข็ม เข้ากลุ่ม QC ได้แล้ว');
+  sendPile('✅ ทดสอบ: แจ้งเตือนขอรายการคำนวณเสาเข็ม เข้ากลุ่ม Rmc คำนวณเสาเข็ม ได้แล้ว');
   pileCalcDaily(true);
 }
 
