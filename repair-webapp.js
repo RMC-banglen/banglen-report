@@ -657,11 +657,16 @@ function pileTelegramPoll() {
     var url = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/getUpdates?timeout=0&limit=100&allowed_updates=' + encodeURIComponent('["message"]') + (offset ? '&offset=' + offset : '');
     var j = JSON.parse(UrlFetchApp.fetch(url, { muteHttpExceptions: true }).getContentText() || '{}');
     if (!j.ok) { Logger.log('pileTelegramPoll: ' + (j.description || 'getUpdates ล้มเหลว')); return; }
+    if (j.result && j.result.length) Logger.log('pileTelegramPoll: รับ ' + j.result.length + ' ข้อความ');
     var ups = j.result || [];
     if (!ups.length) return;
     props.setProperty('PILETG_OFFSET', String(ups[ups.length - 1].update_id + 1));  // ยืนยันก่อนประมวลผล → ไม่ทำซ้ำ
     ups.forEach(function (u) {
-      try { handlePileMessage(u.message); } catch (err) { Logger.log('handlePileMessage: ' + err.message); }
+      try { handlePileMessage(u.message); } catch (err) {
+        Logger.log('handlePileMessage: ' + err.message + ' @ ' + (err.stack || ''));
+        var mm = u.message;
+        if (mm && mm.chat && String(mm.chat.id) === String(TELEGRAM_CHAT_PILE)) sendPile('⚠️ <b>ระบบรับคำขอขัดข้อง ยังไม่ได้บันทึก</b>\nสาเหตุ: ' + esc(err.message) + '\nลองส่งข้อความใหม่อีกครั้ง ถ้ายังไม่ได้ให้แจ้งผู้ดูแลระบบ', mm.message_id);
+      }
     });
   } finally { lock.releaseLock(); }
 }
