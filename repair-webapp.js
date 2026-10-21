@@ -359,21 +359,21 @@ function notifyPileCalc(d) {
     sendPile(L.join('\n'));
   });
 }
-// ── กำหนดเขียนแบบ/คำนวณ: งานที่เข้าวันไหน ต้องเสร็จภายใน 16:30 น. ของวันนั้น ─────────────
-// เข้าหลัง 16:30 หรือวันอาทิตย์ → เลื่อนเป็น 16:30 ของวันทำการถัดไป (จันทร์–เสาร์) · เวลาไทย (UTC+7)
-var PILE_DUE_MIN = 16 * 60 + 30;
+// ── กำหนดเขียนแบบ/คำนวณ: งานที่เข้าวันไหน ต้องเสร็จภายใน 16:00 น. ของวันนั้น ─────────────
+// เข้าหลัง 16:00 หรือวันอาทิตย์ → เลื่อนเป็น 16:00 ของวันทำการถัดไป (จันทร์–เสาร์) · เวลาไทย (UTC+7)
+var PILE_DUE_MIN = 16 * 60;
 function pileDeadline(t) {
   var b = new Date(t + 7 * 36e5);
   var y = b.getUTCFullYear(), m = b.getUTCMonth(), d = b.getUTCDate();
   var add = (b.getUTCHours() * 60 + b.getUTCMinutes()) >= PILE_DUE_MIN ? 1 : 0;
   var dd = new Date(Date.UTC(y, m, d + add));
   if (dd.getUTCDay() === 0) dd = new Date(Date.UTC(y, m, d + add + 1));
-  return Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth(), dd.getUTCDate(), 16, 30) - 7 * 36e5;
+  return Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth(), dd.getUTCDate(), 16, 0) - 7 * 36e5;
 }
 function pileDueText(dl, now) {
   var day = function (ms, f) { return Utilities.formatDate(new Date(ms), 'Asia/Bangkok', f); };
   var lab = day(dl, 'yyyy-MM-dd') === day(now, 'yyyy-MM-dd') ? 'วันนี้' : day(dl, 'yyyy-MM-dd') === day(now + 864e5, 'yyyy-MM-dd') ? 'พรุ่งนี้' : 'วันที่ ' + day(dl, 'd/M');
-  return lab + ' 16:30 น.';
+  return lab + ' 16:00 น.';
 }
 function pileDueHint() {
   var n = Date.now();
@@ -382,7 +382,7 @@ function pileDueHint() {
 function pileAge(ms) {
   return ms < 36e5 * 24 ? Math.max(1, Math.floor(ms / 36e5)) + ' ชม.' : Math.round(ms / 864e5) + ' วัน';
 }
-// กฎเกินกำหนด (ตรงกับ overdue() ในหน้า pile-calc-request) — ขั้น "รอเขียนแบบ" ใช้เส้นตาย 16:30 · ขั้นอื่นนับเป็นวัน
+// กฎเกินกำหนด (ตรงกับ overdue() ในหน้า pile-calc-request) — ขั้น "รอเขียนแบบ" ใช้เส้นตาย 16:00 · ขั้นอื่นนับเป็นวัน
 function pileOverdueRule(st) {
   return {
     drawn:    [PILE_SLA.send, 'เขียนแบบเสร็จแล้ว แต่ยังไม่ส่ง สย.', 'f'],
@@ -452,7 +452,7 @@ function pileCalcDaily(force) {
   L.push('\n<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม (เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)</a>');
   pileSendChunks(L);
 }
-// 15:00 เตือนก่อนครบ 16:30 · 16:30 เตือนงานที่เลยกำหนด (ยังไม่เขียนแบบ/คำนวณเสร็จ) — วันละครั้ง/ช่วง, จันทร์–เสาร์
+// 15:00 เตือนก่อนครบ 16:00 · 16:00 เตือนงานที่เลยกำหนด (ยังไม่เขียนแบบ/คำนวณเสร็จ) — วันละครั้ง/ช่วง, จันทร์–เสาร์
 // ผูกกับรอบ 10 นาทีเดิม (ช่วงเวลากว้าง 30 นาที กันรอบที่พลาด)
 function pileCalcDeadlineCheck(forceSlot) {
   if (!TELEGRAM_CHAT_PILE) return;
@@ -475,14 +475,14 @@ function pileCalcDeadlineCheck(forceSlot) {
   if (!list.length) { if (forceSlot) sendPile('(ทดสอบ ' + slot + ') ไม่มีงานเข้าเงื่อนไข'); return; }
   list.sort(function (a, b) { return a.history[a.history.length - 1].t - b.history[b.history.length - 1].t; });
   var L = [slot === 'OVER'
-    ? '🚨 <b>เลยกำหนด 16:30 น. — ยังเขียนแบบ/คำนวณไม่เสร็จ ' + list.length + ' งาน</b>'
-    : '⏰ <b>ใกล้ครบ 16:30 น. — ยังเขียนแบบ/คำนวณไม่เสร็จ ' + list.length + ' งาน</b>'];
+    ? '🚨 <b>เลยกำหนด 16:00 น. — ยังเขียนแบบ/คำนวณไม่เสร็จ ' + list.length + ' งาน</b>'
+    : '⏰ <b>ใกล้ครบ 16:00 น. — ยังเขียนแบบ/คำนวณไม่เสร็จ ' + list.length + ' งาน</b>'];
   list.slice(0, 15).forEach(function (r) {
     var since = r.history[r.history.length - 1].t;
     L.push('• ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-')
       + (slot === 'OVER' ? ' — เลยกำหนดมา ' + pileAge(now - pileDeadline(since)) : ' — เข้ามาเมื่อ ' + Utilities.formatDate(new Date(since), 'Asia/Bangkok', 'H:mm') + ' น.'));
   });
-  L.push(slot === 'OVER' ? '\nช่วยเร่งให้เสร็จ และกด "เขียนแบบ/คำนวณเสร็จ" ในหน้าติดตาม' : '\nช่วยเร่งให้เสร็จก่อน 16:30 น.');
+  L.push(slot === 'OVER' ? '\nช่วยเร่งให้เสร็จ และกด "เขียนแบบ/คำนวณเสร็จ" ในหน้าติดตาม' : '\nช่วยเร่งให้เสร็จก่อน 16:00 น.');
   L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม</a>');
   pileSendChunks(L);
 }
