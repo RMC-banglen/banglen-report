@@ -128,6 +128,7 @@ function notifyRepair(d) {
 //   ซ่อมเสร็จแต่ผู้แจ้งยังไม่ยืนยันเกิน 1 วัน → เตือนวันละครั้ง
 function repairReminderCheck() {
   try { pileCalcDaily(); } catch (err) { Logger.log('pileCalcDaily: ' + err.message); }
+  try { pileTelegramPoll(); } catch (err) { Logger.log('pileTelegramPoll: ' + err.message); }
   var now = new Date();
   var hour = Number(Utilities.formatDate(now, 'Asia/Bangkok', 'H'));
   var workHours = hour >= 7 && hour < 18;
@@ -318,12 +319,15 @@ var PILE_MSG = {
   original: ['🏁', 'ได้เอกสารตัวจริงแล้ว — จบงาน', function () { return ''; }],
   cancel:   ['🚫', 'ยกเลิกงาน', function () { return ''; }]
 };
-function sendPile(text) {
+var PILE_STL = { received: 'รับคำขอแล้ว', drawn: 'เขียนแบบ/คำนวณเสร็จ', sent: 'ส่ง zip ให้ สย. แล้ว', pdf_back: 'ได้ PDF กลับแล้ว', pdf_ok: 'ตรวจ PDF ผ่าน', revise: 'ส่งแก้กลับ สย.', original: 'ได้เอกสารตัวจริงแล้ว', cancel: 'ยกเลิก' };
+function sendPile(text, replyTo) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_PILE) { Logger.log('ยังไม่ได้ใส่ TELEGRAM_TOKEN / TELEGRAM_CHAT_PILE'); return; }
+  var body = { chat_id: TELEGRAM_CHAT_PILE, text: text, parse_mode: 'HTML', disable_web_page_preview: true };
+  if (replyTo) { body.reply_to_message_id = replyTo; body.allow_sending_without_reply = true; }
   UrlFetchApp.fetch('https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage', {
     method: 'post',
     contentType: 'application/json',
-    payload: JSON.stringify({ chat_id: TELEGRAM_CHAT_PILE, text: text, parse_mode: 'HTML', disable_web_page_preview: true }),
+    payload: JSON.stringify(body),
     muteHttpExceptions: true
   });
 }
@@ -402,6 +406,174 @@ function testPileCalc() {
   pileCalcDaily(true);
 }
 
+
+// ── ส่งข้อความเข้ากลุ่ม → ระบบสร้างคำขอให้เอง ─────────────────────
+// คนในกลุ่มวางข้อความคำขอ (รูปแบบเดียวกับที่วางในหน้า "รับคำขอใหม่") → บอทอ่าน แยกข้อมูล บันทึกเข้าฐานข้อมูล แล้วตอบกลับสรุปให้ตรวจ
+// ต้องตั้งบอทเป็น "ผู้ดูแลกลุ่ม" (ไม่งั้นบอทไม่เห็นข้อความทั่วไป) · ตรวจข้อความใหม่ทุก 1 นาที (setupPileCalc)
+// ตัวแยกข้อความ = โค้ดเดียวกับปุ่ม "แยกข้อมูล" ในหน้า pile-calc-request.html
+var PileParse = (function () {
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const ORG_RE = /^(บริษัท|บจก|บมจ|หจก|ห้างหุ้นส่วน|โรงพยาบาล|รพ\.|โรงเรียน|มหาวิทยาลัย|วัด|อบต|อบจ|เทศบาล|องค์การ|กรม|สำนักงาน|การไฟฟ้า|การประปา|มูลนิธิ|สหกรณ์|กองทัพ|ศาล|ธนาคาร|นิติบุคคล|สมาคม|ร้าน|หมู่บ้าน)/;
+  const cleanProject = s => (s || '').replace(/^\s*(?:ชื่อ)?(?:โ?ครงการ|ชื่องาน)\s*[:：.\-]?\s*/, '');
+  const normOwner = s0 => {
+    const s = (s0 || '').normalize('NFC').replace(/ํา/g, 'ำ').replace(/\s+/g, ' ').trim(); let m;
+    if ((m = s.match(/^(?:บมจ\.?|บริษัทมหาชน|บริษัท\s*มหาชน)\s*(.+?)\s*(?:จำกัด)?\s*(?:\(?\s*มหาชน\s*\)?)?$/))) return `บริษัท ${m[1]} จำกัด (มหาชน)`;
+    if ((m = s.match(/^(?:บจก\.?|บ\.|บริษัท)\s*(.+?)\s*(?:\(?\s*มหาชน\s*\)?)$/))) return `บริษัท ${m[1].replace(/\s*จำกัด$/, '')} จำกัด (มหาชน)`;
+    if ((m = s.match(/^(?:บจก\.?|บ\.|บริษัท)\s*(.+?)\s*(?:จำกัด|จก\.?)?$/))) return `บริษัท ${m[1]} จำกัด`;
+    if ((m = s.match(/^รพ\.?\s*(.+)$/))) return `โรงพยาบาล${m[1]}`;
+    if ((m = s.match(/^(?:หจก\.?|ห้างหุ้นส่วนจำกัด)\s*(.+)$/))) return `ห้างหุ้นส่วนจำกัด ${m[1]}`;
+    if ((m = s.match(/^(?:นางสาว|น\.ส\.|นาย|นาง|คุณ)\s*(.+)$/))) return 'คุณ' + m[1].trim();
+    if (s && !ORG_RE.test(s) && !/^(ดร\.|ด\.ต|จ\.ส\.|ส\.อ|ร\.ต|ร\.ท|ร\.อ|พ\.ต|พ\.ท|พ\.อ|พล|ว่าที่|พระ|หม่อม|ม\.ร\.ว|Mr|Ms|Mrs)/i.test(s)) return 'คุณ' + s;
+    return s;
+  };
+  const emptyItem = () => ({ id: uid(), section: 'I', std: 'tis', joint: 'single', hammer: '', drop: '', dowel: '', size: '', length: '', qa: '', qty: '', micro: false, segLen: '', segCount: '' });
+  const emptyDraft = () => ({ project: '', owner: '', location: '', requester: '', hammer: '', drop: '', items: [emptyItem()] });
+  function parseItem(line) {
+    const sz = line.match(/(?:^|[^a-z])(?:I|ไอ|S|สี่เหลี่ยม|เสา)\s*-?\s*(0?\.\d{2}|\d{2})(?!\d)/i);
+    if (!sz) return null;
+    const it = emptyItem();
+    if (/สี่เหลี่ยม|(?:^|[^a-z])S\s*-?\s*\d/i.test(line)) it.section = 'S';
+    const v = parseFloat(sz[1]); it.size = String(v < 1 ? v : v / 100);
+    const lens = [...line.matchAll(/[x×*]\s*(\d+(?:\.\d+)?)\s*(?:เมตร|ม|m)?/gi)].map(m => m[1]).filter(x => parseFloat(x) >= 1);
+    const len = line.match(/ยาว\s*(\d+(?:\.\d+)?)/);
+    const seg = line.match(/(\d+(?:\.\d+)?)\s*(?:ม\.?|m\.?)\s*[x×*]?\s*(\d+)\s*ท่อน/i);
+    if (len) it.length = len[1]; else if (lens.length) it.length = lens[lens.length - 1];
+    if (/ไมโคร|micro/i.test(line) || seg) {
+      it.micro = true;
+      const ml = line.match(/(?:ไมโคร\S*|micro\S*)\s*(\d+(?:\.\d+)?)\s*(?:ม|m)/i);
+      if (seg) { it.segLen = seg[1]; it.segCount = seg[2]; } else if (ml) it.segLen = ml[1];
+      const c = line.match(/(\d+)\s*ท่อน/); if (c) it.segCount = c[1];
+      if (!it.length && it.segLen && it.segCount) it.length = String(parseFloat(it.segLen) * parseInt(it.segCount));
+      if (!it.segCount && it.segLen && it.length) it.segCount = String(Math.round(parseFloat(it.length) / parseFloat(it.segLen)));
+    }
+    if (!it.micro) { if (/ต\s*\/\s*ช|ตช|ต่อเชื่อม|ต่อ\s*เชื่อม/.test(line)) it.joint = 'joined'; else it.joint = 'single'; } else it.joint = 'micro';
+    if (/โรงงาน|ธรรมดา/.test(line)) it.std = 'factory'; else if (/มอก|TIS/i.test(line)) it.std = 'tis';
+    const qa = line.match(/Qa\.?\s*[=:]?\s*(\d+(?:\.\d+)?)/i) || line.match(/(\d+(?:\.\d+)?)\s*ตัน/); if (qa) it.qa = qa[1];
+    const q = line.match(/(\d+)\s*ต้น/); if (q) it.qty = q[1];
+    return it;
+  }
+  
+  function parseLine(txt) {
+    const d = emptyDraft(); d.items = [];
+    const street = /^(ถนน|ถ\.|แขวง|เขต|ตำบล|ต\.|อำเภอ|อ\.|จังหวัด|จ\.|ซอย|ซ\.)/;
+    let last = null; const pend = {};
+    const addLoc = s => { s = s.trim(); if (s) d.location = d.location ? d.location + ' ' + s : s; };
+    const setOwner = s => {
+      s = s.replace(/^[\s.:：\-–,]+/, '').trim();
+      const m = s.match(/\s*(?:^|\s)(ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|ถ\.|ถนน|ซ\.|ซอย|เลขที่|\d+\/\d+)/);
+      if (m && m.index > 0) { addLoc(s.slice(m.index)); s = s.slice(0, m.index); }
+      d.owner = normOwner(s);
+    };
+    txt.split(/\n/).map(l => l.trim()).filter(Boolean).forEach(l0 => {
+      let l = l0;
+      const ow = l.match(/(เจ้าของ(?:โครงการ)?|ลูกค้า)\s*[:：]?\s*(.+)$/);
+      if (ow) { setOwner(ow[2]); l = l.slice(0, ow.index).trim(); if (l) step(l); last = 'loc'; return; }
+      step(l);
+    });
+    function step(l) { let m;
+      const setLast = (k, v) => { if (d.items.length) d.items[d.items.length - 1][k] = v; else pend[k] = v; };
+      if (/^(สล|สลัก|เหล็กเดือย|dowel)/i.test(l) && (m = l.match(/(\d+)\s*-?\s*(DB|RB)\s*(\d+)\s*(?:mm\.?)?\s*(?:[x×*]\s*(\d+(?:\.\d+)?))?/i))) { setLast('dowel', `${m[1]}${m[2].toUpperCase()}${m[3]}${m[4] ? '×' + parseFloat(m[4]).toFixed(2) + ' ม.' : ''}`); return; }
+      if ((m = l.match(/ตุ้ม\D*?(\d+(?:\.\d+)?)/))) { setLast('hammer', m[1]); return; }
+      if (/^(ยก|ระยะยก)/.test(l) && (m = l.match(/(\d+(?:\.\d+)?)/))) { setLast('drop', m[1]); return; }
+      if (/^Qa/i.test(l) && (m = l.match(/Qa\.?\s*[=:]?\s*(\d+(?:\.\d+)?)/i))) { setLast('qa', m[1]); return; }
+      if (/^(ชื่อ)?(โ?ครงการ|ชื่องาน)/.test(l)) { d.project = cleanProject(l); last = 'project'; return; }
+      if (/^(สถานที่|ที่ตั้ง|หน้างาน|ที่อยู่)/.test(l)) { d.location = l.replace(/^(สถานที่|ที่ตั้ง|หน้างาน|ที่อยู่)\s*[:：]?\s*/, ''); last = 'loc'; return; }
+      if (/^(ผู้ขอ|เซลล์|sale|ผู้ส่ง)/i.test(l)) { d.requester = l.replace(/^(ผู้ขอ|เซลล์|sale|ผู้ส่ง)\s*[:：]?\s*/i, ''); return; }
+      const it = parseItem(l); if (it) { d.items.push(it); last = 'item'; return; }
+      if (!d.owner && d.project && /^(บริษัท|บจก|บมจ|หจก|ห้างหุ้นส่วน|คุณ|นาย|นาง|โรงพยาบาล|รพ\.|โรงเรียน|มหาวิทยาลัย|วัด|อบต|อบจ|เทศบาล|องค์การ|กรม|สำนักงาน|การไฟฟ้า|การประปา|มูลนิธิ|สหกรณ์)/.test(l)) { setOwner(l); last = 'loc'; return; }
+      if (/^(ขอ|รบกวน)/.test(l)) return;
+      if (street.test(l) && (d.location || last === 'loc')) { addLoc(l); last = 'loc'; }
+      else if (last === 'project' && !street.test(l)) d.project += ' ' + l;
+      else if (!d.project) { d.project = l; last = 'project'; }
+      else if (!d.location) { d.location = l; last = 'loc'; }
+      else if (last === 'loc') d.location += ' ' + l;
+    }
+    if (!d.items.length) d.items.push(emptyItem());
+    d.items.forEach(i => Object.keys(pend).forEach(k => { if (!i[k]) i[k] = pend[k]; }));
+    return d;
+  }
+  
+  return { parseLine: parseLine, cleanProject: cleanProject, uid: uid };
+})();
+
+function pileSpec(i) {
+  var f = function (v) { var n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? '?' : n.toFixed(2); };
+  return (i.section || 'I') + '-' + f(i.size) + 'x' + f(i.size) + 'x' + f(i.length) + ' m.'
+    + (i.qa ? ' · Qa ' + i.qa + ' ตัน' : '') + (i.qty ? ' · ' + i.qty + ' ต้น' : '');
+}
+function pileKey(project, items) {
+  return String(project || '').replace(/\s+/g, '').toLowerCase() + '|' + items.map(function (i) { return [i.section, Number(i.size), Number(i.length)].join('/'); }).join(',');
+}
+function pileTelegramPoll() {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_PILE) return;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var offset = Number(props.getProperty('PILETG_OFFSET') || 0);
+    var url = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/getUpdates?timeout=0&limit=100&allowed_updates=' + encodeURIComponent('["message"]') + (offset ? '&offset=' + offset : '');
+    var j = JSON.parse(UrlFetchApp.fetch(url, { muteHttpExceptions: true }).getContentText() || '{}');
+    if (!j.ok) { Logger.log('pileTelegramPoll: ' + (j.description || 'getUpdates ล้มเหลว')); return; }
+    var ups = j.result || [];
+    if (!ups.length) return;
+    props.setProperty('PILETG_OFFSET', String(ups[ups.length - 1].update_id + 1));  // ยืนยันก่อนประมวลผล → ไม่ทำซ้ำ
+    ups.forEach(function (u) {
+      try { handlePileMessage(u.message); } catch (err) { Logger.log('handlePileMessage: ' + err.message); }
+    });
+  } finally { lock.releaseLock(); }
+}
+function handlePileMessage(m) {
+  if (!m || !m.chat || String(m.chat.id) !== String(TELEGRAM_CHAT_PILE)) return;   // รับเฉพาะกลุ่มคำนวณเสาเข็ม
+  if (m.from && m.from.is_bot) return;
+  var text = String(m.text || m.caption || '').trim();
+  if (!text || text.charAt(0) === '/') return;
+  var sender = m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : '';
+  var d = PileParse.parseLine(text);
+  var items = d.items.filter(function (i) { return i.size || i.length; });
+  var project = PileParse.cleanProject(d.project).trim();
+  var lines = text.split(/\n/).filter(function (x) { return x.trim(); }).length;
+  var looksLikeRequest = /(โ?ครงการ|ชื่องาน)\s*[:：]?/.test(text) && lines >= 2;
+  // ข้อความคุยทั่วไป (เช่น "รับทราบ") ไม่นับ — ต้องมีเสาที่ระบุทั้งขนาดและความยาว และมีอย่างน้อย 2 บรรทัด
+  var complete = items.length > 0 && items.every(function (i) { return i.size && i.length; }) && lines >= 2;
+  if (!complete) {
+    if (looksLikeRequest || (items.length && lines >= 2)) sendPile('⚠️ <b>อ่านคำขอไม่ครบ ยังไม่ได้บันทึก</b>\n' + (project ? '' : '• ไม่พบชื่อโครงการ (ขึ้นต้นบรรทัดด้วย "โครงการ ...")\n') + (items.length ? '' : '• ไม่พบขนาด/ความยาวเสา เช่น I0.22×18.00 เมตร\n') + (items.length && !items.every(function (i) { return i.size && i.length; }) ? '• มีเสาที่ขนาดหรือความยาวไม่ครบ\n' : '') + 'ช่วยส่งใหม่ให้ครบ หรือกรอกเองในหน้าติดตาม', m.message_id);
+    return;
+  }
+  if (!project) { sendPile('⚠️ <b>ไม่พบชื่อโครงการ ยังไม่ได้บันทึก</b>\nขึ้นต้นบรรทัดด้วย "โครงการ ..." แล้วส่งใหม่', m.message_id); return; }
+  // กันส่งซ้ำ: ชื่อโครงการ + เสาชุดเดียวกัน ที่ยังไม่จบ/ไม่ยกเลิก
+  var res = sb('get', 'pile_calc_requests?select=data');
+  if (res.getResponseCode() >= 300) { Logger.log('pile intake get: ' + res.getContentText()); sendPile('⚠️ บันทึกไม่ได้ (เชื่อมฐานข้อมูลไม่สำเร็จ) ลองส่งใหม่อีกครั้ง', m.message_id); return; }
+  var key = pileKey(project, items), dup = null;
+  JSON.parse(res.getContentText() || '[]').forEach(function (row) {
+    var r = row.data || {};
+    if (!dup && r.status !== 'cancel' && r.status !== 'original' && pileKey(PileParse.cleanProject(r.project), (r.items || []).filter(function (i) { return i.size || i.length; })) === key) dup = r;
+  });
+  if (dup) { sendPile('ℹ️ <b>มีคำขอนี้อยู่ในระบบแล้ว</b> (ไม่สร้างซ้ำ)\n• <b>' + esc(dup.code || 'ยังไม่มีรหัส') + '</b> ' + esc(dup.project || '') + '\nสถานะ: ' + esc(PILE_STL[dup.status] || dup.status), m.message_id); return; }
+  var nr = {
+    id: PileParse.uid(), code: null, project: project, owner: (d.owner || '').trim(), location: (d.location || '').trim(),
+    requester: (d.requester || '').trim() || sender, hammer: d.hammer || '', drop: d.drop || '', items: items,
+    status: 'received', revisions: 0, check: null, lineRaw: text,
+    history: [{ status: 'received', t: Date.now(), note: 'นำเข้าจากข้อความ Telegram', by: sender }]
+  };
+  var ins = sb('post', 'pile_calc_requests', [{ id: nr.id, data: nr, updated_at: new Date().toISOString(), updated_by: sender || 'Telegram' }]);
+  if (ins.getResponseCode() >= 300) { Logger.log('pile intake insert: ' + ins.getContentText()); sendPile('⚠️ บันทึกไม่ได้ (' + ins.getResponseCode() + ') ลองส่งใหม่อีกครั้ง', m.message_id); return; }
+  var L = ['🆕 <b>รับคำขอคำนวณเสาเข็มเข้าระบบแล้ว</b>', '• ' + esc(nr.project)];
+  if (nr.owner) L.push('   เจ้าของ: ' + esc(nr.owner));
+  if (nr.location) L.push('   สถานที่: ' + esc(nr.location));
+  items.forEach(function (i) { L.push('   เสา: ' + esc(pileSpec(i))); });
+  if (nr.requester) L.push('   ผู้ขอ: ' + esc(nr.requester));
+  L.push('\n⏱ ต้องเขียนแบบ/คำนวณภายใน ' + PILE_SLA.draw + ' วัน');
+  L.push('ถ้าอ่านผิด แก้ได้ในหน้าติดตาม');
+  L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม (เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)</a>');
+  sendPile(L.join('\n'), m.message_id);
+}
+// ตั้งให้ตรวจข้อความในกลุ่มทุก 1 นาที — กด Run ครั้งเดียว (รันซ้ำได้ ไม่ซ้อน)
+function setupPileCalc() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'pileTelegramPoll') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('pileTelegramPoll').timeBased().everyMinutes(1).create();
+  sendPile('✅ ระบบรับคำขอจากข้อความพร้อมแล้ว — วางข้อความคำขอ (เหมือนที่วางในหน้า "รับคำขอใหม่") ในกลุ่มนี้ ระบบจะบันทึกให้เองภายใน 1 นาที\nต้องมี: บรรทัด "โครงการ ..." + เสา เช่น I0.22×18.00 เมตร (อย่างน้อย 2 บรรทัด)');
+}
+
 // ── ติดตั้ง: กด Run ฟังก์ชันนี้ครั้งเดียว (รันซ้ำได้ ไม่ซ้อน) ───────────
 function setup() {
   stopReminder(true);
@@ -416,7 +588,7 @@ function setup() {
 function stopReminder(silent) {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var h = t.getHandlerFunction();
-    if (h === 'repairReminderCheck' || h === 'routineCheck' || h === 'weeklySummary') ScriptApp.deleteTrigger(t);
+    if (h === 'repairReminderCheck' || h === 'routineCheck' || h === 'weeklySummary' || h === 'pileTelegramPoll') ScriptApp.deleteTrigger(t);
   });
   if (silent !== true) Logger.log('ยกเลิกการเตือนทั้งหมดแล้ว');
 }
