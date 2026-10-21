@@ -659,6 +659,33 @@ function pileSpec(i) {
 function pileKey(project, items) {
   return String(project || '').replace(/\s+/g, '').toLowerCase() + '|' + items.map(function (i) { return [i.section, Number(i.size), Number(i.length)].join('/'); }).join(',');
 }
+// ส่งซ้ำ: เทียบข้อความใหม่กับงานเดิม (จับคู่เสาด้วย ชนิด/ขนาด/ความยาว) — เปลี่ยนเฉพาะค่าที่ข้อความใหม่ระบุจริง ค่าที่ไม่ได้ระบุไม่ถูกลบ
+var PILE_FLD = [['std', 'มาตรฐาน'], ['joint', 'รอยต่อ'], ['dowel', 'เสริมเหล็ก'], ['hammer', 'ตุ้ม'], ['drop', 'ยก'], ['qa', 'Qa'], ['qty', 'จำนวน']];
+function pileFldText(k, v) {
+  if (v == null || String(v).trim() === '') return '-';
+  if (k === 'std') return v === 'factory' ? 'โรงงาน' : 'มอก.';
+  if (k === 'joint') return { single: 'ท่อนเดี่ยว', joined: 'ต่อเชื่อม', micro: 'ไมโครไพล์' }[v] || String(v);
+  return String(v);
+}
+function pileMerge(oldR, d, items) {
+  var out = JSON.parse(JSON.stringify(oldR)), ch = [];
+  var same = function (a, b) { return String(a == null ? '' : a).trim() === String(b == null ? '' : b).trim(); };
+  [['owner', 'เจ้าของ'], ['location', 'สถานที่']].forEach(function (f) {
+    var nv = String(d[f[0]] || '').trim();
+    if (nv && !same(out[f[0]], nv)) { ch.push(f[1] + ': ' + (out[f[0]] || '-') + ' → ' + nv); out[f[0]] = nv; }
+  });
+  items.forEach(function (ni) {
+    var oi = (out.items || []).filter(function (x) { return x.section === ni.section && Number(x.size) === Number(ni.size) && Number(x.length) === Number(ni.length); })[0];
+    if (!oi) return;
+    var lab = (ni.section || 'I') + '-' + Number(ni.size).toFixed(2) + '×' + Number(ni.length).toFixed(2) + ' ม.';
+    PILE_FLD.forEach(function (f) {
+      var nv = ni[f[0]];
+      if (nv == null || String(nv).trim() === '') return;
+      if (!same(oi[f[0]], nv)) { ch.push(lab + ' ' + f[1] + ': ' + pileFldText(f[0], oi[f[0]]) + ' → ' + pileFldText(f[0], nv)); oi[f[0]] = nv; }
+    });
+  });
+  return { data: out, changes: ch };
+}
 function pileTelegramPoll() {
   if (!TELEGRAM_TOKEN || !pileChat()) return;
   var lock = LockService.getScriptLock();
@@ -721,7 +748,21 @@ function handlePileText(m, text, sender) {
     var r = row.data || {};
     if (!dup && r.status !== 'cancel' && r.status !== 'original' && pileKey(PileParse.cleanProject(r.project), (r.items || []).filter(function (i) { return i.size || i.length; })) === key) dup = r;
   });
-  if (dup) { sendPile('ℹ️ <b>มีคำขอนี้อยู่ในระบบแล้ว</b> (ไม่สร้างซ้ำ)\n• <b>' + esc(dup.code || 'ยังไม่มีรหัส') + '</b> ' + esc(dup.project || '') + '\nสถานะ: ' + esc(PILE_STL[dup.status] || dup.status), m.message_id); return; }
+  if (dup) {
+    var mg = pileMerge(dup, d, items);
+    var head = '• <b>' + esc(dup.code || 'ยังไม่มีรหัส') + '</b> ' + esc(dup.project || '');
+    var chTxt = mg.changes.map(function (c) { return '   • ' + esc(c); }).join('\n');
+    if (!mg.changes.length) { sendPile('ℹ️ <b>มีคำขอนี้อยู่ในระบบแล้ว</b> (ไม่สร้างซ้ำ)\n' + head + '\nสถานะ: ' + esc(PILE_STL[dup.status] || dup.status), m.message_id); return; }
+    if (dup.status === 'received') {   // ยังไม่มีใครเริ่มทำ → แก้งานเดิมให้ (บันทึกลงรายการแก้ไข ไม่ขยับเส้นตาย 16:00)
+      mg.data.edits = (mg.data.edits || []).concat([{ t: Date.now(), by: sender, note: 'แก้จากข้อความ Telegram: ' + mg.changes.join(' · ') }]);
+      var up = sb('patch', 'pile_calc_requests?id=eq.' + encodeURIComponent(dup.id), { data: mg.data, updated_at: new Date().toISOString(), updated_by: sender || 'Telegram' });
+      if (up.getResponseCode() >= 300) { Logger.log('pile intake patch: ' + up.getContentText()); sendPile('⚠️ แก้คำขอเดิมไม่ได้ (' + up.getResponseCode() + ') ลองส่งใหม่อีกครั้ง', m.message_id); return; }
+      sendPile('✏️ <b>แก้คำขอเดิมให้แล้ว</b> (งานยังไม่เริ่มทำ)\n' + head + '\n' + chTxt + '\n<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม</a>', m.message_id);
+      return;
+    }
+    sendPile('⚠️ <b>มีคำขอนี้อยู่แล้ว แต่ข้อมูลต่างจากในระบบ — ไม่ได้แก้ทับ</b>\n' + head + '\nสถานะ: ' + esc(PILE_STL[dup.status] || dup.status) + ' (งานเริ่มแล้ว)\nข้อความใหม่ต่างจากในระบบ:\n' + chTxt + '\nถ้าต้องแก้ ให้ฝ่ายผลิตแก้ในหน้าติดตาม (ปุ่ม "แก้ไข" ในรายละเอียดงาน)', m.message_id);
+    return;
+  }
   var nr = {
     id: PileParse.uid(), code: null, project: project, owner: (d.owner || '').trim(), location: (d.location || '').trim(),
     requester: (d.requester || '').trim() || sender, hammer: d.hammer || '', drop: d.drop || '', items: items,
