@@ -671,6 +671,16 @@ function handlePileMessage(m) {
   var text = String(m.text || m.caption || '').trim();
   if (!text || text.charAt(0) === '/') return;
   var sender = m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : '';
+  // หลายโครงการในข้อความเดียว (มีบรรทัดขึ้นต้น "โครงการ ..." ตั้งแต่ 2 บรรทัด) → แยกเป็นงานละโครงการ ข้อความก่อนโครงการแรก (เช่น ทักทาย) ไม่นับ
+  var ls = text.split(/\n/), starts = [];
+  ls.forEach(function (l, i) { if (/^\s*(ชื่อ)?(โ?ครงการ|ชื่องาน)/.test(l)) starts.push(i); });
+  if (starts.length >= 2) {
+    starts.forEach(function (st, k) { handlePileText(m, ls.slice(st, k + 1 < starts.length ? starts[k + 1] : ls.length).join('\n'), sender); });
+    return;
+  }
+  handlePileText(m, text, sender);
+}
+function handlePileText(m, text, sender) {
   var d = PileParse.parseLine(text);
   var items = d.items.filter(function (i) { return i.size || i.length; });
   var project = PileParse.cleanProject(d.project).trim();
