@@ -435,37 +435,44 @@ function pileSendChunks(lines) {
   });
   if (cur.length) sendPile(cur.join('\n'));
 }
-// 08:00 (จันทร์–เสาร์): สรุปสถานะงานที่ยังไม่จบทั้งหมด — แยกตามขั้นตอน + ทำเครื่องหมายงานที่เกินกำหนด
+// ทุกเช้า 08:00 (ทุกวัน): สรุปสถานะงานที่ยังไม่จบ ส่งเป็นข้อความธรรมดา (ไม่มีตัวหนา/ลิงก์ซ่อน) เพื่อกดคัดลอกจาก Telegram ไปวางใน LINE ให้คนอื่นรับรู้ได้เลย
+// ส่งทุกวันแม้ไม่มีงานค้าง (บอกว่า "ไม่มีงานค้าง") · ข้อความเดียวจบ ยกเว้นยาวเกินขีดจำกัดของ Telegram
+var TH_WD = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+var TH_MO = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+function pileThaiDate(ms) {
+  var p = new Date(ms + 7 * 36e5);
+  return 'วัน' + TH_WD[p.getUTCDay()] + 'ที่ ' + p.getUTCDate() + ' ' + TH_MO[p.getUTCMonth()] + ' ' + (p.getUTCFullYear() + 543);
+}
 function pileCalcDaily(force) {
   if (!pileChat()) return;
   var now = Date.now(), d0 = new Date(now);
   var hour = Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'H'));
-  var dow = Number(Utilities.formatDate(d0, 'Asia/Bangkok', 'u'));   // 1=จันทร์ … 7=อาทิตย์
   var day = Utilities.formatDate(d0, 'Asia/Bangkok', 'yyyy-MM-dd');
   var props = PropertiesService.getScriptProperties();
   if (force !== true) {
-    if (hour < 8 || hour > 9 || dow === 7) return;
+    if (hour < 8 || hour > 9) return;
     if (props.getProperty('PILECALC_LAST') === day) return;
   }
   var open = pileLoadOpen();
   if (open == null) return;
   if (force !== true) props.setProperty('PILECALC_LAST', day);
-  if (!open.length) { if (force === true) sendPile('✅ ไม่มีงานคำนวณเสาเข็มค้าง'); return; }
+  var head = '📋 สรุปสถานะงานขอรายการคำนวณเสาเข็ม\nประจำ' + pileThaiDate(now);
+  if (!open.length) { sendPile(head + '\n\n✅ ไม่มีงานค้าง — ทุกงานได้เอกสารตัวจริงแล้ว'); return; }
   var od = open.filter(function (r) { return pileIsOverdue(r, now); }).length;
-  var L = ['☀️ <b>สถานะงานคำนวณเสาเข็มที่ยังไม่จบ ' + open.length + ' งาน</b>' + (od ? '  ⚠️ เกินกำหนด ' + od + ' งาน' : '  ✅ ยังไม่เกินกำหนด')];
+  var L = [head, 'ยังไม่จบ ' + open.length + ' งาน' + (od ? ' · ⚠️ เกินกำหนด ' + od + ' งาน' : ' · ✅ ยังไม่เกินกำหนด')];
   PILE_ORDER.forEach(function (st) {
     var list = open.filter(function (r) { return r.status === st; });
     if (!list.length) return;
     list.sort(function (a, b) { return a.history[a.history.length - 1].t - b.history[b.history.length - 1].t; });
-    L.push('\n<b>' + PILE_WAIT[st] + '</b> (' + list.length + ')');
-    list.slice(0, 10).forEach(function (r) {
+    L.push('\n' + PILE_WAIT[st] + ' (' + list.length + ')');
+    list.slice(0, 10).forEach(function (r, k) {
       var since = r.history[r.history.length - 1].t, late = pileIsOverdue(r, now);
-      L.push('• ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-') + ' — ' + (late ? '⚠️ ' : '') + 'ค้าง ' + pileAge(now - since)
+      L.push((k + 1) + ') ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-') + (r.owner ? ' (' + esc(r.owner) + ')' : '') + '\n    ' + (late ? '⚠️ ' : '') + 'ค้าง ' + pileAge(now - since)
         + (st === 'received' || st === 'pdf_back' ? ' · ครบกำหนด ' + pileDueText(pileDeadline(since), now) : ''));
     });
     if (list.length > 10) L.push('… และอีก ' + (list.length - 10) + ' งาน');
   });
-  L.push('\n<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม (เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)</a>');
+  L.push('\nดูรายละเอียด: ' + DASHBOARD_URL + '\n(เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)');
   pileSendChunks(L);
 }
 // 15:00 เตือนก่อนครบ 16:00 · 16:00 เตือนงานที่เลยกำหนด (ยังไม่เขียนแบบ/คำนวณเสร็จ) — วันละครั้ง/ช่วง, จันทร์–เสาร์
