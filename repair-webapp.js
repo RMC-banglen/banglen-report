@@ -315,13 +315,13 @@ var PILE_MSG = {
   received: ['🆕', 'คำขอคำนวณเสาเข็มใหม่', function () { return pileDueHint(); }],
   drawn:    ['✏️', 'เขียนแบบ/คำนวณเสร็จแล้ว', function () { return 'ต่อไป: ส่ง zip ให้ สย.'; }],
   sent:     ['📤', 'ส่ง zip ให้ สย. แล้ว', function () { return '⏱ รอ PDF กลับภายใน ' + PILE_SLA.pdf + ' วัน'; }],
-  pdf_back: ['📥', 'ได้ PDF กลับจาก สย. แล้ว', function () { return 'ต่อไป: ตรวจ PDF'; }],
+  pdf_back: ['📥', 'ได้ PDF กลับจาก สย. แล้ว', function () { return pileDueHintCheck(); }],
   pdf_ok:   ['✅', 'ตรวจ PDF ผ่านแล้ว', function () { return '⏱ รอเอกสารตัวจริงภายใน ' + PILE_SLA.original + ' วัน'; }],
   revise:   ['↩️', 'ส่งแก้กลับ สย.', function () { return '⏱ รอ สย. ส่งคืนภายใน ' + PILE_SLA.pdf + ' วัน'; }],
   original: ['🏁', 'ได้เอกสารตัวจริงแล้ว — จบงาน', function () { return ''; }],
   cancel:   ['🚫', 'ยกเลิกงาน', function () { return ''; }]
 };
-var PILE_STL = { received: 'รับคำขอแล้ว', drawn: 'เขียนแบบ/คำนวณเสร็จ', sent: 'ส่ง zip ให้ สย. แล้ว', pdf_back: 'ได้ PDF กลับแล้ว', pdf_ok: 'ตรวจ PDF ผ่าน', revise: 'ส่งแก้กลับ สย.', original: 'ได้เอกสารตัวจริงแล้ว', cancel: 'ยกเลิก' };
+var PILE_STL = { received: 'รับคำขอแล้ว', drawn: 'เขียนแบบ/คำนวณเสร็จ', sent: 'ส่ง zip ให้ สย. แล้ว', pdf_back: 'ได้ PDF กลับแล้ว — รอตรวจ', pdf_ok: 'ตรวจ PDF ผ่าน', revise: 'ส่งแก้กลับ สย.', original: 'ได้เอกสารตัวจริงแล้ว', cancel: 'ยกเลิก' };
 function pileChat() {
   return PropertiesService.getScriptProperties().getProperty('PILE_CHAT_ID') || TELEGRAM_CHAT_PILE;
 }
@@ -392,6 +392,10 @@ function pileDueHint() {
   var n = Date.now();
   return '⏱ ต้องเขียนแบบ/คำนวณให้เสร็จภายใน <b>' + pileDueText(pileDeadline(n), n) + '</b>';
 }
+function pileDueHintCheck() {   // ได้ PDF กลับจาก สย. แล้ว ต้องตรวจ (ผ่าน/ส่งแก้) ภายในเส้นตาย 16:00 เหมือนงานเขียนแบบ
+  var n = Date.now();
+  return '⏱ ต้องตรวจ PDF (กด ตรวจผ่าน หรือ ส่งแก้กลับ สย.) ภายใน <b>' + pileDueText(pileDeadline(n), n) + '</b>';
+}
 function pileAge(ms) {
   return ms < 36e5 * 24 ? Math.max(1, Math.floor(ms / 36e5)) + ' ชม.' : Math.round(ms / 864e5) + ' วัน';
 }
@@ -400,7 +404,6 @@ function pileOverdueRule(st) {
   return {
     drawn:    [PILE_SLA.send, 'เขียนแบบเสร็จแล้ว แต่ยังไม่ส่ง สย.', 'f'],
     sent:     [PILE_SLA.pdf, 'สย. ยังไม่ส่ง PDF กลับ', 's'],
-    pdf_back: [1, 'ได้ PDF แล้ว แต่ยังไม่ตรวจ', 'f'],
     revise:   [PILE_SLA.pdf, 'ส่งแก้กลับแล้ว สย. ยังไม่ส่งคืน', 's'],
     pdf_ok:   [PILE_SLA.original, 'ยังไม่ได้รับเอกสารตัวจริง', 's']
   }[st];
@@ -408,7 +411,7 @@ function pileOverdueRule(st) {
 function pileIsOverdue(r, now) {
   var since = r.history && r.history.length ? r.history[r.history.length - 1].t : null;
   if (!since) return false;
-  if (r.status === 'received') return now >= pileDeadline(since);
+  if (r.status === 'received' || r.status === 'pdf_back') return now >= pileDeadline(since);
   var rule = pileOverdueRule(r.status);
   return !!rule && (now - since) / 864e5 >= rule[0];
 }
@@ -458,7 +461,7 @@ function pileCalcDaily(force) {
     list.slice(0, 10).forEach(function (r) {
       var since = r.history[r.history.length - 1].t, late = pileIsOverdue(r, now);
       L.push('• ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-') + ' — ' + (late ? '⚠️ ' : '') + 'ค้าง ' + pileAge(now - since)
-        + (st === 'received' ? ' · ครบกำหนด ' + pileDueText(pileDeadline(since), now) : ''));
+        + (st === 'received' || st === 'pdf_back' ? ' · ครบกำหนด ' + pileDueText(pileDeadline(since), now) : ''));
     });
     if (list.length > 10) L.push('… และอีก ' + (list.length - 10) + ' งาน');
   });
@@ -480,22 +483,30 @@ function pileCalcDeadlineCheck(forceSlot) {
   var open = pileLoadOpen();
   if (open == null) return;
   if (!forceSlot) props.setProperty('PILECALC_' + slot, day);
-  var list = open.filter(function (r) {
-    if (r.status !== 'received') return false;
+  var inSlot = function (r) {
     var dl = pileDeadline(r.history[r.history.length - 1].t);
     return slot === 'OVER' ? dl <= now : dl > now && Utilities.formatDate(new Date(dl), 'Asia/Bangkok', 'yyyy-MM-dd') === day;
-  });
-  if (!list.length) { if (forceSlot) sendPile('(ทดสอบ ' + slot + ') ไม่มีงานเข้าเงื่อนไข'); return; }
-  list.sort(function (a, b) { return a.history[a.history.length - 1].t - b.history[b.history.length - 1].t; });
+  };
+  var byT = function (a, b) { return a.history[a.history.length - 1].t - b.history[b.history.length - 1].t; };
+  var draw = open.filter(function (r) { return r.status === 'received' && inSlot(r); }).sort(byT);
+  var chk = open.filter(function (r) { return r.status === 'pdf_back' && inSlot(r); }).sort(byT);
+  if (!draw.length && !chk.length) { if (forceSlot) sendPile('(ทดสอบ ' + slot + ') ไม่มีงานเข้าเงื่อนไข'); return; }
+  var total = draw.length + chk.length;
   var L = [slot === 'OVER'
-    ? '🚨 <b>เลยกำหนด 16:00 น. — ยังเขียนแบบ/คำนวณไม่เสร็จ ' + list.length + ' งาน</b>'
-    : '⏰ <b>ใกล้ครบ 16:00 น. — ยังเขียนแบบ/คำนวณไม่เสร็จ ' + list.length + ' งาน</b>'];
-  list.slice(0, 15).forEach(function (r) {
-    var since = r.history[r.history.length - 1].t;
-    L.push('• ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-')
-      + (slot === 'OVER' ? ' — เลยกำหนดมา ' + pileAge(now - pileDeadline(since)) : ' — เข้ามาเมื่อ ' + Utilities.formatDate(new Date(since), 'Asia/Bangkok', 'H:mm') + ' น.'));
-  });
-  L.push(slot === 'OVER' ? '\nช่วยเร่งให้เสร็จ และกด "เขียนแบบ/คำนวณเสร็จ" ในหน้าติดตาม' : '\nช่วยเร่งให้เสร็จก่อน 16:00 น.');
+    ? '🚨 <b>เลยกำหนด 16:00 น. — มีงานค้าง ' + total + ' งาน</b>'
+    : '⏰ <b>ใกล้ครบ 16:00 น. — มีงานที่ยังไม่เสร็จ ' + total + ' งาน</b>'];
+  var section = function (title, list, hint) {
+    if (!list.length) return;
+    L.push('\n<b>' + title + '</b> (' + list.length + ')');
+    list.slice(0, 15).forEach(function (r) {
+      var since = r.history[r.history.length - 1].t;
+      L.push('• ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-')
+        + (slot === 'OVER' ? ' — เลยกำหนดมา ' + pileAge(now - pileDeadline(since)) : ' — ' + hint + ' ' + Utilities.formatDate(new Date(since), 'Asia/Bangkok', 'H:mm') + ' น.'));
+    });
+  };
+  section('🏭 ยังเขียนแบบ/คำนวณไม่เสร็จ', draw, 'เข้ามาเมื่อ');
+  section('🏭 ได้ PDF กลับแล้ว ยังไม่ตรวจ', chk, 'PDF มาเมื่อ');
+  L.push(slot === 'OVER' ? '\nช่วยเร่ง: กด "เขียนแบบ/คำนวณเสร็จ" หรือ "ตรวจผ่าน / ส่งแก้กลับ สย." ในหน้าติดตาม' : '\nช่วยเร่งให้เสร็จก่อน 16:00 น.');
   L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม</a>');
   pileSendChunks(L);
 }
