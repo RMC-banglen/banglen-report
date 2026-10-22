@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-22i';
+var APP_VERSION='2026-10-22j';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -2551,6 +2551,7 @@ window.__dataReady.then(data => {
     const moreTabs=tabs.slice(MAIN_COUNT);
     const moreActive=moreTabs.some(t=>t.id===tab);
     const [open,setOpen]=React.useState(false);
+    const [alignL,setAlignL]=React.useState(false);   // แถบแท็บตัดบรรทัดในจอแคบ → ปุ่ม "อื่นๆ" อาจอยู่ชิดซ้าย เมนูต้องกางไปทางขวาแทน
     const ref=React.useRef(null);
     React.useEffect(()=>{
       if(!open)return;
@@ -2562,8 +2563,8 @@ window.__dataReady.then(data => {
     return <nav className="tabs" style={{position:'relative',overflow:'visible'}}>
       {mainTabs.map(t=><button key={t.id} className={`tabs__btn ${tab===t.id?'is-active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}
       <div ref={ref} style={{position:'relative',flexShrink:0}}>
-        <button className={`tabs__btn ${moreActive?'is-active':''}`} onClick={()=>setOpen(o=>!o)}>อื่นๆ {open?'▴':'▾'}</button>
-        {open&&<div style={{position:'absolute',top:'100%',right:0,marginTop:4,background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,boxShadow:'0 8px 24px rgba(0,0,0,.12)',padding:6,minWidth:220,zIndex:50,display:'flex',flexDirection:'column',gap:2}}>
+        <button className={`tabs__btn ${moreActive?'is-active':''}`} onClick={()=>{if(ref.current)setAlignL(ref.current.getBoundingClientRect().right<240);setOpen(o=>!o);}}>อื่นๆ {open?'▴':'▾'}</button>
+        {open&&<div style={{position:'absolute',top:'100%',...(alignL?{left:0}:{right:0}),maxWidth:'calc(100vw - 24px)',marginTop:4,background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,boxShadow:'0 8px 24px rgba(0,0,0,.12)',padding:6,minWidth:220,zIndex:50,display:'flex',flexDirection:'column',gap:2}}>
           {moreTabs.map(t=><button key={t.id} onClick={()=>{setTab(t.id);setOpen(false);}} style={{textAlign:'left',border:0,background:tab===t.id?'#eff6ff':'transparent',color:tab===t.id?'var(--primary)':'#334155',fontFamily:'inherit',fontSize:13.5,fontWeight:600,padding:'9px 12px',borderRadius:7,cursor:'pointer'}}>{t.label}</button>)}
         </div>}
       </div>
