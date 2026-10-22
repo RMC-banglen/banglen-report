@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-22e';
+var APP_VERSION='2026-10-22f';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -2574,7 +2574,7 @@ window.__dataReady.then(data => {
       style={{width:'100%',minHeight:400,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
   }
 
-  function PileCalcFrame({canEdit}){
+  function PileCalcFrame({canEdit,sales}){
     const ref=React.useRef(null);
     const lastH=React.useRef(0);
     const resize=()=>{
@@ -2587,7 +2587,7 @@ window.__dataReady.then(data => {
     };
     React.useEffect(()=>{const id=setInterval(resize,400);return ()=>clearInterval(id);},[]);
     const cacheBust=React.useMemo(()=>Date.now(),[]);
-    return <iframe ref={ref} src={`pile-calc-request.html?v=${cacheBust}${canEdit?'':'&readonly=1'}`} title="ขอรายการคำนวณเสาเข็ม" onLoad={resize}
+    return <iframe ref={ref} src={`pile-calc-request.html?v=${cacheBust}${canEdit?'':(sales?'&sales=1':'&readonly=1')}`} title="ขอรายการคำนวณเสาเข็ม" onLoad={resize}
       style={{width:'100%',minHeight:600,border:'1px solid #e2e8f0',borderRadius:12,background:'#fff',display:'block'}}/>;
   }
 
@@ -12997,12 +12997,17 @@ window.__dataReady.then(data => {
           <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:4}}>ตำแหน่ง</div>
           <select value={nu.position||''} onChange={e=>{
             const pos=e.target.value;
-            const role=pos==='ผู้ดูแลระบบ'?'admin':pos==='ผู้บริหาร'||pos==='ฝ่ายที่ปรึกษา'?'viewer':'editor';
+            const role=pos==='ผู้ดูแลระบบ'?'admin':pos==='ผู้บริหาร'||pos==='ฝ่ายที่ปรึกษา'||pos==='ฝ่ายขาย'?'viewer':'editor';
+            if(pos==='ฝ่ายขาย'){ // ชุดสิทธิ์ฝ่ายขาย: เห็นเฉพาะแท็บ "ขอรายการคำนวณเสาเข็ม" (ขอคำขอใหม่ได้ แก้ไขงานไม่ได้)
+              setNu({...nu,position:pos,role:'viewer',permissions:{},tab_perms:{...Object.fromEntries(Object.keys(DEFAULT_TAB_PERMS).map(k=>[k,false])),pilecalc:true}});
+              return;
+            }
             setNu({...nu,position:pos,role});
           }} style={{width:'100%',padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:8,fontSize:13,background:'#fff'}}>
             <option value=''>-- เลือกตำแหน่ง --</option>
             {POSITION_OPTIONS.map(p=><option key={p} value={p}>{p}</option>)}
           </select>
+          {nu.position==='ฝ่ายขาย'&&<div style={{marginTop:6,fontSize:12,color:'#0f766e',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'6px 10px'}}>ตั้งสิทธิ์ชุดฝ่ายขายให้แล้ว: เห็นเฉพาะแท็บ "ขอรายการคำนวณเสาเข็ม" · ขอคำขอใหม่ได้ แต่แก้ไขงานที่มีอยู่ไม่ได้ (ปรับช่องติ๊กด้านล่างได้)</div>}
         </div>
         {nu.role==='editor'&&<div style={{marginBottom:10}}>
           <div style={{fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>สิทธิ์แก้ไข</div>
@@ -13107,7 +13112,7 @@ window.__dataReady.then(data => {
         {tab==='transport'&&<TransportTripTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).transport)}/>}
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
         {tab==='accident'&&<AccidentReportTab currentUser={currentUser}/>}
-        {tab==='pilecalc'&&<div style={{padding:'16px 0'}}><PileCalcFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pilecalc)}/></div>}
+        {tab==='pilecalc'&&<div style={{padding:'16px 0'}}><PileCalcFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pilecalc)} sales={currentUser.position==='ฝ่ายขาย'}/></div>}
         {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pileMaterials)} formulaAdmin={!!(currentUser.permissions||{}).materialFormula}/></div>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>
