@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-22h';
+var APP_VERSION='2026-10-22i';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -8113,32 +8113,32 @@ window.__dataReady.then(data => {
         </span>}
       </div>
       <div style={{display:'flex',gap:16,marginBottom:24,flexWrap:'wrap'}}>
-        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid '+PALETTE.produced,borderRadius:18,padding:'20px 40px 18px',flex:'1 1 220px',minWidth:0,boxShadow:'0 4px 20px rgba(47,150,80,0.12)'}}>
+        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid '+PALETTE.produced,borderRadius:18,padding:'20px clamp(16px,3vw,40px) 18px',flex:'1 1 220px',minWidth:0,boxShadow:'0 4px 20px rgba(47,150,80,0.12)'}}>
           <span style={{fontSize:16,fontWeight:700,color:PALETTE.produced,letterSpacing:'0.5px',marginBottom:8}}>คิวผลิตจริง</span>
-          <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
-            {fmt(kpis[0].val,0)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
+          <span style={{fontSize:'clamp(40px,6.5vw,64px)',fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
+            {fmt(kpis[0].val,0)}<span style={{fontSize:'clamp(18px,3vw,28px)',fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
           </span>
           {kpis[0].prev!=null&&<div style={{marginTop:10,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
             <span style={{fontSize:14,color:'#94a3b8'}}>ปีก่อน: {fmt(kpis[0].prev,0)} m³</span>
             <span style={{fontSize:15,fontWeight:700,color:(kpis[0].val-kpis[0].prev)>=0?'#3f7d2b':'#c0392b'}}>{(kpis[0].val-kpis[0].prev)>=0?'▲':'▼'} {fmt(Math.abs(kpis[0].val-kpis[0].prev),0)} m³</span>
           </div>}
         </div>
-        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid #5a8f3c',borderRadius:18,padding:'20px 40px 18px',flex:'1 1 220px',minWidth:0,boxShadow:'0 4px 20px rgba(90,143,60,0.12)'}}>
+        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid #5a8f3c',borderRadius:18,padding:'20px clamp(16px,3vw,40px) 18px',flex:'1 1 220px',minWidth:0,boxShadow:'0 4px 20px rgba(90,143,60,0.12)'}}>
           <span style={{fontSize:16,fontWeight:700,color:'#5a8f3c',letterSpacing:'0.5px',marginBottom:8}}>เปอร์เซ็นต์ผลิต</span>
-          <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
-            {fmt(kpis[1].val,1)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>%</span>
+          <span style={{fontSize:'clamp(40px,6.5vw,64px)',fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
+            {fmt(kpis[1].val,1)}<span style={{fontSize:'clamp(18px,3vw,28px)',fontWeight:700,color:'#64748b',marginLeft:8}}>%</span>
           </span>
           {kpis[1].prev!=null&&<div style={{marginTop:10,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
             <span style={{fontSize:14,color:'#94a3b8'}}>ปีก่อน: {fmt(kpis[1].prev,1)}%</span>
             <span style={{fontSize:15,fontWeight:700,color:(kpis[1].val-kpis[1].prev)>=0?'#3f7d2b':'#c0392b'}}>{(kpis[1].val-kpis[1].prev)>=0?'▲':'▼'} {fmt(Math.abs(kpis[1].val-kpis[1].prev),1)}%</span>
           </div>}
         </div>
-        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid #2f5fd0',borderRadius:18,padding:'20px 40px 18px',flex:'1 1 220px',minWidth:0,boxShadow:'0 4px 20px rgba(47,95,208,0.12)'}}>
+        <div style={{display:'flex',flexDirection:'column',background:'#fff',border:'3px solid #2f5fd0',borderRadius:18,padding:'20px clamp(16px,3vw,40px) 18px',flex:'1 1 220px',minWidth:0,boxShadow:'0 4px 20px rgba(47,95,208,0.12)'}}>
           <span style={{fontSize:16,fontWeight:700,color:'#2f5fd0',letterSpacing:'0.5px',marginBottom:8}}>งานรอผลิต (บางเลน)</span>
           {pending
             ? <>
-                <span style={{fontSize:64,fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
-                  {fmt(pending.value_m3,0)}<span style={{fontSize:28,fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
+                <span style={{fontSize:'clamp(40px,6.5vw,64px)',fontWeight:900,color:'#1e293b',lineHeight:1,letterSpacing:'-2px'}}>
+                  {fmt(pending.value_m3,0)}<span style={{fontSize:'clamp(18px,3vw,28px)',fontWeight:700,color:'#64748b',marginLeft:8}}>m³</span>
                 </span>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginTop:12,flexWrap:'wrap'}}>
                   <span style={{fontSize:15,fontWeight:700,color:'#fff',background:'#2f5fd0',borderRadius:8,padding:'4px 14px',display:'inline-block'}}>อัพเดท {(()=>{const p=String(pending.updated_date).slice(0,10).split('-');return p[2]+'/'+p[1]+'/'+(Number(p[0])+543);})()}</span>
