@@ -374,6 +374,13 @@ function notifyPileCalc(d) {
 }
 // ── กำหนดเขียนแบบ/คำนวณ: งานที่เข้าวันไหน ต้องเสร็จภายใน 16:00 น. ของวันนั้น ─────────────
 // เข้าหลัง 16:00 หรือวันอาทิตย์ → เลื่อนเป็น 16:00 ของวันทำการถัดไป (จันทร์–เสาร์) · เวลาไทย (UTC+7)
+function pileStageStart(r) {
+  var h = r.history || [];
+  if (!h.length) return null;
+  var i = h.length - 1;
+  while (i > 0 && h[i - 1].status === h[i].status) i--;
+  return h[i].t;
+}
 var PILE_DUE_MIN = 16 * 60;
 function pileDeadline(t) {
   var b = new Date(t + 7 * 36e5);
@@ -397,7 +404,7 @@ function pileDueHintCheck() {   // ได้ PDF กลับจาก สย. �
   return '⏱ ต้องตรวจ PDF (กด ตรวจผ่าน หรือ ส่งแก้กลับ สย.) ภายใน <b>' + pileDueText(pileDeadline(n), n) + '</b>';
 }
 function pileAge(ms) {
-  return ms < 36e5 * 24 ? Math.max(1, Math.floor(ms / 36e5)) + ' ชม.' : Math.round(ms / 864e5) + ' วัน';
+  return ms < 36e5 ? Math.max(1, Math.floor(ms / 6e4)) + ' นาที' : ms < 36e5 * 24 ? Math.floor(ms / 36e5) + ' ชม.' : Math.round(ms / 864e5) + ' วัน';
 }
 // กฎเกินกำหนด (ตรงกับ overdue() ในหน้า pile-calc-request) — ขั้น "รอเขียนแบบ" ใช้เส้นตาย 16:00 · ขั้นอื่นนับเป็นวัน
 function pileOverdueRule(st) {
@@ -409,7 +416,7 @@ function pileOverdueRule(st) {
   }[st];
 }
 function pileIsOverdue(r, now) {
-  var since = r.history && r.history.length ? r.history[r.history.length - 1].t : null;
+  var since = pileStageStart(r);
   if (!since) return false;
   if (r.status === 'received' || r.status === 'pdf_back') return now >= pileDeadline(since);
   var rule = pileOverdueRule(r.status);
@@ -463,12 +470,10 @@ function pileCalcDaily(force) {
   PILE_ORDER.forEach(function (st) {
     var list = open.filter(function (r) { return r.status === st; });
     if (!list.length) return;
-    list.sort(function (a, b) { return a.history[a.history.length - 1].t - b.history[b.history.length - 1].t; });
+    list.sort(function (a, b) { return pileStageStart(a) - pileStageStart(b); });
     L.push('\n' + PILE_WAIT[st] + ' (' + list.length + ')');
     list.slice(0, 10).forEach(function (r, k) {
-      var since = r.history[r.history.length - 1].t, late = pileIsOverdue(r, now);
-      L.push((k + 1) + ') ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-') + (r.owner ? ' (' + esc(r.owner) + ')' : '') + '\n    ' + (late ? '⚠️ ' : '') + 'ค้าง ' + pileAge(now - since)
-        + (st === 'received' || st === 'pdf_back' ? ' · ครบกำหนด ' + pileDueText(pileDeadline(since), now) : ''));
+      L.push((k + 1) + ') ' + (pileIsOverdue(r, now) ? '⚠️ ' : '') + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-') + (r.owner ? ' (' + esc(r.owner) + ')' : ''));
     });
     if (list.length > 10) L.push('… และอีก ' + (list.length - 10) + ' งาน');
   });
@@ -491,10 +496,10 @@ function pileCalcDeadlineCheck(forceSlot) {
   if (open == null) return;
   if (!forceSlot) props.setProperty('PILECALC_' + slot, day);
   var inSlot = function (r) {
-    var dl = pileDeadline(r.history[r.history.length - 1].t);
+    var dl = pileDeadline(pileStageStart(r));
     return slot === 'OVER' ? dl <= now : dl > now && Utilities.formatDate(new Date(dl), 'Asia/Bangkok', 'yyyy-MM-dd') === day;
   };
-  var byT = function (a, b) { return a.history[a.history.length - 1].t - b.history[b.history.length - 1].t; };
+  var byT = function (a, b) { return pileStageStart(a) - pileStageStart(b); };
   var draw = open.filter(function (r) { return r.status === 'received' && inSlot(r); }).sort(byT);
   var chk = open.filter(function (r) { return r.status === 'pdf_back' && inSlot(r); }).sort(byT);
   if (!draw.length && !chk.length) { if (forceSlot) sendPile('(ทดสอบ ' + slot + ') ไม่มีงานเข้าเงื่อนไข'); return; }
@@ -506,7 +511,7 @@ function pileCalcDeadlineCheck(forceSlot) {
     if (!list.length) return;
     L.push('\n<b>' + title + '</b> (' + list.length + ')');
     list.slice(0, 15).forEach(function (r) {
-      var since = r.history[r.history.length - 1].t;
+      var since = pileStageStart(r);
       L.push('• ' + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-')
         + (slot === 'OVER' ? ' — เลยกำหนดมา ' + pileAge(now - pileDeadline(since)) : ' — ' + hint + ' ' + Utilities.formatDate(new Date(since), 'Asia/Bangkok', 'H:mm') + ' น.'));
     });
