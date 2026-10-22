@@ -7,15 +7,28 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-22b';
+var APP_VERSION='2026-10-22c';
 (function(){
+  // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
+  // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
+  var first=true;
+  var banner=function(v){
+    if(document.getElementById('upd-banner')||!document.body)return;
+    var b=document.createElement('div');b.id='upd-banner';
+    b.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#13508A;color:#fff;padding:12px 16px;border-radius:10px;font:600 14px/1.4 system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;gap:12px;align-items:center;justify-content:space-between';
+    b.innerHTML='<span>มีเวอร์ชันใหม่ของระบบ</span><span><button id="upd-later" style="margin-right:8px;padding:6px 12px;border:1px solid rgba(255,255,255,.5);border-radius:8px;background:transparent;color:#fff;font:inherit;cursor:pointer">ไว้ทีหลัง</button><button id="upd-now" style="padding:6px 12px;border:0;border-radius:8px;background:#fff;color:#13508A;font:inherit;cursor:pointer">รีเฟรชตอนนี้</button></span>';
+    document.body.appendChild(b);
+    document.getElementById('upd-now').onclick=function(){location.replace(location.pathname+'?v='+v);};
+    document.getElementById('upd-later').onclick=function(){b.remove();};
+  };
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
       .then(function(r){return r.text();})
       .then(function(t){
         var m=t.match(/APP_VERSION='([^']+)'/);
-        if(m&&m[1]!==APP_VERSION) location.replace(location.pathname+'?v='+m[1]);
-      }).catch(function(){});
+        if(m&&m[1]!==APP_VERSION){ if(first) location.replace(location.pathname+'?v='+m[1]); else banner(m[1]); }
+        first=false;
+      }).catch(function(){first=false;});
   };
   check();
   document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
