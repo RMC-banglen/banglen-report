@@ -1,0 +1,28 @@
+{
+  "id": "./pile-calc-request.html",
+  "name": "ขอรายการคำนวณเสาเข็ม — ร่วมมิตรคอนกรีต(บางเลน)",
+  "short_name": "คำนวณเสาเข็ม",
+  "description": "ติดตามคำขอรายการคำนวณเสาเข็มส่ง สย. — ตรวจ PDF เตือนงานค้าง",
+  "lang": "th",
+  "dir": "ltr",
+  "start_url": "./pile-calc-request.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EBF1F8",
+  "theme_color": "#13508A",
+  "icons": [
+    {
+      "src": "icons/pilecalc-icon-192.png?v=1",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/pilecalc-icon-512.png?v=1",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
