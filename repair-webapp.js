@@ -427,12 +427,22 @@ var PILE_WAIT = {
   received: '🏭 รอเขียนแบบ/คำนวณ', drawn: '🏭 เขียนเสร็จ รอส่ง สย.', sent: '📮 ส่ง สย. แล้ว รอ PDF กลับ',
   pdf_back: '🏭 ได้ PDF แล้ว รอตรวจ', revise: '📮 ส่งแก้กลับ รอ สย.', pdf_ok: '📮 ตรวจผ่านแล้ว รอเอกสารตัวจริง'
 };
-function pileLoadOpen() {
+function pileLoadAll() {
   var res = sb('get', 'pile_calc_requests?select=data');
-  if (res.getResponseCode() >= 300) { Logger.log('pileLoadOpen: ' + res.getContentText()); return null; }
-  return JSON.parse(res.getContentText() || '[]').map(function (x) { return x.data || {}; }).filter(function (r) {
-    return PILE_ORDER.indexOf(r.status) >= 0 && r.history && r.history.length;
-  });
+  if (res.getResponseCode() >= 300) { Logger.log('pileLoadAll: ' + res.getContentText()); return null; }
+  return JSON.parse(res.getContentText() || '[]').map(function (x) { return x.data || {}; }).filter(function (r) { return r.history && r.history.length; });
+}
+function pileLoadOpen() {
+  var all = pileLoadAll();
+  return all == null ? null : all.filter(function (r) { return PILE_ORDER.indexOf(r.status) >= 0; });
+}
+// เกินกำหนดมากี่วัน (นับวันที่เริ่มเกินเป็น 1) — ใช้ท้ายบรรทัดงานในสรุปเช้า
+function pileOverdueDays(r, now) {
+  var since = pileStageStart(r);
+  if (!since) return 0;
+  if (r.status === 'received' || r.status === 'pdf_back') return Math.max(1, Math.ceil((now - pileDeadline(since)) / 864e5));
+  var rule = pileOverdueRule(r.status);
+  return rule ? Math.max(1, Math.ceil((now - since) / 864e5 - rule[0])) : 0;
 }
 function pileSendChunks(lines) {
   var cur = [], len = 0;
@@ -460,23 +470,33 @@ function pileCalcDaily(force) {
     if (hour < 8 || hour > 9) return;
     if (props.getProperty('PILECALC_LAST') === day) return;
   }
-  var open = pileLoadOpen();
-  if (open == null) return;
+  var all = pileLoadAll();
+  if (all == null) return;
   if (force !== true) props.setProperty('PILECALC_LAST', day);
+  var open = all.filter(function (r) { return PILE_ORDER.indexOf(r.status) >= 0; });
+  var b0 = new Date(now + 7 * 36e5), midnight = Date.UTC(b0.getUTCFullYear(), b0.getUTCMonth(), b0.getUTCDate()) - 7 * 36e5;   // 00:00 วันนี้ (เวลาไทย)
+  var doneY = all.filter(function (r) { var t = pileStageStart(r); return r.status === 'original' && t >= midnight - 864e5 && t < midnight; }).length;   // จบ (ได้เอกสารตัวจริง) เมื่อวาน
   var head = '📋 สรุปสถานะงานขอรายการคำนวณเสาเข็ม\nประจำ' + pileThaiDate(now);
-  if (!open.length) { sendPile(head + '\n\n✅ ไม่มีงานค้าง — ทุกงานได้เอกสารตัวจริงแล้ว'); return; }
+  var tail = doneY ? '\n✅ เมื่อวานจบแล้ว ' + doneY + ' งาน (ได้เอกสารตัวจริง)' : '';
+  if (!open.length) { sendPile(head + '\n\n✅ ไม่มีงานค้าง — ทุกงานได้เอกสารตัวจริงแล้ว' + tail); return; }
   var od = open.filter(function (r) { return pileIsOverdue(r, now); }).length;
   var L = [head, 'ยังไม่จบ ' + open.length + ' งาน' + (od ? ' · ⚠️ เกินกำหนด ' + od + ' งาน' : ' · ✅ ยังไม่เกินกำหนด')];
+  // งานที่ครบเส้นตาย 16:00 วันนี้ (รอเขียนแบบ / รอตรวจ PDF)
+  var dueToday = function (st) { return open.filter(function (r) { var dl = pileDeadline(pileStageStart(r)); return r.status === st && dl >= midnight && dl < midnight + 864e5; }).length; };
+  var dD = dueToday('received'), dC = dueToday('pdf_back');
+  if (dD + dC) L.push('⏱ วันนี้ต้องเสร็จภายใน 16:00 น.: ' + (dD + dC) + ' งาน (' + [dD ? 'เขียนแบบ ' + dD : '', dC ? 'ตรวจ PDF ' + dC : ''].filter(Boolean).join(' · ') + ')');
   PILE_ORDER.forEach(function (st) {
     var list = open.filter(function (r) { return r.status === st; });
     if (!list.length) return;
     list.sort(function (a, b) { return pileStageStart(a) - pileStageStart(b); });
     L.push('\n' + PILE_WAIT[st] + ' (' + list.length + ')');
     list.slice(0, 10).forEach(function (r, k) {
-      L.push((k + 1) + ') ' + (pileIsOverdue(r, now) ? '⚠️ ' : '') + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-') + (r.owner ? ' (' + esc(r.owner) + ')' : ''));
+      var late = pileIsOverdue(r, now);
+      L.push((k + 1) + ') ' + (late ? '⚠️ ' : '') + esc(r.code || 'ยังไม่มีรหัส') + ' ' + esc(r.project || '-') + (r.owner ? ' (' + esc(r.owner) + ')' : '') + (late ? ' — เกิน ' + pileOverdueDays(r, now) + ' วัน' : ''));
     });
     if (list.length > 10) L.push('… และอีก ' + (list.length - 10) + ' งาน');
   });
+  if (tail) L.push(tail);
   L.push('\nดูรายละเอียด: ' + DASHBOARD_URL + '\n(เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)');
   pileSendChunks(L);
 }
