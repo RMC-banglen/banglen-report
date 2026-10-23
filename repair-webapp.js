@@ -467,7 +467,7 @@ function pileCalcDaily(force) {
   var day = Utilities.formatDate(d0, 'Asia/Bangkok', 'yyyy-MM-dd');
   var props = PropertiesService.getScriptProperties();
   if (force !== true) {
-    if (hour < 8 || hour > 9) return;
+    if (hour < 8 || hour > 11) return;   // ช่วง 08:00–11:59 (กันกรณีทริกเกอร์มาช้า/สคริปต์ล่ม แล้วกลับมาสาย) · ส่งวันละครั้ง
     if (props.getProperty('PILECALC_LAST') === day) return;
   }
   var all = pileLoadAll();
@@ -828,6 +828,9 @@ function handlePileText(m, text, sender) {
 function setupPileCalc() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'pileTelegramPoll') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('pileTelegramPoll').timeBased().everyMinutes(1).create();
+  // สรุปเช้าไม่พึ่งทริกเกอร์เตือนซ่อม: ตั้งทริกเกอร์ของตัวเองทุกวัน 08:00 (เวลาไทย)
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'pileCalcDaily') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('pileCalcDaily').timeBased().atHour(8).everyDays(1).inTimezone('Asia/Bangkok').create();
   sendPile('✅ ระบบรับคำขอจากข้อความพร้อมแล้ว — วางข้อความคำขอ (เหมือนที่วางในหน้า "รับคำขอใหม่") ในกลุ่มนี้ ระบบจะบันทึกให้เองภายใน 1 นาที\nต้องมี: บรรทัด "โครงการ ..." + เสา เช่น I0.22×18.00 เมตร (อย่างน้อย 2 บรรทัด)');
 }
 
@@ -845,7 +848,7 @@ function setup() {
 function stopReminder(silent) {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var h = t.getHandlerFunction();
-    if (h === 'repairReminderCheck' || h === 'routineCheck' || h === 'weeklySummary' || h === 'pileTelegramPoll') ScriptApp.deleteTrigger(t);
+    if (h === 'repairReminderCheck' || h === 'routineCheck' || h === 'weeklySummary' || h === 'pileTelegramPoll' || h === 'pileCalcDaily') ScriptApp.deleteTrigger(t);
   });
   if (silent !== true) Logger.log('ยกเลิกการเตือนทั้งหมดแล้ว');
 }
