@@ -542,6 +542,8 @@ function pileCalcDeadlineCheck(forceSlot) {
   L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม</a>');
   pileSendChunks(L);
 }
+// ทดสอบสรุปเช้า: กด Run → ส่งสรุปสถานะเข้ากลุ่มทันที (ไม่สนว่ากี่โมง) — ถ้ารัน pileCalcDaily ตรงๆ นอกเวลา 08:00–11:59 จะไม่ส่งอะไร
+function testPileDaily() { pileCalcDaily(true); }
 // ทดสอบ: กด Run ฟังก์ชันนี้ → ส่งสรุปงานเกินกำหนดเข้ากลุ่ม Rmc คำนวณเสาเข็ม ทันที (ไม่นับเป็นรอบของวัน)
 function testPileCalc() {
   sendPile('✅ ทดสอบ: แจ้งเตือนขอรายการคำนวณเสาเข็ม เข้ากลุ่ม Rmc คำนวณเสาเข็ม ได้แล้ว');
