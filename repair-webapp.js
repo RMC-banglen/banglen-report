@@ -634,11 +634,12 @@ var PileParse = (function () {
     const it = emptyItem();
     if (/สี่เหลี่ยม|(?:^|[^a-z])S\s*-?\s*\d/i.test(line)) it.section = 'S';
     const v = parseFloat(sz[1]); it.size = String(v < 1 ? v : v / 100);
-    const lens = [...line.matchAll(/[x×*]\s*(\d+(?:\.\d+)?)\s*(?:เมตร|ม|m)?/gi)].map(m => m[1]).filter(x => parseFloat(x) >= 1);
+    const lens = [...line.replace(/\d*\s*DB\s*\d+\s*[x×*]\s*\d+(?:\.\d+)?/gi, ' ').matchAll(/[x×*]\s*(\d+(?:\.\d+)?)\s*(?:เมตร|ม|m)?(?!\s*ท่อน)/gi)].map(m => m[1]).filter(x => parseFloat(x) >= 1);   // ตัดเหล็กเสริม (4DB12x2.50) และ "x9ท่อน" ออก ไม่ให้ถูกนับเป็นความยาวเสา
     const len = line.match(/ยาว\s*(\d+(?:\.\d+)?)/);
     const seg = line.match(/(\d+(?:\.\d+)?)\s*(?:ม\.?|m\.?)\s*[x×*]?\s*(\d+)\s*ท่อน/i);
     if (len) it.length = len[1]; else if (lens.length) it.length = lens[lens.length - 1];
-    if (/ไมโคร|micro/i.test(line) || seg) {
+    const segShort = seg && parseFloat(seg[1]) <= 4;   // ท่อนสั้น ≤ 4 ม. = ไมโครไพล์ · "22ม. 2ท่อนต่อ" = เสาต่อเชื่อมปกติ ไม่ใช่ไมโครไพล์
+    if (/ไมโคร|micro/i.test(line) || segShort) {
       it.micro = true;
       const ml = line.match(/(?:ไมโคร\S*|micro\S*)\s*(\d+(?:\.\d+)?)\s*(?:ม|m)/i);
       if (seg) { it.segLen = seg[1]; it.segCount = seg[2]; } else if (ml) it.segLen = ml[1];
@@ -646,7 +647,7 @@ var PileParse = (function () {
       if (!it.length && it.segLen && it.segCount) it.length = String(parseFloat(it.segLen) * parseInt(it.segCount));
       if (!it.segCount && it.segLen && it.length) it.segCount = String(Math.round(parseFloat(it.length) / parseFloat(it.segLen)));
     }
-    if (!it.micro) { if (/ต\s*\/\s*ช|ตช|ต่อเชื่อม|ต่อ\s*เชื่อม/.test(line)) it.joint = 'joined'; else it.joint = 'single'; } else it.joint = 'micro';
+    if (!it.micro) { if (/ต\s*\/\s*ช|ตช|ต่อเชื่อม|ต่อ\s*เชื่อม|ท่อน\s*ต่อ|\d\s*ท่อน/.test(line)) it.joint = 'joined'; else it.joint = 'single'; } else it.joint = 'micro';
     if (/โรงงาน|ธรรมดา/.test(line)) it.std = 'factory'; else if (/มอก|TIS/i.test(line)) it.std = 'tis';
     const qa = line.match(/Qa\.?\s*[=:]?\s*(\d+(?:\.\d+)?)/i) || line.match(/(\d+(?:\.\d+)?)\s*ตัน/); if (qa) it.qa = qa[1];
     const q = line.match(/(\d+)\s*ต้น/); if (q) it.qty = q[1];
