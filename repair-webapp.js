@@ -651,6 +651,7 @@ var PileParse = (function () {
     if (/โรงงาน|ธรรมดา/.test(line)) it.std = 'factory'; else if (/มอก|TIS/i.test(line)) it.std = 'tis';
     const qa = line.match(/Qa\.?\s*[=:]?\s*(\d+(?:\.\d+)?)/i) || line.match(/(\d+(?:\.\d+)?)\s*ตัน/); if (qa) it.qa = qa[1];
     const q = line.match(/(\d+)\s*ต้น/); if (q) it.qty = q[1];
+    const dw = line.match(/(\d+)\s*-?\s*(DB|RB)\s*(\d+)\s*(?:mm\.?)?\s*(?:[x×*]\s*(\d+(?:\.\d+)?))?/i); if (dw && !/^(สล|สลัก|เหล็กเดือย|เสริมเหล็ก|เสริม|dowel)/i.test(line)) it.dowel = `${dw[1]}${dw[2].toUpperCase()}${dw[3]}${dw[4] ? '×' + parseFloat(dw[4]).toFixed(2) + ' ม.' : ''}`;
     return it;
   }
   
@@ -677,12 +678,20 @@ var PileParse = (function () {
       if ((m = l.match(/ตุ้ม\D*?(\d+(?:\.\d+)?)/))) { setLast('hammer', m[1]); return; }
       if (/^(ยก|ระยะยก)/.test(l) && (m = l.match(/(\d+(?:\.\d+)?)/))) { setLast('drop', m[1]); return; }
       if (/^Qa/i.test(l) && (m = l.match(/Qa\.?\s*[=:]?\s*(\d+(?:\.\d+)?)/i))) { setLast('qa', m[1]); return; }
-      if (/^(ชื่อ)?(โ?ครงการ|ชื่องาน)/.test(l)) { d.project = cleanProject(l); last = 'project'; return; }
+      if (/^(ชื่อ)?(โ?ครงการ|ชื่องาน)/.test(l)) {
+      let p = cleanProject(l); const sp = p.match(/\s(?:ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|ถ\.|ถนน|ซ\.|ซอย)/);   // ชื่อโครงการกับที่อยู่อยู่บรรทัดเดียวกัน → แยกที่อยู่ไปช่องสถานที่
+      if (sp && sp.index > 3) { addLoc(p.slice(sp.index).trim()); p = p.slice(0, sp.index).trim(); last = 'loc'; } else last = 'project';
+      d.project = p; return;
+    }
       if (/^(สถานที่|ที่ตั้ง|หน้างาน|ที่อยู่)/.test(l)) { d.location = l.replace(/^(สถานที่|ที่ตั้ง|หน้างาน|ที่อยู่)\s*[:：]?\s*/, ''); last = 'loc'; return; }
       if (/^(ผู้ขอ|เซลล์|sale|ผู้ส่ง)/i.test(l)) { d.requester = l.replace(/^(ผู้ขอ|เซลล์|sale|ผู้ส่ง)\s*[:：]?\s*/i, ''); return; }
-      const it = parseItem(l); if (it) { d.items.push(it); last = 'item'; return; }
+      const it = parseItem(l); if (it) {
+      if (!d.project) { const szm = l.match(/(?:^|[^a-z])(?:I|ไอ|S|สี่เหลี่ยม|เสา)\s*-?\s*(?:0?\.\d{2}|\d{2})(?!\d)/i); const pre = szm ? l.slice(0, szm.index).replace(/^\s*(?:ขอ|รบกวน)?\s*รายการ\s*คำนวณ\s*(?:เสาเข็ม)?\s*[-–:：]*\s*/, '').replace(/[\s\-–:：]+$/, '').trim() : ''; if (pre && pre.length >= 3 && /[ก-๙A-Za-z]/.test(pre)) { d.project = pre; } }
+      d.items.push(it); last = 'item'; return;
+    }
       if (!d.owner && d.project && /^(บริษัท|บจก|บมจ|หจก|ห้างหุ้นส่วน|คุณ|นาย|นาง|โรงพยาบาล|รพ\.|โรงเรียน|มหาวิทยาลัย|วัด|อบต|อบจ|เทศบาล|องค์การ|กรม|สำนักงาน|การไฟฟ้า|การประปา|มูลนิธิ|สหกรณ์)/.test(l)) { setOwner(l); last = 'loc'; return; }
       if (/^(ขอ|รบกวน)/.test(l)) return;
+    if (/^(เสาเข็ม\s*)?(มอก|มาตรฐาน)\S*\s*(\(?pdf\)?)?\s*$/i.test(l)) return;
       if (street.test(l) && (d.location || last === 'loc')) { addLoc(l); last = 'loc'; }
       else if (last === 'project' && !street.test(l)) d.project += ' ' + l;
       else if (!d.project) { d.project = l; last = 'project'; }
