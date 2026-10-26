@@ -9146,12 +9146,18 @@ window.__dataReady.then(data => {
 
   function CementAdditionTab({currentUser}){
     const db=DB;
-    const EMPTY={add_date:new Date().toISOString().slice(0,10),raft_num:'',reason:'',pile_item:'',customer_name:'',formula:'',note:''};
+    const pad2=n=>String(n).padStart(2,'0');
+    const dateKey=(y,m,d)=>y+'-'+pad2(m+1)+'-'+pad2(d);
+    const localToday=()=>{const n=new Date();return dateKey(n.getFullYear(),n.getMonth(),n.getDate());};
+    const EMPTY={add_date:localToday(),raft_num:'',reason:'',pile_item:'',customer_name:'',formula:'',note:''};
     const [items,setItems]=useState([]);
     const [loading,setLoading]=useState(true);
     const [showForm,setShowForm]=useState(false);
     const [editId,setEditId]=useState(null);
     const [form,setForm]=useState(EMPTY);
+    // เพิ่มรายการใหม่เลือกได้หลายวัน (เหตุผลเดียวกันแต่คนละวัน กรอกครั้งเดียวแล้วสร้างให้ทุกวัน)
+    const [dates,setDates]=useState(()=>[localToday()]);
+    const [cal,setCal]=useState(()=>{const n=new Date();return{y:n.getFullYear(),m:n.getMonth()};});
     const [saving,setSaving]=useState(false);
     const [errMsg,setErrMsg]=useState('');
     const [confirmDel,setConfirmDel]=useState(null);
@@ -9159,10 +9165,10 @@ window.__dataReady.then(data => {
     const load=()=>{db.from('cement_addition_log').select('*').order('add_date',{ascending:false}).then(({data})=>{setItems(data||[]);setLoading(false);});};
     useEffect(load,[]);
     const fmtDate=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return`${p[2]}/${p[1]}/${Number(p[0])+543}`;};
-    const openNew=()=>{setForm(EMPTY);setEditId(null);setErrMsg('');setShowForm(true);};
+    const openNew=()=>{setForm({...EMPTY,add_date:localToday()});setDates([localToday()]);{const n=new Date();setCal({y:n.getFullYear(),m:n.getMonth()});}setEditId(null);setErrMsg('');setShowForm(true);};
     const openEdit=item=>{setForm({add_date:item.add_date||'',raft_num:item.raft_num||'',reason:item.reason||'',pile_item:item.pile_item||'',customer_name:item.customer_name||'',formula:item.formula||'',note:item.note||''});setEditId(item.id);setErrMsg('');setShowForm(true);};
     const handleSave=async()=>{
-      if(!form.add_date){setErrMsg('❌ กรุณาเลือกวันที่เพิ่มปูน');return;}
+      if(editId?!form.add_date:dates.length===0){setErrMsg('❌ กรุณาเลือกวันที่เพิ่มปูนอย่างน้อย 1 วัน');return;}
       setSaving(true);setErrMsg('');
       // แปลงค่าว่างเป็น null ก่อนส่งเข้า Supabase เสมอ (เคยพังเพราะส่ง '' เข้าคอลัมน์ type date/int มาแล้ว)
       const row={add_date:form.add_date,raft_num:form.raft_num?Number(form.raft_num):null,reason:form.reason||null,pile_item:form.pile_item||null,customer_name:form.customer_name||null,formula:form.formula||null,note:form.note||null,updated_at:new Date().toISOString()};
@@ -9171,14 +9177,47 @@ window.__dataReady.then(data => {
         setSaving(false);
         if(error){setErrMsg('❌ บันทึกไม่สำเร็จ: '+error.message);return;}
       }else{
-        const{error}=await db.from('cement_addition_log').insert({...row,created_at:new Date().toISOString()});
+        const stamp=new Date().toISOString();
+        const{error}=await db.from('cement_addition_log').insert(dates.map(d=>({...row,add_date:d,created_at:stamp})));
         setSaving(false);
         if(error){setErrMsg('❌ บันทึกไม่สำเร็จ: '+error.message);return;}
       }
-      setShowForm(false);setEditId(null);setForm(EMPTY);setErrMsg('');
+      setShowForm(false);setEditId(null);setForm({...EMPTY,add_date:localToday()});setDates([localToday()]);setErrMsg('');
       load();
     };
     const handleDel=async id=>{await db.from('cement_addition_log').delete().eq('id',id);setConfirmDel(null);load();};
+    const toggleDate=k=>setDates(ds=>ds.includes(k)?ds.filter(x=>x!==k):[...ds,k].sort());
+    const MONTHS_TH=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    const renderCal=()=>{
+      const first=new Date(cal.y,cal.m,1).getDay();
+      const dim=new Date(cal.y,cal.m+1,0).getDate();
+      const cells=[];for(let i=0;i<first;i++)cells.push(null);for(let d=1;d<=dim;d++)cells.push(d);
+      const has=new Set(items.map(x=>String(x.add_date).slice(0,10)));   // วันที่มีรายการอยู่แล้ว ขึ้นจุดไว้ กันกรอกซ้ำ
+      const today=localToday();
+      const go=n=>setCal(c=>{const d=new Date(c.y,c.m+n,1);return{y:d.getFullYear(),m:d.getMonth()};});
+      const nav={border:'none',background:'#f1f5f9',borderRadius:8,width:32,height:32,fontSize:16,cursor:'pointer',color:'#475569'};
+      return<div style={{border:'1px solid #e2e8f0',borderRadius:10,padding:10}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          <button type="button" onClick={()=>go(-1)} style={nav}>‹</button>
+          <div style={{fontWeight:700,color:'#1e293b'}}>{MONTHS_TH[cal.m]} {cal.y+543}</div>
+          <button type="button" onClick={()=>go(1)} style={nav}>›</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:3,textAlign:'center'}}>
+          {['อา','จ','อ','พ','พฤ','ศ','ส'].map(w=><div key={w} style={{fontSize:12,color:'#94a3b8',padding:'2px 0'}}>{w}</div>)}
+          {cells.map((d,i)=>{
+            if(d==null)return<div key={'e'+i}/>;
+            const k=dateKey(cal.y,cal.m,d),on=dates.includes(k);
+            return<button type="button" key={k} onClick={()=>toggleDate(k)}
+              style={{position:'relative',height:36,borderRadius:8,fontSize:14,cursor:'pointer',fontFamily:'inherit',
+                border:'1.5px solid '+(on?'#2f5fd0':k===today?'#93c5fd':'transparent'),
+                background:on?'#2f5fd0':'#fff',color:on?'#fff':'#1e293b',fontWeight:on||k===today?700:400}}>
+              {d}{has.has(k)&&<span style={{position:'absolute',bottom:3,left:'50%',marginLeft:-2,width:4,height:4,borderRadius:2,background:on?'#fff':'#f59e0b'}}/>}
+            </button>;
+          })}
+        </div>
+        <div style={{fontSize:11.5,color:'#94a3b8',marginTop:6}}>จุดสีส้ม = วันนั้นมีรายการอยู่แล้ว</div>
+      </div>;
+    };
     const inp={width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:14,outline:'none',boxSizing:'border-box'};
     if(loading)return<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>กำลังโหลด...</div>;
     return<div style={{padding:'24px 0'}}>
@@ -9216,10 +9255,19 @@ window.__dataReady.then(data => {
       {showForm&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bdDown=true;}} onClick={e=>{if(e.currentTarget._bdDown){e.currentTarget._bdDown=false;setShowForm(false);setErrMsg('');}}}>
         <div style={{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
           <div style={{fontSize:18,fontWeight:800,color:'#1e293b',marginBottom:20}}>{editId?'✏️ แก้ไขรายการ':'➕ เพิ่มรายการเพิ่มปูน'}</div>
-          <div style={{marginBottom:14}}>
+          {editId?<div style={{marginBottom:14}}>
             <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>วันที่เพิ่มปูน *</label>
             <input type="date" value={form.add_date} onChange={e=>setForm({...form,add_date:e.target.value})} style={inp}/>
-          </div>
+          </div>:<div style={{marginBottom:14}}>
+            <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:6}}>วันที่เพิ่มปูน * <span style={{fontWeight:400,color:'#94a3b8'}}>— กดเลือกได้หลายวัน</span></label>
+            {renderCal()}
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8,alignItems:'center'}}>
+              {dates.length===0&&<span style={{fontSize:13,color:'#dc2626'}}>ยังไม่ได้เลือกวัน</span>}
+              {dates.map(k=><span key={k} style={{display:'inline-flex',alignItems:'center',gap:5,background:'#eff6ff',color:'#1e40af',border:'1px solid #bfdbfe',borderRadius:99,padding:'3px 6px 3px 10px',fontSize:13,fontWeight:600}}>
+                {fmtDate(k)}<button type="button" onClick={()=>toggleDate(k)} style={{border:'none',background:'none',color:'#1e40af',cursor:'pointer',fontSize:14,padding:0,lineHeight:1}}>✕</button></span>)}
+              {dates.length>1&&<button type="button" onClick={()=>setDates([])} style={{border:'none',background:'none',color:'#94a3b8',cursor:'pointer',fontSize:12.5,textDecoration:'underline'}}>ล้างทั้งหมด</button>}
+            </div>
+          </div>}
           <div style={{marginBottom:14}}>
             <label style={{fontSize:13,fontWeight:600,color:'#475569',display:'block',marginBottom:4}}>แพผลิตที่เพิ่มปูน</label>
             <select value={form.raft_num} onChange={e=>setForm({...form,raft_num:e.target.value})} style={{...inp,background:'#fff'}}>
@@ -9234,7 +9282,7 @@ window.__dataReady.then(data => {
           {errMsg&&<div style={{marginBottom:14,fontSize:14,fontWeight:600,color:'#dc2626',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,padding:'10px 12px'}}>{errMsg}</div>}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
             <button onClick={()=>{setShowForm(false);setEditId(null);setErrMsg('');}} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
-            <button onClick={handleSave} disabled={!form.add_date||saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:form.add_date&&!saving?'#2f5fd0':'#94a3b8',color:'#fff',fontSize:14,fontWeight:700,cursor:form.add_date&&!saving?'pointer':'default'}}>{saving?'กำลังบันทึก…':'บันทึก'}</button>
+            <button onClick={handleSave} disabled={(editId?!form.add_date:dates.length===0)||saving} style={{padding:'10px 20px',borderRadius:8,border:'none',background:(editId?form.add_date:dates.length>0)&&!saving?'#2f5fd0':'#94a3b8',color:'#fff',fontSize:14,fontWeight:700,cursor:(editId?form.add_date:dates.length>0)&&!saving?'pointer':'default'}}>{saving?'กำลังบันทึก…':(!editId&&dates.length>1?'บันทึก '+dates.length+' วัน':'บันทึก')}</button>
           </div>
         </div>
       </div>}
