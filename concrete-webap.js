@@ -1275,3 +1275,45 @@ function qcTestAlertNow() {
   qcCheckPending(0, 'ทดสอบ');
   SpreadsheetApp.getUi().alert('ส่งผลตรวจสอบของวันนี้ไป Telegram แล้ว (ถ้าวันนี้ไม่มีใบงานผลิต จะไม่ส่งอะไร)');
 }
+
+// ============================================================
+// แจ้งเตือนผลก้อนปูน — วันไหนไม่มีผลทดสอบก้อนปูนเข้าระบบเลย
+// ดูจากตาราง concrete_results ที่ "วันทดสอบ" (test_date) ตรงกับวันนั้น
+// ตั้ง Trigger 2 ตัว (เหมือนแจ้งเตือน QC ด้านบน):
+//   cubeAlertEvening  → Day timer 17:00-18:00  (เตือนของวันนี้ ถ้ายังไม่มีผลเข้า)
+//   cubeAlertMorning  → Day timer 08:00-09:00  (เตือนซ้ำของเมื่อวาน ถ้ายังไม่มีผลเข้า)
+// เข้ากลุ่ม QC (TELEGRAM_CHAT_QC) · ไม่มีผลเข้า = ส่งเตือน · มีแม้แต่ก้อนเดียว = เงียบ
+// ============================================================
+
+function cubeAlertEvening() { cubeCheckResults(0, 'วันนี้'); }
+function cubeAlertMorning() { cubeCheckResults(-1, 'เมื่อวาน'); }
+
+function cubeCheckResults(dayOffset, whenLabel) {
+  try {
+    var d = new Date();
+    d.setDate(d.getDate() + (dayOffset || 0));
+    var ymd = Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd');
+    var rows = qcGet('concrete_results?select=id&test_date=eq.' + ymd + '&limit=1');
+    if (rows === null) return;       // อ่านฐานข้อมูลไม่ได้ — ไม่เดาว่า "ไม่มีผล" จะได้ไม่เตือนผิด
+    if (rows.length) return;         // มีผลเข้าแล้ว ไม่ต้องเตือน
+    sendTelegram('🚨 <b>ยังไม่มีผลก้อนปูนเข้าระบบ</b>\n' + whenLabel + ' ' + qcThaiDate(ymd) +
+                 ' ไม่มีผลทดสอบก้อนปูนที่ลงวันทดสอบเป็นวันนี้เลย\n\n' +
+                 'รบกวนกรอกผลที่กดแล้วเข้าระบบ (ถ้าวันนั้นไม่มีก้อนต้องกด/วันหยุด ข้ามข้อความนี้ได้)', tgChatQC());
+  } catch (err) {
+    Logger.log('cubeCheckResults error: ' + err.message);
+  }
+}
+
+// ติดตั้ง Trigger ผลก้อนปูนทั้ง 2 ตัวให้เอง — กด Run ครั้งเดียว (รันซ้ำได้ ไม่ซ้อน)
+function setupCubeAlert() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    var h = t.getHandlerFunction();
+    if (h === 'cubeAlertEvening' || h === 'cubeAlertMorning') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('cubeAlertEvening').timeBased().atHour(17).everyDays(1).inTimezone('Asia/Bangkok').create();
+  ScriptApp.newTrigger('cubeAlertMorning').timeBased().atHour(8).everyDays(1).inTimezone('Asia/Bangkok').create();
+  sendTelegram('✅ ตั้งแจ้งเตือนผลก้อนปูนแล้ว — ถ้าวันไหนไม่มีผลเข้าระบบ จะเตือน 17:00 ของวันนั้น และเตือนซ้ำ 08:00 เช้าวันถัดไป', tgChatQC());
+}
+
+// ทดสอบ: ตรวจวันนี้ทันที (ถ้าวันนี้ยังไม่มีผลเข้าจะส่งข้อความเข้ากลุ่ม)
+function testCubeAlert() { cubeCheckResults(0, 'วันนี้ (ทดสอบ)'); }
