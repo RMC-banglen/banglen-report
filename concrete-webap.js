@@ -1297,7 +1297,7 @@ function cubeCheckResults(dayOffset, whenLabel) {
     if (rows === null) return;       // อ่านฐานข้อมูลไม่ได้ — ไม่เดาว่า "ไม่มีผล" จะได้ไม่เตือนผิด
     if (rows.length) return;         // มีผลเข้าแล้ว ไม่ต้องเตือน
     sendTelegram('🚨 <b>ยังไม่มีผลก้อนปูนเข้าระบบ</b>\n' + whenLabel + ' ' + qcThaiDate(ymd) +
-                 ' ไม่มีผลทดสอบก้อนปูนที่ลงวันทดสอบเป็นวันนี้เลย\n\n' +
+                 ' ไม่มีผลทดสอบก้อนปูนที่มีวันทดสอบตรงกับวันนั้นเข้าระบบเลย\n\n' +
                  'รบกวนกรอกผลที่กดแล้วเข้าระบบ (ถ้าวันนั้นไม่มีก้อนต้องกด/วันหยุด ข้ามข้อความนี้ได้)', tgChatQC());
   } catch (err) {
     Logger.log('cubeCheckResults error: ' + err.message);
