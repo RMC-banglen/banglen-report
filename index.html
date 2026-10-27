@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-27b';
+var APP_VERSION='2026-10-27c';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -5448,20 +5448,11 @@ window.__dataReady.then(data => {
     // ค่าเฉลี่ยกำลังอัด ณ แอมป์แต่ละค่า (ปัดเป็นจำนวนเต็ม A)
     const binMap={};pairs.forEach(p=>{const b=Math.round(p.amp);(binMap[b]=binMap[b]||[]).push(p.ksc);});
     const bins=Object.keys(binMap).map(Number).sort((a,b)=>a-b).map(b=>({amp:b,n:binMap[b].length,avg:mean(binMap[b]),min:Math.min(...binMap[b]),max:Math.max(...binMap[b])}));
-    // เส้นแนวโน้ม (กำลังสองน้อยที่สุด) ต้องมีอย่างน้อย 3 คู่ และแอมป์ต้องไม่เท่ากันหมด
-    let reg=null;
-    if(pairs.length>=3){
-      const mx=mean(pairs.map(p=>p.amp)),my=mean(pairs.map(p=>p.ksc));
-      const sxx=pairs.reduce((s,p)=>s+(p.amp-mx)**2,0),sxy=pairs.reduce((s,p)=>s+(p.amp-mx)*(p.ksc-my),0);
-      if(sxx>0.25){const slope=sxy/sxx;reg={slope,icpt:my-slope*mx};}
-    }
-    const reqAmp=reg&&target!=null&&reg.slope>0?(target-reg.icpt)/reg.slope:null;
+    const mAmp=pairs.length?mean(pairs.map(p=>p.amp)):0,mKsc=pairs.length?mean(pairs.map(p=>p.ksc)):0;
     const amin=pairs.length?Math.min(...pairs.map(p=>p.amp)):0,amax=pairs.length?Math.max(...pairs.map(p=>p.amp)):0;
-    const inRange=reqAmp!=null&&reqAmp>=amin-0.5&&reqAmp<=amax+0.5;
     // วาดกราฟ (SVG)
     const W=720,H=340,ml=54,mr=18,mt=16,mb=42;
     let xlo=Math.floor((pairs.length?amin:48)-1),xhi=Math.ceil((pairs.length?amax:56)+1);
-    if(reqAmp!=null&&reqAmp>xlo-4&&reqAmp<xhi+4){xlo=Math.min(xlo,Math.floor(reqAmp)-1);xhi=Math.max(xhi,Math.ceil(reqAmp)+1);}
     const ys=pairs.map(p=>p.ksc).concat(target!=null?[target]:[]);
     let ylo=ys.length?Math.floor((Math.min(...ys)-20)/25)*25:300,yhi=ys.length?Math.ceil((Math.max(...ys)+20)/25)*25:450;
     if(yhi-ylo<75)yhi=ylo+75;
@@ -5491,22 +5482,23 @@ window.__dataReady.then(data => {
           <text x={(ml+W-mr)/2} y={H-6} fontSize="12" textAnchor="middle" fill="#475569" fontWeight="700">แอมป์ (A)</text>
           <text x={14} y={(mt+H-mb)/2} fontSize="12" textAnchor="middle" fill="#475569" fontWeight="700" transform={'rotate(-90 14 '+(mt+H-mb)/2+')'}>กำลังอัด f'c อายุ {age} วัน (ksc)</text>
           {target!=null&&<g><line x1={ml} x2={W-mr} y1={Y(target)} y2={Y(target)} stroke="#dc2626" strokeWidth="1.5" strokeDasharray="6 4"/><text x={W-mr-4} y={Y(target)-5} fontSize="11" textAnchor="end" fill="#dc2626" fontWeight="700">เกณฑ์ {target}</text></g>}
-          {reg&&<line x1={X(xlo)} y1={Y(reg.icpt+reg.slope*xlo)} x2={X(xhi)} y2={Y(reg.icpt+reg.slope*xhi)} stroke="#2f5fd0" strokeWidth="2" opacity="0.75"/>}
-          {reqAmp!=null&&reqAmp>=xlo&&reqAmp<=xhi&&<g><line x1={X(reqAmp)} x2={X(reqAmp)} y1={Y(target)} y2={H-mb} stroke="#dc2626" strokeWidth="1.2" strokeDasharray="3 3"/><text x={X(reqAmp)} y={H-mb-6} fontSize="11" textAnchor="middle" fill="#dc2626" fontWeight="700">≈ {reqAmp.toFixed(1)} A</text></g>}
-          {pairs.map(p=><circle key={p.d} cx={X(p.amp)} cy={Y(p.ksc)} r="5" fill="#0f766e" stroke="#0f766e" strokeWidth="2" opacity="0.85"><title>{p.d.slice(8)+'/'+p.d.slice(5,7)+' · '+p.amp.toFixed(1)+' A · '+Math.round(p.ksc)+' ksc'}</title></circle>)}
-          {bins.map(b=><g key={'b'+b.amp}><rect x={X(b.amp)-6} y={Y(b.avg)-6} width="12" height="12" fill="#1a2540" transform={'rotate(45 '+X(b.amp)+' '+Y(b.avg)+')'}/><text x={X(b.amp)+11} y={Y(b.avg)-8} fontSize="11" fill="#1a2540" fontWeight="800">{Math.round(b.avg)}</text></g>)}
+          {pairs.map(p=><circle key={p.d} cx={X(p.amp)} cy={Y(p.ksc)} r="5" fill="#0f766e" stroke="#0f766e" strokeWidth="2" opacity="0.55"><title>{p.d.slice(8)+'/'+p.d.slice(5,7)+' · '+p.amp.toFixed(1)+' A · '+Math.round(p.ksc)+' ksc'}</title></circle>)}
+          {pairs.length>0&&<g>
+            <line x1={X(mAmp)} x2={X(mAmp)} y1={Y(mKsc)} y2={H-mb} stroke="#1a2540" strokeWidth="1.6" strokeDasharray="5 4"/>
+            <line x1={ml} x2={X(mAmp)} y1={Y(mKsc)} y2={Y(mKsc)} stroke="#1a2540" strokeWidth="1.6" strokeDasharray="5 4"/>
+            <rect x={X(mAmp)-9} y={Y(mKsc)-9} width="18" height="18" fill="#1a2540" transform={'rotate(45 '+X(mAmp)+' '+Y(mKsc)+')'}/>
+            <text x={X(mAmp)} y={H-mb-6} fontSize="12" textAnchor="middle" fill="#1a2540" fontWeight="800" stroke="#fff" strokeWidth="3" paintOrder="stroke">{mAmp.toFixed(1)} A</text>
+            <text x={ml+6} y={Y(mKsc)-6} fontSize="12" fill="#1a2540" fontWeight="800" stroke="#fff" strokeWidth="3" paintOrder="stroke">{Math.round(mKsc)} ksc</text>
+          </g>}
         </svg>
         </div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap',fontSize:12,color:'#64748b',margin:'4px 0 12px'}}>
-          <span><b style={{color:'#0f766e'}}>●</b> แอมป์รอบเก็บก้อน (1 จุด = 1 วัน)</span><span><b style={{color:'#1a2540'}}>◆</b> ค่าเฉลี่ยกำลังอัดที่แอมป์นั้น</span><span><b style={{color:'#2f5fd0'}}>―</b> เส้นแนวโน้ม</span>
+          <span><b style={{color:'#0f766e'}}>●</b> แอมป์รอบเก็บก้อน (1 จุด = 1 วัน)</span><span><b style={{color:'#1a2540'}}>◆</b> ค่าเฉลี่ย (เส้นประตั้งฉากลงแกนแอมป์และแกนกำลังอัด)</span><span><b style={{color:'#dc2626'}}>- -</b> เกณฑ์</span>
         </div>
-        <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1px solid #bbf7d0',fontSize:13.5,color:'#14532d',lineHeight:1.7,marginBottom:12}}>
-          {reg?<>
-            แนวโน้ม: แอมป์เพิ่ม 1 A → กำลังอัด {reg.slope>=0?'เพิ่ม':'ลด'}ประมาณ <b>{Math.abs(reg.slope).toFixed(1)} ksc</b>
-            {target!=null&&reqAmp!=null&&<> · ถ้าต้องการ <b>{target} ksc</b> ที่อายุ {age} วัน ควรตั้งแอมป์ประมาณ <b>{reqAmp.toFixed(1)} A</b>{inRange?'':<span style={{color:'#b45309'}}> (อยู่นอกช่วงแอมป์ที่เคยมีข้อมูล {amin.toFixed(1)}–{amax.toFixed(1)} A ใช้ด้วยความระวัง)</span>}</>}
-            {target!=null&&reg.slope<=0&&<span style={{color:'#b45309'}}> · เส้นแนวโน้มไม่ขึ้นตามแอมป์ จึงยังบอกแอมป์ที่เหมาะไม่ได้ (ข้อมูลอาจน้อยหรือมีปัจจัยอื่นปน)</span>}
-            {pairs.length<10&&<div style={{color:'#b45309',fontSize:12.5}}>⚠️ ข้อมูลมี {pairs.length} วัน ยังน้อย (ควรมี 10 วันขึ้นไป) ใช้เป็นแนวทางคร่าวๆ ก่อน</div>}
-          </>:<span style={{color:'#92400e'}}>มีข้อมูล {pairs.length} วัน ยังไม่พอทำเส้นแนวโน้ม (ต้องมีอย่างน้อย 3 วันที่แอมป์ต่างกัน) — ดูค่าเฉลี่ยตามตารางด้านล่างไปก่อน</span>}
+        <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1px solid #bbf7d0',fontSize:14,color:'#14532d',lineHeight:1.7,marginBottom:12}}>
+          สูตร <b>{cur}</b> · แอมป์ตอนเก็บก้อนเฉลี่ย <b>{mAmp.toFixed(1)} A</b> → กำลังอัดเฉลี่ยอายุ {age} วัน <b>{Math.round(mKsc)} ksc</b>
+          {target!=null&&<> · เทียบเกณฑ์ {target}: <b style={{color:mKsc>=target?'#15803d':'#dc2626'}}>{mKsc>=target?'+':''}{Math.round(mKsc-target)} ksc</b>{mKsc-target>=40&&<span> (สูงกว่าเกณฑ์มาก — อาจลดแอมป์/ปรับสูตรลงได้ ถ้าข้อมูลพอ)</span>}{mKsc<target&&<span style={{color:'#dc2626'}}> (ต่ำกว่าเกณฑ์ — ควรเพิ่มแอมป์/ปรับสูตรขึ้น)</span>}</>}
+          {pairs.length<10&&<div style={{color:'#b45309',fontSize:12.5}}>⚠️ ข้อมูลมี {pairs.length} วัน ยังน้อย (ควรมี 10 วันขึ้นไป) ค่าเฉลี่ยอาจยังเปลี่ยนได้</div>}
         </div>
         <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',margin:'4px 0 6px'}}>สรุปทุกสูตร (อายุ {age} วัน) — แอมป์ตอนเก็บก้อนเฉลี่ย → กำลังอัดเฉลี่ย</div>
         <div style={{overflowX:'auto',marginBottom:14}}>
