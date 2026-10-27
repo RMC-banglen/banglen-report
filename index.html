@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-27a';
+var APP_VERSION='2026-10-27b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -5411,7 +5411,7 @@ window.__dataReady.then(data => {
 
   // ============================================================
   // แอมป์ vs กำลังอัด — กราฟหาค่าเฉลี่ยกำลังอัดที่แอมป์แต่ละค่า แยกตามสูตรปูน (ตามที่ QC เขียนบนกระดาน)
-  // จับคู่ "วันเก็บตัวอย่าง × สูตร": แอมป์ (เฉลี่ยรอบที่ติ๊กเก็บก้อน ถ้าไม่มีใช้ทุกรอบของวันนั้น) ↔ กำลังอัดอายุที่เลือก (เฉลี่ยของวัน)
+  // จับคู่ "วันเก็บตัวอย่าง × สูตร": แอมป์เฉพาะรอบที่ติ๊กเก็บก้อน (เฉลี่ยถ้ามีหลายรอบ) ↔ กำลังอัดอายุที่เลือก (เฉลี่ยของวัน) — ไม่ใช้แอมป์รอบอื่นของวัน
   // แสดง: จุดรายวัน · ค่าเฉลี่ยกำลังอัดที่แอมป์แต่ละค่า (ปัดเป็นจำนวนเต็ม A) · เส้นแนวโน้ม · แอมป์ที่ควรตั้งเพื่อให้ได้ตามเกณฑ์
   // ============================================================
   function AmpStrengthSection({rows}){
@@ -5420,7 +5420,6 @@ window.__dataReady.then(data => {
     const [amps,setAmps]=useState(null);
     const [selF,setSelF]=useState('');
     const [age,setAge]=useState(1);
-    const [onlyCube,setOnlyCube]=useState(false);
     useEffect(()=>{DB.from('plant_amp_readings').select('d,formula,amp,for_cube').order('d').limit(5000)
       .then(({data,error})=>setAmps(error?[]:(data||[]))).catch(()=>setAmps([]));},[]);
     if(amps===null||!rows)return null;
@@ -5433,14 +5432,16 @@ window.__dataReady.then(data => {
       const pre=f+'|'+ageN+'|';const out=[];
       Object.keys(ksMap).filter(k=>k.startsWith(pre)).forEach(k=>{
         const d=k.slice(pre.length);const o=ampMap[f+'|'+d];if(!o)return;
-        const use=o.cube.length?o.cube:(onlyCube?[]:o.all);if(!use.length)return;
-        out.push({d,amp:mean(use),ksc:mean(ksMap[k]),cube:o.cube.length>0});
+        if(!o.cube.length)return;
+        out.push({d,amp:mean(o.cube),ksc:mean(ksMap[k])});
       });
       return out.sort((a,b)=>a.d<b.d?-1:1);
     };
     const forms=[...new Set(rows.map(r=>nf(r.formula_name)).filter(Boolean))];
     const counts=forms.map(f=>({f,n:pairsOf(f,age).length})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
     const cur=selF&&counts.some(x=>x.f===selF)?selF:(counts[0]?counts[0].f:'');
+    const tgtOf=(f,a)=>(f.includes('280')?{1:340,7:420}:{1:350,3:415,5:435,7:450})[a]??null;
+    const overall=counts.map(x=>{const ps=pairsOf(x.f,age);return{f:x.f,n:ps.length,amp:mean(ps.map(p=>p.amp)),ksc:mean(ps.map(p=>p.ksc)),tg:tgtOf(x.f,age)};});
     const pairs=cur?pairsOf(cur,age):[];
     const isNP280=cur.includes('280');
     const target=(isNP280?{1:340,7:420}:{1:350,3:415,5:435,7:450})[age]??null;
@@ -5470,13 +5471,12 @@ window.__dataReady.then(data => {
     const yt=[];for(let v=ylo;v<=yhi;v+=ystep)yt.push(v);
     const sel={padding:'5px 8px',borderRadius:6,border:'1px solid #d6d8e0',background:'#fff',fontSize:13,color:'#475569'};
     return<ChartCard span="full" title="📈 แอมป์ vs กำลังอัด — หาแอมป์ที่เหมาะตามสูตรปูน"
-      subtitle={'คู่ข้อมูล = วันเก็บตัวอย่าง × สูตรเดียวกัน · แอมป์รอบที่ติ๊กเก็บก้อน (ถ้าไม่มีใช้ทุกรอบของวันนั้น) กับกำลังอัดอายุที่เลือก'}
+      subtitle={'คู่ข้อมูล = วันเก็บตัวอย่าง × สูตรเดียวกัน · ใช้แอมป์เฉพาะรอบที่ติ๊ก "รอบนี้ QC เก็บก้อน" เทียบกับกำลังอัดอายุที่เลือก'}
       right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <select value={cur} onChange={e=>setSelF(e.target.value)} style={sel}>{counts.length===0&&<option value="">ยังไม่มีข้อมูล</option>}{counts.map(x=><option key={x.f} value={x.f}>{x.f} ({x.n} วัน)</option>)}</select>
         <Segmented options={[1,3,5,7].map(a=>({value:a,label:a+' วัน'}))} value={age} onChange={setAge}/>
-        <label style={{fontSize:12.5,color:'#475569',display:'flex',gap:5,alignItems:'center',cursor:'pointer'}}><input type="checkbox" checked={onlyCube} onChange={e=>setOnlyCube(e.target.checked)}/>เฉพาะรอบที่ติ๊กเก็บก้อน</label>
       </div>}>
-      {pairs.length===0?<div style={{padding:'24px 0',textAlign:'center',color:'#94a3b8',fontSize:14}}>ยังไม่มีวันที่มีทั้งค่าแอมป์และผลกำลังอัดอายุ {age} วัน{onlyCube?' (ลองปิด "เฉพาะรอบที่ติ๊กเก็บก้อน")':''} — ข้อมูลจะสะสมเองเมื่อมีการบันทึกแอมป์และผลก้อน</div>:<>
+      {pairs.length===0?<div style={{padding:'24px 0',textAlign:'center',color:'#94a3b8',fontSize:14}}>ยังไม่มีวันที่มีทั้งแอมป์รอบเก็บก้อนและผลกำลังอัดอายุ {age} วัน — คนแพล้นท์ต้องติ๊ก "รอบนี้ QC เก็บก้อน" ตอนบันทึกแอมป์ทุกครั้งที่เก็บก้อน ข้อมูลจะสะสมเอง</div>:<>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
           {[['สูตร '+cur+' · '+pairs.length+' วัน',null],
             ['แอมป์เฉลี่ย '+mean(pairs.map(p=>p.amp)).toFixed(1)+' A',null],
@@ -5493,12 +5493,12 @@ window.__dataReady.then(data => {
           {target!=null&&<g><line x1={ml} x2={W-mr} y1={Y(target)} y2={Y(target)} stroke="#dc2626" strokeWidth="1.5" strokeDasharray="6 4"/><text x={W-mr-4} y={Y(target)-5} fontSize="11" textAnchor="end" fill="#dc2626" fontWeight="700">เกณฑ์ {target}</text></g>}
           {reg&&<line x1={X(xlo)} y1={Y(reg.icpt+reg.slope*xlo)} x2={X(xhi)} y2={Y(reg.icpt+reg.slope*xhi)} stroke="#2f5fd0" strokeWidth="2" opacity="0.75"/>}
           {reqAmp!=null&&reqAmp>=xlo&&reqAmp<=xhi&&<g><line x1={X(reqAmp)} x2={X(reqAmp)} y1={Y(target)} y2={H-mb} stroke="#dc2626" strokeWidth="1.2" strokeDasharray="3 3"/><text x={X(reqAmp)} y={H-mb-6} fontSize="11" textAnchor="middle" fill="#dc2626" fontWeight="700">≈ {reqAmp.toFixed(1)} A</text></g>}
-          {pairs.map(p=><circle key={p.d} cx={X(p.amp)} cy={Y(p.ksc)} r="5" fill={p.cube?'#0f766e':'#fff'} stroke="#0f766e" strokeWidth="2" opacity="0.85"><title>{p.d.slice(8)+'/'+p.d.slice(5,7)+' · '+p.amp.toFixed(1)+' A · '+Math.round(p.ksc)+' ksc'+(p.cube?' (รอบเก็บก้อน)':' (เฉลี่ยทุกรอบของวัน)')}</title></circle>)}
+          {pairs.map(p=><circle key={p.d} cx={X(p.amp)} cy={Y(p.ksc)} r="5" fill="#0f766e" stroke="#0f766e" strokeWidth="2" opacity="0.85"><title>{p.d.slice(8)+'/'+p.d.slice(5,7)+' · '+p.amp.toFixed(1)+' A · '+Math.round(p.ksc)+' ksc'}</title></circle>)}
           {bins.map(b=><g key={'b'+b.amp}><rect x={X(b.amp)-6} y={Y(b.avg)-6} width="12" height="12" fill="#1a2540" transform={'rotate(45 '+X(b.amp)+' '+Y(b.avg)+')'}/><text x={X(b.amp)+11} y={Y(b.avg)-8} fontSize="11" fill="#1a2540" fontWeight="800">{Math.round(b.avg)}</text></g>)}
         </svg>
         </div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap',fontSize:12,color:'#64748b',margin:'4px 0 12px'}}>
-          <span><b style={{color:'#0f766e'}}>●</b> แอมป์รอบเก็บก้อน</span><span><b style={{color:'#0f766e'}}>○</b> เฉลี่ยทุกรอบของวัน (ยังไม่ติ๊กรอบเก็บก้อน)</span><span><b style={{color:'#1a2540'}}>◆</b> ค่าเฉลี่ยกำลังอัดที่แอมป์นั้น</span><span><b style={{color:'#2f5fd0'}}>―</b> เส้นแนวโน้ม</span>
+          <span><b style={{color:'#0f766e'}}>●</b> แอมป์รอบเก็บก้อน (1 จุด = 1 วัน)</span><span><b style={{color:'#1a2540'}}>◆</b> ค่าเฉลี่ยกำลังอัดที่แอมป์นั้น</span><span><b style={{color:'#2f5fd0'}}>―</b> เส้นแนวโน้ม</span>
         </div>
         <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1px solid #bbf7d0',fontSize:13.5,color:'#14532d',lineHeight:1.7,marginBottom:12}}>
           {reg?<>
@@ -5508,6 +5508,21 @@ window.__dataReady.then(data => {
             {pairs.length<10&&<div style={{color:'#b45309',fontSize:12.5}}>⚠️ ข้อมูลมี {pairs.length} วัน ยังน้อย (ควรมี 10 วันขึ้นไป) ใช้เป็นแนวทางคร่าวๆ ก่อน</div>}
           </>:<span style={{color:'#92400e'}}>มีข้อมูล {pairs.length} วัน ยังไม่พอทำเส้นแนวโน้ม (ต้องมีอย่างน้อย 3 วันที่แอมป์ต่างกัน) — ดูค่าเฉลี่ยตามตารางด้านล่างไปก่อน</span>}
         </div>
+        <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',margin:'4px 0 6px'}}>สรุปทุกสูตร (อายุ {age} วัน) — แอมป์ตอนเก็บก้อนเฉลี่ย → กำลังอัดเฉลี่ย</div>
+        <div style={{overflowX:'auto',marginBottom:14}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{background:'#f4f6fa',color:'#475569'}}>{['สูตร','จำนวนวัน','แอมป์เก็บก้อนเฉลี่ย (A)','กำลังอัดเฉลี่ย (ksc)','เกณฑ์','เทียบเกณฑ์'].map(h=><th key={h} style={{padding:'6px 10px',textAlign:'center',fontWeight:700,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+            <tbody>{overall.map(o=>{const d=o.tg!=null?o.ksc-o.tg:null;return<tr key={o.f} onClick={()=>setSelF(o.f)} style={{borderTop:'1px solid #eef0f4',cursor:'pointer',background:o.f===cur?'#f0fdf4':'transparent'}}>
+              <td style={{padding:'5px 10px',textAlign:'center',fontWeight:700}}>{o.f}</td>
+              <td style={{padding:'5px 10px',textAlign:'center'}}>{o.n}</td>
+              <td style={{padding:'5px 10px',textAlign:'center',fontWeight:800}}>{o.amp.toFixed(1)}</td>
+              <td style={{padding:'5px 10px',textAlign:'center',fontWeight:800,color:'#1a2540'}}>{Math.round(o.ksc)}</td>
+              <td style={{padding:'5px 10px',textAlign:'center',color:'#64748b'}}>{o.tg??'–'}</td>
+              <td style={{padding:'5px 10px',textAlign:'center',fontWeight:700,color:d==null?'#94a3b8':d>=0?'#15803d':'#dc2626'}}>{d==null?'–':(d>=0?'+':'')+Math.round(d)}</td>
+            </tr>;})}</tbody>
+          </table>
+        </div>
+        <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',margin:'4px 0 6px'}}>สูตร {cur} แยกตามแอมป์</div>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
             <thead><tr style={{background:'#f4f6fa',color:'#475569'}}>{['แอมป์ (ปัดเป็น A)','จำนวนวัน','กำลังอัดเฉลี่ย (ksc)','ต่ำสุด–สูงสุด','เทียบเกณฑ์'].map(h=><th key={h} style={{padding:'6px 10px',textAlign:'center',fontWeight:700,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
