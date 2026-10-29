@@ -774,6 +774,7 @@ function handlePileMessage(m) {
   if (m && m.chat && !(m.from && m.from.is_bot)) {   // รายงานโฟร์แมน (กลุ่มคำนวณเสาเข็ม หรือกลุ่มที่ตั้งด้วย /foremanchat)
     var t0 = String(m.text || m.caption || '').trim();
     if (/^\/foremanchat(@\w+)?\b/i.test(t0)) { foremanRegisterChat(m); return; }
+    if (t0 && m.reply_to_message && isForemanChat(m.chat.id) && /^แก้\s/.test(t0)) { handleForemanEdit(m, t0); return; }
     if (t0 && isForemanChat(m.chat.id) && /แจ้ง\s*เสา\s*เฟล|เสาเฟล/.test(t0.split('\n')[0])) {
       handleForemanText(m, t0, m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : '');
       return;
@@ -913,7 +914,7 @@ var ForemanParse = (function () {
     var fx = all.match(/(แซม|เสริม|เปลี่ยน)\s*(\d+)\s*ต้น/);
     if (fx) r.fix = fx[1] + ' ' + fx[2] + ' ต้น'; else if (/รอ\s*สรุป/.test(all)) r.fix = 'รอสรุป';
     if (segs.length) r.segs = segs.map(function (x) { return String(x); }).join('+');
-    if (dts.length) { var u = dts.filter(function (d, i) { return dts.indexOf(d) === i; }); r.cast_dates = u.join('-'); }
+    if (dts.length) r.cast_dates = dts.join('-');   // เสา 2 ท่อน = 2 วันที่หล่อ (วันเดียวกันก็เก็บ 2 ค่า เช่น 7/10/69-7/10/69)
     if (!r.remark) r.remark = 'Fail';
     var missing = [];
     if (!r.size || !r.length_m) missing.push('ขนาด/ความยาวเสา (เช่น "เสา I0.18x14.00ม.ต/ช")');
@@ -944,8 +945,10 @@ function foremanRegisterChat(m) {
 function handleForemanText(m, text, sender) {
   var d = new Date((m.date || Math.floor(Date.now() / 1000)) * 1000);
   var day = Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd');
-  var o = ForemanParse.parse(text, { date: day, sender: sender });
+  var o = ForemanParse.parse(text, { date: day, sender: '' });
   var chat = m.chat.id;
+  var nameSrc = '';
+  if (!o.row.foreman) { var fwd = foremanForwardName(m); o.row.foreman = fwd || sender; nameSrc = fwd ? 'ชื่อต้นทางที่ส่งต่อมา' : 'ชื่อผู้ส่งข้อความ'; }
   if (!o.ok) {
     tgReply(chat, '⚠️ <b>อ่านแจ้งเสาเฟลไม่ครบ ยังไม่ได้บันทึก</b>\nขาด: ' + o.missing.map(esc).join(' · ') + '\n\nรูปแบบ:\nแจ้งเสาเฟล\nหน่วยงาน : ชื่อหน้างาน\nเสา I0.22x15.00ม.ต/ช(มอก)\nท่อนแรก 8 ม. (วันหล่อ)\nท่อนสอง 7 ม. (วันหล่อ)\nเสาโรงงาน: บางเลน\nจำนวน: เฟลเป็นต้นที่ 1 จากตอกไปแล้ว 60 ต้น\nหน้างานสรุปแซม 1 ต้น\nสาเหตุที่คิด :', m.message_id);
     return;
@@ -955,15 +958,55 @@ function handleForemanText(m, text, sender) {
     + (r.site ? '&site=eq.' + encodeURIComponent(r.site) : '') + (r.fail_of ? '&fail_of=eq.' + encodeURIComponent(r.fail_of) : '');
   var ex = sb('get', q);
   if (ex.getResponseCode() >= 300) { Logger.log('foreman get: ' + ex.getContentText()); tgReply(chat, '⚠️ บันทึกไม่ได้ (เชื่อมฐานข้อมูลไม่สำเร็จ หรือยังไม่ได้รัน supabase-foreman-reports.sql) ลองส่งใหม่อีกครั้ง', m.message_id); return; }
-  var summary = '• ' + esc(r.size) + ' × ' + esc(r.length_m) + ' ม.' + (r.kind ? ' (' + esc(r.kind) + ')' : '') + (r.segs ? ' ท่อน ' + esc(r.segs) : '')
+  var summary = '• วันที่ตอก: ' + foremanThDate(r.drive_date) + (m.date && r.drive_date === day ? ' (วันที่ส่งข้อความ)' : '') + '\n• ' + esc(r.size) + ' × ' + esc(r.length_m) + ' ม.' + (r.kind ? ' (' + esc(r.kind) + ')' : '') + (r.segs ? ' ท่อน ' + esc(r.segs) : '')
     + '\n• หน้างาน: ' + esc(r.site || r.customer || '-') + (r.factory ? '\n• โรงงาน: ' + esc(r.factory) : '')
-    + (r.fail_of ? '\n• เฟลจากกี่ต้น: ' + esc(r.fail_of) : '') + (r.fix ? '\n• แก้ไข: ' + esc(r.fix) : '') + (r.remark && r.remark !== 'Fail' ? '\n• ปัญหา: ' + esc(r.remark) : '');
+    + (r.fail_of ? '\n• เฟลจากกี่ต้น: ' + esc(r.fail_of) : '') + (r.fix ? '\n• แก้ไข: ' + esc(r.fix) : '') + (r.remark && r.remark !== 'Fail' ? '\n• ปัญหา: ' + esc(r.remark) : '')
+    + '\n• โฟร์แมน: ' + esc(r.foreman || '-') + (nameSrc ? ' (' + nameSrc + ')' : '') + (r.cast_dates ? '\n• วันที่หน้าเสา: ' + esc(r.cast_dates) : '');
   if (JSON.parse(ex.getContentText() || '[]').length) { tgReply(chat, 'ℹ️ <b>มีรายงานนี้ในระบบแล้ว</b> (ไม่บันทึกซ้ำ)\n' + summary, m.message_id); return; }
   var row = { drive_date: r.drive_date, factory: r.factory || null, size: r.size, length_m: Number(r.length_m), kind: r.kind || null, fail_of: r.fail_of || null, customer: r.customer || null, site: r.site || null,
     cast_dates: r.cast_dates || null, foreman: r.foreman || null, fix: r.fix || null, remark: r.remark || null, segs: r.segs || null, crane: r.crane || null, source: 'telegram', created_by: sender || null };
-  var ins = sb('post', 'foreman_reports', [row]);
+  var ins = sb('post', 'foreman_reports', [row], true);
   if (ins.getResponseCode() >= 300) { Logger.log('foreman insert: ' + ins.getContentText()); tgReply(chat, '⚠️ บันทึกไม่ได้ (' + ins.getResponseCode() + ') ลองส่งใหม่อีกครั้ง', m.message_id); return; }
-  tgReply(chat, '✅ <b>บันทึกรายงานเสาเฟลแล้ว</b> (วันที่ตอก ' + r.drive_date.slice(8) .replace(/^0/, '') + '/' + Number(r.drive_date.slice(5, 7)) + '/' + (Number(r.drive_date.slice(0, 4)) + 543) + ')\n' + summary + '\n<a href="' + DASHBOARD_URL + '">👉 ดู/แก้ไขในแท็บ รายงานโฟร์แมน (เมนู อื่นๆ)</a>' + (r.fix ? '' : '\nยังไม่มีวิธีแก้ — แก้ไขในแท็บเมื่อหน้างานสรุป'), m.message_id);
+  var newId = ''; try { newId = JSON.parse(ins.getContentText() || '[]')[0].id; } catch (e) {}
+  tgReply(chat, '✅ <b>บันทึกรายงานเสาเฟลแล้ว</b>' + (newId ? ' · รหัสรายการ #' + newId : '') + '\n' + summary + '\n<a href="' + DASHBOARD_URL + '">👉 ดู/แก้ไขในแท็บ รายงานโฟร์แมน (เมนู อื่นๆ)</a>'
+    + '\n\n<i>ข้อมูลไม่ตรง? ตอบ (Reply) ข้อความนี้ว่า เช่น\nแก้ โฟร์แมน ชานนท์\nแก้ วันที่ตอก 28/10/69\nแก้ ลูกค้า บจก.xxx</i>', m.message_id);
+}
+function foremanForwardName(m) {
+  var o = m.forward_origin;
+  if (o) { if (o.sender_user) return ((o.sender_user.first_name || '') + ' ' + (o.sender_user.last_name || '')).trim(); if (o.sender_user_name) return o.sender_user_name; }
+  if (m.forward_from) return ((m.forward_from.first_name || '') + ' ' + (m.forward_from.last_name || '')).trim();
+  return m.forward_sender_name || '';
+}
+function foremanThDate(iso) { var p = String(iso).split('-'); return Number(p[2]) + '/' + Number(p[1]) + '/' + (Number(p[0]) + 543); }
+function foremanIso(s) {   // 28/10/69 · 28/10/2569 · 28-10-26 → 2026-10-28 (ปี 2 หลัก ≥60 = พ.ศ.)
+  var m = String(s || '').match(/(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})/);
+  if (!m) return '';
+  var d = +m[1], mo = +m[2], y = +m[3];
+  if (y < 100) y = y >= 60 ? y + 2500 - 543 : y + 2000; else if (y > 2400) y -= 543;
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
+}
+// แก้รายการที่บอทบันทึกให้ โดยตอบข้อความของบอท: "แก้ โฟร์แมน ชานนท์" · "แก้ วันที่ตอก 28/10/69" ฯลฯ (เขียนได้หลายบรรทัด)
+var FOREMAN_EDIT_FIELDS = { 'โฟร์แมน': 'foreman', 'วันที่ตอก': 'drive_date', 'วันที่หน้าเสา': 'cast_dates', 'โรงงาน': 'factory', 'ลูกค้า': 'customer', 'หน้างาน': 'site', 'ปัญหา': 'remark', 'เฟลจาก': 'fail_of', 'เฟล': 'fail_of', 'แก้ไข': 'fix', 'วิธีแก้': 'fix', 'ท่อน': 'segs', 'ท่อนต่อ': 'segs', 'ปั้นจั่น': 'crane', 'ประเภท': 'kind', 'ขนาด': 'size', 'ยาว': 'length_m', 'ความยาว': 'length_m' };
+function handleForemanEdit(m, text) {
+  var rm = m.reply_to_message, chat = m.chat.id;
+  var idm = rm && rm.from && rm.from.is_bot ? String(rm.text || '').match(/รหัสรายการ\s*#(\d+)/) : null;
+  if (!idm) { tgReply(chat, 'ℹ️ ต้องตอบ (Reply) ข้อความ "บันทึกรายงานเสาเฟลแล้ว" ของบอท ถึงจะแก้รายการนั้นได้', m.message_id); return; }
+  var patch = {}, done = [], bad = [];
+  text.split(/\n/).forEach(function (l) {
+    var mm = l.trim().match(/^แก้\s*(โฟร์แมน|วันที่ตอก|วันที่หน้าเสา|โรงงาน|ลูกค้า|หน้างาน|ปัญหา|เฟลจาก|เฟล|แก้ไข|วิธีแก้|ท่อนต่อ|ท่อน|ปั้นจั่น|ประเภท|ขนาด|ความยาว|ยาว)\s*[:：]?\s*(.+)$/);
+    if (!mm) return;
+    var col = FOREMAN_EDIT_FIELDS[mm[1]], v = mm[2].trim();
+    if (col === 'drive_date') { v = foremanIso(v); if (!v) { bad.push('วันที่ตอก (อ่านวันที่ไม่ได้ เช่น 28/10/69)'); return; } }
+    else if (col === 'length_m') { v = parseFloat(v); if (!isFinite(v)) { bad.push('ความยาว'); return; } }
+    else if (col === 'size') v = v.toUpperCase().replace(/\s+/g, '');
+    patch[col] = v; done.push(mm[1] + ' → ' + (col === 'drive_date' ? foremanThDate(v) : v));
+  });
+  if (!done.length) { tgReply(chat, '⚠️ อ่านคำสั่งแก้ไม่ได้' + (bad.length ? ' — ' + bad.join(', ') : '') + '\nตัวอย่าง: แก้ โฟร์แมน ชานนท์ · แก้ วันที่ตอก 28/10/69', m.message_id); return; }
+  patch.updated_at = new Date().toISOString();
+  var up = sb('patch', 'foreman_reports?id=eq.' + idm[1], patch);
+  if (up.getResponseCode() >= 300) { Logger.log('foreman edit: ' + up.getContentText()); tgReply(chat, '⚠️ แก้ไม่สำเร็จ (' + up.getResponseCode() + ')', m.message_id); return; }
+  tgReply(chat, '✏️ <b>แก้รายการ #' + idm[1] + ' แล้ว</b>\n' + done.map(function (x) { return '• ' + esc(x); }).join('\n') + (bad.length ? '\n⚠️ ข้าม: ' + esc(bad.join(', ')) : ''), m.message_id);
 }
 // ตั้งให้ตรวจข้อความในกลุ่มทุก 1 นาที — กด Run ครั้งเดียว (รันซ้ำได้ ไม่ซ้อน)
 function setupPileCalc() {

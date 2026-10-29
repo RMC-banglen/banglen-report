@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29l';
+var APP_VERSION='2026-10-29m';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13309,7 +13309,7 @@ window.__dataReady.then(data => {
     var fx = all.match(/(แซม|เสริม|เปลี่ยน)\s*(\d+)\s*ต้น/);
     if (fx) r.fix = fx[1] + ' ' + fx[2] + ' ต้น'; else if (/รอ\s*สรุป/.test(all)) r.fix = 'รอสรุป';
     if (segs.length) r.segs = segs.map(function (x) { return String(x); }).join('+');
-    if (dts.length) { var u = dts.filter(function (d, i) { return dts.indexOf(d) === i; }); r.cast_dates = u.join('-'); }
+    if (dts.length) r.cast_dates = dts.join('-');   // เสา 2 ท่อน = 2 วันที่หล่อ (วันเดียวกันก็เก็บ 2 ค่า เช่น 7/10/69-7/10/69)
     if (!r.remark) r.remark = 'Fail';
     var missing = [];
     if (!r.size || !r.length_m) missing.push('ขนาด/ความยาวเสา (เช่น "เสา I0.18x14.00ม.ต/ช")');
