@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-27c';
+var APP_VERSION='2026-10-29a';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -8987,10 +8987,10 @@ window.__dataReady.then(data => {
 
   const POSITION_OPTIONS=['ผู้ดูแลระบบ','ฝ่ายผลิต','ฝ่ายวางแผน','ฝ่ายขาย','ฝ่ายขนส่ง','ฝ่ายจัดซื้อ','ผู้บริหาร','ฝ่ายที่ปรึกษา'];
   // เรียงลำดับ + ใช้คำเดียวกับ TAB_PERM_LIST ด้านล่าง (หน้าที่เข้าดูได้) ให้ตรงกัน จะได้เทียบคู่กันง่ายตอนตั้งสิทธิ์
-  const PERM_LIST=[{k:'quality',v:'รายงานปัญหา'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'qc',v:'งาน QC'},{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'},{k:'pilecalc',v:'ขอรายการคำนวณเสาเข็ม'}];
+  const PERM_LIST=[{k:'quality',v:'รายงานปัญหา'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'qc',v:'งาน QC'},{k:'production',v:'ฝ่ายผลิต'},{k:'maintenance',v:'ซ่อมบำรุง'},{k:'raft',v:'แพผลิตเสาเข็ม'},{k:'repair_banglen',v:'ค่าซ่อม-บางเลน'},{k:'repair_bottakua',v:'ค่าซ่อม-บ่อตะกั่ว'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'},{k:'pilecalc',v:'ขอรายการคำนวณเสาเข็ม'},{k:'foreman',v:'รายงานโฟร์แมน'}];
   // สิทธิ์แก้ไขแต่ละอัน ต้องมีสิทธิ์ "เข้าดูได้" ของแท็บที่เกี่ยวข้องเปิดอยู่ก่อน ถึงจะเปิดสิทธิ์แก้ไขได้ (ค่าเริ่มต้นถ้าไม่ได้ระบุ = 'worktrack' เดิม สำหรับ production/maintenance/raft)
-  const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',pilecalc:'pilecalc',concrete:'concrete'};
-  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'qc',v:'งาน QC'},{k:'calibration',v:'รอบงานประจำ'},{k:'cementAdd',v:'เหตุผลเพิ่มปูน'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'},{k:'pilecalc',v:'ขอรายการคำนวณเสาเข็ม'}];
+  const PERM_TAB_GATE={quality:'quality',repair_banglen:'repair',repair_bottakua:'repair',transport:'transport',plateusage:'plateusage',pileMaterials:'pileMaterials',pilecalc:'pilecalc',foreman:'foreman',concrete:'concrete'};
+  const TAB_PERM_LIST=[{k:'meeting',v:'ประชุม'},{k:'quality',v:'รายงานปัญหา'},{k:'overview',v:'ภาพรวมผลิต'},{k:'compare',v:'เทียบรายปี'},{k:'damage',v:'มูลค่าเสียหาย'},{k:'concrete',v:'คุณภาพวัตถุดิบ'},{k:'worktrack',v:'ติดตามงาน'},{k:'qc',v:'งาน QC'},{k:'calibration',v:'รอบงานประจำ'},{k:'cementAdd',v:'เหตุผลเพิ่มปูน'},{k:'repair',v:'ค่าซ่อม'},{k:'transport',v:'เที่ยวรถขนส่ง'},{k:'plateusage',v:'ใช้แพผลิต'},{k:'accident',v:'รายงานอุบัติเหตุ'},{k:'pileMaterials',v:'สต็อกวัตถุดิบเสาเข็ม'},{k:'pilecalc',v:'ขอรายการคำนวณเสาเข็ม'},{k:'foreman',v:'รายงานโฟร์แมน'}];
   const DMG_SUBTAB_LIST=[{k:'dmg_damage',v:'มูลค่าเสียหาย'},{k:'dmg_trend',v:'เทียบวิเคราะห์สาเหตุ'},{k:'dmg_summary',v:'ตารางสรุป'},{k:'dmg_cause',v:'แยกสาเหตุ'},{k:'dmg_customer',v:'แยกลูกค้า'},{k:'dmg_size',v:'วิเคราะห์ขนาดเสา'},{k:'dmg_worker',v:'วิเคราะห์ผู้ปฏิบัติงาน'},{k:'dmg_detail',v:'ตารางรายการ'}];
   const DEFAULT_DMG_SUBTABS=Object.fromEntries(DMG_SUBTAB_LIST.map(({k})=>[k,true]));
   const DEFAULT_TAB_PERMS={...Object.fromEntries(TAB_PERM_LIST.map(({k})=>[k,true])),...DEFAULT_DMG_SUBTABS};
@@ -13244,11 +13244,315 @@ window.__dataReady.then(data => {
     }
   }
 
+  // ตัวอ่านข้อความ "แจ้งเสาเฟล" (ชุดเดียวกับที่บอท Telegram ใช้ใน repair-webapp.js)
+  // ตัวอ่านข้อความ "แจ้งเสาเฟล" จากโฟร์แมน (ใช้ซ้ำทั้งหน้าเว็บและ Apps Script — แก้ที่นี่ที่เดียวแล้ว build ใส่ทั้งสองที่)
+  // ข้อความตัวอย่าง:
+  //   แจ้งเสาเฟล
+  //   หน่วยงาน : ทาวน์โฮม ค.ส.ล. 2 ชั้นบ้านแกรนด์สิริ (บางแขม)
+  //   เสา I0.18x14.00ม.ต/ช(ธรรมดา)
+  //   ท่อนแรก 7 ม. (7/10/69)
+  //   ท่อนสอง7ม. (7/10/69)
+  //   เสาโรงงาน: บ่อตะกั่ว
+  //   จำนวน: เฟลเป็นต้นที่2จากตอกไปแล้ว30ต้น
+  //   หน้างานสรุปแซม2ต้นครับ
+  //   สาเหตุที่คิด :
+  function foremanParse(text, opt) {
+    opt = opt || {};
+    var t = String(text || '').replace(/\r/g, '').replace(/[​ ]/g, ' ');
+    var lines = t.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    var r = { drive_date: opt.date || '', factory: '', size: '', length_m: '', kind: '', fail_of: '', customer: '', site: '', cast_dates: '', foreman: opt.sender || '', fix: '', remark: '', segs: '', crane: '' };
+    var val = function (l, re) { var m = l.match(re); return m ? m[m.length - 1].trim() : null; };
+    var segs = [], dts = [], tail = [];
+    var cleanFactory = function (s) { return /บ่อ\s*ตะกั่ว/.test(s) ? 'บ่อตะกั่ว' : /บาง\s*เลน/.test(s) ? 'บางเลน' : s.replace(/^[:：\s]+/, '').trim(); };
+    var normDate = function (s) { return String(s || '').trim(); };   // วันที่หน้าเสา เก็บตามที่เขียน
+    var toIso = function (s) {   // วันที่ตอก: 7/10/69 · 7/10/2569 · 7-10-26 → 2026-10-07 (ปี 2 หลัก ≥60 = พ.ศ.)
+      var m = String(s || '').match(/(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})/);
+      if (!m) return '';
+      var d = +m[1], mo = +m[2], y = +m[3];
+      if (y < 100) y = y >= 60 ? y + 2500 - 543 : y + 2000; else if (y > 2400) y -= 543;
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+      return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
+    };
+    lines.forEach(function (l) {
+      var v;
+      if ((v = val(l, /^(?:หน่วยงาน|โครงการ|หน้างาน|ไซต์งาน|ไซต์)\s*[:：]\s*(.*)$/))) { r.site = v; return; }
+      if ((v = val(l, /^(?:ชื่อ)?ลูกค้า\s*[:：]\s*(.*)$/))) { r.customer = v; return; }
+      if ((v = val(l, /^(?:เสา)?โรงงาน\s*[:：]?\s*(.*)$/)) !== null && /โรงงาน\s*[:：]?/.test(l) && !/มาตรฐาน/.test(l)) { if (v) r.factory = cleanFactory(v); return; }
+      if ((v = val(l, /^(?:วันที่ตอก\s*[:：]?|วันที่\s*[:：])\s*(.*)$/))) { var iso = toIso(v); if (iso) r.drive_date = iso; return; }
+      if ((v = val(l, /^(?:โฟร์?แมน|ผู้แจ้ง|ผู้รายงาน)\s*[:：]\s*(.*)$/))) { r.foreman = v; return; }
+      if ((v = val(l, /^สาเหตุ(?:ที่คิด)?\s*[:：]?\s*(.*)$/)) !== null && /^สาเหตุ/.test(l)) { if (v) r.remark = v; return; }
+      if ((v = val(l, /^ปั้นจั่น\s*[:：]?\s*(.*)$/)) !== null && /^ปั้นจั่น/.test(l)) { r.crane = 'ปั้นจั่น ' + v; return; }
+      // ท่อนแรก 7 ม. (7/10/69) / ท่อนสอง7ม. / ท่อนที่ 3 8 ม.
+      var sg = l.match(/^ท่อน(?:แรก|สอง|สาม|สี่|ที่\s*\d+|\d+)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*(?:ม\.?|m\.?|เมตร)?\s*(?:\(([^)]*)\))?/);
+      if (sg) { segs.push(parseFloat(sg[1])); if (sg[2]) dts.push(normDate(sg[2])); return; }
+      // เสา I0.18x14.00ม.ต/ช(ธรรมดา)
+      var pl = l.match(/^(?:เสา(?:เข็ม)?)?\s*[:：]?\s*(I|ไอ|S|SQ|สี่เหลี่ยม)\s*-?\s*(0?\.\d{2}|\d{2})\s*[x×*]\s*(?:0?\.\d{2}\s*[x×*]\s*)?(\d+(?:\.\d+)?)\s*(?:เมตร|ม\.?|m\.?)?\s*(.*)$/i);
+      if (pl && !r.size) {
+        var sec = /^(S|SQ|สี่)/i.test(pl[1]) ? 'S' : 'I', sv = parseFloat(pl[2]);
+        r.size = sec + String(Math.round(sv < 1 ? sv * 100 : sv));
+        r.length_m = String(parseFloat(pl[3]));
+        var rest = pl[4] || '';
+        var joint = /ต\s*\/\s*ช|ตช|ต่อเชื่อม|ต่อ\s*เชื่อม/.test(rest) ? 'ช' : /ด\s*\/\s*|เดี่ยว|ท่อนเดียว/.test(rest) ? 'ด' : '';
+        var std = /โรงงาน|ธรรมดา|รง\b|\/\s*รง/.test(rest) ? 'รง' : /มอก|TIS/i.test(rest) ? 'มอก' : '';
+        r.kind = [joint, std].filter(Boolean).join('/');
+        return;
+      }
+      tail.push(l);
+    });
+    var all = lines.join(' ');
+    // เฟลจากกี่ต้น: "เฟลเป็นต้นที่2จากตอกไปแล้ว30ต้น" → 2/30 · "เฟล 1 ต้น จาก 60" → 1/60 · "1/60"
+    var fm = all.match(/ต้นที่\s*(\d+)\s*จาก\S*?\s*(\d+)\s*ต้น/) || all.match(/เฟล\s*(\d+)\s*ต้น\s*จาก\D{0,12}(\d+)/) || all.match(/จำนวน\s*[:：]?\s*(\d+)\s*[\/／]\s*(\d+)/);
+    if (fm) r.fail_of = fm[1] + '/' + fm[2];
+    // วิธีแก้: "สรุปแซม2ต้น" → แซม 2 ต้น · รอสรุป
+    var fx = all.match(/(แซม|เสริม|เปลี่ยน)\s*(\d+)\s*ต้น/);
+    if (fx) r.fix = fx[1] + ' ' + fx[2] + ' ต้น'; else if (/รอ\s*สรุป/.test(all)) r.fix = 'รอสรุป';
+    if (segs.length) r.segs = segs.map(function (x) { return String(x); }).join('+');
+    if (dts.length) { var u = dts.filter(function (d, i) { return dts.indexOf(d) === i; }); r.cast_dates = u.join('-'); }
+    if (!r.remark) r.remark = 'Fail';
+    var missing = [];
+    if (!r.size || !r.length_m) missing.push('ขนาด/ความยาวเสา (เช่น "เสา I0.18x14.00ม.ต/ช")');
+    if (!r.site && !r.customer) missing.push('หน่วยงาน/หน้างาน (บรรทัด "หน่วยงาน : ...")');
+    var looks = /แจ้ง\s*เสา\s*เฟล|เสาเฟล|เฟลเป็นต้น/.test(all) || (r.size && r.site && /เฟล|แซม|แตก|หัก|ร้าว/.test(all));
+    return { looks: looks, ok: !missing.length, missing: missing, row: r, unread: tail };
+  }
+
+  // ============================================================
+  // รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน (เดิมกรอกในไฟล์ Excel "รายงานโฟร์แมน")
+  // กรอกเอง / วางข้อความ "แจ้งเสาเฟล" ให้ระบบอ่านใส่ฟอร์ม / นำเข้าจาก Excel / (Telegram: ส่งข้อความเข้ากลุ่ม บอทบันทึกให้)
+  // ตาราง foreman_reports (รัน supabase-foreman-reports.sql)
+  // ============================================================
+  function ForemanReportTab({canEdit}){
+    const db=DB;
+    const pad2=n=>String(n).padStart(2,'0');
+    const todayIso=()=>{const n=new Date();return n.getFullYear()+'-'+pad2(n.getMonth()+1)+'-'+pad2(n.getDate());};
+    const EMPTY=()=>({drive_date:todayIso(),factory:'บางเลน',size:'',length_m:'',kind:'',fail_of:'',customer:'',site:'',cast_dates:'',foreman:'',fix:'',remark:'Fail',segs:'',crane:''});
+    const [rows,setRows]=useState(null);
+    const [noTable,setNoTable]=useState(false);
+    const [yr,setYr]=useState(null);
+    const [fFac,setFFac]=useState('');
+    const [fSize,setFSize]=useState('');
+    const [fMan,setFMan]=useState('');
+    const [q,setQ]=useState('');
+    const [form,setForm]=useState(null);       // null = ปิดฟอร์ม
+    const [editId,setEditId]=useState(null);
+    const [paste,setPaste]=useState('');
+    const [pasteMsg,setPasteMsg]=useState('');
+    const [saving,setSaving]=useState(false);
+    const [err,setErr]=useState('');
+    const [imp,setImp]=useState(null);         // ผลอ่านไฟล์ Excel รอยืนยันนำเข้า
+    const [impBusy,setImpBusy]=useState(false);
+    const fileRef=useRef(null);
+    const load=()=>{db.from('foreman_reports').select('*').order('drive_date',{ascending:false}).order('id',{ascending:false}).limit(5000)
+      .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
+    useEffect(load,[]);
+    if(rows===null)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
+    if(noTable)return <div className="grid"><ChartCard span="full" title="🏗️ รายงานโฟร์แมน (เสาเข็มเฟลหน้างาน)">
+      <div style={{padding:'12px 14px',fontSize:14,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-foreman-reports.sql</b> หนึ่งครั้ง จากนั้นรีเฟรชหน้านี้</div>
+    </ChartCard></div>;
+    const yOf=r=>Number(String(r.drive_date||'').slice(0,4))||0;
+    const years=[...new Set(rows.map(yOf).filter(Boolean))].sort((a,b)=>b-a);
+    const nowY=new Date().getFullYear();
+    const year=yr!==null?yr:(years.find(y=>y<=nowY+1)||nowY);   // ปีที่เปิดมาเป็นอันดับแรก = ปีล่าสุดที่มีข้อมูล (ไม่เอาปีที่พิมพ์ผิดล้ำอนาคต)
+    const inYear=rows.filter(r=>year===0||yOf(r)===year);
+    const facs=[...new Set(inYear.map(r=>r.factory).filter(Boolean))].sort();
+    const sizes=[...new Set(inYear.map(r=>r.size).filter(Boolean))].sort();
+    const mans=[...new Set(inYear.map(r=>r.foreman).filter(Boolean))].sort();
+    const qq=q.trim().toLowerCase();
+    const list=inYear.filter(r=>(!fFac||r.factory===fFac)&&(!fSize||r.size===fSize)&&(!fMan||r.foreman===fMan)
+      &&(!qq||[r.customer,r.site,r.remark,r.fix,r.foreman,r.kind,r.size].some(x=>String(x||'').toLowerCase().includes(qq))));
+    const fixN=r=>{const m=String(r.fix||'').match(/(\d+)\s*ต้น/);return m?Number(m[1]):0;};
+    const countBy=(arr,f)=>{const m={};arr.forEach(r=>{const k=f(r)||'ไม่ระบุ';m[k]=(m[k]||0)+1;});return Object.entries(m).sort((a,b)=>b[1]-a[1]);};
+    const byMonth=Array.from({length:12},(_,i)=>list.filter(r=>Number(String(r.drive_date).slice(5,7))===i+1).length);
+    const maxM=Math.max(1,...byMonth);
+    const MS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const fmtD=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return Number(p[2])+'/'+Number(p[1])+'/'+String(Number(p[0])+543).slice(2);};
+    const inp={padding:'7px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
+    const lbl={fontSize:12.5,color:'#475569',fontWeight:600,marginBottom:3,display:'block'};
+    const btn={padding:'7px 14px',borderRadius:8,border:'1px solid #d6d8e0',background:'#fff',cursor:'pointer',fontSize:13.5,fontWeight:600,color:'#475569'};
+    const btnP={...btn,background:'#2f5fd0',borderColor:'#2f5fd0',color:'#fff'};
+    const sel={...btn,padding:'6px 8px',fontWeight:500};
+    const toRow=f=>({drive_date:f.drive_date,factory:f.factory||null,size:(f.size||'').trim()||null,length_m:f.length_m===''||f.length_m==null?null:Number(f.length_m),kind:f.kind||null,fail_of:f.fail_of||null,customer:f.customer||null,site:f.site||null,cast_dates:f.cast_dates||null,foreman:f.foreman||null,fix:f.fix||null,remark:f.remark||null,segs:f.segs||null,crane:f.crane||null});
+    const openNew=()=>{setForm(EMPTY());setEditId(null);setPaste('');setPasteMsg('');setErr('');};
+    const openEdit=r=>{setForm({...EMPTY(),...Object.fromEntries(Object.keys(EMPTY()).map(k=>[k,r[k]==null?'':String(r[k])])),drive_date:String(r.drive_date||'').slice(0,10)});setEditId(r.id);setPaste('');setPasteMsg('');setErr('');};
+    const doPaste=()=>{
+      const o=foremanParse(paste,{date:todayIso()});
+      if(!paste.trim()){setPasteMsg('วางข้อความก่อน');return;}
+      setForm(f=>({...f,...Object.fromEntries(Object.entries(o.row).filter(([k,v])=>v!==''&&v!=null))}));
+      setPasteMsg(o.ok?'✅ อ่านข้อความแล้ว ตรวจความถูกต้องของช่องด้านล่างก่อนบันทึก':'⚠️ อ่านได้บางส่วน ยังขาด: '+o.missing.join(' · '));
+    };
+    const save=async()=>{
+      if(!form.drive_date){setErr('กรุณาใส่วันที่ตอก');return;}
+      if(!form.size||!form.length_m){setErr('กรุณาใส่ขนาดและความยาวเสา');return;}
+      setSaving(true);setErr('');
+      const row={...toRow(form),updated_at:new Date().toISOString()};
+      const res=editId?await db.from('foreman_reports').update(row).eq('id',editId):await db.from('foreman_reports').insert([{...row,source:'form'}]);
+      setSaving(false);
+      if(res.error){setErr('บันทึกไม่สำเร็จ: '+res.error.message);return;}
+      setForm(null);setEditId(null);load();
+    };
+    const del=async r=>{if(!window.confirm('ลบรายการนี้ ?\n'+fmtD(r.drive_date)+' · '+(r.size||'')+'×'+(r.length_m||'')+' · '+(r.customer||r.site||''))) return;
+      const{error}=await db.from('foreman_reports').delete().eq('id',r.id);if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}load();};
+    // ---------- นำเข้าจาก Excel (ไฟล์ "รายงานโฟร์แมน") ----------
+    const xlDate=c=>{ // อ่านจากข้อความที่แสดงในช่อง (วัน/เดือน/ปี 2 หลัก ค.ศ.) — ค่า Date ของ SheetJS เพี้ยนไป 1 วันตามเขตเวลา
+      if(!c)return null;const w=String(c.w!=null?c.w:'').trim();const m=w.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);if(!m)return null;
+      let d=+m[1],mo=+m[2],y=+m[3];if(y<100)y=y>=60?y+1957:y+2000;else if(y>2400)y-=543;   // ปี 2 หลัก ≥60 = พ.ศ. (ชีทเก่าพิมพ์ 66/67)if(mo<1||mo>12||d<1||d>31)return null;
+      return y+'-'+pad2(mo)+'-'+pad2(d);};
+    const readXlsx=async file=>{
+      setImpBusy(true);
+      try{
+        const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+        const sheets=[];
+        wb.SheetNames.forEach(n=>{
+          if(!/Fail/i.test(n))return;
+          const ws=wb.Sheets[n];const ref=XLSX.utils.decode_range(ws['!ref']||'A1:A1');
+          // หาแถวหัวตาราง (มีคำว่า "วันที่ตอก")
+          let hr=-1;for(let r=ref.s.r;r<=Math.min(ref.e.r,6);r++){for(let c=ref.s.c;c<=ref.e.c;c++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&String(cell.v).trim()==='วันที่ตอก'){hr=r;break;}}if(hr>=0)break;}
+          if(hr<0)return;
+          const col={};for(let c=ref.s.c;c<=ref.e.c;c++){const cell=ws[XLSX.utils.encode_cell({r:hr,c})];if(cell&&String(cell.v).trim())col[String(cell.v).trim()]=c;}
+          const txt=(r,name)=>{if(col[name]==null)return'';const cell=ws[XLSX.utils.encode_cell({r,c:col[name]})];return cell==null||cell.v==null?'':String(cell.w!=null&&cell.t==='n'?cell.v:cell.v).trim();};
+          const lastNamed=Math.max(...Object.values(col));
+          const out=[];
+          for(let r=hr+1;r<=ref.e.r;r++){
+            const dc=col['วันที่ตอก']!=null?ws[XLSX.utils.encode_cell({r,c:col['วันที่ตอก']})]:null;const d=xlDate(dc);
+            if(!d)continue;
+            const size=txt(r,'ขนาดเสาเข็ม');if(!size)continue;
+            // คอลัมน์ท้ายตาราง (ไม่มีหัว): "8+7" = ความยาวแต่ละท่อน · "ปั้นจั่น 2" = ปั้นจั่น
+            let segs='',crane='';
+            for(let c=lastNamed+1;c<=ref.e.c;c++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(!cell||cell.v==null||cell.v==='')continue;const v=String(cell.v).trim();
+              if(/^\d+(?:\.\d+)?(?:\s*\+\s*\d+(?:\.\d+)?)*$/.test(v))segs=v.replace(/\s+/g,'');else crane=crane?crane+' '+v:v;}
+            const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
+            const lenRaw=txt(r,'ความยาว');
+            out.push({drive_date:d,factory:clean(txt(r,'โรงงาน')),size:clean(size),length_m:lenRaw===''||isNaN(Number(lenRaw))?null:Number(lenRaw),kind:clean(txt(r,'ประเภท')).replace(/\.$/,''),fail_of:clean(txt(r,'เฟลจากกี่ต้น')),customer:clean(txt(r,'ชื่อลูกค้า')),site:clean(txt(r,'หน้างาน')),cast_dates:clean(txt(r,'วันที่หน้าเสา')),foreman:clean(txt(r,'โฟร์แมนรายงาน')),fix:clean(txt(r,'แก้ไข')),remark:clean(txt(r,'หมายเหตุ')),segs,crane,source:'excel'});
+          }
+          sheets.push({name:n,rows:out});
+        });
+        const key=r=>[String(r.drive_date).slice(0,10),r.factory||'',r.size||'',Number(r.length_m)||0,(r.customer||'').trim(),(r.site||'').trim(),(r.foreman||'').trim()].join('|');
+        // นับจำนวนครั้งของแต่ละรายการ: แถวซ้ำกันทุกช่อง (เช่น เฟล 2 ต้นหน้างานเดียวกันวันเดียวกัน) นับเป็น 2 รายการจริง · นำเข้าซ้ำจะไม่ซ้อน
+        const have={};rows.forEach(r=>{const k=key(r);have[k]=(have[k]||0)+1;});
+        const t=x=>new Date(x.drive_date).getTime();
+        sheets.forEach(s=>{
+          const run={};s.fresh=s.rows.filter(r=>{const k=key(r);run[k]=(run[k]||0)+1;return run[k]>(have[k]||0);});s.pick=s.fresh.length>0;
+          // วันที่น่าสงสัย: ห่างจากแถวข้างเคียงเกิน 60 วัน (มักพิมพ์วัน/เดือนสลับ)
+          s.odd=s.rows.filter((r,i)=>{const nb=s.rows.slice(Math.max(0,i-3),i).concat(s.rows.slice(i+1,i+4)).map(t).sort((a,b)=>a-b);if(nb.length<3)return false;return Math.abs(t(r)-nb[Math.floor(nb.length/2)])>60*864e5;});
+        });
+        setImp({fileName:file.name,sheets});
+      }catch(e){alert('อ่านไฟล์ไม่ได้: '+e.message);}
+      setImpBusy(false);
+    };
+    const doImport=async()=>{
+      const all=imp.sheets.filter(s=>s.pick).flatMap(s=>s.fresh);
+      if(!all.length){setImp(null);return;}
+      setImpBusy(true);
+      for(let i=0;i<all.length;i+=200){
+        const { error }=await db.from('foreman_reports').insert(all.slice(i,i+200));
+        if(error){setImpBusy(false);alert('นำเข้าไม่สำเร็จที่แถว '+(i+1)+': '+error.message);load();return;}
+      }
+      setImpBusy(false);setImp(null);load();alert('นำเข้าแล้ว '+all.length+' รายการ');
+    };
+    const totalFix=list.reduce((s,r)=>s+fixN(r),0);
+    const th={padding:'7px 9px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa'};
+    const td={padding:'6px 9px',fontSize:13,borderTop:'1px solid #eef0f4',verticalAlign:'top'};
+    const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
+    return<div className="grid">
+      <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
+        subtitle={`ปี ${year?year+543:'ทั้งหมด'} · ${list.length} รายการ · แซมรวม ${totalFix} ต้น`}
+        right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          <select value={year} onChange={e=>setYr(Number(e.target.value))} style={sel}>{years.map(y=><option key={y} value={y}>ปี {y+543}</option>)}<option value={0}>ทุกปี</option></select>
+          {canEdit&&<button style={btnP} onClick={openNew}>＋ เพิ่มรายการ</button>}
+          {canEdit&&<button style={btn} disabled={impBusy} onClick={()=>fileRef.current&&fileRef.current.click()}>{impBusy?'กำลังอ่าน…':'📥 นำเข้าจาก Excel'}</button>}
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];e.target.value='';if(f)readXlsx(f);}}/>
+        </div>}>
+        <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',marginBottom:14}}>
+          <div className="kpi"><div className="kpi__label">แจ้งเฟล (ครั้ง)</div><div className="kpi__value">{list.length}</div></div>
+          <div className="kpi"><div className="kpi__label">แซมรวม (ต้น)</div><div className="kpi__value">{totalFix}</div></div>
+          <div className="kpi"><div className="kpi__label">รอสรุป</div><div className="kpi__value" style={{color:'#b45309'}}>{list.filter(r=>/รอ\s*สรุป/.test(r.fix||'')).length}</div></div>
+          {countBy(list,r=>r.factory).slice(0,2).map(([k,n])=><div className="kpi" key={k}><div className="kpi__label">โรงงาน {k}</div><div className="kpi__value">{n}</div></div>)}
+        </div>
+        <div style={{display:'flex',gap:3,alignItems:'flex-end',height:64,marginBottom:14}} title="จำนวนครั้งที่แจ้งเฟลรายเดือน">
+          {byMonth.map((n,i)=><div key={i} style={{flex:1,textAlign:'center',fontSize:11,color:'#64748b'}}>
+            <div style={{height:Math.max(2,n/maxM*40),background:n?'#2f5fd0':'#e5e8ef',borderRadius:3,margin:'0 2px'}}/>{n||''}<div>{MS[i]}</div></div>)}
+        </div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / อาการ / โฟร์แมน" style={{...inp,width:'auto',flex:'1 1 220px'}}/>
+          <select value={fFac} onChange={e=>setFFac(e.target.value)} style={sel}><option value="">ทุกโรงงาน</option>{facs.map(x=><option key={x}>{x}</option>)}</select>
+          <select value={fSize} onChange={e=>setFSize(e.target.value)} style={sel}><option value="">ทุกขนาด</option>{sizes.map(x=><option key={x}>{x}</option>)}</select>
+          <select value={fMan} onChange={e=>setFMan(e.target.value)} style={sel}><option value="">ทุกโฟร์แมน</option>{mans.map(x=><option key={x}>{x}</option>)}</select>
+        </div>
+        <div className="table-wrap" style={{margin:0}}>
+          <table style={{width:'100%',borderCollapse:'collapse',minWidth:980}}>
+            <thead><tr>{['วันที่ตอก','โรงงาน','ขนาด','ยาว','ประเภท','เฟลจาก','ลูกค้า','หน้างาน','วันที่หน้าเสา','โฟร์แมน','แก้ไข','หมายเหตุ','ท่อน/ปั้นจั่น',canEdit?'':null].filter(h=>h!==null).map(h=><th key={h||'x'} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{list.map(r=><tr key={r.id}>
+              <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.drive_date)}</td><td style={td}>{r.factory||''}</td>
+              <td style={{...td,fontWeight:700,whiteSpace:'nowrap'}}>{r.size||''}</td><td style={td}>{r.length_m!=null?Number(r.length_m).toFixed(2):''}</td>
+              <td style={{...td,whiteSpace:'nowrap'}}>{r.kind||''}</td><td style={{...td,whiteSpace:'nowrap'}}>{r.fail_of||''}</td>
+              <td style={td}>{r.customer||''}</td><td style={td}>{r.site||''}</td><td style={{...td,whiteSpace:'nowrap'}}>{r.cast_dates||''}</td>
+              <td style={td}>{r.foreman||''}</td>
+              <td style={{...td,fontWeight:700,whiteSpace:'nowrap',color:/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{r.fix||''}</td>
+              <td style={td}>{r.remark||''}</td><td style={{...td,whiteSpace:'nowrap'}}>{[r.segs,r.crane].filter(Boolean).join(' · ')}</td>
+              {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={()=>openEdit(r)}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button></td>}
+            </tr>)}
+            {!list.length&&<tr><td colSpan={14} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>ยังไม่มีรายการ{canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
+          </table>
+        </div>
+      </ChartCard>
+
+      {form&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setForm(null);}}>
+        <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:720,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
+          <div style={{fontSize:17,fontWeight:800,color:'#1a2540',marginBottom:12}}>{editId?'แก้ไขรายการ':'เพิ่มรายการเสาเข็มเฟล'}</div>
+          {!editId&&<div style={{marginBottom:14,padding:12,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10}}>
+            <label style={{...lbl,color:'#0369a1'}}>วางข้อความที่โฟร์แมนส่งมา (ขึ้นต้น "แจ้งเสาเฟล") แล้วให้ระบบอ่านใส่ช่องให้</label>
+            <textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={6} placeholder={'แจ้งเสาเฟล\nหน่วยงาน : ...\nเสา I0.18x14.00ม.ต/ช(ธรรมดา)\nท่อนแรก 7 ม. (7/10/69)\nท่อนสอง 7 ม. (7/10/69)\nเสาโรงงาน: บ่อตะกั่ว\nจำนวน: เฟลเป็นต้นที่2จากตอกไปแล้ว30ต้น\nหน้างานสรุปแซม2ต้นครับ\nสาเหตุที่คิด :'} style={{...inp,fontFamily:'inherit'}}/>
+            <div style={{display:'flex',gap:10,alignItems:'center',marginTop:6,flexWrap:'wrap'}}><button style={btnP} onClick={doPaste}>🔍 อ่านข้อความ</button><span style={{fontSize:13,color:pasteMsg.startsWith('✅')?'#15803d':'#b45309'}}>{pasteMsg}</span></div>
+          </div>}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10}}>
+            {F('drive_date','วันที่ตอก',{type:'date'})}
+            <div><label style={lbl}>โรงงาน</label><select style={inp} value={form.factory||''} onChange={e=>setForm({...form,factory:e.target.value})}><option value=""></option><option>บางเลน</option><option>บ่อตะกั่ว</option>{form.factory&&!['บางเลน','บ่อตะกั่ว'].includes(form.factory)&&<option>{form.factory}</option>}</select></div>
+            {F('size','ขนาดเสา (เช่น I22)',{placeholder:'I22'})}
+            {F('length_m','ความยาว (ม.)',{type:'number',step:'any'})}
+            {F('kind','ประเภท',{list:'fm-kinds',placeholder:'ช/มอก'})}
+            {F('fail_of','เฟลจากกี่ต้น',{placeholder:'1/60'})}
+            {F('customer','ชื่อลูกค้า')}
+            {F('site','หน้างาน')}
+            {F('cast_dates','วันที่หน้าเสา',{placeholder:'7/10/69'})}
+            {F('foreman','โฟร์แมนรายงาน')}
+            {F('fix','แก้ไข',{list:'fm-fix',placeholder:'แซม 1 ต้น'})}
+            {F('remark','หมายเหตุ / อาการ')}
+            {F('segs','ท่อน (เช่น 8+7)')}
+            {F('crane','ปั้นจั่น')}
+          </div>
+          <datalist id="fm-kinds"><option value="ช/มอก"/><option value="ช/รง"/><option value="ด/มอก"/><option value="ด/รง"/></datalist>
+          <datalist id="fm-fix"><option value="แซม 1 ต้น"/><option value="แซม 2 ต้น"/><option value="รอสรุป"/></datalist>
+          {err&&<div style={{marginTop:10,color:'#dc2626',fontSize:13.5}}>{err}</div>}
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:16}}>
+            <button style={btn} onClick={()=>setForm(null)}>ยกเลิก</button>
+            <button style={btnP} disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'💾 บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
+
+      {imp&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setImp(null);}}>
+        <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:640,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
+          <div style={{fontSize:17,fontWeight:800,color:'#1a2540',marginBottom:4}}>นำเข้าจาก Excel</div>
+          <div style={{fontSize:12.5,color:'#64748b',marginBottom:12}}>{imp.fileName} · นำเข้าเฉพาะรายการที่ยังไม่มีในระบบ (เทียบ วันที่ตอก+โรงงาน+ขนาด+ยาว+ลูกค้า+หน้างาน+โฟร์แมน) นำเข้าซ้ำกี่ครั้งก็ไม่ซ้อน</div>
+          {imp.sheets.length===0&&<div style={{color:'#b45309'}}>ไม่พบชีตที่ชื่อมีคำว่า "Fail" ในไฟล์นี้</div>}
+          {imp.sheets.map((s,i)=><label key={s.name} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:'1px solid #e2e8f0',borderRadius:8,marginBottom:6,cursor:s.fresh.length?'pointer':'default',opacity:s.fresh.length?1:.55}}>
+            <input type="checkbox" checked={!!s.pick} disabled={!s.fresh.length} onChange={e=>setImp({...imp,sheets:imp.sheets.map((x,j)=>j===i?{...x,pick:e.target.checked}:x)})}/>
+            <span style={{flex:1}}><b>{s.name}</b><br/><span style={{fontSize:12.5,color:'#64748b'}}>อ่านได้ {s.rows.length} แถว · ใหม่ {s.fresh.length} · มีอยู่แล้ว {s.rows.length-s.fresh.length}</span>{s.odd&&s.odd.length>0&&<><br/><span style={{fontSize:12.5,color:'#b45309'}}>⚠️ วันที่น่าสงสัย {s.odd.length} แถว (เช่น {s.odd.slice(0,3).map(r=>fmtD(r.drive_date)+' '+(r.size||'')).join(', ')}) อาจพิมพ์วัน/เดือนสลับในไฟล์ — นำเข้าแล้วแก้ในตารางได้</span></>}</span>
+          </label>)}
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:14}}>
+            <button style={btn} onClick={()=>setImp(null)}>ยกเลิก</button>
+            <button style={btnP} disabled={impBusy||!imp.sheets.some(s=>s.pick)} onClick={doImport}>{impBusy?'กำลังนำเข้า…':'นำเข้า '+imp.sheets.filter(s=>s.pick).reduce((a,s)=>a+s.fresh.length,0)+' รายการ'}</button>
+          </div>
+        </div>
+      </div>}
+    </div>;
+  }
+
   function App(){
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const getFirstTab=(user)=>{
       const tp={...DEFAULT_TAB_PERMS,...(user?.tab_perms||{})};
-      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','qc','calibration','cementAdd','repair','transport','plateusage','accident','pileMaterials','pilecalc'];
+      const ordered=['meeting','quality','overview','compare','damage','concrete','worktrack','qc','calibration','cementAdd','repair','transport','plateusage','accident','pileMaterials','pilecalc','foreman'];
       return user?.role==='admin'?'meeting':(ordered.find(k=>tp[k]!==false)||'meeting');
     };
     const [tab,setTab]=useState(()=>getFirstTab(JSON.parse(sessionStorage.getItem('wt_user')||'null')));
@@ -13264,7 +13568,7 @@ window.__dataReady.then(data => {
     if(!currentUser) return <LoginScreen onLogin={login}/>;
     const isAdmin=currentUser.role==='admin';
     const userTabPerms={...DEFAULT_TAB_PERMS,...(currentUser.tab_perms||{})};
-    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'qc',label:'งาน QC'},{id:'calibration',label:'รอบงานประจำ'},{id:'cementAdd',label:'เหตุผลเพิ่มปูน'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'},{id:'accident',label:'รายงานอุบัติเหตุ'},{id:'pileMaterials',label:'สต็อกวัตถุดิบเสาเข็ม'},{id:'pilecalc',label:'ขอรายการคำนวณเสาเข็ม'}];
+    const allTabs=[{id:'meeting',label:'ประชุมสำนักงานใหญ่'},{id:'quality',label:'รายงานปัญหา'},{id:'overview',label:'ภาพรวมการผลิต'},{id:'compare',label:'เทียบรายปี'},{id:'damage',label:'มูลค่า-เปอร์เซ็นต์เสียหาย'},{id:'concrete',label:'คุณภาพ-วัตถุดิบ'},{id:'worktrack',label:'ติดตามงาน'},{id:'qc',label:'งาน QC'},{id:'calibration',label:'รอบงานประจำ'},{id:'cementAdd',label:'เหตุผลเพิ่มปูน'},{id:'repair',label:'ค่าซ่อมเครื่องจักรและยานยนต์'},{id:'transport',label:'รายงานเที่ยวรถขนส่ง'},{id:'plateusage',label:'ภาพรวมการใช้แพผลิต'},{id:'accident',label:'รายงานอุบัติเหตุ'},{id:'pileMaterials',label:'สต็อกวัตถุดิบเสาเข็ม'},{id:'pilecalc',label:'ขอรายการคำนวณเสาเข็ม'},{id:'foreman',label:'รายงานโฟร์แมน'}];
     const tabs=[...allTabs.filter(t=>isAdmin||userTabPerms[t.id]!==false),...(isAdmin?[{id:'users',label:'จัดการผู้ใช้'}]:[])];
     return <div className="app">
       <header className="topbar">
@@ -13305,6 +13609,7 @@ window.__dataReady.then(data => {
         {tab==='plateusage'&&<PlateUsageTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).plateusage)}/>}
         {tab==='accident'&&<AccidentReportTab currentUser={currentUser}/>}
         {tab==='pilecalc'&&<div style={{padding:'16px 0'}}><PileCalcFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pilecalc)} sales={currentUser.position==='ฝ่ายขาย'}/></div>}
+        {tab==='foreman'&&<ForemanReportTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).foreman)}/>}
         {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pileMaterials)} formulaAdmin={!!(currentUser.permissions||{}).materialFormula}/></div>}
         {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
       </main>

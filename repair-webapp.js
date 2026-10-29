@@ -768,6 +768,14 @@ function handlePileMessage(m) {
   if (m && m.migrate_from_chat_id && String(m.migrate_from_chat_id) === String(pileChat())) {   // กลุ่มถูกอัปเกรดเป็นซูเปอร์กรุ๊ป → ใช้ไอดีใหม่
     PropertiesService.getScriptProperties().setProperty('PILE_CHAT_ID', String(m.chat.id)); return;
   }
+  if (m && m.chat && !(m.from && m.from.is_bot)) {   // รายงานโฟร์แมน (กลุ่มคำนวณเสาเข็ม หรือกลุ่มที่ตั้งด้วย /foremanchat)
+    var t0 = String(m.text || m.caption || '').trim();
+    if (/^\/foremanchat(@\w+)?\b/i.test(t0)) { foremanRegisterChat(m); return; }
+    if (t0 && isForemanChat(m.chat.id) && /แจ้ง\s*เสา\s*เฟล|เสาเฟล/.test(t0.split('\n')[0])) {
+      handleForemanText(m, t0, m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : '');
+      return;
+    }
+  }
   if (!m || !m.chat || String(m.chat.id) !== String(pileChat())) return;   // รับเฉพาะกลุ่มคำนวณเสาเข็ม
   if (m.from && m.from.is_bot) return;
   var text = String(m.text || m.caption || '').trim();
@@ -835,6 +843,124 @@ function handlePileText(m, text, sender) {
   L.push('ถ้าอ่านผิด แก้ได้ในหน้าติดตาม');
   L.push('<a href="' + DASHBOARD_URL + '">👉 เปิดหน้าติดตาม (เมนู อื่นๆ → ขอรายการคำนวณเสาเข็ม)</a>');
   sendPile(L.join('\n'), m.message_id);
+}
+// ── รายงานโฟร์แมน: ข้อความ "แจ้งเสาเฟล" ในกลุ่ม → บันทึกเข้าตาราง foreman_reports (แท็บ "รายงานโฟร์แมน") ──────────
+// รับจากกลุ่มคำนวณเสาเข็ม (ค่าเริ่มต้น) หรือกลุ่มที่ตั้งด้วยคำสั่ง /foremanchat (ผู้ดูแลกลุ่มพิมพ์ในกลุ่มนั้น)
+// ตัวอ่านข้อความชุดเดียวกับหน้าเว็บ (ช่อง "วางข้อความ" ในหน้ารายงานโฟร์แมน)
+var ForemanParse = (function () {
+  // ตัวอ่านข้อความ "แจ้งเสาเฟล" จากโฟร์แมน (ใช้ซ้ำทั้งหน้าเว็บและ Apps Script — แก้ที่นี่ที่เดียวแล้ว build ใส่ทั้งสองที่)
+  // ข้อความตัวอย่าง:
+  //   แจ้งเสาเฟล
+  //   หน่วยงาน : ทาวน์โฮม ค.ส.ล. 2 ชั้นบ้านแกรนด์สิริ (บางแขม)
+  //   เสา I0.18x14.00ม.ต/ช(ธรรมดา)
+  //   ท่อนแรก 7 ม. (7/10/69)
+  //   ท่อนสอง7ม. (7/10/69)
+  //   เสาโรงงาน: บ่อตะกั่ว
+  //   จำนวน: เฟลเป็นต้นที่2จากตอกไปแล้ว30ต้น
+  //   หน้างานสรุปแซม2ต้นครับ
+  //   สาเหตุที่คิด :
+  function foremanParse(text, opt) {
+    opt = opt || {};
+    var t = String(text || '').replace(/\r/g, '').replace(/[​ ]/g, ' ');
+    var lines = t.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    var r = { drive_date: opt.date || '', factory: '', size: '', length_m: '', kind: '', fail_of: '', customer: '', site: '', cast_dates: '', foreman: opt.sender || '', fix: '', remark: '', segs: '', crane: '' };
+    var val = function (l, re) { var m = l.match(re); return m ? m[m.length - 1].trim() : null; };
+    var segs = [], dts = [], tail = [];
+    var cleanFactory = function (s) { return /บ่อ\s*ตะกั่ว/.test(s) ? 'บ่อตะกั่ว' : /บาง\s*เลน/.test(s) ? 'บางเลน' : s.replace(/^[:：\s]+/, '').trim(); };
+    var normDate = function (s) { return String(s || '').trim(); };   // วันที่หน้าเสา เก็บตามที่เขียน
+    var toIso = function (s) {   // วันที่ตอก: 7/10/69 · 7/10/2569 · 7-10-26 → 2026-10-07 (ปี 2 หลัก ≥60 = พ.ศ.)
+      var m = String(s || '').match(/(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})/);
+      if (!m) return '';
+      var d = +m[1], mo = +m[2], y = +m[3];
+      if (y < 100) y = y >= 60 ? y + 2500 - 543 : y + 2000; else if (y > 2400) y -= 543;
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+      return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
+    };
+    lines.forEach(function (l) {
+      var v;
+      if ((v = val(l, /^(?:หน่วยงาน|โครงการ|หน้างาน|ไซต์งาน|ไซต์)\s*[:：]\s*(.*)$/))) { r.site = v; return; }
+      if ((v = val(l, /^(?:ชื่อ)?ลูกค้า\s*[:：]\s*(.*)$/))) { r.customer = v; return; }
+      if ((v = val(l, /^(?:เสา)?โรงงาน\s*[:：]?\s*(.*)$/)) !== null && /โรงงาน\s*[:：]?/.test(l) && !/มาตรฐาน/.test(l)) { if (v) r.factory = cleanFactory(v); return; }
+      if ((v = val(l, /^(?:วันที่ตอก\s*[:：]?|วันที่\s*[:：])\s*(.*)$/))) { var iso = toIso(v); if (iso) r.drive_date = iso; return; }
+      if ((v = val(l, /^(?:โฟร์?แมน|ผู้แจ้ง|ผู้รายงาน)\s*[:：]\s*(.*)$/))) { r.foreman = v; return; }
+      if ((v = val(l, /^สาเหตุ(?:ที่คิด)?\s*[:：]?\s*(.*)$/)) !== null && /^สาเหตุ/.test(l)) { if (v) r.remark = v; return; }
+      if ((v = val(l, /^ปั้นจั่น\s*[:：]?\s*(.*)$/)) !== null && /^ปั้นจั่น/.test(l)) { r.crane = 'ปั้นจั่น ' + v; return; }
+      // ท่อนแรก 7 ม. (7/10/69) / ท่อนสอง7ม. / ท่อนที่ 3 8 ม.
+      var sg = l.match(/^ท่อน(?:แรก|สอง|สาม|สี่|ที่\s*\d+|\d+)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*(?:ม\.?|m\.?|เมตร)?\s*(?:\(([^)]*)\))?/);
+      if (sg) { segs.push(parseFloat(sg[1])); if (sg[2]) dts.push(normDate(sg[2])); return; }
+      // เสา I0.18x14.00ม.ต/ช(ธรรมดา)
+      var pl = l.match(/^(?:เสา(?:เข็ม)?)?\s*[:：]?\s*(I|ไอ|S|SQ|สี่เหลี่ยม)\s*-?\s*(0?\.\d{2}|\d{2})\s*[x×*]\s*(?:0?\.\d{2}\s*[x×*]\s*)?(\d+(?:\.\d+)?)\s*(?:เมตร|ม\.?|m\.?)?\s*(.*)$/i);
+      if (pl && !r.size) {
+        var sec = /^(S|SQ|สี่)/i.test(pl[1]) ? 'S' : 'I', sv = parseFloat(pl[2]);
+        r.size = sec + String(Math.round(sv < 1 ? sv * 100 : sv));
+        r.length_m = String(parseFloat(pl[3]));
+        var rest = pl[4] || '';
+        var joint = /ต\s*\/\s*ช|ตช|ต่อเชื่อม|ต่อ\s*เชื่อม/.test(rest) ? 'ช' : /ด\s*\/\s*|เดี่ยว|ท่อนเดียว/.test(rest) ? 'ด' : '';
+        var std = /โรงงาน|ธรรมดา|รง\b|\/\s*รง/.test(rest) ? 'รง' : /มอก|TIS/i.test(rest) ? 'มอก' : '';
+        r.kind = [joint, std].filter(Boolean).join('/');
+        return;
+      }
+      tail.push(l);
+    });
+    var all = lines.join(' ');
+    // เฟลจากกี่ต้น: "เฟลเป็นต้นที่2จากตอกไปแล้ว30ต้น" → 2/30 · "เฟล 1 ต้น จาก 60" → 1/60 · "1/60"
+    var fm = all.match(/ต้นที่\s*(\d+)\s*จาก\S*?\s*(\d+)\s*ต้น/) || all.match(/เฟล\s*(\d+)\s*ต้น\s*จาก\D{0,12}(\d+)/) || all.match(/จำนวน\s*[:：]?\s*(\d+)\s*[\/／]\s*(\d+)/);
+    if (fm) r.fail_of = fm[1] + '/' + fm[2];
+    // วิธีแก้: "สรุปแซม2ต้น" → แซม 2 ต้น · รอสรุป
+    var fx = all.match(/(แซม|เสริม|เปลี่ยน)\s*(\d+)\s*ต้น/);
+    if (fx) r.fix = fx[1] + ' ' + fx[2] + ' ต้น'; else if (/รอ\s*สรุป/.test(all)) r.fix = 'รอสรุป';
+    if (segs.length) r.segs = segs.map(function (x) { return String(x); }).join('+');
+    if (dts.length) { var u = dts.filter(function (d, i) { return dts.indexOf(d) === i; }); r.cast_dates = u.join('-'); }
+    if (!r.remark) r.remark = 'Fail';
+    var missing = [];
+    if (!r.size || !r.length_m) missing.push('ขนาด/ความยาวเสา (เช่น "เสา I0.18x14.00ม.ต/ช")');
+    if (!r.site && !r.customer) missing.push('หน่วยงาน/หน้างาน (บรรทัด "หน่วยงาน : ...")');
+    var looks = /แจ้ง\s*เสา\s*เฟล|เสาเฟล|เฟลเป็นต้น/.test(all) || (r.size && r.site && /เฟล|แซม|แตก|หัก|ร้าว/.test(all));
+    return { looks: looks, ok: !missing.length, missing: missing, row: r, unread: tail };
+  }
+
+  return { parse: foremanParse };
+})();
+function foremanChat() { return PropertiesService.getScriptProperties().getProperty('FOREMAN_CHAT_ID') || ''; }
+function isForemanChat(id) { var f = foremanChat(); return String(id) === String(pileChat()) || (f && String(id) === String(f)); }
+function tgReply(chat, text, replyTo) {
+  if (!TELEGRAM_TOKEN || !chat) return;
+  var body = { chat_id: chat, text: text, parse_mode: 'HTML', disable_web_page_preview: true };
+  if (replyTo) { body.reply_to_message_id = replyTo; body.allow_sending_without_reply = true; }
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage', { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+}
+// พิมพ์ /foremanchat ในกลุ่มที่ต้องการรับรายงานโฟร์แมน (เฉพาะผู้ดูแลกลุ่ม)
+function foremanRegisterChat(m) {
+  var uid = m.from && m.from.id;
+  var r = JSON.parse(UrlFetchApp.fetch('https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/getChatMember?chat_id=' + encodeURIComponent(m.chat.id) + '&user_id=' + encodeURIComponent(uid), { muteHttpExceptions: true }).getContentText() || '{}');
+  var st = r.ok && r.result ? r.result.status : '';
+  if (st !== 'creator' && st !== 'administrator') { tgReply(m.chat.id, '⚠️ ตั้งกลุ่มรับรายงานโฟร์แมนได้เฉพาะผู้ดูแลกลุ่ม', m.message_id); return; }
+  PropertiesService.getScriptProperties().setProperty('FOREMAN_CHAT_ID', String(m.chat.id));
+  tgReply(m.chat.id, '✅ ตั้งกลุ่มนี้เป็นกลุ่มรับรายงานเสาเฟลจากโฟร์แมนแล้ว — ส่งข้อความขึ้นต้น "แจ้งเสาเฟล" ได้เลย ระบบบันทึกเข้าแท็บ "รายงานโฟร์แมน" ให้', m.message_id);
+}
+function handleForemanText(m, text, sender) {
+  var d = new Date((m.date || Math.floor(Date.now() / 1000)) * 1000);
+  var day = Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd');
+  var o = ForemanParse.parse(text, { date: day, sender: sender });
+  var chat = m.chat.id;
+  if (!o.ok) {
+    tgReply(chat, '⚠️ <b>อ่านแจ้งเสาเฟลไม่ครบ ยังไม่ได้บันทึก</b>\nขาด: ' + o.missing.map(esc).join(' · ') + '\n\nรูปแบบ:\nแจ้งเสาเฟล\nหน่วยงาน : ชื่อหน้างาน\nเสา I0.22x15.00ม.ต/ช(มอก)\nท่อนแรก 8 ม. (วันหล่อ)\nท่อนสอง 7 ม. (วันหล่อ)\nเสาโรงงาน: บางเลน\nจำนวน: เฟลเป็นต้นที่ 1 จากตอกไปแล้ว 60 ต้น\nหน้างานสรุปแซม 1 ต้น\nสาเหตุที่คิด :', m.message_id);
+    return;
+  }
+  var r = o.row;
+  var q = 'foreman_reports?select=id&drive_date=eq.' + encodeURIComponent(r.drive_date) + '&size=eq.' + encodeURIComponent(r.size) + '&length_m=eq.' + encodeURIComponent(r.length_m)
+    + (r.site ? '&site=eq.' + encodeURIComponent(r.site) : '') + (r.fail_of ? '&fail_of=eq.' + encodeURIComponent(r.fail_of) : '');
+  var ex = sb('get', q);
+  if (ex.getResponseCode() >= 300) { Logger.log('foreman get: ' + ex.getContentText()); tgReply(chat, '⚠️ บันทึกไม่ได้ (เชื่อมฐานข้อมูลไม่สำเร็จ หรือยังไม่ได้รัน supabase-foreman-reports.sql) ลองส่งใหม่อีกครั้ง', m.message_id); return; }
+  var summary = '• ' + esc(r.size) + ' × ' + esc(r.length_m) + ' ม.' + (r.kind ? ' (' + esc(r.kind) + ')' : '') + (r.segs ? ' ท่อน ' + esc(r.segs) : '')
+    + '\n• หน้างาน: ' + esc(r.site || r.customer || '-') + (r.factory ? '\n• โรงงาน: ' + esc(r.factory) : '')
+    + (r.fail_of ? '\n• เฟลจากกี่ต้น: ' + esc(r.fail_of) : '') + (r.fix ? '\n• แก้ไข: ' + esc(r.fix) : '') + (r.remark && r.remark !== 'Fail' ? '\n• อาการ/สาเหตุ: ' + esc(r.remark) : '');
+  if (JSON.parse(ex.getContentText() || '[]').length) { tgReply(chat, 'ℹ️ <b>มีรายงานนี้ในระบบแล้ว</b> (ไม่บันทึกซ้ำ)\n' + summary, m.message_id); return; }
+  var row = { drive_date: r.drive_date, factory: r.factory || null, size: r.size, length_m: Number(r.length_m), kind: r.kind || null, fail_of: r.fail_of || null, customer: r.customer || null, site: r.site || null,
+    cast_dates: r.cast_dates || null, foreman: r.foreman || null, fix: r.fix || null, remark: r.remark || null, segs: r.segs || null, crane: r.crane || null, source: 'telegram', created_by: sender || null };
+  var ins = sb('post', 'foreman_reports', [row]);
+  if (ins.getResponseCode() >= 300) { Logger.log('foreman insert: ' + ins.getContentText()); tgReply(chat, '⚠️ บันทึกไม่ได้ (' + ins.getResponseCode() + ') ลองส่งใหม่อีกครั้ง', m.message_id); return; }
+  tgReply(chat, '✅ <b>บันทึกรายงานเสาเฟลแล้ว</b> (วันที่ตอก ' + r.drive_date.slice(8) .replace(/^0/, '') + '/' + Number(r.drive_date.slice(5, 7)) + '/' + (Number(r.drive_date.slice(0, 4)) + 543) + ')\n' + summary + '\n<a href="' + DASHBOARD_URL + '">👉 ดู/แก้ไขในแท็บ รายงานโฟร์แมน (เมนู อื่นๆ)</a>' + (r.fix ? '' : '\nยังไม่มีวิธีแก้ — แก้ไขในแท็บเมื่อหน้างานสรุป'), m.message_id);
 }
 // ตั้งให้ตรวจข้อความในกลุ่มทุก 1 นาที — กด Run ครั้งเดียว (รันซ้ำได้ ไม่ซ้อน)
 function setupPileCalc() {
