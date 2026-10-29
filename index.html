@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29a';
+var APP_VERSION='2026-10-29b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13409,7 +13409,7 @@ window.__dataReady.then(data => {
           let hr=-1;for(let r=ref.s.r;r<=Math.min(ref.e.r,6);r++){for(let c=ref.s.c;c<=ref.e.c;c++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&String(cell.v).trim()==='วันที่ตอก'){hr=r;break;}}if(hr>=0)break;}
           if(hr<0)return;
           const col={};for(let c=ref.s.c;c<=ref.e.c;c++){const cell=ws[XLSX.utils.encode_cell({r:hr,c})];if(cell&&String(cell.v).trim())col[String(cell.v).trim()]=c;}
-          const txt=(r,name)=>{if(col[name]==null)return'';const cell=ws[XLSX.utils.encode_cell({r,c:col[name]})];return cell==null||cell.v==null?'':String(cell.w!=null&&cell.t==='n'?cell.v:cell.v).trim();};
+          const txt=(r,name)=>{if(col[name]==null)return'';const cell=ws[XLSX.utils.encode_cell({r,c:col[name]})];return cell==null||cell.v==null?'':String(cell.t==='d'&&cell.w!=null?cell.w:cell.v).trim();};
           const lastNamed=Math.max(...Object.values(col));
           const out=[];
           for(let r=hr+1;r<=ref.e.r;r++){
@@ -13451,7 +13451,8 @@ window.__dataReady.then(data => {
     };
     const totalFix=list.reduce((s,r)=>s+fixN(r),0);
     const th={padding:'7px 9px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa'};
-    const td={padding:'6px 9px',fontSize:13,borderTop:'1px solid #eef0f4',verticalAlign:'top'};
+    const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
+    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['ลูกค้า',r=>r.customer,{w:190}],['หน้างาน',r=>r.site,{w:180}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['หมายเหตุ',r=>r.remark,{w:160}],['ท่อน/ปั้นจั่น',r=>[r.segs,r.crane].filter(Boolean).join(' · '),{w:110}]];
     const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
     return<div className="grid">
       <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
@@ -13479,17 +13480,11 @@ window.__dataReady.then(data => {
           <select value={fMan} onChange={e=>setFMan(e.target.value)} style={sel}><option value="">ทุกโฟร์แมน</option>{mans.map(x=><option key={x}>{x}</option>)}</select>
         </div>
         <div className="table-wrap" style={{margin:0}}>
-          <table style={{width:'100%',borderCollapse:'collapse',minWidth:980}}>
-            <thead><tr>{['วันที่ตอก','โรงงาน','ขนาด','ยาว','ประเภท','เฟลจาก','ลูกค้า','หน้างาน','วันที่หน้าเสา','โฟร์แมน','แก้ไข','หมายเหตุ','ท่อน/ปั้นจั่น',canEdit?'':null].filter(h=>h!==null).map(h=><th key={h||'x'} style={th}>{h}</th>)}</tr></thead>
-            <tbody>{list.map(r=><tr key={r.id}>
-              <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.drive_date)}</td><td style={td}>{r.factory||''}</td>
-              <td style={{...td,fontWeight:700,whiteSpace:'nowrap'}}>{r.size||''}</td><td style={td}>{r.length_m!=null?Number(r.length_m).toFixed(2):''}</td>
-              <td style={{...td,whiteSpace:'nowrap'}}>{r.kind||''}</td><td style={{...td,whiteSpace:'nowrap'}}>{r.fail_of||''}</td>
-              <td style={td}>{r.customer||''}</td><td style={td}>{r.site||''}</td><td style={{...td,whiteSpace:'nowrap'}}>{r.cast_dates||''}</td>
-              <td style={td}>{r.foreman||''}</td>
-              <td style={{...td,fontWeight:700,whiteSpace:'nowrap',color:/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{r.fix||''}</td>
-              <td style={td}>{r.remark||''}</td><td style={{...td,whiteSpace:'nowrap'}}>{[r.segs,r.crane].filter(Boolean).join(' · ')}</td>
+          <table style={{width:'100%',borderCollapse:'collapse',minWidth:1480}}>
+            <thead><tr>{canEdit&&<th style={th}></th>}{COLS.map(c=><th key={c[0]} style={{...th,whiteSpace:'nowrap'}}>{c[0]}</th>)}</tr></thead>
+            <tbody>{list.map((r,i)=><tr key={r.id} style={{background:i%2?'#fafbfd':'#fff'}}>
               {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={()=>openEdit(r)}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button></td>}
+              {COLS.map(c=>{const o=c[2]||{};const v=c[1](r);return<td key={c[0]} style={{...td,whiteSpace:o.nw?'nowrap':'normal',minWidth:o.w||undefined,fontWeight:o.b?700:400,textAlign:o.r?'right':'left',color:o.fix&&/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{v==null?'':v}</td>;})}
             </tr>)}
             {!list.length&&<tr><td colSpan={14} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>ยังไม่มีรายการ{canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
           </table>
