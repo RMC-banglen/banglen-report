@@ -18,6 +18,7 @@ create table if not exists foreman_reports (
   foreman     text,                   -- โฟร์แมนรายงาน
   fix         text,                   -- แก้ไข เช่น แซม 2 ต้น / รอสรุป
   remark      text,                   -- ปัญหา เช่น Fail, เสาแตกปีกขณะตอก
+  cause       text,                   -- สาเหตุที่คิด (โฟร์แมนเขียนมา)
   segs        text,                   -- ความยาวแต่ละท่อน เช่น 8+7
   crane       text,                   -- ปั้นจั่น
   source      text default 'form',    -- form / excel / telegram
@@ -25,6 +26,9 @@ create table if not exists foreman_reports (
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
+
+-- ถ้าสร้างตารางไว้แล้วก่อนมีช่องสาเหตุที่คิด: เพิ่มช่องให้ (รันซ้ำได้)
+alter table foreman_reports add column if not exists cause text;
 
 create index if not exists foreman_reports_drive_idx on foreman_reports (drive_date desc);
 

@@ -867,9 +867,9 @@ var ForemanParse = (function () {
     opt = opt || {};
     var t = String(text || '').replace(/\r/g, '').replace(/[​ ]/g, ' ');
     var lines = t.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
-    var r = { drive_date: opt.date || '', factory: '', size: '', length_m: '', kind: '', fail_of: '', customer: '', site: '', cast_dates: '', foreman: opt.sender || '', fix: '', remark: '', segs: '', crane: '' };
+    var r = { drive_date: opt.date || '', factory: '', size: '', length_m: '', kind: '', fail_of: '', customer: '', site: '', cast_dates: '', foreman: opt.sender || '', fix: '', remark: '', segs: '', crane: '', cause: '' };
     var val = function (l, re) { var m = l.match(re); return m ? m[m.length - 1].trim() : null; };
-    var segs = [], dts = [], tail = [];
+    var segs = [], dts = [], tail = [], causeParts = [], inCause = false;
     var cleanFactory = function (s) { return /บ่อ\s*ตะกั่ว/.test(s) ? 'บ่อตะกั่ว' : /บาง\s*เลน/.test(s) ? 'บางเลน' : s.replace(/^[:：\s]+/, '').trim(); };
     var normDate = function (s) { return String(s || '').trim(); };   // วันที่หน้าเสา เก็บตามที่เขียน
     var toIso = function (s) {   // วันที่ตอก: 7/10/69 · 7/10/2569 · 7-10-26 → 2026-10-07 (ปี 2 หลัก ≥60 = พ.ศ.)
@@ -881,13 +881,14 @@ var ForemanParse = (function () {
       return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
     };
     lines.forEach(function (l) {
+      if (inCause && !/^(?:โฟร์?แมน|ผู้แจ้ง|ผู้รายงาน|วันที่ตอก)\s*[:：]/.test(l)) { causeParts.push(l); return; }   // หลังบรรทัด "สาเหตุที่คิด" ทุกบรรทัดที่ตามมาเป็นข้อความสาเหตุ
       var v;
       if ((v = val(l, /^(?:หน่วยงาน|โครงการ|หน้างาน|ไซต์งาน|ไซต์)\s*[:：]\s*(.*)$/))) { r.site = v; return; }
       if ((v = val(l, /^(?:ชื่อ)?ลูกค้า\s*[:：]\s*(.*)$/))) { r.customer = v; return; }
       if ((v = val(l, /^(?:เสา)?โรงงาน\s*[:：]?\s*(.*)$/)) !== null && /โรงงาน\s*[:：]?/.test(l) && !/มาตรฐาน/.test(l)) { if (v) r.factory = cleanFactory(v); return; }
       if ((v = val(l, /^(?:วันที่ตอก\s*[:：]?|วันที่\s*[:：])\s*(.*)$/))) { var iso = toIso(v); if (iso) r.drive_date = iso; return; }
       if ((v = val(l, /^(?:โฟร์?แมน|ผู้แจ้ง|ผู้รายงาน)\s*[:：]\s*(.*)$/))) { r.foreman = v; return; }
-      if ((v = val(l, /^สาเหตุ(?:ที่คิด)?\s*[:：]?\s*(.*)$/)) !== null && /^สาเหตุ/.test(l)) { if (v) r.remark = v; return; }
+      if ((v = val(l, /^สาเหตุ(?:ที่คิด)?\s*[:：]?\s*(.*)$/)) !== null && /^สาเหตุ/.test(l)) { inCause = true; if (v) causeParts.push(v); return; }   // โฟร์แมนบางคนพิมพ์สาเหตุต่อท้ายหลายบรรทัด → รวมให้
       if ((v = val(l, /^ปั้นจั่น\s*[:：]?\s*(.*)$/)) !== null && /^ปั้นจั่น/.test(l)) { r.crane = 'ปั้นจั่น ' + v; return; }
       // ท่อนแรก 7 ม. (7/10/69) / ท่อนสอง7ม. / ท่อนที่ 3 8 ม.
       var sg = l.match(/^ท่อน(?:แรก|สอง|สาม|สี่|ที่\s*\d+|\d+)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*(?:ม\.?|m\.?|เมตร)?\s*(?:\(([^)]*)\))?/);
@@ -904,7 +905,7 @@ var ForemanParse = (function () {
         r.kind = [joint, std].filter(Boolean).join('/');
         return;
       }
-      tail.push(l);
+      if (inCause) causeParts.push(l); else tail.push(l);
     });
     var all = lines.join(' ');
     // เฟลจากกี่ต้น: "เฟลเป็นต้นที่2จากตอกไปแล้ว30ต้น" → 2/30 · "เฟล 1 ต้น จาก 60" → 1/60 · "1/60"
@@ -915,7 +916,7 @@ var ForemanParse = (function () {
     if (fx) r.fix = fx[1] + ' ' + fx[2] + ' ต้น'; else if (/รอ\s*สรุป/.test(all)) r.fix = 'รอสรุป';
     if (segs.length) r.segs = segs.map(function (x) { return String(x); }).join('+');
     if (dts.length) r.cast_dates = dts.join('-');   // เสา 2 ท่อน = 2 วันที่หล่อ (วันเดียวกันก็เก็บ 2 ค่า เช่น 7/10/69-7/10/69)
-    if (!r.remark) r.remark = 'Fail';
+    r.cause = causeParts.join(' '); if (!r.remark) r.remark = 'Fail';
     var missing = [];
     if (!r.size || !r.length_m) missing.push('ขนาด/ความยาวเสา (เช่น "เสา I0.18x14.00ม.ต/ช")');
     if (!r.site && !r.customer) missing.push('หน่วยงาน/หน้างาน (บรรทัด "หน่วยงาน : ...")');
@@ -961,12 +962,13 @@ function handleForemanText(m, text, sender) {
   var summary = '• วันที่ตอก: ' + foremanThDate(r.drive_date) + (m.date && r.drive_date === day ? ' (วันที่ส่งข้อความ)' : '') + '\n• ' + esc(r.size) + ' × ' + esc(r.length_m) + ' ม.' + (r.kind ? ' (' + esc(r.kind) + ')' : '') + (r.segs ? ' ท่อน ' + esc(r.segs) : '')
     + '\n• หน้างาน: ' + esc(r.site || r.customer || '-') + (r.factory ? '\n• โรงงาน: ' + esc(r.factory) : '')
     + (r.fail_of ? '\n• เฟลจากกี่ต้น: ' + esc(r.fail_of) : '') + (r.fix ? '\n• แก้ไข: ' + esc(r.fix) : '') + (r.remark && r.remark !== 'Fail' ? '\n• ปัญหา: ' + esc(r.remark) : '')
-    + '\n• โฟร์แมน: ' + esc(r.foreman || '-') + (nameSrc ? ' (' + nameSrc + ')' : '') + (r.cast_dates ? '\n• วันที่หน้าเสา: ' + esc(r.cast_dates) : '');
+    + '\n• โฟร์แมน: ' + esc(r.foreman || '-') + (nameSrc ? ' (' + nameSrc + ')' : '') + (r.cast_dates ? '\n• วันที่หน้าเสา: ' + esc(r.cast_dates) : '') + (r.cause ? '\n• สาเหตุที่คิด: ' + esc(r.cause) : '');
   if (JSON.parse(ex.getContentText() || '[]').length) { tgReply(chat, 'ℹ️ <b>มีรายงานนี้ในระบบแล้ว</b> (ไม่บันทึกซ้ำ)\n' + summary, m.message_id); return; }
   var row = { drive_date: r.drive_date, factory: r.factory || null, size: r.size, length_m: Number(r.length_m), kind: r.kind || null, fail_of: r.fail_of || null, customer: r.customer || null, site: r.site || null,
     cast_dates: r.cast_dates || null, foreman: r.foreman || null, fix: r.fix || null, remark: r.remark || null, segs: r.segs || null, crane: r.crane || null, source: 'telegram', created_by: sender || null };
+  if (r.cause) row.cause = r.cause;   // คอลัมน์ cause ต้องรัน SQL ล่าสุดก่อน (ส่งเฉพาะเมื่อมีข้อความ กันบันทึกปกติพัง)
   var ins = sb('post', 'foreman_reports', [row], true);
-  if (ins.getResponseCode() >= 300) { Logger.log('foreman insert: ' + ins.getContentText()); tgReply(chat, '⚠️ บันทึกไม่ได้ (' + ins.getResponseCode() + ') ลองส่งใหม่อีกครั้ง', m.message_id); return; }
+  if (ins.getResponseCode() >= 300) { Logger.log('foreman insert: ' + ins.getContentText()); tgReply(chat, '⚠️ บันทึกไม่ได้ (' + ins.getResponseCode() + ')' + (/cause/.test(ins.getContentText()) ? ' — ยังไม่ได้รัน SQL ล่าสุด (supabase-foreman-reports.sql) เพื่อเพิ่มช่อง สาเหตุที่คิด' : ' ลองส่งใหม่อีกครั้ง'), m.message_id); return; }
   var newId = ''; try { newId = JSON.parse(ins.getContentText() || '[]')[0].id; } catch (e) {}
   tgReply(chat, '✅ <b>บันทึกรายงานเสาเฟลแล้ว</b>' + (newId ? ' · รหัสรายการ #' + newId : '') + '\n' + summary + '\n<a href="' + DASHBOARD_URL + '">👉 ดู/แก้ไขในแท็บ รายงานโฟร์แมน (เมนู อื่นๆ)</a>'
     + '\n\n<i>ข้อมูลไม่ตรง? ตอบ (Reply) ข้อความนี้ว่า เช่น\nแก้ โฟร์แมน ชานนท์\nแก้ วันที่ตอก 28/10/69\nแก้ ลูกค้า บจก.xxx</i>', m.message_id);
@@ -987,14 +989,14 @@ function foremanIso(s) {   // 28/10/69 · 28/10/2569 · 28-10-26 → 2026-10-28 
   return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
 }
 // แก้รายการที่บอทบันทึกให้ โดยตอบข้อความของบอท: "แก้ โฟร์แมน ชานนท์" · "แก้ วันที่ตอก 28/10/69" ฯลฯ (เขียนได้หลายบรรทัด)
-var FOREMAN_EDIT_FIELDS = { 'โฟร์แมน': 'foreman', 'วันที่ตอก': 'drive_date', 'วันที่หน้าเสา': 'cast_dates', 'โรงงาน': 'factory', 'ลูกค้า': 'customer', 'หน้างาน': 'site', 'ปัญหา': 'remark', 'เฟลจาก': 'fail_of', 'เฟล': 'fail_of', 'แก้ไข': 'fix', 'วิธีแก้': 'fix', 'ท่อน': 'segs', 'ท่อนต่อ': 'segs', 'ปั้นจั่น': 'crane', 'ประเภท': 'kind', 'ขนาด': 'size', 'ยาว': 'length_m', 'ความยาว': 'length_m' };
+var FOREMAN_EDIT_FIELDS = { 'โฟร์แมน': 'foreman', 'วันที่ตอก': 'drive_date', 'วันที่หน้าเสา': 'cast_dates', 'โรงงาน': 'factory', 'ลูกค้า': 'customer', 'หน้างาน': 'site', 'ปัญหา': 'remark', 'สาเหตุที่คิด': 'cause', 'สาเหตุ': 'cause', 'เฟลจาก': 'fail_of', 'เฟล': 'fail_of', 'แก้ไข': 'fix', 'วิธีแก้': 'fix', 'ท่อน': 'segs', 'ท่อนต่อ': 'segs', 'ปั้นจั่น': 'crane', 'ประเภท': 'kind', 'ขนาด': 'size', 'ยาว': 'length_m', 'ความยาว': 'length_m' };
 function handleForemanEdit(m, text) {
   var rm = m.reply_to_message, chat = m.chat.id;
   var idm = rm && rm.from && rm.from.is_bot ? String(rm.text || '').match(/รหัสรายการ\s*#(\d+)/) : null;
   if (!idm) { tgReply(chat, 'ℹ️ ต้องตอบ (Reply) ข้อความ "บันทึกรายงานเสาเฟลแล้ว" ของบอท ถึงจะแก้รายการนั้นได้', m.message_id); return; }
   var patch = {}, done = [], bad = [];
   text.split(/\n/).forEach(function (l) {
-    var mm = l.trim().match(/^แก้\s*(โฟร์แมน|วันที่ตอก|วันที่หน้าเสา|โรงงาน|ลูกค้า|หน้างาน|ปัญหา|เฟลจาก|เฟล|แก้ไข|วิธีแก้|ท่อนต่อ|ท่อน|ปั้นจั่น|ประเภท|ขนาด|ความยาว|ยาว)\s*[:：]?\s*(.+)$/);
+    var mm = l.trim().match(/^แก้\s*(โฟร์แมน|วันที่ตอก|วันที่หน้าเสา|โรงงาน|ลูกค้า|หน้างาน|ปัญหา|สาเหตุที่คิด|สาเหตุ|เฟลจาก|เฟล|แก้ไข|วิธีแก้|ท่อนต่อ|ท่อน|ปั้นจั่น|ประเภท|ขนาด|ความยาว|ยาว)\s*[:：]?\s*(.+)$/);
     if (!mm) return;
     var col = FOREMAN_EDIT_FIELDS[mm[1]], v = mm[2].trim();
     if (col === 'drive_date') { v = foremanIso(v); if (!v) { bad.push('วันที่ตอก (อ่านวันที่ไม่ได้ เช่น 28/10/69)'); return; } }
