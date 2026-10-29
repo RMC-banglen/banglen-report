@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29b';
+var APP_VERSION='2026-10-29d';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13339,6 +13339,7 @@ window.__dataReady.then(data => {
     const [pasteMsg,setPasteMsg]=useState('');
     const [saving,setSaving]=useState(false);
     const [err,setErr]=useState('');
+    const [oth,setOth]=useState({});        // ช่องที่เลือก "อื่นๆ (พิมพ์เอง)" ในดรอปดาวน์
     const [imp,setImp]=useState(null);         // ผลอ่านไฟล์ Excel รอยืนยันนำเข้า
     const [impBusy,setImpBusy]=useState(false);
     const fileRef=useRef(null);
@@ -13372,8 +13373,8 @@ window.__dataReady.then(data => {
     const btnP={...btn,background:'#2f5fd0',borderColor:'#2f5fd0',color:'#fff'};
     const sel={...btn,padding:'6px 8px',fontWeight:500};
     const toRow=f=>({drive_date:f.drive_date,factory:f.factory||null,size:(f.size||'').trim()||null,length_m:f.length_m===''||f.length_m==null?null:Number(f.length_m),kind:f.kind||null,fail_of:f.fail_of||null,customer:f.customer||null,site:f.site||null,cast_dates:f.cast_dates||null,foreman:f.foreman||null,fix:f.fix||null,remark:f.remark||null,segs:f.segs||null,crane:f.crane||null});
-    const openNew=()=>{setForm(EMPTY());setEditId(null);setPaste('');setPasteMsg('');setErr('');};
-    const openEdit=r=>{setForm({...EMPTY(),...Object.fromEntries(Object.keys(EMPTY()).map(k=>[k,r[k]==null?'':String(r[k])])),drive_date:String(r.drive_date||'').slice(0,10)});setEditId(r.id);setPaste('');setPasteMsg('');setErr('');};
+    const openNew=()=>{setForm(EMPTY());setEditId(null);setPaste('');setPasteMsg('');setErr('');setOth({});};
+    const openEdit=r=>{setForm({...EMPTY(),...Object.fromEntries(Object.keys(EMPTY()).map(k=>[k,r[k]==null?'':String(r[k])])),drive_date:String(r.drive_date||'').slice(0,10)});setEditId(r.id);setPaste('');setPasteMsg('');setErr('');setOth({});};
     const doPaste=()=>{
       const o=foremanParse(paste,{date:todayIso()});
       if(!paste.trim()){setPasteMsg('วางข้อความก่อน');return;}
@@ -13450,10 +13451,16 @@ window.__dataReady.then(data => {
       setImpBusy(false);setImp(null);load();alert('นำเข้าแล้ว '+all.length+' รายการ');
     };
     const totalFix=list.reduce((s,r)=>s+fixN(r),0);
+    const probOpts=[...new Set(['Fail','เสาแตกปีกขณะตอก','เสาแตกผ่ากลาง','เสาหักกลางต้น','เสาหัก 1 ท่อน','หัวเสาแตก','ตอกแตกใต้เพลท','หักท่อนแรก',...countBy(rows,r=>r.remark).filter(([k,n])=>k!=='ไม่ระบุ'&&n>=2).map(([k])=>k)])];
     const th={padding:'7px 9px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa'};
     const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
-    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['ลูกค้า',r=>r.customer,{w:190}],['หน้างาน',r=>r.site,{w:180}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['หมายเหตุ',r=>r.remark,{w:160}],['ท่อน/ปั้นจั่น',r=>[r.segs,r.crane].filter(Boolean).join(' · '),{w:110}]];
+    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['เฟลจาก',r=>r.fail_of,{nw:1}],['ลูกค้า',r=>r.customer,{w:190}],['หน้างาน',r=>r.site,{w:180}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['ท่อน/ปั้นจั่น',r=>[r.segs,r.crane].filter(Boolean).join(' · '),{w:110}]];
     const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
+    const P=(k,label,opts,ph)=>{const v=form[k]||'';const custom=!!oth[k]||(v!==''&&!opts.includes(v));
+      return <div style={{minWidth:0}}><label style={lbl}>{label}</label>
+        <select style={inp} value={custom?'__other':v} onChange={e=>{const x=e.target.value;if(x==='__other'){setOth({...oth,[k]:true});setForm({...form,[k]:custom?v:''});}else{setOth({...oth,[k]:false});setForm({...form,[k]:x});}}}>
+          <option value="">— เลือก —</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}<option value="__other">อื่นๆ (พิมพ์เอง)</option></select>
+        {custom&&<input style={{...inp,marginTop:6}} value={v} placeholder={ph||'พิมพ์เอง'} onChange={e=>setForm({...form,[k]:e.target.value})}/>}</div>;};
     return<div className="grid">
       <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
         subtitle={`ปี ${year?year+543:'ทั้งหมด'} · ${list.length} รายการ · แซมรวม ${totalFix} ต้น`}
@@ -13474,7 +13481,7 @@ window.__dataReady.then(data => {
             <div style={{height:Math.max(2,n/maxM*40),background:n?'#2f5fd0':'#e5e8ef',borderRadius:3,margin:'0 2px'}}/>{n||''}<div>{MS[i]}</div></div>)}
         </div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
-          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / อาการ / โฟร์แมน" style={{...inp,width:'auto',flex:'1 1 220px'}}/>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / ปัญหา / โฟร์แมน" style={{...inp,width:'auto',flex:'1 1 220px'}}/>
           <select value={fFac} onChange={e=>setFFac(e.target.value)} style={sel}><option value="">ทุกโรงงาน</option>{facs.map(x=><option key={x}>{x}</option>)}</select>
           <select value={fSize} onChange={e=>setFSize(e.target.value)} style={sel}><option value="">ทุกขนาด</option>{sizes.map(x=><option key={x}>{x}</option>)}</select>
           <select value={fMan} onChange={e=>setFMan(e.target.value)} style={sel}><option value="">ทุกโฟร์แมน</option>{mans.map(x=><option key={x}>{x}</option>)}</select>
@@ -13504,19 +13511,17 @@ window.__dataReady.then(data => {
             <div><label style={lbl}>โรงงาน</label><select style={inp} value={form.factory||''} onChange={e=>setForm({...form,factory:e.target.value})}><option value=""></option><option>บางเลน</option><option>บ่อตะกั่ว</option>{form.factory&&!['บางเลน','บ่อตะกั่ว'].includes(form.factory)&&<option>{form.factory}</option>}</select></div>
             {F('size','ขนาดเสา (เช่น I22)',{placeholder:'I22'})}
             {F('length_m','ความยาว (ม.)',{type:'number',step:'any'})}
-            {F('kind','ประเภท',{list:'fm-kinds',placeholder:'ช/มอก'})}
+            {P('kind','ประเภท',['ช/มอก','ช/รง','ด/มอก','ด/รง'])}
+            {P('remark','ปัญหา',probOpts,'พิมพ์ปัญหาเอง')}
             {F('fail_of','เฟลจากกี่ต้น',{placeholder:'1/60'})}
             {F('customer','ชื่อลูกค้า')}
             {F('site','หน้างาน')}
             {F('cast_dates','วันที่หน้าเสา',{placeholder:'7/10/69'})}
             {F('foreman','โฟร์แมนรายงาน')}
-            {F('fix','แก้ไข',{list:'fm-fix',placeholder:'แซม 1 ต้น'})}
-            {F('remark','หมายเหตุ / อาการ')}
+            {P('fix','แก้ไข',['แซม 1 ต้น','แซม 2 ต้น','แซม 3 ต้น','รอสรุป'],'เช่น แซม 4 ต้น')}
             {F('segs','ท่อน (เช่น 8+7)')}
             {F('crane','ปั้นจั่น')}
           </div>
-          <datalist id="fm-kinds"><option value="ช/มอก"/><option value="ช/รง"/><option value="ด/มอก"/><option value="ด/รง"/></datalist>
-          <datalist id="fm-fix"><option value="แซม 1 ต้น"/><option value="แซม 2 ต้น"/><option value="รอสรุป"/></datalist>
           {err&&<div style={{marginTop:10,color:'#dc2626',fontSize:13.5}}>{err}</div>}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:16}}>
             <button style={btn} onClick={()=>setForm(null)}>ยกเลิก</button>

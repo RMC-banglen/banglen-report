@@ -957,7 +957,7 @@ function handleForemanText(m, text, sender) {
   if (ex.getResponseCode() >= 300) { Logger.log('foreman get: ' + ex.getContentText()); tgReply(chat, '⚠️ บันทึกไม่ได้ (เชื่อมฐานข้อมูลไม่สำเร็จ หรือยังไม่ได้รัน supabase-foreman-reports.sql) ลองส่งใหม่อีกครั้ง', m.message_id); return; }
   var summary = '• ' + esc(r.size) + ' × ' + esc(r.length_m) + ' ม.' + (r.kind ? ' (' + esc(r.kind) + ')' : '') + (r.segs ? ' ท่อน ' + esc(r.segs) : '')
     + '\n• หน้างาน: ' + esc(r.site || r.customer || '-') + (r.factory ? '\n• โรงงาน: ' + esc(r.factory) : '')
-    + (r.fail_of ? '\n• เฟลจากกี่ต้น: ' + esc(r.fail_of) : '') + (r.fix ? '\n• แก้ไข: ' + esc(r.fix) : '') + (r.remark && r.remark !== 'Fail' ? '\n• อาการ/สาเหตุ: ' + esc(r.remark) : '');
+    + (r.fail_of ? '\n• เฟลจากกี่ต้น: ' + esc(r.fail_of) : '') + (r.fix ? '\n• แก้ไข: ' + esc(r.fix) : '') + (r.remark && r.remark !== 'Fail' ? '\n• ปัญหา: ' + esc(r.remark) : '');
   if (JSON.parse(ex.getContentText() || '[]').length) { tgReply(chat, 'ℹ️ <b>มีรายงานนี้ในระบบแล้ว</b> (ไม่บันทึกซ้ำ)\n' + summary, m.message_id); return; }
   var row = { drive_date: r.drive_date, factory: r.factory || null, size: r.size, length_m: Number(r.length_m), kind: r.kind || null, fail_of: r.fail_of || null, customer: r.customer || null, site: r.site || null,
     cast_dates: r.cast_dates || null, foreman: r.foreman || null, fix: r.fix || null, remark: r.remark || null, segs: r.segs || null, crane: r.crane || null, source: 'telegram', created_by: sender || null };

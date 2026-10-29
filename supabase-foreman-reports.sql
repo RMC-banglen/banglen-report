@@ -17,7 +17,7 @@ create table if not exists foreman_reports (
   cast_dates  text,                   -- วันที่หน้าเสา (วันหล่อเสา) เช่น 21/12/68-4/1/69
   foreman     text,                   -- โฟร์แมนรายงาน
   fix         text,                   -- แก้ไข เช่น แซม 2 ต้น / รอสรุป
-  remark      text,                   -- หมายเหตุ / อาการ เช่น Fail, เสาแตกปีกขณะตอก
+  remark      text,                   -- ปัญหา เช่น Fail, เสาแตกปีกขณะตอก
   segs        text,                   -- ความยาวแต่ละท่อน เช่น 8+7
   crane       text,                   -- ปั้นจั่น
   source      text default 'form',    -- form / excel / telegram
