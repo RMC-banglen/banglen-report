@@ -765,6 +765,9 @@ function pileTelegramPoll() {
   } finally { lock.releaseLock(); }
 }
 function handlePileMessage(m) {
+  if (m && m.migrate_from_chat_id && foremanChat() && String(m.migrate_from_chat_id) === String(foremanChat())) {   // กลุ่มรายงานโฟร์แมนถูกอัปเกรดเป็นซูเปอร์กรุ๊ป → ใช้ไอดีใหม่
+    PropertiesService.getScriptProperties().setProperty('FOREMAN_CHAT_ID', String(m.chat.id));
+  }
   if (m && m.migrate_from_chat_id && String(m.migrate_from_chat_id) === String(pileChat())) {   // กลุ่มถูกอัปเกรดเป็นซูเปอร์กรุ๊ป → ใช้ไอดีใหม่
     PropertiesService.getScriptProperties().setProperty('PILE_CHAT_ID', String(m.chat.id)); return;
   }
