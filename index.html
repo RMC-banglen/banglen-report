@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29f';
+var APP_VERSION='2026-10-29g';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -188,6 +188,8 @@ var APP_VERSION='2026-10-29f';
 
   /* table */
   .table-wrap { overflow-x: auto; margin: 0 4px; }
+  .fm-row { cursor: pointer; }
+  .fm-row:hover td { background: #eef4ff; }
   .dt { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--num); }
   .dt th,.dt td { padding: 9px 10px; text-align: right; white-space: nowrap; }
   .dt thead th { font-size: 11.5px; color: var(--muted-text); font-weight: 600; border-bottom: 1.5px solid var(--line-strong); font-family: var(--font); }
@@ -13489,9 +13491,9 @@ window.__dataReady.then(data => {
         <div className="table-wrap" style={{margin:0}}>
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:1480}}>
             <thead><tr>{COLS.map(c=><th key={c[0]} style={{...th,whiteSpace:'nowrap'}}>{c[0]}</th>)}{canEdit&&<th style={th}></th>}</tr></thead>
-            <tbody>{list.map((r,i)=><tr key={r.id} style={{background:i%2?'#fafbfd':'#fff'}}>
+            <tbody>{list.map((r,i)=><tr key={r.id} className={canEdit?'fm-row':''} title={canEdit?'คลิกเพื่อแก้ไข':undefined} style={{background:i%2?'#fafbfd':'#fff'}} onClick={()=>{if(!canEdit)return;const sel=window.getSelection&&window.getSelection().toString();if(sel)return;openEdit(r);}}>
               {COLS.map(c=>{const o=c[2]||{};const v=c[1](r);return<td key={c[0]} style={{...td,whiteSpace:o.nw?'nowrap':'normal',minWidth:o.w||undefined,fontWeight:o.b?700:400,textAlign:o.r?'right':'left',color:o.fix&&/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{v==null?'':v}</td>;})}
-              {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={()=>openEdit(r)}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button></td>}
+              {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={e=>{e.stopPropagation();openEdit(r);}}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={e=>{e.stopPropagation();del(r);}}>ลบ</button></td>}
             </tr>)}
             {!list.length&&<tr><td colSpan={14} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>ยังไม่มีรายการ{canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
           </table>
