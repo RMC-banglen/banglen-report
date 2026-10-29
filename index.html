@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29k';
+var APP_VERSION='2026-10-29l';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13335,6 +13335,8 @@ window.__dataReady.then(data => {
     const [fSize,setFSize]=useState('');
     const [fMan,setFMan]=useState('');
     const [fMonth,setFMonth]=useState(0);      // 0 = ทุกเดือน
+    const [fPend,setFPend]=useState(false);    // true = แสดงเฉพาะงานที่ยัง "รอสรุป"
+    const tblRef=useRef(null);
     const [q,setQ]=useState('');
     const [form,setForm]=useState(null);       // null = ปิดฟอร์ม
     const [editId,setEditId]=useState(null);
@@ -13365,7 +13367,9 @@ window.__dataReady.then(data => {
     const base=inYear.filter(r=>(!fFac||r.factory===fFac)&&(!fSize||r.size===fSize)&&(!fMan||r.foreman===fMan)
       &&(!qq||[r.customer,r.site,r.remark,r.fix,r.foreman,r.kind,r.size].some(x=>String(x||'').toLowerCase().includes(qq))));
     const monthOf=r=>Number(String(r.drive_date).slice(5,7));
-    const list=base.filter(r=>!fMonth||monthOf(r)===fMonth);
+    const isPend=r=>/รอ\s*สรุป/.test(r.fix||'');
+    const list0=base.filter(r=>!fMonth||monthOf(r)===fMonth);
+    const list=fPend?list0.filter(isPend):list0;
     const fixN=r=>{const m=String(r.fix||'').match(/(\d+)\s*ต้น/);return m?Number(m[1]):0;};
     const countBy=(arr,f)=>{const m={};arr.forEach(r=>{const k=f(r)||'ไม่ระบุ';m[k]=(m[k]||0)+1;});return Object.entries(m).sort((a,b)=>b[1]-a[1]);};
     const byMonth=Array.from({length:12},(_,i)=>base.filter(r=>monthOf(r)===i+1).length);
@@ -13456,7 +13460,7 @@ window.__dataReady.then(data => {
       }
       setImpBusy(false);setImp(null);load();alert('นำเข้าแล้ว '+all.length+' รายการ');
     };
-    const totalFix=list.reduce((s,r)=>s+fixN(r),0);
+    const totalFix=list0.reduce((s,r)=>s+fixN(r),0);
     const probOpts=[...new Set(['Fail','เสาแตกปีกขณะตอก','เสาแตกผ่ากลาง','เสาหักกลางต้น','เสาหัก 1 ท่อน','หัวเสาแตก','ตอกแตกใต้เพลท','หักท่อนแรก',...countBy(rows,r=>r.remark).filter(([k,n])=>k!=='ไม่ระบุ'&&n>=2).map(([k])=>k)])];
     const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
     const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
@@ -13469,7 +13473,7 @@ window.__dataReady.then(data => {
         {custom&&<input style={{...inp,marginTop:6}} value={v} placeholder={ph||'พิมพ์เอง'} onChange={e=>setForm({...form,[k]:e.target.value})}/>}</div>;};
     return<div className="grid">
       <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
-        subtitle={`ปี ${year?year+543:'ทั้งหมด'}${fMonth?' · เดือน'+MF[fMonth-1]:''} · ${list.length} รายการ · แซมรวม ${totalFix} ต้น`}
+        subtitle={`ปี ${year?year+543:'ทั้งหมด'}${fMonth?' · เดือน'+MF[fMonth-1]:''} · ${list0.length} รายการ · แซมรวม ${totalFix} ต้น${fPend?' · แสดงเฉพาะรอสรุป '+list.length+' รายการ':''}`}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           <select value={year} onChange={e=>{setYr(Number(e.target.value));setFMonth(0);}} style={sel}>{years.map(y=><option key={y} value={y}>ปี {y+543}</option>)}<option value={0}>ทุกปี</option></select>
           {canEdit&&<button style={btnP} onClick={openNew}>＋ เพิ่มรายการ</button>}
@@ -13477,10 +13481,10 @@ window.__dataReady.then(data => {
           <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];e.target.value='';if(f)readXlsx(f);}}/>
         </div>}>
         <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',marginBottom:14}}>
-          <div className="kpi"><div className="kpi__label">แจ้งเฟล (ครั้ง)</div><div className="kpi__value">{list.length}</div></div>
+          <div className="kpi"><div className="kpi__label">แจ้งเฟล (ครั้ง)</div><div className="kpi__value">{list0.length}</div></div>
           <div className="kpi"><div className="kpi__label">แซมรวม (ต้น)</div><div className="kpi__value">{totalFix}</div></div>
-          <div className="kpi"><div className="kpi__label">รอสรุป</div><div className="kpi__value" style={{color:'#b45309'}}>{list.filter(r=>/รอ\s*สรุป/.test(r.fix||'')).length}</div></div>
-          {countBy(list,r=>r.factory).slice(0,2).map(([k,n])=><div className="kpi" key={k}><div className="kpi__label">โรงงาน {k}</div><div className="kpi__value">{n}</div></div>)}
+          <div className="kpi" role="button" tabIndex={0} title="คลิกเพื่อดูว่างานไหนรอสรุป" style={{cursor:'pointer',borderColor:fPend?'#b45309':undefined,background:fPend?'#fffbeb':undefined}} onClick={()=>{const on=!fPend;setFPend(on);if(on)setTimeout(()=>{tblRef.current&&tblRef.current.scrollIntoView({behavior:'smooth',block:'start'});},60);}} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.currentTarget.click();}}}><div className="kpi__label">รอสรุป {fPend?'(กำลังแสดง)':'· คลิกดู'}</div><div className="kpi__value" style={{color:'#b45309'}}>{list0.filter(isPend).length}</div></div>
+          {countBy(list0,r=>r.factory).slice(0,2).map(([k,n])=><div className="kpi" key={k}><div className="kpi__label">โรงงาน {k}</div><div className="kpi__value">{n}</div></div>)}
         </div>
         <div style={{display:'flex',gap:3,alignItems:'flex-end',height:64,marginBottom:14}} title="จำนวนครั้งที่แจ้งเฟลรายเดือน">
           {byMonth.map((n,i)=><div key={i} onClick={()=>setFMonth(fMonth===i+1?0:i+1)} title={'ดูเฉพาะเดือน'+MF[i]+' (คลิกอีกครั้งเพื่อดูทุกเดือน)'} style={{flex:1,textAlign:'center',fontSize:11,color:fMonth===i+1?'#1a2540':'#64748b',fontWeight:fMonth===i+1?800:400,cursor:'pointer',opacity:fMonth&&fMonth!==i+1?.45:1}}>
@@ -13493,14 +13497,15 @@ window.__dataReady.then(data => {
           <select value={fSize} onChange={e=>setFSize(e.target.value)} style={sel}><option value="">ทุกขนาด</option>{sizes.map(x=><option key={x}>{x}</option>)}</select>
           <select value={fMan} onChange={e=>setFMan(e.target.value)} style={sel}><option value="">ทุกโฟร์แมน</option>{mans.map(x=><option key={x}>{x}</option>)}</select>
         </div>
-        <div className="table-wrap" style={{margin:0,maxHeight:'70vh',overflow:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
+        {fPend&&<div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',margin:'0 0 8px',padding:'8px 12px',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,fontSize:13.5,color:'#92400e'}}>แสดงเฉพาะงานที่รอสรุป {list.length} รายการ — คลิกแถวเพื่อแก้ไข (ใส่วิธีแก้ เช่น แซม 2 ต้น เมื่อหน้างานสรุปแล้ว)<button style={{...btn,padding:'2px 10px',fontSize:12.5}} onClick={()=>setFPend(false)}>✕ ดูทั้งหมด</button></div>}
+        <div ref={tblRef} className="table-wrap" style={{margin:0,maxHeight:'70vh',overflow:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:1480}}>
             <thead><tr>{COLS.map(c=><th key={c[0]} style={{...th,whiteSpace:'nowrap'}}>{c[0]}</th>)}{canEdit&&<th style={th}></th>}</tr></thead>
             <tbody>{list.map((r,i)=><tr key={r.id} className={canEdit?'fm-row':''} title={canEdit?'คลิกเพื่อแก้ไข':undefined} style={{background:i%2?'#fafbfd':'#fff'}} onClick={()=>{if(!canEdit)return;const sel=window.getSelection&&window.getSelection().toString();if(sel)return;openEdit(r);}}>
               {COLS.map(c=>{const o=c[2]||{};const v=c[1](r);return<td key={c[0]} style={{...td,whiteSpace:o.nw?'nowrap':'normal',minWidth:o.w||undefined,fontWeight:o.b?700:400,textAlign:o.r?'right':'left',color:o.fix&&/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{v==null?'':v}</td>;})}
               {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={e=>{e.stopPropagation();openEdit(r);}}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={e=>{e.stopPropagation();del(r);}}>ลบ</button></td>}
             </tr>)}
-            {!list.length&&<tr><td colSpan={15} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>ยังไม่มีรายการ{canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
+            {!list.length&&<tr><td colSpan={15} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{fPend?'ไม่มีงานที่รอสรุปแล้ว 🎉':'ยังไม่มีรายการ'}{!fPend&&canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
           </table>
         </div>
       </ChartCard>
