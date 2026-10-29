@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29j';
+var APP_VERSION='2026-10-29k';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13334,6 +13334,7 @@ window.__dataReady.then(data => {
     const [fFac,setFFac]=useState('');
     const [fSize,setFSize]=useState('');
     const [fMan,setFMan]=useState('');
+    const [fMonth,setFMonth]=useState(0);      // 0 = ทุกเดือน
     const [q,setQ]=useState('');
     const [form,setForm]=useState(null);       // null = ปิดฟอร์ม
     const [editId,setEditId]=useState(null);
@@ -13361,11 +13362,14 @@ window.__dataReady.then(data => {
     const sizes=[...new Set(inYear.map(r=>r.size).filter(Boolean))].sort();
     const mans=[...new Set(inYear.map(r=>r.foreman).filter(Boolean))].sort();
     const qq=q.trim().toLowerCase();
-    const list=inYear.filter(r=>(!fFac||r.factory===fFac)&&(!fSize||r.size===fSize)&&(!fMan||r.foreman===fMan)
+    const base=inYear.filter(r=>(!fFac||r.factory===fFac)&&(!fSize||r.size===fSize)&&(!fMan||r.foreman===fMan)
       &&(!qq||[r.customer,r.site,r.remark,r.fix,r.foreman,r.kind,r.size].some(x=>String(x||'').toLowerCase().includes(qq))));
+    const monthOf=r=>Number(String(r.drive_date).slice(5,7));
+    const list=base.filter(r=>!fMonth||monthOf(r)===fMonth);
     const fixN=r=>{const m=String(r.fix||'').match(/(\d+)\s*ต้น/);return m?Number(m[1]):0;};
     const countBy=(arr,f)=>{const m={};arr.forEach(r=>{const k=f(r)||'ไม่ระบุ';m[k]=(m[k]||0)+1;});return Object.entries(m).sort((a,b)=>b[1]-a[1]);};
-    const byMonth=Array.from({length:12},(_,i)=>list.filter(r=>Number(String(r.drive_date).slice(5,7))===i+1).length);
+    const byMonth=Array.from({length:12},(_,i)=>base.filter(r=>monthOf(r)===i+1).length);
+    const MF=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
     const maxM=Math.max(1,...byMonth);
     const MS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const fmtD=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return Number(p[2])+'/'+Number(p[1])+'/'+String(Number(p[0])+543).slice(2);};
@@ -13465,9 +13469,9 @@ window.__dataReady.then(data => {
         {custom&&<input style={{...inp,marginTop:6}} value={v} placeholder={ph||'พิมพ์เอง'} onChange={e=>setForm({...form,[k]:e.target.value})}/>}</div>;};
     return<div className="grid">
       <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
-        subtitle={`ปี ${year?year+543:'ทั้งหมด'} · ${list.length} รายการ · แซมรวม ${totalFix} ต้น`}
+        subtitle={`ปี ${year?year+543:'ทั้งหมด'}${fMonth?' · เดือน'+MF[fMonth-1]:''} · ${list.length} รายการ · แซมรวม ${totalFix} ต้น`}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          <select value={year} onChange={e=>setYr(Number(e.target.value))} style={sel}>{years.map(y=><option key={y} value={y}>ปี {y+543}</option>)}<option value={0}>ทุกปี</option></select>
+          <select value={year} onChange={e=>{setYr(Number(e.target.value));setFMonth(0);}} style={sel}>{years.map(y=><option key={y} value={y}>ปี {y+543}</option>)}<option value={0}>ทุกปี</option></select>
           {canEdit&&<button style={btnP} onClick={openNew}>＋ เพิ่มรายการ</button>}
           {canEdit&&<button style={btn} disabled={impBusy} onClick={()=>fileRef.current&&fileRef.current.click()}>{impBusy?'กำลังอ่าน…':'📥 นำเข้าจาก Excel'}</button>}
           <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];e.target.value='';if(f)readXlsx(f);}}/>
@@ -13479,11 +13483,12 @@ window.__dataReady.then(data => {
           {countBy(list,r=>r.factory).slice(0,2).map(([k,n])=><div className="kpi" key={k}><div className="kpi__label">โรงงาน {k}</div><div className="kpi__value">{n}</div></div>)}
         </div>
         <div style={{display:'flex',gap:3,alignItems:'flex-end',height:64,marginBottom:14}} title="จำนวนครั้งที่แจ้งเฟลรายเดือน">
-          {byMonth.map((n,i)=><div key={i} style={{flex:1,textAlign:'center',fontSize:11,color:'#64748b'}}>
+          {byMonth.map((n,i)=><div key={i} onClick={()=>setFMonth(fMonth===i+1?0:i+1)} title={'ดูเฉพาะเดือน'+MF[i]+' (คลิกอีกครั้งเพื่อดูทุกเดือน)'} style={{flex:1,textAlign:'center',fontSize:11,color:fMonth===i+1?'#1a2540':'#64748b',fontWeight:fMonth===i+1?800:400,cursor:'pointer',opacity:fMonth&&fMonth!==i+1?.45:1}}>
             <div style={{height:Math.max(2,n/maxM*40),background:n?'#2f5fd0':'#e5e8ef',borderRadius:3,margin:'0 2px'}}/>{n||''}<div>{MS[i]}</div></div>)}
         </div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / ปัญหา / โฟร์แมน" style={{...inp,width:'auto',flex:'1 1 220px'}}/>
+          <select value={fMonth} onChange={e=>setFMonth(Number(e.target.value))} style={sel}><option value={0}>ทุกเดือน</option>{MF.map((m,i)=><option key={m} value={i+1}>{m}</option>)}</select>
           <select value={fFac} onChange={e=>setFFac(e.target.value)} style={sel}><option value="">ทุกโรงงาน</option>{facs.map(x=><option key={x}>{x}</option>)}</select>
           <select value={fSize} onChange={e=>setFSize(e.target.value)} style={sel}><option value="">ทุกขนาด</option>{sizes.map(x=><option key={x}>{x}</option>)}</select>
           <select value={fMan} onChange={e=>setFMan(e.target.value)} style={sel}><option value="">ทุกโฟร์แมน</option>{mans.map(x=><option key={x}>{x}</option>)}</select>
