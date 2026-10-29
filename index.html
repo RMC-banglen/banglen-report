@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29e';
+var APP_VERSION='2026-10-29f';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13488,10 +13488,10 @@ window.__dataReady.then(data => {
         </div>
         <div className="table-wrap" style={{margin:0}}>
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:1480}}>
-            <thead><tr>{canEdit&&<th style={th}></th>}{COLS.map(c=><th key={c[0]} style={{...th,whiteSpace:'nowrap'}}>{c[0]}</th>)}</tr></thead>
+            <thead><tr>{COLS.map(c=><th key={c[0]} style={{...th,whiteSpace:'nowrap'}}>{c[0]}</th>)}{canEdit&&<th style={th}></th>}</tr></thead>
             <tbody>{list.map((r,i)=><tr key={r.id} style={{background:i%2?'#fafbfd':'#fff'}}>
-              {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={()=>openEdit(r)}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button></td>}
               {COLS.map(c=>{const o=c[2]||{};const v=c[1](r);return<td key={c[0]} style={{...td,whiteSpace:o.nw?'nowrap':'normal',minWidth:o.w||undefined,fontWeight:o.b?700:400,textAlign:o.r?'right':'left',color:o.fix&&/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{v==null?'':v}</td>;})}
+              {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={()=>openEdit(r)}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button></td>}
             </tr>)}
             {!list.length&&<tr><td colSpan={14} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>ยังไม่มีรายการ{canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
           </table>
