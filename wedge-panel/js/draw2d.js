@@ -1,14 +1,14 @@
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010305";
-import { fmt, f2, f3 } from "./calc.js?v=202611010305";
+import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010311";
+import { fmt, f2, f3 } from "./calc.js?v=202611010311";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
 const TX=(x,y,t,an,rot,sz)=>A(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" style="fill:var(--muted);font-size:${sz||11}px;font-family:inherit;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round" text-anchor="${an||"middle"}" ${rot?`transform="rotate(-90 ${x.toFixed(1)} ${y.toFixed(1)})"`:""}>${t}</text>`);
 const tick=(x,y)=>L(x-3,y+3,x+3,y-3,"var(--muted)",.9);
 function dimLine(xa,xb,y,t,below){L(xa,y,xb,y);tick(xa,y);tick(xb,y);TX((xa+xb)/2,below?y+16:y-8,t)}
-function chainH(pts,y,t){pts.forEach(([x,yr])=>{const sd=yr>y?1:-1;L(x,yr-sd*2,x,y-sd*3)});L(pts[0][0],y,pts[pts.length-1][0],y);pts.forEach(([x])=>tick(x,y));for(let i=0;i<pts.length-1;i++){const w=pts[i+1][0]-pts[i][0];TX((pts[i][0]+pts[i+1][0])/2,w>=34?y-8:y+16,t[i])}}
+function chainH(pts,y,t){pts.forEach(([x,yr])=>{const sd=yr>y?1:-1;L(x,yr-sd*2,x,y-sd*3)});L(pts[0][0],y,pts[pts.length-1][0],y);pts.forEach(([x])=>tick(x,y));for(let i=0;i<pts.length-1;i++){const w=pts[i+1][0]-pts[i][0],n=pts.length-2;if(w>=34||(i>0&&i<n))TX((pts[i][0]+pts[i+1][0])/2,w>=34?y-8:y+16,t[i]);else if(i===0)TX(pts[0][0]-5,y-8,t[i],"end");else TX(pts[n+1][0]+5,y-8,t[i],"start")}}
 function chainV(pts,x,t){const sd=x>pts[0][0]?1:-1;pts.forEach(([xr,y])=>L(xr+sd*3,y,x+sd*3,y));L(x,pts[0][1],x,pts[pts.length-1][1]);pts.forEach(([,y])=>tick(x,y));for(let i=0;i<pts.length-1;i++){const h=Math.abs(pts[i+1][1]-pts[i][1]),ym=(pts[i][1]+pts[i+1][1])/2;if(h>=40)TX(x+(sd>0?18:-10),ym,t[i],"middle",true);else TX(x+sd*12,ym+4,t[i],sd>0?"start":"end")}}
 const poly=(pts,X,Y,st,fl,w)=>A(`<polygon points="${pts.map(q=>X(q[0]).toFixed(1)+","+Y(q[1]).toFixed(1)).join(" ")}" style="fill:${fl||"none"};stroke:${st||"var(--ink)"};stroke-width:${w||1.1}"/>`);
 export function pilePoly(p){const b=p.B/2,m=b-p.f,h=p.c/2,w=p.tw/2,ch=10;return[[-b+ch,-b],[b-ch,-b],[b,-b+ch],[b,-m],[w,-h],[w,h],[b,m],[b,b-ch],[b-ch,b],[-b+ch,b],[-b,b-ch],[-b,m],[-w,h],[-w,-h],[-b,-m],[-b,-b+ch]]}
