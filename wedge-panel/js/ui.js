@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101064304";
+import { STD, HS } from "./standards.js?v=20261101064632";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101064304";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101064304";
-import { panelSheet, jointSvg, remark3d, esc } from "./draw2d.js?v=20261101064304";
-import { createViews } from "./view3d.js?v=20261101064304";
-import { makePdf, downloadSummary } from "./pdf.js?v=20261101064304";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101064304";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101064304";
+} from "./calc.js?v=20261101064632";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101064632";
+import { panelSheet, jointSvg, remark3d, esc } from "./draw2d.js?v=20261101064632";
+import { createViews } from "./view3d.js?v=20261101064632";
+import { makePdf } from "./pdf.js?v=20261101064632";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101064632";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101064632";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -171,7 +171,7 @@ function renderProd() {
 function drawJoint() {
   const gr = STATE.groups[+$("sel3").value || 0], j = jointSvg(STATE, gr);
   $("sJ").outerHTML = j.svg ? j.svg.replace("<svg ", '<svg id="sJ" ') : '<svg id="sJ" viewBox="0 0 680 20"></svg>';
-  $("jNote").textContent = j.note;
+  $("jNote").textContent = STATE.direct ? "" : j.note; // โหมดสั่งตามจำนวนแผ่น: มีหมายเหตุใต้ภาพ 3 มิติแล้ว ไม่ต้องแสดงข้อมูลตรวจรอยต่อ
   $("n3").innerHTML = remark3d(STATE, gr);
 }
 function drawPanel() {
@@ -257,10 +257,6 @@ $("bAdd").onclick = () => {
   $("pj").value = base.replace(/ (สั่งเพิ่ม)$/, "") + " (สั่งเพิ่ม)";
   curId = null; try { history.replaceState(null, "", "#drawing"); } catch (e) {}
   renderRows(); run(); msg("คัดลอกเป็นใบสั่งเพิ่มแล้ว • แก้จำนวนแผ่นแล้วกดบันทึกโครงการ (จะบันทึกเป็นโครงการใหม่)");
-};
-$("bDl").onclick = () => {
-  if (!STATE || !STATE.list.length) { msg("ยังไม่มีรายการแผ่นให้สรุป"); return; }
-  downloadSummary(STATE, collect(), +$("tk").value || DEFAULT_TRUCK_KG); msg("ดาวน์โหลดใบสรุปแล้ว • เปิดไฟล์แล้วสั่งพิมพ์เป็น PDF ได้");
 };
 $("bPdf").onclick = async () => {
   if (!STATE || !STATE.list.length) { msg("ยังไม่มีรายการแผ่นให้ส่งออก"); return; }
