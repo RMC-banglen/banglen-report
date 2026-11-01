@@ -1,6 +1,6 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { f3, fmt } from "./calc.js";
+import { f2, f3, fmt } from "./calc.js";
 import { pilePoly, planPoly } from "./draw2d.js";
 
 export function createViews({ $, getState }) {
@@ -94,9 +94,9 @@ for(let i=0;i<n;i++){const xa=CE+i*(W+TC),xb=xa+W;const P=[[xa,0],[xb,0],...G.ti
 wedge(g3,ty,TD,xe,-1,z0,H,false);if(k===0)ends.push([xe+WB/2,WB]);if(k<R-1){bx(g3,CE-55,z0+H,xe-CE+110,TDV,0,100,RHSC);if(ty==="A")bx(g3,CE-55,z0+H,xe-CE+110,TDV,100,110,FBC)}}
 ends.forEach(([cx,w])=>{joint(g3,cx,w,CS,1,A.sp,Tt);joint(g3,cx,w,zM,-1,B.sp,Tt);for(let k=0;k<R-1;k++){const z0=CS+k*(H+TDV);bx(g3,cx-w/2,z0+H-60,w,TDV+120,Tt,Tt+8,PAC)}});
 const blocks=ends.map(([cx])=>[cx-105,cx+105]),mags=[];[1000,3000,5000].forEach(p=>{const want=x0L+p;for(let d=0;d<=900;d+=5){let got=null;for(const s of [1,-1]){const x=want+s*d;if(x-190<x0L||x+190>x0L+LF)continue;if(blocks.concat(mags.map(m=>[m-200,m+200])).some(([a,b])=>x+165>a-10&&x-165<b+10))continue;if([x-135,x+135].some(a=>B.sp.some(q=>Math.abs(a-q)<BLK)))continue;got=x;break}if(got!==null){mags.push(got);magnet(g3,zM,got,Tt);break}}});
-$("tInfo").textContent=`${it.code} • ${R} แถว × ${n} แผ่น = ${R*n} แผ่น/โต๊ะ/รอบ • หัวลิ่มแบบ ${ty} • แม่เหล็ก ${mags.length} ตัว • เหลือแบบข้างว่าง ${fmt(xeMax-xe)} มม.`;frame()}
+$("tInfo").textContent=`${it.code} • ${R} แถว × ${n} แผ่น = ${R*n} แผ่น/โต๊ะ/รอบ • หัวลิ่มแบบ ${ty} • แม่เหล็ก ${mags.length} ตัว • เหลือแบบข้างว่าง ${f3(xeMax-xe)} ม.`;frame()}
 function frame(){const b=new THREE.Box3().setFromObject(g3),c=new THREE.Vector3();b.getCenter(c);g3.position.set(-c.x,0,-c.z);T0.set(0,0,0);tg.set(0,0,0);R0=6096*KK*1.1;rr=R0;th=-.7;ph=.95;upd()}
-function refresh(){const st=getState();if(!st)return;const s=$("selT"),k=s.value;s.innerHTML=st.list.map(i=>`<option value="${i.code}">${i.code} • สูง ${(i.H/1000).toFixed(2)} × กว้าง ${fmt(i.WT)}</option>`).join("");if(k&&st.list.some(i=>i.code===k))s.value=k}
+function refresh(){const st=getState();if(!st)return;const s=$("selT"),k=s.value;s.innerHTML=st.list.map(i=>`<option value="${i.code}">${i.code} • สูง ${(i.H/1000).toFixed(2)} × กว้าง ${f2(i.WT)}</option>`).join("");if(k&&st.list.some(i=>i.code===k))s.value=k}
 return{build,refresh}})();
 return { buildWall: build3d, snapshot, table: TV, resetWall(){ th=-.6; ph=1.05; r=R0; upd(); } };
 }

@@ -47,15 +47,15 @@
 <button type="button" id="addSpan">เพิ่มช่วงเสา</button>
 <p class="hint">ช่วงที่เสาห่างเท่ากัน ใส่แถวเดียว แล้วบอกจำนวนช่วง</p></div>
 <details class="adv"><summary>ค่าเผื่อการทำงาน</summary>
-<label for="gp">ค่าเผื่อข้างละ (มม.)</label><input id="gp" type="number" value="20" step="5" min="5" max="40"><p class="hint">มาตรฐานแนะนำข้างละ 20 มม.</p></details>
+<label for="gp">ค่าเผื่อข้างละ (ม.)</label><input id="gp" type="number" value="0.020" step="0.005" min="0.005" max="0.04"><p class="hint">มาตรฐานแนะนำข้างละ 0.020 ม.</p></details>
 </fieldset>
 <fieldset>
 <legend>รูปแบบงาน</legend>
 <div class="mode"><input type="radio" name="md" id="mdS" value="std" checked><label for="mdS">มาตรฐานบริษัท</label><input type="radio" name="md" id="mdP" value="sp"><label for="mdP">สั่งพิเศษ</label></div>
-<div class="std" id="stdBox"><b>มาตรฐานบริษัท</b><br>เหล็กแนวตั้ง RB6 @200 • เหล็กแนวนอน RB9 @200<br>ระยะหุ้ม 25 • เหล็กเลยจุดผูก 25<br>ท่อระบายน้ำ PVC 1½" สูง 0.50 = 1 แถว • สูงกว่า = 2 แถว • 1 คอลัมน์ต่อกว้าง 600 มม.</div>
+<div class="std" id="stdBox"><b>มาตรฐานบริษัท</b><br>เหล็กแนวตั้ง RB6 @0.200 ม. • เหล็กแนวนอน RB9 @0.200 ม.<br>ระยะหุ้ม 0.025 ม. • เหล็กเลยจุดผูก 0.025 ม.<br>ท่อระบายน้ำ PVC 1½" สูง 0.50 = 1 แถว • สูงกว่า = 2 แถว • 1 คอลัมน์ต่อกว้าง 0.60 ม.</div>
 <div id="spBox" hidden>
-<div class="row2"><div><label for="dv">เหล็กแนวตั้ง</label><select id="dv"><option value="6" selected>RB6</option><option value="9">RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="sv">@ แนวตั้ง (มม.)</label><input id="sv" type="number" value="200" step="10" min="75"></div></div>
-<div class="row2"><div><label for="dh">เหล็กแนวนอน</label><select id="dh"><option value="6">RB6</option><option value="9" selected>RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="sh">@ แนวนอน (มม.)</label><input id="sh" type="number" value="200" step="10" min="75"></div></div>
+<div class="row2"><div><label for="dv">เหล็กแนวตั้ง</label><select id="dv"><option value="6" selected>RB6</option><option value="9">RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="sv">@ แนวตั้ง (ม.)</label><input id="sv" type="number" value="0.200" step="0.010" min="0.075"></div></div>
+<div class="row2"><div><label for="dh">เหล็กแนวนอน</label><select id="dh"><option value="6">RB6</option><option value="9" selected>RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="sh">@ แนวนอน (ม.)</label><input id="sh" type="number" value="0.200" step="0.010" min="0.075"></div></div>
 <div class="row3"><div><label for="pd">ท่อ PVC</label><select id="pd"><option value="0">ไม่มี</option><option value="34">1"</option><option value="48" selected>1½"</option><option value="60">2"</option><option value="76">2½"</option><option value="89">3"</option></select></div><div><label for="pr">แถว</label><input id="pr" type="number" value="2" min="1" max="6"></div><div><label for="pc">คอลัมน์</label><input id="pc" type="number" value="0" min="0" max="10"></div></div>
 <p class="hint">คอลัมน์ 0 = คิดตามความกว้างอัตโนมัติ</p>
 <label for="nt">รายละเอียดที่สั่งพิเศษ</label><textarea id="nt" placeholder="เสริมเหล็กขอบบน 2-DB12 ตามแบบผู้ออกแบบ"></textarea>

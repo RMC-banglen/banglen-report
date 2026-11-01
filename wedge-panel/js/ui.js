@@ -75,7 +75,7 @@ function renderStack() {
 const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
 function spec() {
   if (radio("md") !== "sp") return standardSpec();
-  return { sp: true, dv: +$("dv").value, sv: +$("sv").value, dh: +$("dh").value, sh: +$("sh").value, cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, note: $("nt").value.trim() };
+  return { sp: true, dv: +$("dv").value, sv: Math.round(+$("sv").value * 1000), dh: +$("dh").value, sh: Math.round(+$("sh").value * 1000), cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, note: $("nt").value.trim() };
 }
 function currentSpans(al) {
   if (radio("sm") !== "len") return spans;
@@ -103,7 +103,7 @@ function run() {
   const sp = currentSpans(spanAl);
   const stk = op[stackSel] ? [...op[stackSel]] : [];
   const truck = +$("tk").value || DEFAULT_TRUCK_KG;
-  const r = calcProject({ pile: $("pt").value, allowance: +$("gp").value, spans: sp, stack: stk, spec: S, truckKg: truck });
+  const r = calcProject({ pile: $("pt").value, allowance: Math.round(+$("gp").value * 1000), spans: sp, stack: stk, spec: S, truckKg: truck });
   r.al = [...r.al.filter((a) => a[1].startsWith("งานสั่งพิเศษ")), ...spanAl, ...r.al.filter((a) => !a[1].startsWith("งานสั่งพิเศษ"))];
   STATE = r;
   const { p, G, list, nPile, nSpan, wLen, totQ, totV, totS, totW, trips } = r;
@@ -114,8 +114,8 @@ function run() {
 <div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${(totW / 1000).toFixed(1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
   $("alerts").innerHTML = r.al.map((a) => `<div class="al ${a[0]}">${esc(a[1])}</div>`).join("");
   $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ")}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
-  fillSelect("sel3", r.groups.map((gr, i) => [String(i), `กลาง/กลางเสา ${fmt(gr.cc)} มม. • กว้างแผ่น ${fmt(gr.F.WT)} • ${gr.n} ช่วง`]));
-  const optItem = list.map((i) => [i.code, `${i.code} • สูง ${(i.H / 1000).toFixed(2)} × กว้าง ${fmt(i.WT)}`]);
+  fillSelect("sel3", r.groups.map((gr, i) => [String(i), `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${gr.n} ช่วง`]));
+  const optItem = list.map((i) => [i.code, `${i.code} • สูง ${(i.H / 1000).toFixed(2)} × กว้าง ${f2(i.WT)}`]);
   fillSelect("selD", optItem); fillSelect("selT", optItem);
   renderProd(); drawJoint(); drawPanel();
   if (cur === "view3d") views.buildWall(+$("sel3").value || 0);
@@ -166,7 +166,8 @@ const FIELDS = ["pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd"
 function collect() {
   const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm") };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
-  o.wh = +o.wh; o.gp = +o.gp;
+  o.wh = +o.wh; // บันทึกค่าที่เป็นความยาวเล็กๆ เป็นมม. เสมอ (ช่องกรอกเป็นเมตร)
+  ['gp', 'sv', 'sh'].forEach((k) => { o[k] = Math.round(+o[k] * 1000); });
   return o;
 }
 function apply(d) {
@@ -174,6 +175,7 @@ function apply(d) {
   (d.sm === "man" ? $("smM") : $("smL")).checked = true;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
   if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 1500, n: +s.n || 1 }));
+  ["gp", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
   stackSel = +d.stackSel || 0;
   (d.md === "sp" ? $("mdP") : $("mdS")).checked = true;
   renderSpans(); run();

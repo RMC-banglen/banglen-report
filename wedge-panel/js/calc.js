@@ -188,8 +188,8 @@ export function calcProject(input) {
   const S = input.spec || standardSpec();
   const stk = input.stack || [];
   const al = [];
-  if (!(g >= 5 && g <= 40)) al.push(["d", "ค่าเผื่อควรอยู่ระหว่าง 5 ถึง 40 มม."]);
-  if (S.sp && (!(S.sv >= 75) || !(S.sh >= 75))) al.push(["d", "ระยะ @ เหล็กต้องไม่น้อยกว่า 75 มม."]);
+  if (!(g >= 5 && g <= 40)) al.push(["d", "ค่าเผื่อควรอยู่ระหว่าง 0.005 ถึง 0.040 ม."]);
+  if (S.sp && (!(S.sv >= 75) || !(S.sh >= 75))) al.push(["d", "ระยะ @ เหล็กต้องไม่น้อยกว่า 0.075 ม."]);
 
   const groups = [];
   (input.spans || []).forEach((s, i) => {
@@ -198,8 +198,8 @@ export function calcProject(input) {
       return;
     }
     const F = fitCalc(p, G, s.cc, g);
-    if (F.ze < 20) al.push(["d", `ช่วง กลาง/กลางเสา ${fmt(s.cc)}: ค่าเผื่อมากเกินไป แผ่นเสียบร่องได้น้อยกว่า 20 มม.`]);
-    if (F.mn < 3) al.push(["d", `ช่วง กลาง/กลางเสา ${fmt(s.cc)}: ลิ่มหนากว่าร่อง แผ่นจะติด ต้องเพิ่มค่าเผื่อ`]);
+    if (F.ze < 20) al.push(["d", `ช่วง กลาง/กลางเสา ${f2(s.cc)} ม.: ค่าเผื่อมากเกินไป แผ่นเสียบร่องได้น้อยกว่า 0.020 ม.`]);
+    if (F.mn < 3) al.push(["d", `ช่วง กลาง/กลางเสา ${f2(s.cc)} ม.: ลิ่มหนากว่าร่อง แผ่นจะติด ต้องเพิ่มค่าเผื่อ`]);
     groups.push({ ...s, F });
   });
 
@@ -218,7 +218,7 @@ export function calcProject(input) {
         items.set(key, it);
         if (P.pipe.warn) al.push(["w", `${code}: ${P.pipe.warn}`]);
         it.tf = tableFit(G, P.W, H);
-        if (it.tf.n < 1 || it.tf.R < 1) al.push(["d", `${code}: แผ่นใหญ่เกินโต๊ะหล่อ (ตัวแผ่นยาวได้ไม่เกิน ${fmt(it.tf.span)} มม.)`]);
+        if (it.tf.n < 1 || it.tf.R < 1) al.push(["d", `${code}: แผ่นใหญ่เกินโต๊ะหล่อ (ตัวแผ่นยาวได้ไม่เกิน ${f2(it.tf.span)} ม.)`]);
       }
       it.qty += gr.n;
       it.cc.add(gr.cc);
