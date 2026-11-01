@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101072246";
+import { STD, HS } from "./standards.js?v=20261101072457";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101072246";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101072246";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101072246";
-import { createViews } from "./view3d.js?v=20261101072246";
-import { makePdf } from "./pdf.js?v=20261101072246";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101072246";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101072246";
+} from "./calc.js?v=20261101072457";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101072457";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101072457";
+import { createViews } from "./view3d.js?v=20261101072457";
+import { makePdf } from "./pdf.js?v=20261101072457";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101072457";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101072457";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -278,15 +278,18 @@ $("bAdd").onclick = () => {
   curId = null; try { history.replaceState(null, "", "#drawing"); } catch (e) {}
   renderRows(); run(); msg("ทำใบสั่งเพิ่มจากโครงการนี้แล้ว • แก้จำนวนแผ่นแล้วกดบันทึกโครงการ (จะบันทึกเป็นโครงการใหม่)");
 };
-$("bPdf").onclick = async () => {
+// ส่งออก PDF: ภายใน = มีหน้าสรุป (น้ำหนัก วัสดุ การผลิต) / ส่งลูกค้า = เฉพาะภาพ 3 มิติและแบบแผ่น
+async function exportPdf(customer) {
   if (!STATE || !STATE.list.length) { msg("ยังไม่มีรายการแผ่นให้ส่งออก"); return; }
-  const btn = $("bPdf"); btn.disabled = true; msg("กำลังสร้าง PDF…");
+  const btns = [$("bPdf"), $("bPdfC")]; btns.forEach((b) => (b.disabled = true)); msg("กำลังสร้าง PDF…");
   try {
-    await makePdf({ st: STATE, d: collect(), $, views, onStatus: msg });
-    msg("ดาวน์โหลด PDF แล้ว • หน้าแรกสรุปโครงการ หน้าถัดไปเป็นแบบแผ่นทุกรหัส");
+    await makePdf({ st: STATE, d: collect(), $, views, onStatus: msg, customer });
+    msg(customer ? "ดาวน์โหลด PDF สำหรับลูกค้าแล้ว • มีเฉพาะภาพ 3 มิติและแบบแผ่นทุกรหัส" : "ดาวน์โหลด PDF ภายในแล้ว • หน้าแรกสรุปโครงการ หน้าถัดไปเป็นภาพ 3 มิติและแบบแผ่นทุกรหัส");
   } catch (e) { msg(e && e.message ? e.message : "สร้าง PDF ไม่สำเร็จ ลองใหม่อีกครั้ง"); }
-  finally { btn.disabled = false; views.buildWall(+$("sel3").value || 0); }
-};
+  finally { btns.forEach((b) => (b.disabled = false)); views.buildWall(+$("sel3").value || 0); }
+}
+$("bPdf").onclick = () => exportPdf(false);
+$("bPdfC").onclick = () => exportPdf(true);
 
 // ---------------- เริ่มทำงาน ----------------
 function wire() {

@@ -1,8 +1,8 @@
 // ส่งออก PDF / ใบสรุป HTML — สร้างในเครื่องผู้ใช้ตอนกดดาวน์โหลด ไม่เก็บไฟล์ลง Storage
 // โครงตามต้นแบบ: หน้า 1 สรุปโครงการ • 1 หน้าต่อ c/c (3D + รูปขยายรอยต่อ) • 1 หน้าต่อรหัส (รูปตัด 2 + รูปด้าน 2)
 // ชิ้นเนื้อหาที่ยาวเกินหน้าจะถูกย่อให้พอดี ไม่ตัดกลางชิ้น
-import { fmt, f2, f3 } from "./calc.js?v=20261101072246";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101072246";
+import { fmt, f2, f3 } from "./calc.js?v=20261101072457";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101072457";
 
 const PRINT = {"--bg":"#FFFFFF","--surface":"#FFFFFF","--surface-2":"#F5F6F4","--ink":"#1D2725","--muted":"#5B6964","--faint":"#8A9691","--line":"#CDD3CF","--accent":"#0F6E56","--accent-soft":"#E1F2EB","--rebar":"#C2522B","--rebar-2":"#B07316","--pipe":"#1E5FA0","--warn":"#9A5B05","--warn-soft":"#FBF0DC","--danger":"#A32D2D","--danger-soft":"#FBE8E8","--concrete":"rgba(93,202,165,.20)"};
 const unvar = (s) => s.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => PRINT[k] || "#1D2725");
@@ -24,7 +24,8 @@ ${st.direct ? "" : document.querySelector(".hstd").outerHTML}${$("cards").outerH
 }
 
 // views.snapshot(i) = ภาพ 3 มิติช่วงที่ i เป็น JPEG data URL, onStatus(text) = แจ้งความคืบหน้า
-export async function makePdf({ st, d, $, views, onStatus }) {
+// customer = true: ไม่มีหน้าสรุปภายใน (เฉพาะภาพ 3 มิติ + แบบแผ่น) สำหรับส่งลูกค้า
+export async function makePdf({ st, d, $, views, onStatus, customer = false }) {
   if (!window.html2canvas || !window.jspdf) throw new Error("โหลดตัวสร้าง PDF ไม่สำเร็จ ลองรีเฟรชหน้า");
   const box = document.createElement("div");
   box.id = "pdfbox";
@@ -34,7 +35,7 @@ export async function makePdf({ st, d, $, views, onStatus }) {
   document.body.appendChild(box);
   try {
     await document.fonts.ready;
-    const spec = [{ h: pdfSummary(st, d, $) }];
+    const spec = customer ? [] : [{ h: pdfSummary(st, d, $) }];
     st.groups.forEach((gr, i) => {
       const img = views.snapshot(i), j = jointSvg(st, gr);
       spec.push({ h: `<h2 style="font-size:18px;margin:0 0 2px">ภาพ 3 มิติ • ช่วงเสา กลาง/กลางเสา ${f2(gr.cc)} ม.</h2><p style="margin:0 0 6px;color:#5B6964">${st.p.n} • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${gr.stk ? `สูง ${(gr.stk[0] / 1000).toFixed(2)} ม. • ${fmt(gr.n)} แผ่น` : `ซ้อน ${stackTxt(st)} ม. • ${fmt(gr.n)} ช่วง`}</p><img src="${img}" alt="ภาพ 3 มิติเสาเข็มกับแผ่นกันดิน" style="width:100%;display:block;border:1px solid #CDD3CF;border-radius:6px"><p class="cap">รูปขยายรอยต่อด้านขวา</p>${j.svg}${remark3d(st, gr)}${shoulderRemark(st, gr, d)}` });
@@ -58,7 +59,7 @@ export async function makePdf({ st, d, $, views, onStatus }) {
       pdf.addImage(cv.toDataURL("image/jpeg", 0.92), "JPEG", (pw - w) / 2, M, w, h);
       pg.remove();
     }
-    download(`แผ่นกันดิน-${safeName(d.pj, "โครงการ")}.pdf`, pdf.output("blob"));
+    download(`แผ่นกันดิน-${safeName(d.pj, "โครงการ")}${customer ? "-ส่งลูกค้า" : ""}.pdf`, pdf.output("blob"));
   } finally {
     box.remove();
   }
