@@ -1,7 +1,7 @@
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010323";
-import { fmt, f2, f3 } from "./calc.js?v=202611010323";
+import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010332";
+import { fmt, f2, f3 } from "./calc.js?v=202611010332";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -30,7 +30,7 @@ chainV([[bx,Y(-G.T/2)],[bx,Y(G.T/2)]],bx-26,["หนา "+f3(G.T)]);
 chainH([[X(cx-b),Y(-b)],[X(cx+b),Y(-b)]],Y(-b)-26,["กว้างหน้าตัดเสา "+f3(p.B)]);
 const yb=Y(b)+22;chainH([[X(pf),Y(b)],[X(wf),Y(p.c/2)+4]],yb,["ลึกร่อง "+f3(p.dg)]);
 const svg=`<svg viewBox="0 0 680 ${Math.ceil(yb+12)}" role="img" aria-label="รูปขยายรอยต่อเสากับแผ่น">${o}</svg>`;
-const note=`${p.n} • กลาง/กลางเสา ${f2(gr.cc)} ม. → กว้างแผ่น ${f2(F.WT)} ม. (คำนวณได้ ${f2(F.raw)} ปัดลงทุก 0.01 ม.) • เสียบร่องข้างละ ${f3(Math.round(F.ze))} ม. • ช่องว่างปากร่อง ${f3(Math.round(F.cm))} ม./ข้าง • ปลายลิ่ม ${f3(Math.round(F.ct))} ม./ข้าง`;return{svg,note}}
+const note=`${p.n} • กลาง/กลางเสา ${f2(gr.cc)} ม. → กว้างแผ่น ${f2(F.WT)} ม. (คำนวณได้ ${f2(F.raw)} ปัดลงทุก 0.01 ม.) • เผื่อทำงานข้างละ ${f3(Math.round(F.gr))} ม. • เสียบร่องข้างละ ${f3(Math.round(F.ze))} ม. • ช่องว่างปากร่อง ${f3(Math.round(F.cm))} ม./ข้าง • ปลายลิ่ม ${f3(Math.round(F.ct))} ม./ข้าง`;return{svg,note}}
 
 function sec(G,W){return G===WG.A?[[0,0],[W,0],[W,5.2],[W+65,20],[W+65,90],[W,104.8],[W,110],[0,110],[0,104.8],[-65,90],[-65,20],[0,5.2]]:[[0,0],[W,0],[W+85,25],[W+85,75],[W,100],[0,100],[-85,75],[-85,25]]}
 const near=(arr,v)=>arr.reduce((b,x,i)=>Math.abs(x-v)<Math.abs(arr[b]-v)?i:b,0);

@@ -1,6 +1,6 @@
 // Supabase: ใช้ตาราง worktrack_users ของเว็บเดิม (ล็อกอิน) และ wedge_panel_projects (โครงการ)
 // โครงการเก็บเป็นข้อมูลฟอร์ม JSON เท่านั้น ไม่เก็บผลคำนวณ ไม่เก็บ PDF
-import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=202611010323";
+import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=202611010332";
 
 let client = null;
 export function db() {

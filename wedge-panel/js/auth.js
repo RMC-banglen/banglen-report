@@ -1,7 +1,7 @@
 // ล็อกอินด้วย PIN จากตาราง worktrack_users ชุดเดียวกับเว็บรายงานการผลิต
 // session เก็บใน sessionStorage คีย์ wt_user (ใช้ร่วมกับเว็บเดิมได้เมื่ออยู่โดเมนเดียวกัน)
-import { SESSION_KEY, PERM_KEY } from "./config.js?v=202611010323";
-import { listUsers, refreshUser } from "./db.js?v=202611010323";
+import { SESSION_KEY, PERM_KEY } from "./config.js?v=202611010332";
+import { listUsers, refreshUser } from "./db.js?v=202611010332";
 
 export function getSession() {
   try { const u = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); return u && u.id ? u : null; } catch (e) { return null; }

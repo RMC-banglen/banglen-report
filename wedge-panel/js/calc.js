@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=202611010323";
+} from "./standards.js?v=202611010332";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -15,6 +15,11 @@ export const f2 = (n) => (n / 1000).toFixed(Math.round(n) % 10 ? 3 : 2);
 export function fitCalc(pile, G, cc, g) {
   const raw = cc - pile.tw - 2 * g;
   const WT = Math.floor(raw / 10) * 10;
+  return fitWidth(pile, G, cc, WT, raw);
+}
+
+// ตรวจการเสียบร่องของแผ่นกว้างรวม WT ที่ระยะกลาง/กลางเสา cc (ค่าเผื่อจริง gr = (cc − tw − WT)/2)
+export function fitWidth(pile, G, cc, WT, raw = WT) {
   const gr = (cc - pile.tw - WT) / 2;
   const ze = pile.dg - gr; // เสียบร่อง
   const m = pile.B / 2 - pile.f;
@@ -26,6 +31,9 @@ export function fitCalc(pile, G, cc, g) {
   }
   return { WT, raw, gr, ze, mn, cm: m - G.ht(ze), ct: m - (tap * ze) / pile.dg - G.E / 2 };
 }
+
+// กว้างรวมมากสุดที่ใช้ได้กับระยะกลาง/กลางเสา cc และค่าเผื่อ g (ปัดลงทุก 10 มม.)
+export const maxWidthFor = (pile, cc, g) => Math.floor((cc - pile.tw - 2 * g) / 10) * 10;
 
 // ---------- แบ่งระยะเสาจากความยาวกำแพง ----------
 // method "eq": ทุกช่วงห่างเท่ากัน กระจายเศษทีละ 10 มม.
@@ -250,22 +258,34 @@ function totals(items, truckKg) {
 export function calcDirect(input) {
   const p = PILES[input.pile], G = WG[p.ty];
   const S = input.spec || standardSpec();
-  const al = [], items = new Map();
+  const g = input.allowance ?? DEFAULT_ALLOWANCE;
+  const al = [], items = new Map(), groups = new Map(), rowInfo = [];
+  if (!(g >= 5 && g <= 40)) al.push(["d", "ค่าเผื่อควรอยู่ระหว่าง 0.005 ถึง 0.040 ม."]);
   (input.rows || []).forEach((r, i) => {
     const n = i + 1, WT = Math.round(r.WT), H = Math.round(r.H), qty = Math.floor(r.qty);
     if (!(WT > 0) || !(qty >= 1)) { al.push(["d", `รายการที่ ${n}: ใส่ความกว้างและจำนวนแผ่น (อย่างน้อย 1 แผ่น)`]); return; }
     if (!HS.includes(H)) { al.push(["d", `รายการที่ ${n}: ความสูงต้องเป็นขนาดมาตรฐาน 0.50 / 0.75 / 1.00 / 1.20 ม.`]); return; }
-    if (WT % 10) al.push(["w", `รายการที่ ${n}: ความกว้าง ${f2(WT)} ม. ไม่ลงทุก 0.01 ม. ปัดลงเป็น ${f2(Math.floor(WT / 10) * 10)} ม.`]);
     const WTr = Math.floor(WT / 10) * 10;
-    const g = DEFAULT_ALLOWANCE, cc = WTr + p.tw + 2 * g;
-    if (!(cc >= 600 && cc <= 6000)) { al.push(["d", `รายการที่ ${n}: ความกว้าง ${f2(WTr)} ม. อยู่นอกช่วงที่ใช้กับเสาเข็มได้ (กลาง/กลางเสา 0.60–6.00 ม.)`]); return; }
-    const F = fitCalc(p, G, cc, g);
+    if (WT % 10) al.push(["w", `รายการที่ ${n}: ความกว้าง ${f2(WT)} ม. ไม่ลงทุก 0.01 ม. ปัดลงเป็น ${f2(WTr)} ม.`]);
+    // กลาง/กลางเสา: ถ้าใส่ค่าหน้างานมาใช้ค่านั้น ไม่ใส่ = แนะนำจากกว้างรวม + เอวเสา + 2×ค่าเผื่อ
+    const actual = r.cc > 0 ? Math.round(r.cc) : null;
+    const cc = actual ?? WTr + p.tw + 2 * g;
+    if (!(cc >= 600 && cc <= 6000)) { al.push(["d", `รายการที่ ${n}: กลาง/กลางเสา ${f2(cc)} ม. อยู่นอกช่วงที่ใช้ได้ (0.60–6.00 ม.)`]); return; }
+    const F = fitWidth(p, G, cc, WTr);
+    const maxW = maxWidthFor(p, cc, g);
+    rowInfo[i] = { n, WT: WTr, cc, actual: actual != null, gr: F.gr, ze: F.ze, maxW, over: actual != null && WTr > maxW };
+    if (rowInfo[i].over) al.push(["d", `รายการที่ ${n}: กลาง/กลางเสาหน้างาน ${f2(cc)} ม. ใช้แผ่นกว้าง ${f2(WTr)} ม. ไม่ได้ (เหลือค่าเผื่อข้างละ ${f3(Math.max(0, F.gr))} ม. น้อยกว่ามาตรฐาน ${f3(g)} ม.) แนะนำลดความกว้างเป็น ${f2(maxW)} ม.`]);
+    else if (F.ze < 20) al.push(["d", `รายการที่ ${n}: ค่าเผื่อมากเกินไป แผ่นเสียบร่องได้น้อยกว่า 0.020 ม.${actual != null ? ` แนะนำเพิ่มความกว้างเป็น ${f2(maxW)} ม.` : ""}`]);
     if (F.mn < 3) al.push(["d", `รายการที่ ${n}: ลิ่มหนากว่าร่อง แผ่นจะติด`]);
     const it = getItem(items, G, S, WTr, H, al);
     it.qty += qty;
+    it.cc.add(cc);
+    const key = cc + "|" + WTr + "|" + H;
+    const gr = groups.get(key) || { cc, n: 0, F, stk: [H], WT: WTr };
+    gr.n += qty; groups.set(key, gr);
   });
   if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
-  return { p, G, g: DEFAULT_ALLOWANCE, S, stk: [], groups: [], nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg), al };
+  return { p, G, g, S, stk: [], groups: [...groups.values()], rowInfo, nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg), al };
 }
 
 // ---------- การผลิต ----------

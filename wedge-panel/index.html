@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="202611010323">
+<meta name="app-version" content="202611010332">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=202611010323">
+<link rel="stylesheet" href="css/app.css?v=202611010332">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -70,7 +70,8 @@
 </fieldset>
 <fieldset id="rowsFs" hidden>
 <legend>รายการแผ่นที่สั่ง</legend>
-<div id="orows"></div>
+<label for="gpD">ค่าเผื่อข้างละ (ม.)</label><input id="gpD" type="number" value="0.020" step="0.005" min="0.005" max="0.04"><p class="hint">มาตรฐานแนะนำข้างละ 0.020 ม. ใช้หาระยะกลาง/กลางเสาที่แนะนำ</p>
+<div id="orows" style="margin-top:10px"></div>
 <button type="button" id="addRow">เพิ่มรายการแผ่น</button>
 <p class="hint">กว้างรวม = ปลายลิ่มถึงปลายลิ่ม (ม.) ความสูงเลือกจากขนาดมาตรฐานบริษัท ใช้กับสั่งขาด สั่งเพิ่ม หรือลูกค้ากำหนดความกว้างและจำนวนมาเอง</p>
 <label for="rf">อ้างอิง / หมายเหตุ</label><input id="rf" type="text" placeholder="เช่น สั่งเพิ่มจากโครงการ กำแพงบ้านคุณสมชาย">
@@ -105,7 +106,7 @@
 <div class="tblw"><table class="tbl" id="sched"><thead><tr><th>รหัสสินค้า</th><th style="text-align:left">ชื่อสินค้า</th><th>สูง (ม.)</th><th>กว้างรวม (ม.)</th><th>ช่วง กลาง/กลางเสา (ม.)</th><th>จำนวน (แผ่น)</th><th>นน./แผ่น (กก.)</th><th>คอนกรีต/แผ่น (ลบ.ม.)</th><th>เหล็ก/แผ่น (กก.)</th></tr></thead><tbody></tbody></table></div>
 <nav class="tabs" role="tablist"><button role="tab" id="t-view3d" aria-selected="true" data-p="view3d">ภาพ 3 มิติ</button><button role="tab" id="t-drawing" aria-selected="false" data-p="drawing">แบบแผ่น</button><button role="tab" id="t-production" aria-selected="false" data-p="production">การผลิตและขนส่ง</button><button role="tab" id="t-table" aria-selected="false" data-p="table">โต๊ะหล่อ</button></nav>
 <section class="pane" id="p-view3d">
-<div class="bar"><div><label for="sel3">ช่วงเสาที่แสดง</label><select id="sel3"></select></div><button type="button" id="b3a">มุมเฉียง</button><button type="button" id="b3t">มองจากด้านบน</button><button type="button" id="b3f">มองด้านหน้า</button></div>
+<div class="bar"><div><label for="sel3">ช่วงเสาที่แสดง</label><select id="sel3"></select></div><button type="button" id="b3a">มุมเฉียง</button><button type="button" id="b3t">มองจากด้านบน</button><button type="button" id="b3f">มองด้านหน้า</button><button type="button" id="b3p">ซ่อนเสา</button></div>
 <div id="v3"></div>
 <p class="hint">ลากหมุน • ถ่างนิ้วหรือเลื่อนล้อเมาส์ซูม</p>
 <p class="cap">รูปขยายรอยต่อด้านขวา</p>
@@ -135,6 +136,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=202611010323"></script>
+<script type="module" src="js/ui.js?v=202611010332"></script>
 </body>
 </html>
