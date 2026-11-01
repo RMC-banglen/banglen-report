@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101124744";
+import { STD, HS } from "./standards.js?v=20261101124857";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101124744";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101124744";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101124744";
-import { createViews } from "./view3d.js?v=20261101124744";
-import { makePdf } from "./pdf.js?v=20261101124744";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101124744";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101124744";
+} from "./calc.js?v=20261101124857";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101124857";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101124857";
+import { createViews } from "./view3d.js?v=20261101124857";
+import { makePdf } from "./pdf.js?v=20261101124857";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101124857";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101124857";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -71,8 +71,8 @@ function renderStdChips(Ht) {
 function drawStackVis(a) {
   const v = $("stkVis");
   if (!a) { v.innerHTML = ""; return; }
-  const tot = a.reduce((p, q) => p + q, 0), k = Math.min(0.06, 170 / tot);
-  v.innerHTML = `<small>กำแพงที่เลือก</small><b>${(tot / 1000).toFixed(2)}</b><div class="col" role="img" aria-label="ซ้อนแผ่น ${a.map((h) => (h / 1000).toFixed(2)).join(" + ")} เมตร">${a.map((h) => `<i style="height:${Math.max(16, h * k)}px">${(h / 1000).toFixed(2)}</i>`).join("")}</div>`;
+  const tot = a.reduce((p, q) => p + q, 0), k = Math.min(0.04, 100 / tot);
+  v.innerHTML = `<small>กำแพงที่เลือก</small><b>${(tot / 1000).toFixed(2)}</b><div class="col" role="img" aria-label="ซ้อนแผ่น ${a.map((h) => (h / 1000).toFixed(2)).join(" + ")} เมตร">${a.map((h) => `<i style="height:${Math.max(15, h * k)}px">${(h / 1000).toFixed(2)}</i>`).join("")}</div>`;
 }
 function renderStack() {
   const Ht = Math.round(+$("wh").value * 1000);

@@ -39,8 +39,8 @@ button.pri:hover{filter:brightness(1.07)}
 .stack label{display:flex;gap:8px;align-items:center;margin:0;padding:7px 10px;border:1px solid var(--line);border-radius:6px;color:var(--ink);font-size:14px;cursor:pointer}
 .stack label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 .stack input{accent-color:var(--accent)}
-.hstd{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px 8px;margin:4px 0 10px}
-.hstd .t{font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.hstd{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px 6px;margin:4px 0 8px}
+.hstd .t{font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:4px}
 .hbars{display:flex;align-items:flex-end;gap:10px;flex-wrap:nowrap}
 .hbars>div{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px}
 .hbars span{display:block;width:32px;background:var(--concrete);border:1.5px solid var(--accent);border-radius:2px}
