@@ -1,6 +1,6 @@
 // Supabase: ใช้ตาราง worktrack_users ของเว็บเดิม (ล็อกอิน) และ wedge_panel_projects (โครงการ)
 // โครงการเก็บเป็นข้อมูลฟอร์ม JSON เท่านั้น ไม่เก็บผลคำนวณ ไม่เก็บ PDF
-import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=20261101080335";
+import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=20261101080808";
 
 let client = null;
 export function db() {
@@ -49,4 +49,10 @@ export async function saveProject({ id, form, user }) {
   const { error } = await db().from(TABLE_PROJECTS).upsert(row);
   if (error) throw error;
   return row.id;
+}
+
+// ลบโครงการถาวร (เรียกหลังผู้ใช้ยืนยันแล้วเท่านั้น)
+export async function deleteProject(id) {
+  const { error } = await db().from(TABLE_PROJECTS).delete().eq("id", id);
+  if (error) throw error;
 }
