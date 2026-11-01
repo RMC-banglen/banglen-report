@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101121134";
+import { STD, HS } from "./standards.js?v=20261101121434";
 import {
   calcProject, calcDirect, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101121134";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101121134";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101121134";
-import { createViews } from "./view3d.js?v=20261101121134";
-import { makePdf } from "./pdf.js?v=20261101121134";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101121134";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101121134";
+} from "./calc.js?v=20261101121434";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101121434";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101121434";
+import { createViews } from "./view3d.js?v=20261101121434";
+import { makePdf } from "./pdf.js?v=20261101121434";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101121434";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101121434";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -194,10 +194,15 @@ function renderProd() {
   }).join("");
   // สรุปวัสดุทั้งโครงการ แยกชนิดเหล็ก (ใช้ภายใน คิดราคา)
   const m = st.mat, S2 = st.S;
-  const rows = m.bars.map((b) => `<tr><td style="text-align:left">เหล็ก ${NM(b.d)}</td><td>${fmt(b.n)} เส้น</td><td>${nf(b.len, 2)}</td><td>${nf(b.kg, 1)} กก.</td></tr>`);
-  rows.push(`<tr><td style="text-align:left"><b>เหล็กรวม</b></td><td>-</td><td>-</td><td><b>${nf(st.totS, 1)} กก.</b></td></tr>`);
-  rows.push(`<tr><td style="text-align:left">คอนกรีต</td><td>-</td><td>-</td><td>${nf(st.totV, 2)} ลบ.ม.</td></tr>`);
-  if (S2.pd && m.pipeCount) rows.push(`<tr><td style="text-align:left">ท่อ PVC Ø${PN[S2.pd]}</td><td>${fmt(m.pipeCount)} ท่อน</td><td>${nf(m.pipeLen, 2)}</td><td>-</td></tr>`);
+  const rows = [];
+  m.bars.forEach((b) => {
+    const ls = m.lines.filter((l) => l.d === b.d);
+    ls.forEach((l) => rows.push(`<tr><td style="text-align:left">เหล็ก ${NM(l.d)}</td><td>${f2(l.each)}</td><td>${fmt(l.n)} เส้น</td><td>${nf(l.len, 2)}</td><td>${nf(l.kg, 1)} กก.</td></tr>`));
+    if (ls.length > 1) rows.push(`<tr><td style="text-align:left"><i>รวมเหล็ก ${NM(b.d)}</i></td><td>-</td><td><i>${fmt(b.n)} เส้น</i></td><td><i>${nf(b.len, 2)}</i></td><td><i>${nf(b.kg, 1)} กก.</i></td></tr>`);
+  });
+  rows.push(`<tr><td style="text-align:left"><b>เหล็กรวม</b></td><td>-</td><td>-</td><td>-</td><td><b>${nf(st.totS, 1)} กก.</b></td></tr>`);
+  rows.push(`<tr><td style="text-align:left">คอนกรีต</td><td>-</td><td>-</td><td>-</td><td>${nf(st.totV, 2)} ลบ.ม.</td></tr>`);
+  if (S2.pd && m.pipeCount) rows.push(`<tr><td style="text-align:left">ท่อ PVC Ø${PN[S2.pd]}</td><td>${f2(m.pipeEach)}</td><td>${fmt(m.pipeCount)} ท่อน</td><td>${nf(m.pipeLen, 2)}</td><td>-</td></tr>`);
   $("matTot").querySelector("tbody").innerHTML = st.list.length ? rows.join("") : "";
 }
 function drawJoint() {

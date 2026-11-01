@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261101121134";
+} from "./standards.js?v=20261101121434";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -260,7 +260,18 @@ function totals(items, truckKg, S) {
   });
   const pipeCount = S.pd ? list.reduce((s, i) => s + i.qty * i.P.pipe.P.length, 0) : 0;
   const pipeLen = S.pd ? list.reduce((s, i) => s + (i.qty * i.P.pipe.P.length * i.P.T) / 1000, 0) : 0;
-  const mat = { bars: [...bars.values()].sort((a, b) => a.d - b.d), pipeCount, pipeLen };
+  // แตกตามขนาดเหล็ก + ความยาวต่อเส้น (มม.) เช่น RB6 ยาว 0.95 ม. กี่เส้น (ความยาวต่อเส้นต่างกันตามความสูงแผ่น)
+  const lines = new Map();
+  const addLine = (d, each, n) => {
+    const key = d + "|" + each, l = lines.get(key) || { d, each, n: 0, len: 0, kg: 0 };
+    l.n += n; l.len += (n * each) / 1000; l.kg += ((n * each) / 1000) * KG[d]; lines.set(key, l);
+  };
+  list.forEach((i) => { addLine(S.dv, i.P.lv, i.qty * i.P.nv); addLine(S.dh, i.P.lh, i.qty * i.P.nh); });
+  const mat = {
+    bars: [...bars.values()].sort((a, b) => a.d - b.d),
+    lines: [...lines.values()].sort((a, b) => a.d - b.d || b.each - a.each),
+    pipeCount, pipeLen, pipeEach: list.length ? list[0].P.T : 0, // ท่อยาวเท่าความหนาแผ่น (มม.)
+  };
   return { list, totQ, totW, totV, totS, truck, trips: Math.ceil(totW / truck), mat };
 }
 
