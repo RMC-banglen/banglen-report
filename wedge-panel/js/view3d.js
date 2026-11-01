@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261101070449";
-import { f2, f3, fmt } from "./calc.js?v=20261101070449";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261101070449";
+import { SHOULDER } from "./standards.js?v=20261101070923";
+import { f2, f3, fmt } from "./calc.js?v=20261101070923";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261101070923";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -25,14 +25,14 @@ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(
 function build3d(gi=0){init3d();const st=getState(),gr=st.groups[gi];sc.remove(root);root.traverse(q=>{if(q.geometry)q.geometry.dispose()});root=new THREE.Group();sc.add(root);if(!gr){upd();return}
 const stkX=gr.stk||st.stk,p=st.p,G=st.G,Wb=gr.F.WT-2*G.TP,Ht=stkX.reduce((a,b)=>a+b,0)||1000,pp=pilePoly(p);
 const n0=root.children.length;
-const SF=SHOULDER.flat,ST=SHOULDER.taper,piH=shOn?Ht+shDrop+SF+ST+300:Ht+600,piY=shOn?-(SF+ST+300):-300;
+const SF=SHOULDER.flat,ST=SHOULDER.taper,piH=shOn?Ht+shDrop+SF+ST+300:Ht+300,piY=shOn?-(SF+ST+300):-300;
 [-gr.cc/2,gr.cc/2].forEach(cx=>ext(pp.map(q=>[q[0]+cx,q[1]]),piH,piY,0xD3D1C7,1));
 if(shOn){const sb=p.B/2,sm=sb-p.f,sw=p.tw/2,sh=p.c/2;[[-gr.cc/2,1],[gr.cc/2,-1]].forEach(([cx,sg])=>{ext([[cx+sg*sb,-sm],[cx+sg*sw,-sh],[cx+sg*sw,sh],[cx+sg*sb,sm]],SF,-SF,0xBEBBB0,1);taper3d(cx,sg,sb,sm,sw,sh,SF,ST)})} // บ่าในร่องเสา: ก้อนเต็มร่อง + ส่วนเรียวด้านล่าง
-const SZ=Math.max(gr.cc,Ht)*K*.08,yd=Ht+300+160,tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,Ht+320,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);const ccT="กลาง/กลางเสา"+(gr.stk?"ที่แนะนำ ":" ")+f3(gr.cc)+" ม.";if(gr.stk)label3d(ccT+"\nเผื่อค่าการทำงานแล้วข้างละ "+f3(Math.round(gr.F.gr))+" ม.",0,yd+230+SZ*.8/K,0,SZ*.8);else label3d(ccT,0,yd+SZ/K/2+230,0,SZ);
+const SZ=Math.max(gr.cc,Ht)*K*.08,hd=(shOn?Ht+shDrop:Ht),yd=Math.max(Ht+460,hd+160),tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,hd+20,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);const ccT="กลาง/กลางเสา"+(gr.stk?"ที่แนะนำ ":" ")+f3(gr.cc)+" ม.";if(gr.stk)label3d(ccT+"\nเผื่อค่าการทำงานแล้วข้างละ "+f3(Math.round(gr.F.gr))+" ม.",0,yd+230+SZ*.8/K,0,SZ*.8);else label3d(ccT,0,yd+SZ/K/2+230,0,SZ);
 pileObjs=root.children.slice(n0);pileObjs.forEach(o=>{o.visible=showP}); // เสา + เส้นระยะกลาง/กลางเสา ซ่อนได้
 label3d("กว้างแผ่น "+f3(gr.F.WT)+" ม.",0,Ht+SZ*.85/K/2+110,0,SZ*.85);
 let y=0;const shade=[0x9FE1CB,0x7FD3B6];stkX.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);const it=st.list.find(q=>q.H===h&&q.WT===gr.F.WT),pp2=it&&it.P&&it.P.pipe;if(pp2&&pp2.P.length&&st.S.pd)pp2.P.forEach(([px,py])=>holeAt(px-Wb/2,y+py,st.S.pd/2,G.T));y+=h});
-tg.set(0,(shOn?Ht+320:Ht+620)/2*K,0);R0=Math.max(gr.cc+p.B,shOn?Ht+1350:Ht+1050)*K*1.75;r=R0;upd()}
+tg.set(0,(shOn?Ht+320:Ht+620)/2*K,0);R0=Math.max(gr.cc+p.B,shOn?Ht+1350:Ht+1250)*K*1.75;r=R0;upd()}
 $("b3p").onclick=()=>{showP=!showP;pileObjs.forEach(o=>{o.visible=showP});$("b3p").textContent=showP?"ซ่อนเสา":"แสดงเสา";upd()};
 $("b3a").onclick=()=>{th=-.6;ph=1.05;r=R0;upd()};$("b3t").onclick=()=>{th=0;ph=.06;r=R0*.9;upd()};$("b3f").onclick=()=>{th=0;ph=1.5;r=R0;upd()};
 function snapshot(gi){const W2=1400,H2=820;init3d();const keepP=showP;showP=true;build3d(gi);showP=keepP;

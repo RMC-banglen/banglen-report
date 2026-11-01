@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101070449";
+import { STD, HS } from "./standards.js?v=20261101070923";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101070449";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101070449";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101070449";
-import { createViews } from "./view3d.js?v=20261101070449";
-import { makePdf } from "./pdf.js?v=20261101070449";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101070449";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101070449";
+} from "./calc.js?v=20261101070923";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101070923";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101070923";
+import { createViews } from "./view3d.js?v=20261101070923";
+import { makePdf } from "./pdf.js?v=20261101070923";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101070923";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101070923";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
