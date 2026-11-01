@@ -1,7 +1,7 @@
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010300";
-import { fmt, f2, f3 } from "./calc.js?v=202611010300";
+import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010302";
+import { fmt, f2, f3 } from "./calc.js?v=202611010302";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -18,7 +18,7 @@ export function planPoly(G,Wb){const tr=planTip(G),R=tr(Wb/2),Lf=tr(0).map(q=>[-
 
 export function jointSvg(st,gr){if(!gr)return{svg:"",note:""};
 o="";const p=st.p,G=st.G,F=gr.F,b=p.B/2,cx=gr.cc/2,wf=cx-p.tw/2,pf=cx-b,te=wf-F.gr,m=b-p.f,tp=planTip(G);
-const x0=te-G.TP-120,x1=cx+b,k=Math.min(2.2,480/(x1-x0)),X=x=>80+(x-x0)*k,Y=z=>30+(z+b)*k;
+const x0=te-G.TP-120,x1=cx+b,k=Math.min(2.2,480/(x1-x0)),X=x=>80+(x-x0)*k,Y=z=>62+(z+b)*k;
 poly(pilePoly(p).map(q=>[q[0]+cx,q[1]]),X,Y,"var(--ink)","var(--surface-2)");L(X(cx),Y(-b)-6,X(cx),Y(b)+6,"var(--muted)",.5,"4 3");
 const pts=[[x0+12,-G.T/2],...tp(te-G.TP),[x0+12,G.T/2]];A(`<polyline points="${pts.map(q=>X(q[0]).toFixed(1)+","+Y(q[1]).toFixed(1)).join(" ")}" style="fill:var(--concrete);stroke:var(--accent);stroke-width:1.3"/>`);
 const bx=X(x0+12);A(`<polyline points="${bx},${Y(-G.T/2)-6} ${bx},${Y(-8)} ${bx-6},${Y(-2)} ${bx+6},${Y(4)} ${bx},${Y(10)} ${bx},${Y(G.T/2)+6}" style="fill:none;stroke:var(--muted);stroke-width:.8"/>`);
@@ -27,6 +27,7 @@ dimLine(X(te-G.TP),X(te),Y(-G.T/4),"ลิ่ม "+f3(G.TP));
 const yc=Y(G.T/4);L(X(pf),yc,X(wf),yc);[pf,te,wf].forEach(x=>tick(X(x),yc));TX(X((pf+te)/2),yc-8,"เสียบ "+f3(F.ze));TX(X(wf)-6,yc+18,f3(F.gr),"end");
 const xs=X(cx+b);chainV([[xs,Y(-m)],[xs,Y(m)]],xs+24,["ปาก "+f3(2*m)]);chainV([[X(cx+p.tw/2),Y(-p.c/2)],[X(cx+p.tw/2),Y(p.c/2)]],xs+62,["ก้น "+f3(p.c)]);
 chainV([[bx,Y(-G.T/2)],[bx,Y(G.T/2)]],bx-26,["หนา "+f3(G.T)]);
+chainH([[X(cx-b),Y(-b)],[X(cx+b),Y(-b)]],Y(-b)-26,["กว้างหน้าตัดเสา "+f3(p.B)]);
 const yb=Y(b)+22;chainH([[X(pf),Y(b)],[X(wf),Y(p.c/2)+4]],yb,["ลึกร่อง "+f3(p.dg)]);
 const svg=`<svg viewBox="0 0 680 ${Math.ceil(yb+12)}" role="img" aria-label="รูปขยายรอยต่อเสากับแผ่น">${o}</svg>`;
 const note=`${p.n} • กลาง/กลางเสา ${f2(gr.cc)} ม. → กว้างแผ่น ${f2(F.WT)} ม. (คำนวณได้ ${f2(F.raw)} ปัดลงทุก 0.01 ม.) • เสียบร่องข้างละ ${f3(Math.round(F.ze))} ม. • ช่องว่างปากร่อง ${f3(Math.round(F.cm))} ม./ข้าง • ปลายลิ่ม ${f3(Math.round(F.ct))} ม./ข้าง`;return{svg,note}}
