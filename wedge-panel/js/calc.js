@@ -2,10 +2,12 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261101094329";
+} from "./standards.js?v=20261101094746";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
+// ตัวเลขมีลูกน้ำคั่นหลักพัน + ทศนิยม d ตำแหน่ง เช่น nf(1234.5, 1) = "1,234.5"
+export const nf = (n, d = 0) => Number(n).toLocaleString("th-TH", { minimumFractionDigits: d, maximumFractionDigits: d });
 export const f3 = (n) => (n / 1000).toFixed(3);
 // เมตร 2 ตำแหน่ง ถ้าไม่ลงทุก 10 มม. ใช้ 3 ตำแหน่ง
 export const f2 = (n) => (n / 1000).toFixed(Math.round(n) % 10 ? 3 : 2);

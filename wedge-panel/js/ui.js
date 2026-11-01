@@ -1,16 +1,20 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101094329";
+import { STD, HS } from "./standards.js?v=20261101094746";
 import {
-  calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101094329";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101094329";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101094329";
-import { createViews } from "./view3d.js?v=20261101094329";
-import { makePdf } from "./pdf.js?v=20261101094329";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101094329";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101094329";
+  calcProject, calcDirect, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
+} from "./calc.js?v=20261101094746";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101094746";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101094746";
+import { createViews } from "./view3d.js?v=20261101094746";
+import { makePdf } from "./pdf.js?v=20261101094746";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101094746";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101094746";
 
 const $ = (id) => document.getElementById(id);
+// ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
+const toInt = (v) => Math.floor(Number(String(v).replace(/,/g, "")) || 0);
+document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input.thou")) t.value = t.value.replace(/,/g, ""); });
+document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches("input.thou") && t.value !== "") t.value = toInt(t.value).toLocaleString("th-TH"); });
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
 let orderRows = [{ WT: 0, H: 0, qty: 0 }];
 let orderAllowance = 20; // มม. ค่าเผื่อทำงานข้างละ (มาตรฐาน 20) ไม่มีช่องให้แก้ ใช้คำนวณระยะกลาง/กลางเสาในหมายเหตุ
@@ -34,11 +38,11 @@ function renderRows() {
   const box = $("orows"); box.innerHTML = "";
   orderRows.forEach((r, i) => {
     const d = document.createElement("div"); d.className = "oitem";
-    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select><option value="" ${r.H ? "" : "selected"}>เลือก</option>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty || ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
+    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select><option value="" ${r.H ? "" : "selected"}>เลือก</option>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
     const [w, q] = d.querySelectorAll("input"), h = d.querySelector("select");
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
     h.onchange = () => { r.H = +h.value || 0; run(); };
-    q.oninput = () => { r.qty = Math.floor(+q.value) || 0; sched(); };
+    q.oninput = () => { r.qty = toInt(q.value); sched(); };
     d.querySelector("button").onclick = () => { if (orderRows.length > 1) { orderRows.splice(i, 1); renderRows(); run(); } };
     box.appendChild(d);
   });
@@ -122,7 +126,7 @@ function run() {
   syncShoulder();
   const S = spec();
   $("stdBox").hidden = S.sp; $("spBox").hidden = !S.sp;
-  const truck = +$("tk").value || DEFAULT_TRUCK_KG;
+  const truck = toInt($("tk").value) || DEFAULT_TRUCK_KG;
   let r;
   if (direct) {
     if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1 && HS.includes(x.H))) return showEmpty();
@@ -143,13 +147,13 @@ function run() {
   $("results").hidden = false; $("emptyMsg").hidden = true; setActions(true);
   const { p, G, list, nPile, nSpan, wLen, totQ, totV, totS, totW, trips } = r;
   $("cards").innerHTML = `<div class="card"><div class="k">หัวลิ่ม</div><div class="v">แบบ ${p.ty}</div><div class="s">${G.d} • ${p.n}</div></div>
-${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div class="v">ตามจำนวนแผ่น</div><div class="s">${esc(r.ref || "ไม่มีข้อมูลระยะเสา")}</div></div>` : `<div class="card"><div class="k">เสาเข็มไอ</div><div class="v">${fmt(nPile)} ต้น</div><div class="s">${fmt(nSpan)} ช่วง • กำแพงยาว ${(wLen / 1000).toFixed(2)} ม.</div></div>`}
+${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div class="v">ตามจำนวนแผ่น</div><div class="s">${esc(r.ref || "ไม่มีข้อมูลระยะเสา")}</div></div>` : `<div class="card"><div class="k">เสาเข็มไอ</div><div class="v">${fmt(nPile)} ต้น</div><div class="s">${fmt(nSpan)} ช่วง • กำแพงยาว ${nf(wLen / 1000, 2)} ม.</div></div>`}
 <div class="card"><div class="k">แผ่นทั้งโครงการ</div><div class="v">${fmt(totQ)} แผ่น</div><div class="s">${list.length} รหัส • <span class="stamp ${S.sp ? "sp" : "std"}">${S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</span></div></div>
-<div class="card"><div class="k">คอนกรีตรวม</div><div class="v">${totV.toFixed(2)} ลบ.ม.</div><div class="s">เหล็กเสริม ${fmt(totS)} กก.</div></div>
-<div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${(totW / 1000).toFixed(1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
+<div class="card"><div class="k">คอนกรีตรวม</div><div class="v">${nf(totV, 2)} ลบ.ม.</div><div class="s">เหล็กเสริม ${fmt(totS)} กก.</div></div>
+<div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${nf(totW / 1000, 1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
   $("alerts").innerHTML = r.al.map((a) => `<div class="al ${a[0]}">${esc(a[1])}</div>`).join("");
   $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ") || "-"}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
-  fillSelect("sel3", r.groups.map((gr, i) => [String(i), gr.stk ? `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • สูง ${f2(gr.stk[0])} ม. • ${gr.n} แผ่น` : `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${gr.n} ช่วง`]));
+  fillSelect("sel3", r.groups.map((gr, i) => [String(i), gr.stk ? `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • สูง ${f2(gr.stk[0])} ม. • ${fmt(gr.n)} แผ่น` : `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${fmt(gr.n)} ช่วง`]));
   const optItem = list.map((i) => [i.code, `${i.code} • สูง ${(i.H / 1000).toFixed(2)} × กว้าง ${f2(i.WT)}`]);
   fillSelect("selD", optItem); fillSelect("selT", optItem);
   renderProd(); drawJoint(); drawPanel();
@@ -184,10 +188,10 @@ function renderProd() {
   }).join("");
   // สรุปวัสดุทั้งโครงการ แยกชนิดเหล็ก (ใช้ภายใน คิดราคา)
   const m = st.mat, S2 = st.S;
-  const rows = m.bars.map((b) => `<tr><td style="text-align:left">เหล็ก ${NM(b.d)}</td><td>${fmt(b.n)} เส้น</td><td>${b.len.toFixed(2)}</td><td>${b.kg.toFixed(1)} กก.</td></tr>`);
-  rows.push(`<tr><td style="text-align:left"><b>เหล็กรวม</b></td><td>-</td><td>-</td><td><b>${st.totS.toFixed(1)} กก.</b></td></tr>`);
-  rows.push(`<tr><td style="text-align:left">คอนกรีต</td><td>-</td><td>-</td><td>${st.totV.toFixed(2)} ลบ.ม.</td></tr>`);
-  if (S2.pd && m.pipeCount) rows.push(`<tr><td style="text-align:left">ท่อ PVC Ø${PN[S2.pd]}</td><td>${fmt(m.pipeCount)} ท่อน</td><td>${m.pipeLen.toFixed(2)}</td><td>-</td></tr>`);
+  const rows = m.bars.map((b) => `<tr><td style="text-align:left">เหล็ก ${NM(b.d)}</td><td>${fmt(b.n)} เส้น</td><td>${nf(b.len, 2)}</td><td>${nf(b.kg, 1)} กก.</td></tr>`);
+  rows.push(`<tr><td style="text-align:left"><b>เหล็กรวม</b></td><td>-</td><td>-</td><td><b>${nf(st.totS, 1)} กก.</b></td></tr>`);
+  rows.push(`<tr><td style="text-align:left">คอนกรีต</td><td>-</td><td>-</td><td>${nf(st.totV, 2)} ลบ.ม.</td></tr>`);
+  if (S2.pd && m.pipeCount) rows.push(`<tr><td style="text-align:left">ท่อ PVC Ø${PN[S2.pd]}</td><td>${fmt(m.pipeCount)} ท่อน</td><td>${nf(m.pipeLen, 2)}</td><td>-</td></tr>`);
   $("matTot").querySelector("tbody").innerHTML = st.list.length ? rows.join("") : "";
 }
 function drawJoint() {
@@ -229,6 +233,7 @@ const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh"
 function collect() {
   const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
+  o.tk = toInt(o.tk);
   o.wh = +o.wh; // บันทึกค่าที่เป็นความยาวเล็กๆ เป็นมม. เสมอ (ช่องกรอกเป็นเมตร)
   ['gp', 'sv', 'sh'].forEach((k) => { o[k] = Math.round(+o[k] * 1000); });
   o.ga = orderAllowance;
@@ -245,6 +250,7 @@ function apply(d) {
   if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 1500, n: +s.n || 1 }));
   ["gp", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
   if (!+d.wh) $("wh").value = "";
+  if (d.tk !== undefined) $("tk").value = (toInt(d.tk) || DEFAULT_TRUCK_KG).toLocaleString("th-TH");
   stackSel = +d.stackSel || 0;
   (d.md === "sp" ? $("mdP") : $("mdS")).checked = true;
   renderSpans(); renderRows(); run();

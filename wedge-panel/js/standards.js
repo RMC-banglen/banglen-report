@@ -51,7 +51,7 @@ export const TABLE = { TL: 6096, TW: 1524, LF: 6000, CS: 55, MG: 211, TDV: 60 };
 
 export const CONCRETE_DENSITY = 2400; // กก./ลบ.ม.
 export const DEFAULT_ALLOWANCE = 20; // ค่าเผื่อ มม./ข้าง
-export const DEFAULT_TRUCK_KG = 12000;
+export const DEFAULT_TRUCK_KG = 16000;
 export const SPECIAL_ORDER_WARNING = "งานสั่งพิเศษ: ต้องให้ฝ่ายวิศวกรรมตรวจแบบก่อนผลิต";
 
 // บ่ารองรับแผ่น (มม.): ก้อนเต็มร่อง flat สูง 200 หน้าบนแบนรับแผ่น + ส่วนเรียว taper 100 ด้านล่าง

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261101094329">
+<meta name="app-version" content="20261101094746">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261101094329">
+<link rel="stylesheet" href="css/app.css?v=20261101094746">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -89,7 +89,7 @@
 </fieldset>
 <fieldset>
 <legend>การผลิตและขนส่ง</legend>
-<div class="row3"><div><label for="tn">จำนวนโต๊ะ</label><input id="tn" type="number" value="4" min="1" max="40"></div><div><label for="cy">รอบ/วัน</label><input id="cy" type="number" value="1" min="1" max="3"></div><div><label for="tk">รถบรรทุก (กก.)</label><input id="tk" type="number" value="12000" step="500" min="1000"></div></div>
+<div class="row3"><div><label for="tn">จำนวนโต๊ะ</label><input id="tn" type="number" value="4" min="1" max="40"></div><div><label for="cy">รอบ/วัน</label><input id="cy" type="number" value="1" min="1" max="3"></div><div><label for="tk">รถบรรทุก (กก.)</label><input id="tk" class="thou" type="text" inputmode="numeric" value="16,000"></div></div>
 </fieldset>
 <fieldset>
 <legend>บันทึกและแชร์</legend>
@@ -143,6 +143,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261101094329"></script>
+<script type="module" src="js/ui.js?v=20261101094746"></script>
 </body>
 </html>
