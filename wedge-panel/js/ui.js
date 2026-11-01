@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101123412";
+import { STD, HS } from "./standards.js?v=20261101124014";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101123412";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101123412";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101123412";
-import { createViews } from "./view3d.js?v=20261101123412";
-import { makePdf } from "./pdf.js?v=20261101123412";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101123412";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101123412";
+} from "./calc.js?v=20261101124014";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101124014";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101124014";
+import { createViews } from "./view3d.js?v=20261101124014";
+import { makePdf } from "./pdf.js?v=20261101124014";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101124014";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101124014";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -150,7 +150,6 @@ function run() {
   $("cards").innerHTML = `<div class="card"><div class="k">หัวลิ่ม</div><div class="v">แบบ ${p.ty}</div><div class="s">${G.d} • ${p.n}</div></div>
 ${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div class="v">ตามจำนวนแผ่น</div><div class="s">${esc(r.ref || "ไม่มีข้อมูลระยะเสา")}</div></div>` : `<div class="card"><div class="k">เสาเข็มไอ</div><div class="v">${fmt(nPile)} ต้น</div><div class="s">${fmt(nSpan)} ช่วง • กำแพงยาว ${nf(wLen / 1000, 2)} ม.</div></div>`}
 <div class="card"><div class="k">แผ่นทั้งโครงการ</div><div class="v">${fmt(totQ)} แผ่น</div><div class="s">${list.length} รหัส • <span class="stamp ${S.sp ? "sp" : "std"}">${S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</span></div></div>
-<div class="card"><div class="k">คอนกรีตรวม</div><div class="v">${nf(totV, 2)} ลบ.ม.</div><div class="s">เหล็กเสริม ${fmt(totS)} กก.</div></div>
 <div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${nf(totW / 1000, 1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
   $("alerts").innerHTML = r.al.map((a) => `<div class="al ${a[0]}">${esc(a[1])}</div>`).join("");
   $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ") || "-"}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
