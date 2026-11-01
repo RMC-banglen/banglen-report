@@ -158,3 +158,11 @@ button.danger:hover{background:var(--danger-soft)}
 .modal__box p{margin:0 0 16px;color:var(--muted);font-size:14px}
 .modal__btns{display:flex;flex-direction:column;gap:8px}
 .modal__btns button{width:100%;min-height:42px}
+
+/* รายการโครงการ: แถวที่เปิดอยู่ไฮไลต์ + ถังขยะลบ */
+.prow{display:flex;gap:6px;align-items:stretch}
+.prow .pbtn{flex:1;text-align:left}
+.prow.cur .pbtn{border-color:var(--primary);background:var(--primary-wash)}
+.ptrash{min-width:40px;padding:4px 8px;border-color:transparent;background:transparent;color:var(--danger);display:flex;align-items:center;justify-content:center}
+.ptrash:hover{background:var(--danger-soft);border-color:var(--danger)}
+.ptrash svg{width:18px;height:18px}

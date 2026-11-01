@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101095130";
+import { STD, HS } from "./standards.js?v=20261101115358";
 import {
   calcProject, calcDirect, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101095130";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101095130";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101095130";
-import { createViews } from "./view3d.js?v=20261101095130";
-import { makePdf } from "./pdf.js?v=20261101095130";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101095130";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101095130";
+} from "./calc.js?v=20261101115358";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101115358";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101115358";
+import { createViews } from "./view3d.js?v=20261101115358";
+import { makePdf } from "./pdf.js?v=20261101115358";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101115358";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101115358";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -17,6 +17,7 @@ document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches 
 document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches("input.thou") && t.value !== "") t.value = toInt(t.value).toLocaleString("th-TH"); });
 let STATE = null, spans = [{ cc: 0, n: 0 }], stackSel = 0, curId = null, user = null, editable = false;
 let orderRows = [{ WT: 0, H: 0, qty: 0 }];
+let listRows = []; // รายการโครงการที่โหลดมา
 let orderAllowance = 20; // มม. ค่าเผื่อทำงานข้างละ (มาตรฐาน 20) ไม่มีช่องให้แก้ ใช้คำนวณระยะกลาง/กลางเสาในหมายเหตุ
 let views = null, cur = "view3d";
 const PANES = ["view3d", "drawing", "production", "table"];
@@ -178,9 +179,14 @@ function fillSelect(id, opts) {
 }
 function renderProd() {
   const st = STATE, tn = +$("tn").value || 1, cy = +$("cy").value || 1;
+  // ข้อความใต้ตาราง: 1 โต๊ะผลิตได้กี่แผ่น (ถ้ามีรหัสเดียวบอกตัวเลขเลย ถ้าหลายรหัสให้ดูในตาราง)
+  const perOf = (i) => i.tf.R * i.tf.n;
+  $("prodNote").textContent = (st.list.length === 1 && perOf(st.list[0])
+    ? "1 โต๊ะผลิตได้ " + fmt(perOf(st.list[0])) + " แผ่น/รอบ • ใช้ " + fmt(tn) + " โต๊ะ × " + fmt(cy) + " รอบ/วัน = " + fmt(perOf(st.list[0]) * tn * cy) + " แผ่น/วัน"
+    : "ใช้ " + fmt(tn) + " โต๊ะ × " + fmt(cy) + " รอบ/วัน • จำนวนแผ่นที่ 1 โต๊ะผลิตได้ต่อรอบของแต่ละรหัส ดูในตาราง") + " • 1 โต๊ะหล่อได้รหัสเดียวต่อรอบ";
   $("prod").querySelector("tbody").innerHTML = st.list.map((i) => {
     const per = i.tf.R * i.tf.n, pd = per * tn * cy, days = per ? Math.ceil(i.qty / pd) : "-";
-    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${per} (${i.tf.R}×${i.tf.n})` : "วางไม่ได้"}</td><td>${per ? fmt(pd) : "-"}</td><td>${days}</td><td>${fmt(i.P.wt)}</td></tr>`;
+    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${per} แผ่น (${i.tf.R} แถว × ${i.tf.n} แผ่น)` : "วางไม่ได้"}</td><td>${per ? fmt(pd) : "-"}</td><td>${days}</td><td>${fmt(i.P.wt)}</td></tr>`;
   }).join("");
   $("mat").querySelector("tbody").innerHTML = st.list.map((i) => {
     const P = i.P, S = st.S;
@@ -258,13 +264,21 @@ function apply(d) {
 function saveDraft() { try { localStorage.setItem("wp-draft", JSON.stringify(collect())); } catch (e) {} }
 function loadDraft() { try { const d = JSON.parse(localStorage.getItem("wp-draft") || "null"); if (d) apply(d); } catch (e) {} }
 
-const msg = (t) => { $("saveMsg").textContent = t; $("bLink").hidden = !curId; $("bDel").hidden = !(curId && editable); $("bSave").textContent = curId ? "บันทึกการแก้ไข" : "บันทึกโครงการ"; };
+const msg = (t) => { $("saveMsg").textContent = t; $("bLink").hidden = !curId; renderList(); $("bSave").textContent = curId ? "บันทึกการแก้ไข" : "บันทึกโครงการ"; };
+// วาดรายการโครงการ: แถวที่เปิดอยู่ไฮไลต์ และมีไอคอนถังขยะ (เฉพาะผู้ที่แก้ไขได้) กดแล้วต้องยืนยันก่อนลบ
+const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+function renderList() {
+  $("plist").innerHTML = listRows.map((r) => {
+    const cur = r.id === curId;
+    return '<div class="prow' + (cur ? " cur" : "") + '"><button type="button" class="pbtn" data-id="' + esc(r.id) + '">' + esc(r.name || "ไม่มีชื่อโครงการ") + ' <span style="color:var(--faint)">• ' + esc(r.customer || "") + " • " + new Date(r.updated_at || 0).toLocaleDateString("th-TH") + "</span></button>" +
+      (cur && editable ? '<button type="button" class="ptrash" title="ลบโครงการนี้" aria-label="ลบโครงการนี้">' + TRASH_SVG + "</button>" : "") + "</div>";
+  }).join("");
+  $("plist").querySelectorAll(".pbtn").forEach((b) => (b.onclick = async () => { if (!(await guardUnsaved())) return; location.hash = "#" + b.dataset.id; }));
+  const t = $("plist").querySelector(".ptrash"); if (t) t.onclick = deleteCurrent;
+}
 async function refreshList() {
-  try {
-    const rows = await listProjects(15);
-    $("plist").innerHTML = rows.map((r) => `<button type="button" data-id="${esc(r.id)}">${esc(r.name || "ไม่มีชื่อโครงการ")} <span style="color:var(--faint)">• ${esc(r.customer || "")} • ${new Date(r.updated_at || 0).toLocaleDateString("th-TH")}</span></button>`).join("");
-    $("plist").querySelectorAll("button").forEach((b) => (b.onclick = async () => { if (!(await guardUnsaved())) return; location.hash = "#" + b.dataset.id; }));
-  } catch (e) { $("plist").innerHTML = ""; }
+  try { listRows = await listProjects(15); } catch (e) { listRows = []; }
+  renderList();
 }
 async function loadProject(id) {
   try {
@@ -287,7 +301,7 @@ async function saveCurrent() {
   } catch (e) { msg("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); return false; }
 }
 $("bSave").onclick = saveCurrent;
-$("bDel").onclick = async () => {
+async function deleteCurrent() {
   if (!curId || !editable) return;
   const name = $("pj").value.trim() || "(ไม่มีชื่อ)";
   if (!window.confirm('ลบโครงการ "' + name + '" ออกจากระบบถาวรใช่ไหม?\n\nลบแล้วกู้คืนไม่ได้ และคนที่เปิดลิงก์โครงการนี้จะเปิดไม่ได้อีก')) return;
@@ -296,7 +310,7 @@ $("bDel").onclick = async () => {
     resetAll(); // ล้างหน้าจอกลับเป็นโครงการเปล่า
     msg('ลบโครงการ "' + name + '" แล้ว'); refreshList();
   } catch (e) { msg("ลบไม่สำเร็จ ลองใหม่อีกครั้ง"); }
-};
+}
 $("bLink").onclick = async () => {
   if (!curId) return;
   const url = location.origin + location.pathname + "#" + curId;
