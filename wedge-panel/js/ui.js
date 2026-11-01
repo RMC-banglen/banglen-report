@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101063113";
+import { STD, HS } from "./standards.js?v=20261101064057";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101063113";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101063113";
-import { panelSheet, jointSvg, esc } from "./draw2d.js?v=20261101063113";
-import { createViews } from "./view3d.js?v=20261101063113";
-import { makePdf, downloadSummary } from "./pdf.js?v=20261101063113";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101063113";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101063113";
+} from "./calc.js?v=20261101064057";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101064057";
+import { panelSheet, jointSvg, esc } from "./draw2d.js?v=20261101064057";
+import { createViews } from "./view3d.js?v=20261101064057";
+import { makePdf, downloadSummary } from "./pdf.js?v=20261101064057";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101064057";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101064057";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -175,7 +175,7 @@ function drawJoint() {
 }
 function drawPanel() {
   const st = STATE, it = st.list.find((i) => i.code === $("selD").value) || st.list[0];
-  $("dwg").innerHTML = it ? panelSheet(it, st) : '<p class="hint">ยังไม่มีรายการแผ่น</p>';
+  $("dwg").innerHTML = it ? panelSheet(it, st, $("cu").value.trim()) : '<p class="hint">ยังไม่มีรายการแผ่น</p>';
 }
 
 let tmr; function sched() { clearTimeout(tmr); tmr = setTimeout(run, 220); }

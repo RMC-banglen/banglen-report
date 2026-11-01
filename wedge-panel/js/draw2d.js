@@ -1,7 +1,7 @@
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261101063113";
-import { fmt, f2, f3 } from "./calc.js?v=20261101063113";
+import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261101064057";
+import { fmt, f2, f3 } from "./calc.js?v=20261101064057";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -55,6 +55,12 @@ const j2=jc>0?jc-1:jc+1;labs.push([`V-bar ${P.nv}-${NM(S.dv)} @${f3(P.am).slice(
 const rx=X2(W+TP)+22;labs.sort((a,b)=>a[2]-b[2]);let last=-1e9;labs.forEach(l=>{l[3]=Math.max(l[2],last+22);last=l[3]});
 labs.forEach(([t,x,y,ly])=>{A(`<polyline points="${x.toFixed(1)},${y.toFixed(1)} ${(rx-14).toFixed(1)},${y.toFixed(1)} ${(rx-4).toFixed(1)},${ly.toFixed(1)} ${rx.toFixed(1)},${ly.toFixed(1)}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);A(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.2" style="fill:var(--muted)"/>`);TX(rx+4,ly+4,t,"start")});
 vb=Math.max(vb,last+10);return `<svg viewBox="0 0 680 ${Math.ceil(vb+10)}" role="img" aria-label="รูปด้านแผ่น">${o}</svg>`}
-export function panelSheet(it,st){const G=st.G,P=it.P,S=st.S;return `<p class="cap">รูปตัดแผ่นกันดิน</p>${svgSection(G,P,S,false)}<p class="cap">รูปตัดแผ่นกันดิน (แสดงเหล็กเสริม)</p>${svgSection(G,P,S,true)}<p class="cap">รูปด้านแผ่นกันดิน (ระยะท่อ)</p>${svgElev(G,P,S,false,true)}<p class="cap">รูปด้านแผ่นกันดิน (แสดงเหล็กเสริม)</p>${svgElev(G,P,S,true,false)}
-<div class="tb"><span>รหัส <b>${it.code}</b></span><span>${st.p.n} • หัวลิ่มแบบ ${st.p.ty}</span><span>คอนกรีต ${P.vol.toFixed(3)} ลบ.ม. • เหล็ก ${P.kg.toFixed(1)} กก. • หนัก ${fmt(P.wt)} กก.</span><span class="stamp ${S.sp?"sp":"std"}">${S.sp?"สั่งพิเศษ":"มาตรฐานบริษัท"}</span></div>${S.sp&&S.note?`<p class="hint">รายละเอียดพิเศษ: ${esc(S.note)}</p>`:""}${st.direct&&it.cc.size?`<p style="font-size:13px;margin:8px 0 0"><b>หมายเหตุ:</b> แผ่นกว้าง ${f2(it.WT)} ม. เมื่อเสียบเสาเข็ม ${st.p.n} จะได้ระยะกลาง/กลางเสา ${[...it.cc].map(f2).join(", ")} ม. (เผื่อค่าการทำงานแล้วข้างละ ${f3(st.g)} ม.)</p>`:""}`}
+export function panelSheet(it,st,cust){const G=st.G,P=it.P,S=st.S;return `<p class="cap">รูปตัดแผ่นกันดิน</p>${svgSection(G,P,S,false)}<p class="cap">รูปตัดแผ่นกันดิน (แสดงเหล็กเสริม)</p>${svgSection(G,P,S,true)}<p class="cap">รูปด้านแผ่นกันดิน (ระยะท่อ)</p>${svgElev(G,P,S,false,true)}<p class="cap">รูปด้านแผ่นกันดิน (แสดงเหล็กเสริม)</p>${svgElev(G,P,S,true,false)}
+<div class="tb"><span>รหัส <b>${it.code}</b></span><span>${st.p.n} • หัวลิ่มแบบ ${st.p.ty}</span><span>คอนกรีต ${P.vol.toFixed(3)} ลบ.ม. • เหล็ก ${P.kg.toFixed(1)} กก. • หนัก ${fmt(P.wt)} กก.</span><span class="stamp ${S.sp?"sp":"std"}">${S.sp?"สั่งพิเศษ":"มาตรฐานบริษัท"}</span></div>${S.sp&&S.note?`<p class="hint">รายละเอียดพิเศษ: ${esc(S.note)}</p>`:""}${st.direct&&it.cc.size?`<p style="font-size:13px;margin:8px 0 0"><b>หมายเหตุ:</b> แผ่นกว้าง ${f2(it.WT)} ม. เมื่อเสียบเสาเข็ม ${st.p.n} จะได้ระยะกลาง/กลางเสา ${[...it.cc].map(f2).join(", ")} ม. (เผื่อค่าการทำงานแล้วข้างละ ${f3(st.g)} ม.)</p>`:""}${cust===undefined?"":confirmBox(cust)}`}
 export function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+// ช่องลูกค้ายืนยันการผลิตท้ายแบบแผ่น (บรรทัดเดียว มีแค่ชื่อลูกค้า) cust = ชื่อลูกค้า ว่างได้
+export function confirmBox(cust){
+  const nm=String(cust||"").trim()?esc(String(cust).trim()):"................................";
+  return `<div style="margin-top:12px;border:1px solid #CDD3CF;border-radius:6px;padding:8px 12px;display:flex;align-items:flex-end;gap:16px;font-size:13px;page-break-inside:avoid"><div style="white-space:nowrap"><b>ลูกค้ายืนยันการผลิต</b><br><span style="font-size:12px;color:#5B6964">ตามแบบนี้</span></div><div style="flex:1;text-align:center"><div style="border-bottom:1px solid #1D2725;height:30px"></div>( ${nm} )</div><div style="white-space:nowrap">วันที่ ........./........./.........</div></div>`;
+}
