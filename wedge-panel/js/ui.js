@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101071353";
+import { STD, HS } from "./standards.js?v=20261101072246";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101071353";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101071353";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101071353";
-import { createViews } from "./view3d.js?v=20261101071353";
-import { makePdf } from "./pdf.js?v=20261101071353";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101071353";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101071353";
+} from "./calc.js?v=20261101072246";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101072246";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101072246";
+import { createViews } from "./view3d.js?v=20261101072246";
+import { makePdf } from "./pdf.js?v=20261101072246";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101072246";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101072246";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -166,8 +166,15 @@ function renderProd() {
   }).join("");
   $("mat").querySelector("tbody").innerHTML = st.list.map((i) => {
     const P = i.P, S = st.S;
-    return `<tr><td class="code">${i.code}</td><td>${P.nv}-${NM(S.dv)} ยาว ${f2(P.lv)}</td><td>${P.nh}-${NM(S.dh)} ยาว ${f2(P.lh)}</td><td>${P.kg.toFixed(1)}</td><td>${P.vol.toFixed(3)}</td><td>${S.pd && P.pipe.P.length ? P.pipe.P.length + " ท่อน Ø" + PN[S.pd] + " ยาว " + f2(P.T) : "-"}</td></tr>`;
+    return `<tr><td class="code">${i.code}</td><td>${P.nv}-${NM(S.dv)} ยาว ${f2(P.lv)}</td><td>${P.kv.toFixed(2)}</td><td>${P.nh}-${NM(S.dh)} ยาว ${f2(P.lh)}</td><td>${P.kh.toFixed(2)}</td><td>${P.kg.toFixed(2)}</td><td>${P.vol.toFixed(3)}</td><td>${S.pd && P.pipe.P.length ? P.pipe.P.length + " ท่อน Ø" + PN[S.pd] + " ยาว " + f2(P.T) : "-"}</td></tr>`;
   }).join("");
+  // สรุปวัสดุทั้งโครงการ แยกชนิดเหล็ก (ใช้ภายใน คิดราคา)
+  const m = st.mat, S2 = st.S;
+  const rows = m.bars.map((b) => `<tr><td style="text-align:left">เหล็ก ${NM(b.d)}</td><td>${fmt(b.n)} เส้น</td><td>${b.len.toFixed(2)}</td><td>${b.kg.toFixed(1)} กก.</td></tr>`);
+  rows.push(`<tr><td style="text-align:left"><b>เหล็กรวม</b></td><td>-</td><td>-</td><td><b>${st.totS.toFixed(1)} กก.</b></td></tr>`);
+  rows.push(`<tr><td style="text-align:left">คอนกรีต</td><td>-</td><td>-</td><td>${st.totV.toFixed(2)} ลบ.ม.</td></tr>`);
+  if (S2.pd && m.pipeCount) rows.push(`<tr><td style="text-align:left">ท่อ PVC Ø${PN[S2.pd]}</td><td>${fmt(m.pipeCount)} ท่อน</td><td>${m.pipeLen.toFixed(2)}</td><td>-</td></tr>`);
+  $("matTot").querySelector("tbody").innerHTML = st.list.length ? rows.join("") : "";
 }
 function drawJoint() {
   const gr = STATE.groups[+$("sel3").value || 0], j = jointSvg(STATE, gr);

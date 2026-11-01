@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261101071353";
+} from "./standards.js?v=20261101072246";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -224,7 +224,7 @@ export function calcProject(input) {
     });
   });
   if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
-  return { p, G, g, S, stk, groups, nSpan, nPile, wLen, ...totals(items, input.truckKg), al };
+  return { p, G, g, S, stk, groups, nSpan, nPile, wLen, ...totals(items, input.truckKg, S), al };
 }
 
 // รายการแผ่นหนึ่งรหัส (กว้างรวม WT, สูง H) สร้างครั้งเดียวต่อคู่ แล้วสะสมจำนวนเข้าไป
@@ -242,14 +242,24 @@ function getItem(items, G, S, WT, H, al) {
   return it;
 }
 
-function totals(items, truckKg) {
+function totals(items, truckKg, S) {
   const list = [...items.values()].sort((a, b) => b.H - a.H || a.WT - b.WT);
   const totQ = list.reduce((s, i) => s + i.qty, 0);
   const totW = list.reduce((s, i) => s + i.qty * i.P.wt, 0);
   const totV = list.reduce((s, i) => s + i.qty * i.P.vol, 0);
   const totS = list.reduce((s, i) => s + i.qty * i.P.kg, 0);
   const truck = truckKg || DEFAULT_TRUCK_KG;
-  return { list, totQ, totW, totV, totS, truck, trips: Math.ceil(totW / truck) };
+  // สรุปวัสดุแยกชนิดเหล็ก (ขนาดเดียวกันรวมกัน) และท่อ PVC ทั้งโครงการ
+  const bars = new Map();
+  const addBar = (d, n, len, kg) => { const b = bars.get(d) || { d, n: 0, len: 0, kg: 0 }; b.n += n; b.len += len; b.kg += kg; bars.set(d, b); };
+  list.forEach((i) => {
+    addBar(S.dv, i.qty * i.P.nv, (i.qty * i.P.nv * i.P.lv) / 1000, i.qty * i.P.kv);
+    addBar(S.dh, i.qty * i.P.nh, (i.qty * i.P.nh * i.P.lh) / 1000, i.qty * i.P.kh);
+  });
+  const pipeCount = S.pd ? list.reduce((s, i) => s + i.qty * i.P.pipe.P.length, 0) : 0;
+  const pipeLen = S.pd ? list.reduce((s, i) => s + (i.qty * i.P.pipe.P.length * i.P.T) / 1000, 0) : 0;
+  const mat = { bars: [...bars.values()].sort((a, b) => a.d - b.d), pipeCount, pipeLen };
+  return { list, totQ, totW, totV, totS, truck, trips: Math.ceil(totW / truck), mat };
 }
 
 // ---------- สั่งตามจำนวนแผ่น (ลูกค้ากำหนดความกว้างและจำนวนมาเอง / สั่งเพิ่ม) ----------
@@ -285,7 +295,7 @@ export function calcDirect(input) {
     gr.n += qty; groups.set(key, gr);
   });
   if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
-  return { p, G, g, S, stk: [], groups: [...groups.values()], rowInfo, nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg), al };
+  return { p, G, g, S, stk: [], groups: [...groups.values()], rowInfo, nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg, S), al };
 }
 
 // ---------- การผลิต ----------
