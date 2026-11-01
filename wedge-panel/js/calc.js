@@ -1,0 +1,245 @@
+// การคำนวณทั้งหมด ไม่แตะ DOM — สูตรตามหัวข้อ 4 ของ HANDOFF.md (พอร์ตจาก wedge-panel-designer.html)
+import {
+  PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
+  CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
+} from "./standards.js";
+
+// ---------- รูปแบบตัวเลข ----------
+export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
+export const f3 = (n) => (n / 1000).toFixed(3);
+// เมตร 2 ตำแหน่ง ถ้าไม่ลงทุก 10 มม. ใช้ 3 ตำแหน่ง
+export const f2 = (n) => (n / 1000).toFixed(Math.round(n) % 10 ? 3 : 2);
+
+// ---------- ความกว้างแผ่นและการเสียบร่อง ----------
+// กว้างรวม = c/c − tw − 2×ค่าเผื่อ ปัดลงทุก 10 มม. ค่าเผื่อจริง = (c/c − tw − กว้างรวมที่ปัด)/2
+export function fitCalc(pile, G, cc, g) {
+  const raw = cc - pile.tw - 2 * g;
+  const WT = Math.floor(raw / 10) * 10;
+  const gr = (cc - pile.tw - WT) / 2;
+  const ze = pile.dg - gr; // เสียบร่อง
+  const m = pile.B / 2 - pile.f;
+  const tap = m - pile.c / 2;
+  let mn = 1e9;
+  for (let z = 0; z <= ze; z += 0.5) {
+    const c = m - (tap * z) / pile.dg - G.ht(ze - z);
+    if (c < mn) mn = c;
+  }
+  return { WT, raw, gr, ze, mn, cm: m - G.ht(ze), ct: m - (tap * ze) / pile.dg - G.E / 2 };
+}
+
+// ---------- แบ่งระยะเสาจากความยาวกำแพง ----------
+// method "eq": ทุกช่วงห่างเท่ากัน กระจายเศษทีละ 10 มม.
+// method "rest": ช่วงเต็มตามระยะที่ใส่ + ช่วงสุดท้ายเป็นเศษ
+// คืน { spans:[{cc,n}], warnings:[[level,text]], errors:[text], pileCount }
+export function splitSpans(length, spacing, method) {
+  const L = Math.round(length), s = Math.round(spacing);
+  const out = [], warnings = [], errors = [];
+  if (!(L >= 600)) { errors.push("ใส่ความยาวกำแพงอย่างน้อย 0.60 ม."); return { spans: out, warnings, errors, pileCount: 0 }; }
+  if (!(s >= 600 && s <= 6000)) { errors.push("เสาต้องห่างกัน 0.60 ถึง 6.00 ม."); return { spans: out, warnings, errors, pileCount: 0 }; }
+  if (method === "eq") {
+    const n = Math.ceil(L / s), b = Math.floor(L / n / 10) * 10, rest = L - b * n;
+    const k = Math.min(n, Math.floor(rest / 10)), frac = rest - k * 10;
+    if (k > 0 && k < n) { out.push({ cc: b + 10, n: k }); out.push({ cc: b + frac, n: n - k }); }
+    else if (k === n) { out.push({ cc: b + 10, n: n - 1 }); out.push({ cc: b + 10 + frac, n: 1 }); }
+    else out.push({ cc: b + frac, n });
+    if (frac && k < n && n - k > 1) { const g = out.pop(); out.push({ cc: b, n: g.n - 1 }, { cc: b + frac, n: 1 }); }
+  } else {
+    const n = Math.floor(L / s), rem = L - n * s;
+    if (n) out.push({ cc: s, n });
+    if (rem > 0) {
+      out.push({ cc: rem, n: 1 });
+      if (rem < 600) warnings.push(["w", `ช่วงสุดท้ายเหลือแค่ ${f2(rem)} ม. สั้นเกินไป แนะนำเลือก “ทุกช่วงห่างเท่ากัน”`]);
+    }
+  }
+  const nSpan = out.reduce((a, b) => a + b.n, 0);
+  return { spans: out, warnings, errors, pileCount: nSpan + 1 };
+}
+
+// ---------- การซ้อนแผ่น ----------
+// ชุดแผ่นมาตรฐาน 1–4 แผ่นที่รวมได้พอดีความสูงกำแพง เรียงจากใช้แผ่นน้อยที่สุด
+export function stackOptions(Ht) {
+  const res = [];
+  const rec = (start, arr, sum) => {
+    if (arr.length && sum >= Ht) { res.push(arr.slice()); return; }
+    if (arr.length >= MAX_STACK) return;
+    for (let i = start; i < HS.length; i++) { arr.push(HS[i]); rec(i, arr, sum + HS[i]); arr.pop(); }
+  };
+  rec(0, [], 0);
+  res.forEach((a) => { a.sort((x, y) => y - x); a.sum = a.reduce((p, q) => p + q, 0); a.over = a.sum - Ht; a.k = new Set(a).size; });
+  const pool = res.filter((a) => a.over === 0).sort((a, b) => a.length - b.length || a.over - b.over || a.k - b.k);
+  const seen = new Set(), out = [];
+  pool.forEach((a) => { const key = a.join("+"); if (!seen.has(key)) { seen.add(key); out.push(a); } });
+  return out.slice(0, 4);
+}
+
+// ความสูงกำแพงมาตรฐานทั้งหมดที่ซ้อนได้ (ผลรวมของแผ่น 1–4 แผ่น)
+export const STDH = (() => {
+  const s = new Set();
+  const rec = (st, sum, k) => {
+    if (k) s.add(sum);
+    if (k === MAX_STACK) return;
+    for (let i = st; i < HS.length; i++) rec(i, sum + HS[i], k + 1);
+  };
+  rec(0, 0, 0);
+  return [...s].sort((a, b) => a - b);
+})();
+
+// ถ้าไม่ตรงมาตรฐาน เสนอ "ปรับขึ้น" (แนะนำ) และ "ปรับลง"
+export function suggestHeights(Ht) {
+  return { up: STDH.find((h) => h > Ht) ?? null, down: [...STDH].reverse().find((h) => h < Ht) ?? null };
+}
+
+// ---------- เหล็กเสริม ท่อ น้ำหนัก ----------
+export function standardSpec() { return { sp: false, ...STD, pr: null, pc: 0 }; }
+
+function placePipes(vx, hy, dv, dh, pd, nr, nc, WT, TP, H) {
+  if (!pd) return { P: [], xs: [], ys: [], warn: "" };
+  const rad = pd / 2, st = 50;
+  const ax = (bars, n, Lt, lo, hi, bd) => {
+    const ok = (c) => c - rad >= lo && c + rad <= hi && bars.every((b) => Math.abs(b - c) - bd / 2 - rad >= 10);
+    const out = [];
+    for (let i = 0; i < Math.floor(n / 2); i++) {
+      let got = null;
+      for (let d = 0; d <= 900 && got === null; d += st)
+        for (const sg of [1, -1]) {
+          const c = Math.round((Lt * (i + 0.5)) / n / st) * st + sg * d;
+          if (ok(c) && ok(Lt - c) && !out.includes(c)) { got = c; break; }
+        }
+      if (got === null) return null;
+      out.push(got, Lt - got);
+    }
+    if (n % 2) {
+      let c = Lt / 2;
+      if (!ok(c)) {
+        c = null;
+        for (let d = 0; d <= 900 && c === null; d += st)
+          for (const sg of [1, -1]) {
+            const cc = Math.round(Lt / 2 / st) * st + sg * d;
+            if (ok(cc)) { c = cc; break; }
+          }
+      }
+      if (c === null) return null;
+      out.push(c);
+    }
+    return out.sort((a, b) => a - b);
+  };
+  const xsT = ax(vx.map((x) => x + TP), nc, WT, TP, WT - TP, dv);
+  const ys = ax(hy, nr, H, 0, H, dh);
+  if (!xsT || !ys) return { P: [], xs: [], ys: [], warn: "วางท่อระบายน้ำให้ไม่โดนเหล็กไม่ได้" };
+  const xs = xsT.map((x) => x - TP), P = [];
+  ys.forEach((y) => xs.forEach((x) => P.push([x, y])));
+  let gap = 1e9;
+  xs.forEach((c) => vx.forEach((b) => { gap = Math.min(gap, Math.abs(b - c) - dv / 2 - rad); }));
+  ys.forEach((c) => hy.forEach((b) => { gap = Math.min(gap, Math.abs(b - c) - dh / 2 - rad); }));
+  return { P, xs, ys, warn: "", gap };
+}
+
+// แผ่นหนึ่งรหัส: เหล็ก ท่อ คอนกรีต น้ำหนัก (WT = กว้างรวมปลายลิ่มถึงปลายลิ่ม, H = สูง)
+export function panelCalc(G, WT, H, S) {
+  const T = G.T, TP = G.TP, W = WT - 2 * TP, cv = S.cv, oh = S.oh;
+  const x0 = -TP + cv, x1 = WT - TP - cv, lv = H - 2 * cv, lh = WT - 2 * cv;
+  const vs = x0 + oh, ve = x1 - oh;
+  const nm = Math.max(2, Math.ceil((ve - vs) / S.sv) + 1), am = (ve - vs) / (nm - 1), vx = [];
+  for (let i = 0; i < nm; i++) vx.push(vs + i * am);
+  const hs = cv + oh, he = H - cv - oh;
+  const nh = Math.max(2, Math.ceil((he - hs) / S.sh) + 1), ah = (he - hs) / (nh - 1), hy = [];
+  for (let j = 0; j < nh; j++) hy.push(hs + j * ah);
+  const rows = S.pd ? (S.pr || (H <= 500 ? 1 : 2)) : 0;
+  const cols = S.pd ? (S.pc || Math.max(1, Math.floor(WT / 600))) : 0;
+  const pipe = placePipes(vx, hy, S.dv, S.dh, S.pd, rows, cols, WT, TP, H);
+  const kv = (nm * lv / 1000) * KG[S.dv], kh = (nh * lh / 1000) * KG[S.dh];
+  const vol = ((W * T + 2 * G.tipA) * H) / 1e9 - (pipe.P.length * Math.PI * (S.pd / 2) ** 2 * T) / 1e9;
+  return { W, WT, H, T, TP, vx, hy, am, ah, lv, lh, nv: nm, nh, kv, kh, kg: kv + kh, vol, wt: vol * CONCRETE_DENSITY, pipe, ties: nm * nh, x0, x1 };
+}
+
+// ---------- โต๊ะหล่อ ----------
+export function tableFit(G, W, H) {
+  const WB = G.TD + 50, CE = WB + 5, x0 = CE - WB, xeMax = x0 + TABLE.LF - WB, span = xeMax - CE;
+  let R = 1;
+  while (TABLE.CS + (R + 1) * H + R * TABLE.TDV + TABLE.MG <= TABLE.TW) R++;
+  const okH = TABLE.CS + H + TABLE.MG <= TABLE.TW;
+  const n = Math.floor((span + G.TC) / (W + G.TC));
+  return { R: okH ? R : 0, n: Math.max(0, n), span };
+}
+
+// ---------- รหัสและชื่อสินค้า ----------
+const c3 = (v) => String(Math.round(v)).padStart(3, "0");
+const d2 = (d) => String(d).padStart(2, "0");
+
+export function mkCode(WT, H, T, S, P) {
+  const hc = H % 10 ? String(H).padStart(4, "0") : c3(H / 10);
+  let c = `2s-${c3(WT / 10)}-${hc}-${c3(T / 10)}`;
+  if (S.sp) c += `-${P.nv}+${P.nh}-${S.dv === S.dh ? d2(S.dv) : d2(S.dv) + d2(S.dh)}`;
+  return c;
+}
+
+export function mkName(WT, H, T, S, P) {
+  let n = `แผ่นกันดิน ${(WT / 1000).toFixed(2)} x ${H % 10 ? (H / 1000).toFixed(3) : (H / 1000).toFixed(2)} x ${(T / 1000).toFixed(2)} ม.`;
+  if (S.sp) n += ` เสริมเหล็ก ${P.nv}+${P.nh}${S.dv === S.dh ? barName(S.dv) : barName(S.dv) + "/" + barName(S.dh)} มม.`;
+  return n;
+}
+
+// ---------- ทั้งโครงการ ----------
+// in = { pile, allowance, spans:[{cc,n}], stack:[ความสูงแผ่น...], spec, truckKg }
+// คืน { p, G, g, S, groups, list, totQ, totW, totV, totS, trips, nSpan, nPile, wLen, al }
+export function calcProject(input) {
+  const p = PILES[input.pile], G = WG[p.ty];
+  const g = input.allowance ?? DEFAULT_ALLOWANCE;
+  const S = input.spec || standardSpec();
+  const stk = input.stack || [];
+  const al = [];
+  if (!(g >= 5 && g <= 40)) al.push(["d", "ค่าเผื่อควรอยู่ระหว่าง 5 ถึง 40 มม."]);
+  if (S.sp && (!(S.sv >= 75) || !(S.sh >= 75))) al.push(["d", "ระยะ @ เหล็กต้องไม่น้อยกว่า 75 มม."]);
+
+  const groups = [];
+  (input.spans || []).forEach((s, i) => {
+    if (!(s.cc >= 600 && s.cc <= 6000) || !(s.n >= 1)) {
+      al.push(["d", `ช่วงเสาแถวที่ ${i + 1}: เสาต้องห่างกัน 0.60 ถึง 6.00 ม. และมีอย่างน้อย 1 ช่วง`]);
+      return;
+    }
+    const F = fitCalc(p, G, s.cc, g);
+    if (F.ze < 20) al.push(["d", `ช่วง c/c ${fmt(s.cc)}: ค่าเผื่อมากเกินไป แผ่นเสียบร่องได้น้อยกว่า 20 มม.`]);
+    if (F.mn < 3) al.push(["d", `ช่วง c/c ${fmt(s.cc)}: ลิ่มหนากว่าร่อง แผ่นจะติด ต้องเพิ่มค่าเผื่อ`]);
+    groups.push({ ...s, F });
+  });
+
+  const nSpan = groups.reduce((a, x) => a + x.n, 0);
+  const nPile = nSpan ? nSpan + 1 : 0;
+  const wLen = groups.reduce((a, x) => a + x.cc * x.n, 0);
+
+  const items = new Map();
+  groups.forEach((gr) => {
+    stk.forEach((H) => {
+      const key = gr.F.WT + "|" + H;
+      let it = items.get(key);
+      if (!it) {
+        const P = panelCalc(G, gr.F.WT, H, S), code = mkCode(gr.F.WT, H, G.T, S, P);
+        it = { code, name: mkName(gr.F.WT, H, G.T, S, P), H, WT: gr.F.WT, P, qty: 0, cc: new Set() };
+        items.set(key, it);
+        if (P.pipe.warn) al.push(["w", `${code}: ${P.pipe.warn}`]);
+        it.tf = tableFit(G, P.W, H);
+        if (it.tf.n < 1 || it.tf.R < 1) al.push(["d", `${code}: แผ่นใหญ่เกินโต๊ะหล่อ (ตัวแผ่นยาวได้ไม่เกิน ${fmt(it.tf.span)} มม.)`]);
+      }
+      it.qty += gr.n;
+      it.cc.add(gr.cc);
+    });
+  });
+  if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
+
+  const list = [...items.values()].sort((a, b) => b.H - a.H || a.WT - b.WT);
+  const totQ = list.reduce((s, i) => s + i.qty, 0);
+  const totW = list.reduce((s, i) => s + i.qty * i.P.wt, 0);
+  const totV = list.reduce((s, i) => s + i.qty * i.P.vol, 0);
+  const totS = list.reduce((s, i) => s + i.qty * i.P.kg, 0);
+  const truck = input.truckKg || DEFAULT_TRUCK_KG;
+  const trips = Math.ceil(totW / truck);
+  return { p, G, g, S, stk, groups, list, nSpan, nPile, wLen, totQ, totW, totV, totS, truck, trips, al };
+}
+
+// ---------- การผลิต ----------
+// แผ่นต่อโต๊ะต่อรอบ = แถว × แผ่นต่อแถว, วันผลิต = ceil(จำนวน / (ต่อรอบ × โต๊ะ × รอบต่อวัน))
+export function productionPlan(item, tables = 1, cyclesPerDay = 1) {
+  const per = item.tf.R * item.tf.n;
+  const perDay = per * tables * cyclesPerDay;
+  return { per, perDay, days: per ? Math.ceil(item.qty / perDay) : null };
+}

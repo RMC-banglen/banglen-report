@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ออกแบบแผ่นกันดินหัวลิ่ม • RMC บางเลน</title>
+<meta name="theme-color" content="#2f5fd0">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="login" hidden></div>
+<div id="app" hidden>
+<header class="top">
+<div class="brand"><img src="assets/logo.png" alt="RMC"><div><span class="co">บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด</span><h1>ออกแบบแผ่นกันดินหัวลิ่ม</h1></div></div>
+<div class="userbar"><a href="../" id="backLink">← รายงานการผลิต</a><span id="uName"></span><span class="ro" id="roTag" hidden>ดูอย่างเดียว</span><button type="button" id="bOut">ออก</button></div>
+</header>
+<div class="wrap">
+<aside>
+<form id="f" autocomplete="off" onsubmit="return false">
+<fieldset>
+<legend>โครงการ</legend>
+<label for="pj">ชื่อโครงการ</label><input id="pj" type="text" placeholder="กำแพงกันดิน บ้านคุณสมชาย">
+<div class="row2"><div><label for="cu">ลูกค้า</label><input id="cu" type="text" placeholder="ชื่อลูกค้า"></div><div><label for="sa">ผู้ขาย</label><input id="sa" type="text" placeholder="ชื่อฝ่ายขาย"></div></div>
+</fieldset>
+<fieldset>
+<legend>เสาเข็มและความสูงกำแพง</legend>
+<label for="pt">หน้าตัดเสาเข็มไอ</label>
+<select id="pt"><optgroup label="มาตรฐานโรงงาน"><option value="F18">I-18 โรงงาน</option><option value="F22">I-22 โรงงาน</option><option value="F26">I-26 โรงงาน</option></optgroup><optgroup label="มอก."><option value="T22">I-22 มอก.</option><option value="T26" selected>I-26 มอก.</option><option value="T30">I-30 มอก.</option></optgroup></select>
+<div class="hstd" role="img" aria-label="ความสูงแผ่นมาตรฐานบริษัท 0.50 0.75 1.00 และ 1.20 เมตร"><div class="t">ความสูงแผ่นมาตรฐานบริษัท มี 4 ขนาด</div><div class="hbars"><div><span style="height:30px"></span><b>0.50</b></div><div><span style="height:45px"></span><b>0.75</b></div><div><span style="height:60px"></span><b>1.00</b></div><div><span style="height:72px"></span><b>1.20</b></div><div class="stv" id="stkVis" aria-live="polite"></div></div></div>
+<label for="wh">ความสูงกำแพง (ม.)</label><input id="wh" type="number" value="1.00" step="0.05" min="0.5" max="4.8">
+<div class="err" id="whE"></div><div id="whSug"></div>
+<p class="hint" style="margin:10px 0 4px">ความสูงกำแพงที่ทำได้จากการซ้อนแผ่นมาตรฐาน (กดเพื่อเลือก, ม.)</p><div class="chips" id="whStd"></div>
+<label>การซ้อนแผ่น</label>
+<div class="stack" id="stk"></div>
+</fieldset>
+<fieldset>
+<legend>ความยาวกำแพงและระยะเสา</legend>
+<div class="mode"><input type="radio" name="sm" id="smL" value="len" checked><label for="smL">ใส่ความยาวกำแพง</label><input type="radio" name="sm" id="smM" value="man"><label for="smM">ใส่ระยะเสาเอง</label></div>
+<div id="lenBox"><div class="row2"><div><label for="lm">ความยาวกำแพง (ม.)</label><input id="lm" type="number" value="15" step="0.01" min="0.6"></div><div><label for="cmx">เสาห่างกัน กลาง-กลาง เสาเข็ม (ม.)</label><input id="cmx" type="number" value="1.50" step="0.01" min="0.6" max="6"></div></div>
+<label for="lmt">แบ่งระยะเสาแบบไหน</label><select id="lmt"><option value="eq" selected>ทุกช่วงห่างเท่ากัน (แนะนำ)</option><option value="fx">ห่างเท่ากัน เหลือเศษช่วงสุดท้าย</option></select>
+<p class="hint">วัดจากกลางเสาต้นแรก ถึงกลางเสาต้นสุดท้าย (กำแพงแนวตรง)</p><div class="std" id="lenOut"></div></div>
+<div id="manBox" hidden><div class="spans" id="spans"></div>
+<button type="button" id="addSpan">เพิ่มช่วงเสา</button>
+<p class="hint">ช่วงที่เสาห่างเท่ากัน ใส่แถวเดียว แล้วบอกจำนวนช่วง</p></div>
+<details class="adv"><summary>ค่าเผื่อการทำงาน</summary>
+<label for="gp">ค่าเผื่อข้างละ (มม.)</label><input id="gp" type="number" value="20" step="5" min="5" max="40"><p class="hint">มาตรฐานแนะนำข้างละ 20 มม.</p></details>
+</fieldset>
+<fieldset>
+<legend>รูปแบบงาน</legend>
+<div class="mode"><input type="radio" name="md" id="mdS" value="std" checked><label for="mdS">มาตรฐานบริษัท</label><input type="radio" name="md" id="mdP" value="sp"><label for="mdP">สั่งพิเศษ</label></div>
+<div class="std" id="stdBox"><b>มาตรฐานบริษัท</b><br>เหล็กแนวตั้ง RB6 @200 • เหล็กแนวนอน RB9 @200<br>ระยะหุ้ม 25 • เหล็กเลยจุดผูก 25<br>ท่อระบายน้ำ PVC 1½" สูง 0.50 = 1 แถว • สูงกว่า = 2 แถว • 1 คอลัมน์ต่อกว้าง 600 มม.</div>
+<div id="spBox" hidden>
+<div class="row2"><div><label for="dv">เหล็กแนวตั้ง</label><select id="dv"><option value="6" selected>RB6</option><option value="9">RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="sv">@ แนวตั้ง (มม.)</label><input id="sv" type="number" value="200" step="10" min="75"></div></div>
+<div class="row2"><div><label for="dh">เหล็กแนวนอน</label><select id="dh"><option value="6">RB6</option><option value="9" selected>RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="sh">@ แนวนอน (มม.)</label><input id="sh" type="number" value="200" step="10" min="75"></div></div>
+<div class="row3"><div><label for="pd">ท่อ PVC</label><select id="pd"><option value="0">ไม่มี</option><option value="34">1"</option><option value="48" selected>1½"</option><option value="60">2"</option><option value="76">2½"</option><option value="89">3"</option></select></div><div><label for="pr">แถว</label><input id="pr" type="number" value="2" min="1" max="6"></div><div><label for="pc">คอลัมน์</label><input id="pc" type="number" value="0" min="0" max="10"></div></div>
+<p class="hint">คอลัมน์ 0 = คิดตามความกว้างอัตโนมัติ</p>
+<label for="nt">รายละเอียดที่สั่งพิเศษ</label><textarea id="nt" placeholder="เสริมเหล็กขอบบน 2-DB12 ตามแบบผู้ออกแบบ"></textarea>
+</div>
+</fieldset>
+<fieldset>
+<legend>การผลิตและขนส่ง</legend>
+<div class="row3"><div><label for="tn">จำนวนโต๊ะ</label><input id="tn" type="number" value="4" min="1" max="40"></div><div><label for="cy">รอบ/วัน</label><input id="cy" type="number" value="1" min="1" max="3"></div><div><label for="tk">รถบรรทุก (กก.)</label><input id="tk" type="number" value="12000" step="500" min="1000"></div></div>
+</fieldset>
+<fieldset>
+<legend>บันทึกและแชร์</legend>
+<div class="actions"><button type="button" class="pri" id="bSave">บันทึกโครงการ</button><button type="button" id="bNew">เริ่มโครงการใหม่</button><button type="button" id="bPdf">ส่งออก PDF</button><button type="button" id="bDl">ใบสรุป HTML</button></div>
+<div class="msg" id="saveMsg"></div>
+<div class="projlist" id="plist"></div>
+</fieldset>
+</form>
+</aside>
+<main>
+<div class="cards" id="cards"></div>
+<div class="alerts" id="alerts"></div>
+<div class="tblw"><table class="tbl" id="sched"><thead><tr><th>รหัสสินค้า</th><th style="text-align:left">ชื่อสินค้า</th><th>สูง (ม.)</th><th>กว้างรวม (ม.)</th><th>ช่วง c/c (ม.)</th><th>จำนวน (แผ่น)</th><th>นน./แผ่น (กก.)</th><th>คอนกรีต/แผ่น (ลบ.ม.)</th><th>เหล็ก/แผ่น (กก.)</th></tr></thead><tbody></tbody></table></div>
+<nav class="tabs" role="tablist"><button role="tab" id="t-view3d" aria-selected="true" data-p="view3d">ภาพ 3 มิติ</button><button role="tab" id="t-drawing" aria-selected="false" data-p="drawing">แบบแผ่น</button><button role="tab" id="t-production" aria-selected="false" data-p="production">การผลิตและขนส่ง</button><button role="tab" id="t-table" aria-selected="false" data-p="table">โต๊ะหล่อ</button></nav>
+<section class="pane" id="p-view3d">
+<div class="bar"><div><label for="sel3">ช่วงเสาที่แสดง</label><select id="sel3"></select></div><button type="button" id="b3a">มุมเฉียง</button><button type="button" id="b3t">มองจากด้านบน</button><button type="button" id="b3f">มองด้านหน้า</button></div>
+<div id="v3"></div>
+<p class="hint">ลากหมุน • ถ่างนิ้วหรือเลื่อนล้อเมาส์ซูม</p>
+<p class="cap">รูปขยายรอยต่อด้านขวา</p>
+<div class="sheet"><svg id="sJ" viewBox="0 0 680 300" role="img" aria-label="รูปขยายรอยต่อเสากับแผ่น"></svg></div>
+<p class="hint" id="jNote"></p>
+</section>
+<section class="pane" id="p-drawing" hidden>
+<div class="bar"><div><label for="selD">แผ่นที่แสดง</label><select id="selD"></select></div></div>
+<div class="sheet" id="dwg"></div>
+</section>
+<section class="pane" id="p-table" hidden>
+<div class="bar"><div><label for="selT">แผ่นที่วางบนโต๊ะ</label><select id="selT"></select></div><label style="display:flex;gap:6px;align-items:center;margin:0 0 8px;color:var(--ink);font-size:14px"><input id="tR" type="checkbox" checked style="accent-color:var(--accent)"> เรียงหลายแถว</label><button type="button" id="tA">มุมเฉียง</button><button type="button" id="tT">มองจากด้านบน</button><button type="button" id="tE">มองหน้าตัด</button><button type="button" id="tC">ซ่อนคอนกรีต</button></div>
+<div id="vT" style="width:100%;height:440px;border-radius:8px;background:var(--surface);border:1px solid var(--line);touch-action:none"></div>
+<p class="hint" id="tInfo"></p>
+<p class="hint">โต๊ะหล่อ 5×20 ฟุต • แบบข้างเหล็กกล่อง 100×50 พร้อมร่องเลื่อน • ฝั่งหนึ่งยูกิ๊บ อีกฝั่งแม่เหล็ก • ตัวกั้นยึดด้วยสลัก • ส่วนนี้ใช้ดูภายใน ไม่รวมใน PDF</p>
+</section>
+<section class="pane" id="p-production" hidden>
+<div class="tblw"><table class="tbl" id="prod"><thead><tr><th>รหัสสินค้า</th><th>จำนวน (แผ่น)</th><th>แผ่น/โต๊ะ/รอบ (แถว×แผ่น)</th><th>แผ่น/วัน</th><th>วันผลิต (วัน)</th><th>นน./แผ่น (กก.)</th></tr></thead><tbody></tbody></table></div>
+<div class="tblw"><table class="tbl" id="mat"><thead><tr><th>รหัสสินค้า</th><th>V-bar/แผ่น (เส้น-ขนาด ยาว ม.)</th><th>H-bar/แผ่น (เส้น-ขนาด ยาว ม.)</th><th>เหล็ก/แผ่น (กก.)</th><th>คอนกรีต/แผ่น (ลบ.ม.)</th><th>ท่อ PVC/แผ่น (ยาว ม.)</th></tr></thead><tbody></tbody></table></div>
+<p class="hint">วันผลิตคิดแบบหนึ่งโต๊ะหล่อแผ่นรหัสเดียวต่อรอบ</p>
+</section>
+</main>
+</div>
+</div>
+<div class="deny" id="deny" hidden>บัญชีนี้ไม่มีสิทธิ์ใช้หน้าออกแบบแผ่นกันดิน<br><button type="button" id="bDenyOut" style="margin-top:12px">ออกจากระบบ</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script type="module" src="js/ui.js"></script>
+</body>
+</html>
