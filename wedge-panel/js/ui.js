@@ -20,7 +20,7 @@ function renderSpans() {
   const box = $("spans"); box.innerHTML = "";
   spans.forEach((s, i) => {
     const d = document.createElement("div"); d.className = "sr";
-    d.innerHTML = `<div><label>ระยะ c/c (ม.)</label><input type="number" step="0.01" min="0.6" max="6" value="${(s.cc / 1000).toFixed(2)}"></div><div><label>จำนวนช่วง</label><input type="number" step="1" min="1" value="${s.n}"></div><button type="button" class="iconbtn" aria-label="ลบช่วงนี้">✕</button>`;
+    d.innerHTML = `<div><label>ระยะ กลาง/กลางเสา (ม.)</label><input type="number" step="0.01" min="0.6" max="6" value="${(s.cc / 1000).toFixed(2)}"></div><div><label>จำนวนช่วง</label><input type="number" step="1" min="1" value="${s.n}"></div><button type="button" class="iconbtn" aria-label="ลบช่วงนี้">✕</button>`;
     const [a, b] = d.querySelectorAll("input");
     a.oninput = () => { s.cc = Math.round(+a.value * 1000); sched(); };
     b.oninput = () => { s.n = Math.floor(+b.value) || 0; sched(); };
@@ -114,7 +114,7 @@ function run() {
 <div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${(totW / 1000).toFixed(1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
   $("alerts").innerHTML = r.al.map((a) => `<div class="al ${a[0]}">${esc(a[1])}</div>`).join("");
   $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ")}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
-  fillSelect("sel3", r.groups.map((gr, i) => [String(i), `c/c ${fmt(gr.cc)} มม. • กว้างแผ่น ${fmt(gr.F.WT)} • ${gr.n} ช่วง`]));
+  fillSelect("sel3", r.groups.map((gr, i) => [String(i), `กลาง/กลางเสา ${fmt(gr.cc)} มม. • กว้างแผ่น ${fmt(gr.F.WT)} • ${gr.n} ช่วง`]));
   const optItem = list.map((i) => [i.code, `${i.code} • สูง ${(i.H / 1000).toFixed(2)} × กว้าง ${fmt(i.WT)}`]);
   fillSelect("selD", optItem); fillSelect("selT", optItem);
   renderProd(); drawJoint(); drawPanel();
