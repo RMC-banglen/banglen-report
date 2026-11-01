@@ -1,8 +1,8 @@
 // ส่งออก PDF / ใบสรุป HTML — สร้างในเครื่องผู้ใช้ตอนกดดาวน์โหลด ไม่เก็บไฟล์ลง Storage
 // โครงตามต้นแบบ: หน้า 1 สรุปโครงการ • 1 หน้าต่อ c/c (3D + รูปขยายรอยต่อ) • 1 หน้าต่อรหัส (รูปตัด 2 + รูปด้าน 2)
 // ชิ้นเนื้อหาที่ยาวเกินหน้าจะถูกย่อให้พอดี ไม่ตัดกลางชิ้น
-import { fmt, f2, f3 } from "./calc.js?v=20261101064632";
-import { panelSheet, jointSvg, remark3d, esc } from "./draw2d.js?v=20261101064632";
+import { fmt, f2, f3 } from "./calc.js?v=20261101064746";
+import { panelSheet, jointSvg, remark3d, esc } from "./draw2d.js?v=20261101064746";
 
 const PRINT = {"--bg":"#FFFFFF","--surface":"#FFFFFF","--surface-2":"#F5F6F4","--ink":"#1D2725","--muted":"#5B6964","--faint":"#8A9691","--line":"#CDD3CF","--accent":"#0F6E56","--accent-soft":"#E1F2EB","--rebar":"#C2522B","--rebar-2":"#B07316","--pipe":"#1E5FA0","--warn":"#9A5B05","--warn-soft":"#FBF0DC","--danger":"#A32D2D","--danger-soft":"#FBE8E8","--concrete":"rgba(93,202,165,.20)"};
 const unvar = (s) => s.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => PRINT[k] || "#1D2725");
@@ -37,7 +37,7 @@ export async function makePdf({ st, d, $, views, onStatus }) {
     const spec = [{ h: pdfSummary(st, d, $) }];
     st.groups.forEach((gr, i) => {
       const img = views.snapshot(i), j = jointSvg(st, gr);
-      spec.push({ h: `<h2 style="font-size:18px;margin:0 0 2px">ภาพ 3 มิติ • ช่วงเสา กลาง/กลางเสา ${f2(gr.cc)} ม.</h2><p style="margin:0 0 6px;color:#5B6964">${st.p.n} • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${gr.stk ? `สูง ${(gr.stk[0] / 1000).toFixed(2)} ม. • ${fmt(gr.n)} แผ่น` : `ซ้อน ${stackTxt(st)} ม. • ${fmt(gr.n)} ช่วง`}</p><img src="${img}" alt="ภาพ 3 มิติเสาเข็มกับแผ่นกันดิน" style="width:100%;display:block;border:1px solid #CDD3CF;border-radius:6px"><p class="cap">รูปขยายรอยต่อด้านขวา</p>${j.svg}${st.direct ? "" : `<p class="hint">${esc(j.note)}</p>`}${remark3d(st, gr)}` });
+      spec.push({ h: `<h2 style="font-size:18px;margin:0 0 2px">ภาพ 3 มิติ • ช่วงเสา กลาง/กลางเสา ${f2(gr.cc)} ม.</h2><p style="margin:0 0 6px;color:#5B6964">${st.p.n} • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${gr.stk ? `สูง ${(gr.stk[0] / 1000).toFixed(2)} ม. • ${fmt(gr.n)} แผ่น` : `ซ้อน ${stackTxt(st)} ม. • ${fmt(gr.n)} ช่วง`}</p><img src="${img}" alt="ภาพ 3 มิติเสาเข็มกับแผ่นกันดิน" style="width:100%;display:block;border:1px solid #CDD3CF;border-radius:6px"><p class="cap">รูปขยายรอยต่อด้านขวา</p>${j.svg}${remark3d(st, gr)}` });
     });
     st.list.forEach((it) => {
       spec.push({ h: `<h2 style="font-size:18px;margin:0 0 2px">แบบแผ่น ${it.code}</h2><p style="margin:0;color:#5B6964">${it.name} • จำนวน ${fmt(it.qty)} แผ่น • ${st.p.n} • หัวลิ่มแบบ ${st.p.ty} • ${st.S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</p>${panelSheet(it, st, d.cu || "")}` });
