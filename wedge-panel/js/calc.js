@@ -168,7 +168,7 @@ const d2 = (d) => String(d).padStart(2, "0");
 
 export function mkCode(WT, H, T, S, P) {
   const hc = H % 10 ? String(H).padStart(4, "0") : c3(H / 10);
-  let c = `2s-${c3(WT / 10)}-${hc}-${c3(T / 10)}`;
+  let c = `2ร-${c3(WT / 10)}-${hc}-${c3(T / 10)}`;
   if (S.sp) c += `-${P.nv}+${P.nh}-${S.dv === S.dh ? d2(S.dv) : d2(S.dv) + d2(S.dh)}`;
   return c;
 }
