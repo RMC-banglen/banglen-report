@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101115358";
+import { STD, HS } from "./standards.js?v=20261101120223";
 import {
   calcProject, calcDirect, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101115358";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101115358";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101115358";
-import { createViews } from "./view3d.js?v=20261101115358";
-import { makePdf } from "./pdf.js?v=20261101115358";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101115358";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101115358";
+} from "./calc.js?v=20261101120223";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101120223";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101120223";
+import { createViews } from "./view3d.js?v=20261101120223";
+import { makePdf } from "./pdf.js?v=20261101120223";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101120223";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101120223";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -261,8 +261,20 @@ function apply(d) {
   (d.md === "sp" ? $("mdP") : $("mdS")).checked = true;
   renderSpans(); renderRows(); run();
 }
-function saveDraft() { try { localStorage.setItem("wp-draft", JSON.stringify(collect())); } catch (e) {} }
-function loadDraft() { try { const d = JSON.parse(localStorage.getItem("wp-draft") || "null"); if (d) apply(d); } catch (e) {} }
+// ร่างในเครื่องจำด้วยว่าเป็นโครงการที่บันทึกไว้แล้วไหม (_id) และสถานะ ณ ตอนบันทึกล่าสุด (_saved) เพื่อไม่ให้กู้ร่างแล้วกลายเป็นโครงการใหม่ซ้ำ
+function saveDraft() { try { localStorage.setItem("wp-draft", JSON.stringify({ ...collect(), _id: curId, _saved: lastSaved })); } catch (e) {} }
+function loadDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem("wp-draft") || "null");
+    if (!d) return;
+    apply(d);
+    if (d._id) {
+      curId = d._id; lastSaved = d._saved ?? null; msg(""); saveDraft();
+      // โครงการถูกลบไปแล้ว (เช่นลบจากเครื่องอื่น) ให้ถือเป็นโครงการใหม่ที่ยังไม่บันทึก
+      getProject(d._id).then((row) => { if (!row) { curId = null; lastSaved = null; msg(""); saveDraft(); } }).catch(() => {});
+    }
+  } catch (e) {}
+}
 
 const msg = (t) => { $("saveMsg").textContent = t; $("bLink").hidden = !curId; renderList(); $("bSave").textContent = curId ? "บันทึกการแก้ไข" : "บันทึกโครงการ"; };
 // วาดรายการโครงการ: แถวที่เปิดอยู่ไฮไลต์ และมีไอคอนถังขยะ (เฉพาะผู้ที่แก้ไขได้) กดแล้วต้องยืนยันก่อนลบ
@@ -284,7 +296,7 @@ async function loadProject(id) {
   try {
     const row = await getProject(id);
     if (!row) { msg("ไม่พบโครงการนี้"); return; }
-    apply(row.data); curId = id; lastSaved = snapshot(); msg("เปิดโครงการแล้ว");
+    apply(row.data); curId = id; lastSaved = snapshot(); saveDraft(); msg("เปิดโครงการแล้ว");
   } catch (e) { msg("เปิดโครงการไม่ได้ ลองใหม่อีกครั้ง"); }
 }
 async function saveCurrent() {
@@ -294,7 +306,7 @@ async function saveCurrent() {
   try {
     curId = await saveProject({ id: curId, form: collect(), user });
     try { history.replaceState(null, "", "#" + curId); } catch (e) {}
-    lastSaved = snapshot();
+    lastSaved = snapshot(); saveDraft();
     msg(wasNew ? "บันทึกแล้ว • กด \"คัดลอกลิงก์โครงการ\" เพื่อส่งให้ทีมเปิดดู (ต้องล็อกอินก่อน)" : "บันทึกการแก้ไขแล้ว");
     refreshList();
     return true;
