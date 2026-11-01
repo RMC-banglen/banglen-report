@@ -166,3 +166,6 @@ button.danger:hover{background:var(--danger-soft)}
 .ptrash{min-width:40px;padding:4px 8px;border-color:transparent;background:transparent;color:var(--danger);display:flex;align-items:center;justify-content:center}
 .ptrash:hover{background:var(--danger-soft);border-color:var(--danger)}
 .ptrash svg{width:18px;height:18px}
+
+.arow{display:flex;align-items:center;gap:8px;margin:6px 0}.arow .code{flex:1;min-width:0;word-break:break-all;font-size:13px}.arow small{color:var(--faint);white-space:nowrap}.arow input{width:64px}
+#allocBox{margin-top:10px}#allocBox button{margin-top:6px}

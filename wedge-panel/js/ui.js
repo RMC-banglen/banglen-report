@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101122221";
+import { STD, HS } from "./standards.js?v=20261101123256";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101122221";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101122221";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101122221";
-import { createViews } from "./view3d.js?v=20261101122221";
-import { makePdf } from "./pdf.js?v=20261101122221";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101122221";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101122221";
+} from "./calc.js?v=20261101123256";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101123256";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101123256";
+import { createViews } from "./view3d.js?v=20261101123256";
+import { makePdf } from "./pdf.js?v=20261101123256";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101123256";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101123256";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -192,14 +192,19 @@ function renderProd() {
     if (!per) warn.push("รหัส " + i.code + " วางบนโต๊ะไม่ได้");
     else if (!t) warn.push("รหัส " + i.code + " ยังไม่ได้จัดโต๊ะ");
     if (pl.days) maxDays = Math.max(maxDays, pl.days);
-    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${fmt(per)} แผ่น` : "วางไม่ได้"}</td><td><input type="number" class="tbA" data-code="${esc(i.code)}" min="0" max="99" value="${t}" ${per ? "" : "disabled"}></td><td>${per && t ? fmt(pl.perDay) : "-"}</td><td>${pl.days || "-"}</td><td>${fmt(i.P.wt)}</td></tr>`;
+    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${fmt(per)} แผ่น` : "วางไม่ได้"}</td><td>${per ? fmt(t) : "-"}</td><td>${per && t ? fmt(pl.perDay) : "-"}</td><td>${pl.days || "-"}</td><td>${fmt(i.P.wt)}</td></tr>`;
   }).join("");
   if (used > tn) warn.push("จัดโต๊ะรวม " + fmt(used) + " โต๊ะ เกินจำนวนโต๊ะที่มี (" + fmt(tn) + " โต๊ะ)");
   $("prodSum").innerHTML = st.list.length ? "<b>รวมวันผลิตทั้งหมด " + (warn.length ? "-" : fmt(maxDays)) + " วัน</b> (ใช้โต๊ะ " + fmt(used) + " จาก " + fmt(tn) + " โต๊ะ • แต่ละโต๊ะหล่อรหัสเดียวต่อวัน ทุกรหัสผลิตพร้อมกัน จึงนับวันของรหัสที่นานที่สุด)" : "";
   $("prodWarn").innerHTML = warn.map((w) => '<div class="al w">' + esc(w) + "</div>").join("");
-  $("bAuto").hidden = !st.list.length || st.list.length < 2 && !tableAlloc;
-  $("prod").querySelectorAll(".tbA").forEach((x) => (x.onchange = () => {
-    tableAlloc = {}; $("prod").querySelectorAll(".tbA").forEach((y) => { tableAlloc[y.dataset.code] = Math.max(0, Math.floor(+y.value) || 0); });
+  // ช่องกรอกจำนวนโต๊ะต่อรหัส อยู่ในฟอร์ม (หน้ากรอก) — ตารางผลิตฝั่งผลลัพธ์แสดงเป็นตัวเลขเท่านั้น
+  $("allocBox").hidden = !st.list.length;
+  $("allocRows").innerHTML = st.list.map((i) => {
+    const per = i.tf.R * i.tf.n;
+    return `<div class="arow"><span class="code">${i.code}</span><small>${per ? "1 โต๊ะ = " + fmt(per) + " แผ่น/วัน" : "วางไม่ได้"}</small><input type="number" class="tbA" data-code="${esc(i.code)}" min="0" max="99" value="${alloc[i.code]}" ${per ? "" : "disabled"} aria-label="จำนวนโต๊ะ ${esc(i.code)}"><span>โต๊ะ</span></div>`;
+  }).join("");
+  $("allocRows").querySelectorAll(".tbA").forEach((x) => (x.onchange = () => {
+    tableAlloc = {}; $("allocRows").querySelectorAll(".tbA").forEach((y) => { tableAlloc[y.dataset.code] = Math.max(0, Math.floor(+y.value) || 0); });
     renderProd(); saveDraft();
   }));
   $("bAuto").onclick = () => { tableAlloc = null; renderProd(); saveDraft(); };
