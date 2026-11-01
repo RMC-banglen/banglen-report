@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261101121434";
+} from "./standards.js?v=20261101122221";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -312,9 +312,26 @@ export function calcDirect(input) {
 }
 
 // ---------- การผลิต ----------
-// แผ่นต่อโต๊ะต่อรอบ = แถว × แผ่นต่อแถว, วันผลิต = ceil(จำนวน / (ต่อรอบ × โต๊ะ × รอบต่อวัน))
-export function productionPlan(item, tables = 1, cyclesPerDay = 1) {
+// 1 โต๊ะผลิต 1 รอบ/วัน เสมอ และหล่อรหัสเดียวต่อวัน: แผ่นต่อวัน = (แถว × แผ่นต่อแถว) × จำนวนโต๊ะที่จัดให้รหัสนั้น
+export function productionPlan(item, tables = 1) {
   const per = item.tf.R * item.tf.n;
-  const perDay = per * tables * cyclesPerDay;
-  return { per, perDay, days: per ? Math.ceil(item.qty / perDay) : null };
+  const perDay = per * tables;
+  return { per, perDay, days: per && tables > 0 ? Math.ceil(item.qty / perDay) : null };
+}
+
+// จัดโต๊ะให้แต่ละรหัสอัตโนมัติ: ให้รหัสละ 1 โต๊ะก่อน (ถ้าโต๊ะพอ) แล้วเติมให้รหัสที่ใช้วันมากที่สุดทีละโต๊ะ จนโต๊ะหมด
+// คืน { [code]: จำนวนโต๊ะ } — รหัสที่วางโต๊ะไม่ได้ได้ 0
+export function allocateTables(list, tables) {
+  const out = {}, ok = list.filter((i) => i.tf.R * i.tf.n > 0);
+  list.forEach((i) => { out[i.code] = 0; });
+  const days = (i) => (out[i.code] ? productionPlan(i, out[i.code]).days : Infinity);
+  const byQty = [...ok].sort((a, b) => b.qty / (b.tf.R * b.tf.n) - a.qty / (a.tf.R * a.tf.n));
+  let left = Math.max(0, Math.floor(tables));
+  byQty.forEach((i) => { if (left > 0) { out[i.code] = 1; left--; } });
+  while (left > 0 && ok.length) {
+    const w = ok.reduce((m, i) => (days(i) > days(m) ? i : m), ok[0]);
+    if (days(w) <= 1) break; // ทุกรหัสเสร็จภายใน 1 วันแล้ว ไม่ต้องเติมโต๊ะ
+    out[w.code]++; left--;
+  }
+  return out;
 }

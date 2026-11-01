@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101121434";
+import { STD, HS } from "./standards.js?v=20261101122221";
 import {
-  calcProject, calcDirect, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101121434";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101121434";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101121434";
-import { createViews } from "./view3d.js?v=20261101121434";
-import { makePdf } from "./pdf.js?v=20261101121434";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101121434";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101121434";
+  calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
+} from "./calc.js?v=20261101122221";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101122221";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101122221";
+import { createViews } from "./view3d.js?v=20261101122221";
+import { makePdf } from "./pdf.js?v=20261101122221";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101122221";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101122221";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -177,17 +177,36 @@ function fillSelect(id, opts) {
   s.innerHTML = opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
   if (k && opts.some(([v]) => v === k)) s.value = k;
 }
+// จำนวนโต๊ะต่อรหัสที่ผู้ใช้กำหนดเอง (ว่าง = ให้ระบบจัดให้) — เก็บในโครงการด้วย
+let tableAlloc = null;
 function renderProd() {
-  const st = STATE, tn = +$("tn").value || 1, cy = +$("cy").value || 1;
-  // ข้อความใต้ตาราง: 1 โต๊ะผลิตได้กี่แผ่น (ถ้ามีรหัสเดียวบอกตัวเลขเลย ถ้าหลายรหัสให้ดูในตาราง)
-  const perOf = (i) => i.tf.R * i.tf.n;
-  $("prodNote").textContent = (st.list.length === 1 && perOf(st.list[0])
-    ? "1 โต๊ะผลิตได้ " + fmt(perOf(st.list[0])) + " แผ่น/รอบ • ใช้ " + fmt(tn) + " โต๊ะ × " + fmt(cy) + " รอบ/วัน = " + fmt(perOf(st.list[0]) * tn * cy) + " แผ่น/วัน"
-    : "ใช้ " + fmt(tn) + " โต๊ะ × " + fmt(cy) + " รอบ/วัน • จำนวนแผ่นที่ 1 โต๊ะผลิตได้ต่อรอบของแต่ละรหัส ดูในตาราง") + " • 1 โต๊ะหล่อได้รหัสเดียวต่อรอบ";
+  const st = STATE, tn = Math.max(1, Math.floor(+$("tn").value) || 1);
+  const auto = allocateTables(st.list, tn);
+  const alloc = {};
+  st.list.forEach((i) => { const v = tableAlloc && tableAlloc[i.code]; alloc[i.code] = Number.isInteger(v) && v >= 0 ? v : auto[i.code]; });
+  let maxDays = 0, used = 0;
+  const warn = [];
   $("prod").querySelector("tbody").innerHTML = st.list.map((i) => {
-    const per = i.tf.R * i.tf.n, pd = per * tn * cy, days = per ? Math.ceil(i.qty / pd) : "-";
-    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${fmt(per)} แผ่น` : "วางไม่ได้"}</td><td>${fmt(tn)}</td><td>${per ? fmt(pd) : "-"}</td><td>${days}</td><td>${fmt(i.P.wt)}</td></tr>`;
+    const t = alloc[i.code], pl = productionPlan(i, t), per = pl.per;
+    used += t;
+    if (!per) warn.push("รหัส " + i.code + " วางบนโต๊ะไม่ได้");
+    else if (!t) warn.push("รหัส " + i.code + " ยังไม่ได้จัดโต๊ะ");
+    if (pl.days) maxDays = Math.max(maxDays, pl.days);
+    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${fmt(per)} แผ่น` : "วางไม่ได้"}</td><td><input type="number" class="tbA" data-code="${esc(i.code)}" min="0" max="99" value="${t}" ${per ? "" : "disabled"}></td><td>${per && t ? fmt(pl.perDay) : "-"}</td><td>${pl.days || "-"}</td><td>${fmt(i.P.wt)}</td></tr>`;
   }).join("");
+  if (used > tn) warn.push("จัดโต๊ะรวม " + fmt(used) + " โต๊ะ เกินจำนวนโต๊ะที่มี (" + fmt(tn) + " โต๊ะ)");
+  $("prodSum").innerHTML = st.list.length ? "<b>รวมวันผลิตทั้งหมด " + (warn.length ? "-" : fmt(maxDays)) + " วัน</b> (ใช้โต๊ะ " + fmt(used) + " จาก " + fmt(tn) + " โต๊ะ • แต่ละโต๊ะหล่อรหัสเดียวต่อวัน ทุกรหัสผลิตพร้อมกัน จึงนับวันของรหัสที่นานที่สุด)" : "";
+  $("prodWarn").innerHTML = warn.map((w) => '<div class="al w">' + esc(w) + "</div>").join("");
+  $("bAuto").hidden = !st.list.length || st.list.length < 2 && !tableAlloc;
+  $("prod").querySelectorAll(".tbA").forEach((x) => (x.onchange = () => {
+    tableAlloc = {}; $("prod").querySelectorAll(".tbA").forEach((y) => { tableAlloc[y.dataset.code] = Math.max(0, Math.floor(+y.value) || 0); });
+    renderProd(); saveDraft();
+  }));
+  $("bAuto").onclick = () => { tableAlloc = null; renderProd(); saveDraft(); };
+  const perOf = (i) => i.tf.R * i.tf.n;
+  $("prodNote").textContent = st.list.length === 1 && perOf(st.list[0])
+    ? "1 โต๊ะผลิตได้ " + fmt(perOf(st.list[0])) + " แผ่น/วัน (1 โต๊ะผลิต 1 รอบต่อวัน)"
+    : "1 โต๊ะผลิต 1 รอบต่อวัน • จำนวนแผ่นที่ 1 โต๊ะผลิตได้ของแต่ละรหัส ดูในตาราง";
   $("mat").querySelector("tbody").innerHTML = st.list.map((i) => {
     const P = i.P, S = st.S;
     return `<tr><td class="code">${i.code}</td><td>${P.nv}-${NM(S.dv)} ยาว ${f2(P.lv)}</td><td>${P.kv.toFixed(2)}</td><td>${P.nh}-${NM(S.dh)} ยาว ${f2(P.lh)}</td><td>${P.kh.toFixed(2)}</td><td>${P.kg.toFixed(2)}</td><td>${P.vol.toFixed(3)}</td><td>${S.pd && P.pipe.P.length ? P.pipe.P.length + " ท่อน Ø" + PN[S.pd] + " ยาว " + f2(P.T) : "-"}</td></tr>`;
@@ -240,7 +259,7 @@ document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => {
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (PANES.includes(h)) show(h); else if (/^p-[a-z0-9]+$/.test(h)) loadProject(h); });
 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
-const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "cy", "tk", "lm", "cmx", "lmt"];
+const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "tk", "lm", "cmx", "lmt"];
 function collect() {
   const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
@@ -248,6 +267,7 @@ function collect() {
   o.wh = +o.wh; // บันทึกค่าที่เป็นความยาวเล็กๆ เป็นมม. เสมอ (ช่องกรอกเป็นเมตร)
   ['gp', 'sv', 'sh'].forEach((k) => { o[k] = Math.round(+o[k] * 1000); });
   o.ga = orderAllowance;
+  o.ta = tableAlloc ? { ...tableAlloc } : null;
   return o;
 }
 function apply(d) {
@@ -257,6 +277,7 @@ function apply(d) {
   $("shOn").checked = !!d.shOn; if (d.shMode) $("shMode").value = d.shMode; if (d.shDrop !== undefined) $("shDrop").value = (+d.shDrop / 1000).toFixed(2);
   if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 0, H: HS.includes(+r.H) ? +r.H : 0, qty: +r.qty || 0 }));
   orderAllowance = +d.ga > 0 ? +d.ga : 20;
+  tableAlloc = d.ta && typeof d.ta === "object" ? { ...d.ta } : null;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
   if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 0, n: +s.n || 0 }));
   ["gp", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
