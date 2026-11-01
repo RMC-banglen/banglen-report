@@ -1,7 +1,7 @@
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261101065418";
-import { fmt, f2, f3 } from "./calc.js?v=20261101065418";
+import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261101070449";
+import { fmt, f2, f3 } from "./calc.js?v=20261101070449";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -69,4 +69,12 @@ export function confirmBox(cust){
 export function remark3d(st,gr){
   if(!st||!st.direct||!gr)return "";
   return `<p style="font-size:13px;margin:8px 0 0"><b>หมายเหตุ:</b> แผ่นกว้าง ${f2(gr.F.WT)} ม. เมื่อเสียบเสาเข็ม ${st.p.n} จะได้ระยะกลาง/กลางเสาที่แนะนำ ${f2(gr.cc)} ม. (เผื่อค่าการทำงานแล้วข้างละ ${f3(st.g)} ม.)</p>`;
+}
+
+// หมายเหตุบ่ารองรับแผ่น (ใต้ภาพ 3 มิติ / หน้า 3 มิติใน PDF) d = ข้อมูลฟอร์ม (shOn, shMode, shDrop มม.)
+export function shoulderRemark(st,gr,d){
+  if(!d||!d.shOn||!gr)return "";
+  const Ht=(gr.stk||st.stk).reduce((a,b)=>a+b,0),drop=d.shMode==="drop"?(+d.shDrop||0):0;
+  const top=drop?`ด้านบนแผ่นลงมาจากหัวเข็ม ${f2(drop)} ม. + ความสูงแผ่น ${f2(Ht)} ม.`:`ด้านบนแผ่นเสมอหัวเข็ม • ความสูงแผ่น ${f2(Ht)} ม.`;
+  return `<p style="font-size:13px;margin:8px 0 0"><b>บ่ารองรับแผ่น:</b> หน้าบ่าอยู่ต่ำจากหัวเข็ม ${f2(Ht+drop)} ม. (${top}) • บ่ายาว ${f2(SHOULDER.flat)} ม. + ส่วนเรียว ${f2(SHOULDER.taper)} ม.</p>`;
 }

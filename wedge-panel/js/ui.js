@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101065418";
+import { STD, HS } from "./standards.js?v=20261101070449";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101065418";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101065418";
-import { panelSheet, jointSvg, remark3d, esc } from "./draw2d.js?v=20261101065418";
-import { createViews } from "./view3d.js?v=20261101065418";
-import { makePdf } from "./pdf.js?v=20261101065418";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101065418";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101065418";
+} from "./calc.js?v=20261101070449";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101070449";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101070449";
+import { createViews } from "./view3d.js?v=20261101070449";
+import { makePdf } from "./pdf.js?v=20261101070449";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101070449";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101070449";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -118,6 +118,7 @@ function currentSpans(al) {
 function run() {
   const direct = radio("om") === "direct";
   applyModeUi(direct);
+  syncShoulder();
   const S = spec();
   $("stdBox").hidden = S.sp; $("spBox").hidden = !S.sp;
   const truck = +$("tk").value || DEFAULT_TRUCK_KG;
@@ -172,11 +173,22 @@ function drawJoint() {
   const gr = STATE.groups[+$("sel3").value || 0], j = jointSvg(STATE, gr);
   $("sJ").outerHTML = j.svg ? j.svg.replace("<svg ", '<svg id="sJ" ') : '<svg id="sJ" viewBox="0 0 680 20"></svg>';
   $("jNote").textContent = STATE.direct ? "" : j.note; // โหมดสั่งตามจำนวนแผ่น: มีหมายเหตุใต้ภาพ 3 มิติแล้ว ไม่ต้องแสดงข้อมูลตรวจรอยต่อ
-  $("n3").innerHTML = remark3d(STATE, gr);
+  updateNote3d();
 }
 function drawPanel() {
   const st = STATE, it = st.list.find((i) => i.code === $("selD").value) || st.list[0];
   $("dwg").innerHTML = it ? panelSheet(it, st, $("cu").value.trim()) : '<p class="hint">ยังไม่มีรายการแผ่น</p>';
+}
+
+// บ่ารองรับแผ่น (ภาพ 3 มิติ): เปิด/ปิด + ด้านบนแผ่นเสมอหัวเข็ม หรือ ลงมาจากหัวเข็ม ___ ม.
+function syncShoulder() {
+  const on = $("shOn").checked, drop = on && $("shMode").value === "drop";
+  $("shMode").hidden = !on; $("shDrop").hidden = !drop; $("shDropU").hidden = !drop;
+  views.setShoulder(on, drop ? Math.max(0, Math.round((+$("shDrop").value || 0) * 1000)) : 0);
+}
+function updateNote3d() {
+  const gr = STATE.groups[+$("sel3").value || 0];
+  $("n3").innerHTML = remark3d(STATE, gr) + shoulderRemark(STATE, gr, collect());
 }
 
 let tmr; function sched() { clearTimeout(tmr); tmr = setTimeout(run, 220); }
@@ -195,7 +207,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
 const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "cy", "tk", "lm", "cmx", "lmt"];
 function collect() {
-  const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })) };
+  const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
   o.wh = +o.wh; // บันทึกค่าที่เป็นความยาวเล็กๆ เป็นมม. เสมอ (ช่องกรอกเป็นเมตร)
   ['gp', 'sv', 'sh'].forEach((k) => { o[k] = Math.round(+o[k] * 1000); });
@@ -206,6 +218,7 @@ function apply(d) {
   if (!d) return;
   (d.sm === "man" ? $("smM") : $("smL")).checked = true;
   (d.om === "direct" ? $("omD") : $("omW")).checked = true;
+  $("shOn").checked = !!d.shOn; if (d.shMode) $("shMode").value = d.shMode; if (d.shDrop !== undefined) $("shDrop").value = (+d.shDrop / 1000).toFixed(2);
   if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 1370, H: +r.H || 1000, qty: +r.qty || 1 }));
   orderAllowance = +d.ga > 0 ? +d.ga : 20;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
@@ -273,6 +286,7 @@ function wire() {
   views = createViews({ $, getState: () => STATE });
   $("sel3").onchange = () => { drawJoint(); views.buildWall(+$("sel3").value || 0); };
   $("selD").onchange = drawPanel;
+  ["shOn", "shMode", "shDrop"].forEach((id) => { $(id).addEventListener("input", sched); $(id).addEventListener("change", sched); });
   FIELDS.forEach((id) => { $(id).addEventListener("input", sched); $(id).addEventListener("change", sched); });
   document.querySelectorAll('input[name="md"],input[name="sm"],input[name="om"]').forEach((x) => x.addEventListener("change", run));
 }

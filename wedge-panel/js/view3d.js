@@ -1,11 +1,12 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { f2, f3, fmt } from "./calc.js?v=20261101065418";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261101065418";
+import { SHOULDER } from "./standards.js?v=20261101070449";
+import { f2, f3, fmt } from "./calc.js?v=20261101070449";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261101070449";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
-const v3=$("v3");let ren=null,sc,cam,root,th=-.6,ph=1.05,r=3,R0=3,showP=true,pileObjs=[];const tg=new THREE.Vector3();
+const v3=$("v3");let ren=null,sc,cam,root,th=-.6,ph=1.05,r=3,R0=3,showP=true,pileObjs=[],shOn=false,shDrop=0;const tg=new THREE.Vector3();
 function init3d(){if(ren)return;ren=new THREE.WebGLRenderer({antialias:true,alpha:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(v3.clientWidth,v3.clientHeight);v3.appendChild(ren.domElement);
 sc=new THREE.Scene();cam=new THREE.PerspectiveCamera(38,v3.clientWidth/v3.clientHeight,.005,100);sc.add(new THREE.AmbientLight(0xffffff,.6));const l1=new THREE.DirectionalLight(0xffffff,.75);l1.position.set(3,6,4);sc.add(l1);const l2=new THREE.DirectionalLight(0xffffff,.35);l2.position.set(-4,-2,-3);sc.add(l2);root=new THREE.Group();sc.add(root);
 const pts=new Map();let pd=0;const ce=ren.domElement;ce.style.touchAction="none";
@@ -16,6 +17,7 @@ ce.addEventListener("wheel",e=>{e.preventDefault();r*=1+Math.sign(e.deltaY)*.08;
 new ResizeObserver(()=>{if(!v3.clientWidth)return;ren.setSize(v3.clientWidth,v3.clientHeight);cam.aspect=v3.clientWidth/v3.clientHeight;cam.updateProjectionMatrix();upd()}).observe(v3)}
 function upd(){if(!ren)return;ph=Math.max(.05,Math.min(1.6,ph));r=Math.max(.2,Math.min(30,r));cam.position.set(tg.x+r*Math.sin(ph)*Math.sin(th),tg.y+r*Math.cos(ph),tg.z+r*Math.sin(ph)*Math.cos(th));cam.lookAt(tg);ren.render(sc,cam)}
 const K=.001;function ext(pts,h,y0,col,op){const s=new THREE.Shape();pts.forEach((q,i)=>i?s.lineTo(q[0]*K,q[1]*K):s.moveTo(q[0]*K,q[1]*K));const m=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:h*K,bevelEnabled:false}),new THREE.MeshLambertMaterial({color:col,transparent:op<1,opacity:op,side:THREE.DoubleSide}));m.rotation.x=-Math.PI/2;m.position.y=y0*K;const e=new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry,25),new THREE.LineBasicMaterial({color:0x5F5E5A}));e.rotation.copy(m.rotation);e.position.copy(m.position);root.add(m);root.add(e)}
+function taper3d(cx,sg,b,m,w,hh,SF,ST){const V=[[b,-m,-SF],[w,-hh,-SF],[w,hh,-SF],[b,m,-SF],[w,-hh,-SF-ST],[w,hh,-SF-ST]].map(([x,z,y])=>new THREE.Vector3((cx+sg*x)*K,y*K,z*K));const g=new THREE.BufferGeometry().setFromPoints(V);g.setIndex([0,3,5,0,5,4,0,1,4,3,2,5]);g.computeVertexNormals();root.add(new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0xBEBBB0,side:THREE.DoubleSide})))}
 function holeAt(x,y,rad,T){const m=new THREE.Mesh(new THREE.CylinderGeometry(rad*K,rad*K,(T+3)*K,28),new THREE.MeshLambertMaterial({color:0x26323A}));m.rotation.x=Math.PI/2;m.position.set(x*K,y*K,0);root.add(m)}
 function line3d(pts){const g=new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p[0]*K,p[1]*K,p[2]*K)));const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x5B6964,depthTest:false}));l.renderOrder=9;root.add(l)}
 function label3d(t,x,y,z,S){const ls=String(t).split("\n"),n=ls.length,c=document.createElement("canvas"),fz=44,fnt="500 "+fz+"px Tahoma,sans-serif";let ctx=c.getContext("2d");ctx.font=fnt;const w=Math.ceil(Math.max(...ls.map(q=>ctx.measureText(q).width)))+48;c.width=w;c.height=n*(fz+14)+8;ctx=c.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,w,c.height);ctx.strokeStyle="#8A9691";ctx.lineWidth=3;ctx.strokeRect(1.5,1.5,w-3,c.height-3);ctx.font=fnt;ctx.fillStyle="#1D2725";ctx.textBaseline="middle";ls.forEach((q,i)=>ctx.fillText(q,24,4+(i+.5)*(fz+14)+2));
@@ -23,12 +25,14 @@ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(
 function build3d(gi=0){init3d();const st=getState(),gr=st.groups[gi];sc.remove(root);root.traverse(q=>{if(q.geometry)q.geometry.dispose()});root=new THREE.Group();sc.add(root);if(!gr){upd();return}
 const stkX=gr.stk||st.stk,p=st.p,G=st.G,Wb=gr.F.WT-2*G.TP,Ht=stkX.reduce((a,b)=>a+b,0)||1000,pp=pilePoly(p);
 const n0=root.children.length;
-[-gr.cc/2,gr.cc/2].forEach(cx=>ext(pp.map(q=>[q[0]+cx,q[1]]),Ht+600,-300,0xD3D1C7,1));
+const SF=SHOULDER.flat,ST=SHOULDER.taper,piH=shOn?Ht+shDrop+SF+ST+300:Ht+600,piY=shOn?-(SF+ST+300):-300;
+[-gr.cc/2,gr.cc/2].forEach(cx=>ext(pp.map(q=>[q[0]+cx,q[1]]),piH,piY,0xD3D1C7,1));
+if(shOn){const sb=p.B/2,sm=sb-p.f,sw=p.tw/2,sh=p.c/2;[[-gr.cc/2,1],[gr.cc/2,-1]].forEach(([cx,sg])=>{ext([[cx+sg*sb,-sm],[cx+sg*sw,-sh],[cx+sg*sw,sh],[cx+sg*sb,sm]],SF,-SF,0xBEBBB0,1);taper3d(cx,sg,sb,sm,sw,sh,SF,ST)})} // บ่าในร่องเสา: ก้อนเต็มร่อง + ส่วนเรียวด้านล่าง
 const SZ=Math.max(gr.cc,Ht)*K*.08,yd=Ht+300+160,tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,Ht+320,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);const ccT="กลาง/กลางเสา"+(gr.stk?"ที่แนะนำ ":" ")+f3(gr.cc)+" ม.";if(gr.stk)label3d(ccT+"\nเผื่อค่าการทำงานแล้วข้างละ "+f3(Math.round(gr.F.gr))+" ม.",0,yd+230+SZ*.8/K,0,SZ*.8);else label3d(ccT,0,yd+SZ/K/2+230,0,SZ);
 pileObjs=root.children.slice(n0);pileObjs.forEach(o=>{o.visible=showP}); // เสา + เส้นระยะกลาง/กลางเสา ซ่อนได้
 label3d("กว้างแผ่น "+f3(gr.F.WT)+" ม.",0,Ht+SZ*.85/K/2+110,0,SZ*.85);
 let y=0;const shade=[0x9FE1CB,0x7FD3B6];stkX.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);const it=st.list.find(q=>q.H===h&&q.WT===gr.F.WT),pp2=it&&it.P&&it.P.pipe;if(pp2&&pp2.P.length&&st.S.pd)pp2.P.forEach(([px,py])=>holeAt(px-Wb/2,y+py,st.S.pd/2,G.T));y+=h});
-tg.set(0,(Ht+620)/2*K,0);R0=Math.max(gr.cc+p.B,Ht+1050)*K*1.75;r=R0;upd()}
+tg.set(0,(shOn?Ht+320:Ht+620)/2*K,0);R0=Math.max(gr.cc+p.B,shOn?Ht+1350:Ht+1050)*K*1.75;r=R0;upd()}
 $("b3p").onclick=()=>{showP=!showP;pileObjs.forEach(o=>{o.visible=showP});$("b3p").textContent=showP?"ซ่อนเสา":"แสดงเสา";upd()};
 $("b3a").onclick=()=>{th=-.6;ph=1.05;r=R0;upd()};$("b3t").onclick=()=>{th=0;ph=.06;r=R0*.9;upd()};$("b3f").onclick=()=>{th=0;ph=1.5;r=R0;upd()};
 function snapshot(gi){const W2=1400,H2=820;init3d();const keepP=showP;showP=true;build3d(gi);showP=keepP;
@@ -102,5 +106,5 @@ $("tInfo").textContent=`${it.code} • ${R} แถว × ${n} แผ่น = ${R
 function frame(){const b=new THREE.Box3().setFromObject(g3),c=new THREE.Vector3();b.getCenter(c);g3.position.set(-c.x,0,-c.z);T0.set(0,0,0);tg.set(0,0,0);R0=6096*KK*1.1;rr=R0;th=-.7;ph=.95;upd()}
 function refresh(){const st=getState();if(!st)return;const s=$("selT"),k=s.value;s.innerHTML=st.list.map(i=>`<option value="${i.code}">${i.code} • สูง ${(i.H/1000).toFixed(2)} × กว้าง ${f2(i.WT)}</option>`).join("");if(k&&st.list.some(i=>i.code===k))s.value=k}
 return{build,refresh}})();
-return { buildWall: build3d, snapshot, table: TV, resetWall(){ th=-.6; ph=1.05; r=R0; upd(); } };
+return { setShoulder(on,drop){shOn=!!on;shDrop=+drop||0}, buildWall: build3d, snapshot, table: TV, resetWall(){ th=-.6; ph=1.05; r=R0; upd(); } };
 }
