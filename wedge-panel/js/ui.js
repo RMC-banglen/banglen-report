@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101124450";
+import { STD, HS } from "./standards.js?v=20261101124744";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101124450";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101124450";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101124450";
-import { createViews } from "./view3d.js?v=20261101124450";
-import { makePdf } from "./pdf.js?v=20261101124450";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101124450";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101124450";
+} from "./calc.js?v=20261101124744";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101124744";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101124744";
+import { createViews } from "./view3d.js?v=20261101124744";
+import { makePdf } from "./pdf.js?v=20261101124744";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101124744";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101124744";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -183,18 +183,16 @@ function renderProd() {
   const auto = allocateTables(st.list, tn);
   const alloc = {};
   st.list.forEach((i) => { const v = tableAlloc && tableAlloc[i.code]; alloc[i.code] = Number.isInteger(v) && v >= 0 ? v : auto[i.code]; });
-  let maxDays = 0, used = 0;
+  let used = 0;
   const warn = [];
   $("prod").querySelector("tbody").innerHTML = st.list.map((i) => {
     const t = alloc[i.code], pl = productionPlan(i, t), per = pl.per;
     used += t;
     if (!per) warn.push("รหัส " + i.code + " วางบนโต๊ะไม่ได้");
     else if (!t) warn.push("รหัส " + i.code + " ยังไม่ได้จัดโต๊ะ");
-    if (pl.days) maxDays = Math.max(maxDays, pl.days);
     return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${fmt(per)} แผ่น` : "วางไม่ได้"}</td><td>${per ? fmt(t) : "-"}</td><td>${per && t ? fmt(pl.perDay) : "-"}</td><td>${pl.days || "-"}</td><td>${fmt(i.P.wt)}</td></tr>`;
   }).join("");
   if (used > tn) warn.push("จัดโต๊ะรวม " + fmt(used) + " โต๊ะ เกินจำนวนโต๊ะที่มี (" + fmt(tn) + " โต๊ะ)");
-  $("prodSum").innerHTML = st.list.length ? "<b>รวมวันผลิตทั้งหมด " + (warn.length ? "-" : fmt(maxDays)) + " วัน</b> (ใช้โต๊ะ " + fmt(used) + " จาก " + fmt(tn) + " โต๊ะ)" : "";
   $("prodWarn").innerHTML = warn.map((w) => '<div class="al w">' + esc(w) + "</div>").join("");
   // ช่องกรอกจำนวนโต๊ะต่อรหัส อยู่ในฟอร์ม (หน้ากรอก) — ตารางผลิตฝั่งผลลัพธ์แสดงเป็นตัวเลขเท่านั้น
   $("allocBox").hidden = !st.list.length;
