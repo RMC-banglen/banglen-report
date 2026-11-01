@@ -1,18 +1,18 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101081525";
+import { STD, HS } from "./standards.js?v=20261101094329";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101081525";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101081525";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101081525";
-import { createViews } from "./view3d.js?v=20261101081525";
-import { makePdf } from "./pdf.js?v=20261101081525";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101081525";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101081525";
+} from "./calc.js?v=20261101094329";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101094329";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101094329";
+import { createViews } from "./view3d.js?v=20261101094329";
+import { makePdf } from "./pdf.js?v=20261101094329";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101094329";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101094329";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
-let orderRows = [{ WT: 1370, H: 1000, qty: 10 }];
+let orderRows = [{ WT: 0, H: 0, qty: 0 }];
 let orderAllowance = 20; // มม. ค่าเผื่อทำงานข้างละ (มาตรฐาน 20) ไม่มีช่องให้แก้ ใช้คำนวณระยะกลาง/กลางเสาในหมายเหตุ
 let views = null, cur = "view3d";
 const PANES = ["view3d", "drawing", "production", "table"];
@@ -34,16 +34,16 @@ function renderRows() {
   const box = $("orows"); box.innerHTML = "";
   orderRows.forEach((r, i) => {
     const d = document.createElement("div"); d.className = "oitem";
-    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty || ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
+    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select><option value="" ${r.H ? "" : "selected"}>เลือก</option>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty || ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
     const [w, q] = d.querySelectorAll("input"), h = d.querySelector("select");
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
-    h.onchange = () => { r.H = +h.value; run(); };
+    h.onchange = () => { r.H = +h.value || 0; run(); };
     q.oninput = () => { r.qty = Math.floor(+q.value) || 0; sched(); };
     d.querySelector("button").onclick = () => { if (orderRows.length > 1) { orderRows.splice(i, 1); renderRows(); run(); } };
     box.appendChild(d);
   });
 }
-$("addRow").onclick = () => { const l = orderRows[orderRows.length - 1] || { WT: 1370, H: 1000 }; orderRows.push({ WT: l.WT, H: l.H, qty: 1 }); renderRows(); run(); };
+$("addRow").onclick = () => { const l = orderRows[orderRows.length - 1] || { H: 0 }; orderRows.push({ WT: 0, H: l.H, qty: 0 }); renderRows(); run(); };
 // แสดง/ซ่อนส่วนของแต่ละโหมด
 function applyModeUi(direct) {
   $("wallBox").hidden = direct; $("spanFs").hidden = direct; $("rowsFs").hidden = !direct;
@@ -125,8 +125,8 @@ function run() {
   const truck = +$("tk").value || DEFAULT_TRUCK_KG;
   let r;
   if (direct) {
-    if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1)) return showEmpty();
-    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.map((r) => ({ WT: r.WT, H: r.H, qty: r.qty })), spec: S, truckKg: truck });
+    if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1 && HS.includes(x.H))) return showEmpty();
+    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, H: r.H, qty: r.qty })), spec: S, truckKg: truck });
     r.ref = $("rf").value.trim();
   } else {
     const op = renderStack();
@@ -239,7 +239,7 @@ function apply(d) {
   (d.sm === "man" ? $("smM") : $("smL")).checked = true;
   (d.om === "direct" ? $("omD") : $("omW")).checked = true;
   $("shOn").checked = !!d.shOn; if (d.shMode) $("shMode").value = d.shMode; if (d.shDrop !== undefined) $("shDrop").value = (+d.shDrop / 1000).toFixed(2);
-  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 1370, H: +r.H || 1000, qty: +r.qty || 1 }));
+  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 0, H: HS.includes(+r.H) ? +r.H : 0, qty: +r.qty || 0 }));
   orderAllowance = +d.ga > 0 ? +d.ga : 20;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
   if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 1500, n: +s.n || 1 }));
@@ -304,7 +304,7 @@ const isDirty = () => ($("pj").value.trim() || $("pt").value) && snapshot() !== 
 function resetAll() {
   const seller = $("sa").value;
   $("f").reset(); $("sa").value = seller;
-  spans = [{ cc: 1500, n: 10 }]; orderRows = [{ WT: 0, H: 1000, qty: 0 }];
+  spans = [{ cc: 1500, n: 10 }]; orderRows = [{ WT: 0, H: 0, qty: 0 }];
   stackSel = 0; curId = null; orderAllowance = 20;
   try { localStorage.removeItem("wp-draft"); } catch (e) {}
   try { history.replaceState(null, "", "#view3d"); } catch (e) {}
