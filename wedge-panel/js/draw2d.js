@@ -1,7 +1,7 @@
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261101061557";
-import { fmt, f2, f3 } from "./calc.js?v=20261101061557";
+import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261101063113";
+import { fmt, f2, f3 } from "./calc.js?v=20261101063113";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -30,7 +30,7 @@ chainV([[bx,Y(-G.T/2)],[bx,Y(G.T/2)]],bx-26,["หนา "+f3(G.T)]);
 chainH([[X(cx-b),Y(-b)],[X(cx+b),Y(-b)]],Y(-b)-26,["กว้างหน้าตัดเสา "+f3(p.B)]);
 const yb=Y(b)+22;chainH([[X(pf),Y(b)],[X(wf),Y(p.c/2)+4],[X(cx+p.tw/2),Y(p.c/2)+4]],yb,["ลึกร่อง "+f3(p.dg),"เอวเสา "+f3(p.tw)]);
 const svg=`<svg viewBox="0 0 680 ${Math.ceil(yb+12)}" role="img" aria-label="รูปขยายรอยต่อเสากับแผ่น">${o}</svg>`;
-const note=`${p.n} • กลาง/กลางเสา ${f2(gr.cc)} ม. → กว้างแผ่น ${f2(F.WT)} ม. (คำนวณได้ ${f2(F.raw)} ปัดลงทุก 0.01 ม.) ${gr.stk ? `• เผื่อทำงานแล้วข้างละ ${f3(Math.round(F.gr))} ม. ` : ""}• เสียบร่องข้างละ ${f3(Math.round(F.ze))} ม. • ช่องว่างปากร่อง ${f3(Math.round(F.cm))} ม./ข้าง • ปลายลิ่ม ${f3(Math.round(F.ct))} ม./ข้าง`;return{svg,note}}
+const note=`${p.n} • กลาง/กลางเสา ${f2(gr.cc)} ม. → กว้างแผ่น ${f2(F.WT)} ม. (คำนวณได้ ${f2(F.raw)} ปัดลงทุก 0.01 ม.) ${gr.stk ? `• เผื่อค่าการทำงานแล้วข้างละ ${f3(Math.round(F.gr))} ม. ` : ""}• เสียบร่องข้างละ ${f3(Math.round(F.ze))} ม. • ช่องว่างปากร่อง ${f3(Math.round(F.cm))} ม./ข้าง • ปลายลิ่ม ${f3(Math.round(F.ct))} ม./ข้าง`;return{svg,note}}
 
 function sec(G,W){return G===WG.A?[[0,0],[W,0],[W,5.2],[W+65,20],[W+65,90],[W,104.8],[W,110],[0,110],[0,104.8],[-65,90],[-65,20],[0,5.2]]:[[0,0],[W,0],[W+85,25],[W+85,75],[W,100],[0,100],[-85,75],[-85,25]]}
 const near=(arr,v)=>arr.reduce((b,x,i)=>Math.abs(x-v)<Math.abs(arr[b]-v)?i:b,0);
@@ -56,5 +56,5 @@ const rx=X2(W+TP)+22;labs.sort((a,b)=>a[2]-b[2]);let last=-1e9;labs.forEach(l=>{
 labs.forEach(([t,x,y,ly])=>{A(`<polyline points="${x.toFixed(1)},${y.toFixed(1)} ${(rx-14).toFixed(1)},${y.toFixed(1)} ${(rx-4).toFixed(1)},${ly.toFixed(1)} ${rx.toFixed(1)},${ly.toFixed(1)}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);A(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.2" style="fill:var(--muted)"/>`);TX(rx+4,ly+4,t,"start")});
 vb=Math.max(vb,last+10);return `<svg viewBox="0 0 680 ${Math.ceil(vb+10)}" role="img" aria-label="รูปด้านแผ่น">${o}</svg>`}
 export function panelSheet(it,st){const G=st.G,P=it.P,S=st.S;return `<p class="cap">รูปตัดแผ่นกันดิน</p>${svgSection(G,P,S,false)}<p class="cap">รูปตัดแผ่นกันดิน (แสดงเหล็กเสริม)</p>${svgSection(G,P,S,true)}<p class="cap">รูปด้านแผ่นกันดิน (ระยะท่อ)</p>${svgElev(G,P,S,false,true)}<p class="cap">รูปด้านแผ่นกันดิน (แสดงเหล็กเสริม)</p>${svgElev(G,P,S,true,false)}
-<div class="tb"><span>รหัส <b>${it.code}</b></span><span>${st.p.n} • หัวลิ่มแบบ ${st.p.ty}</span><span>คอนกรีต ${P.vol.toFixed(3)} ลบ.ม. • เหล็ก ${P.kg.toFixed(1)} กก. • หนัก ${fmt(P.wt)} กก.</span><span class="stamp ${S.sp?"sp":"std"}">${S.sp?"สั่งพิเศษ":"มาตรฐานบริษัท"}</span></div>${S.sp&&S.note?`<p class="hint">รายละเอียดพิเศษ: ${esc(S.note)}</p>`:""}`}
+<div class="tb"><span>รหัส <b>${it.code}</b></span><span>${st.p.n} • หัวลิ่มแบบ ${st.p.ty}</span><span>คอนกรีต ${P.vol.toFixed(3)} ลบ.ม. • เหล็ก ${P.kg.toFixed(1)} กก. • หนัก ${fmt(P.wt)} กก.</span><span class="stamp ${S.sp?"sp":"std"}">${S.sp?"สั่งพิเศษ":"มาตรฐานบริษัท"}</span></div>${S.sp&&S.note?`<p class="hint">รายละเอียดพิเศษ: ${esc(S.note)}</p>`:""}${st.direct&&it.cc.size?`<p style="font-size:13px;margin:8px 0 0"><b>หมายเหตุ:</b> แผ่นกว้าง ${f2(it.WT)} ม. เมื่อเสียบเสาเข็ม ${st.p.n} จะได้ระยะกลาง/กลางเสา ${[...it.cc].map(f2).join(", ")} ม. (เผื่อค่าการทำงานแล้วข้างละ ${f3(st.g)} ม.)</p>`:""}`}
 export function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}

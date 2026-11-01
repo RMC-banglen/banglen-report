@@ -1,7 +1,7 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { f2, f3, fmt } from "./calc.js?v=20261101061557";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261101061557";
+import { f2, f3, fmt } from "./calc.js?v=20261101063113";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261101063113";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -23,7 +23,7 @@ function build3d(gi=0){init3d();const st=getState(),gr=st.groups[gi];sc.remove(r
 const stkX=gr.stk||st.stk,p=st.p,G=st.G,Wb=gr.F.WT-2*G.TP,Ht=stkX.reduce((a,b)=>a+b,0)||1000,pp=pilePoly(p);
 const n0=root.children.length;
 [-gr.cc/2,gr.cc/2].forEach(cx=>ext(pp.map(q=>[q[0]+cx,q[1]]),Ht+600,-300,0xD3D1C7,1));
-const SZ=Math.max(gr.cc,Ht)*K*.08,yd=Ht+300+160,tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,Ht+320,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);const ccT="กลาง/กลางเสา "+f3(gr.cc)+" ม.";if(gr.stk)label3d(ccT+"\nแผ่นเผื่อทำงานแล้วข้างละ "+f3(Math.round(gr.F.gr))+" ม.",0,yd+230+SZ*.8/K,0,SZ*.8);else label3d(ccT,0,yd+SZ/K/2+230,0,SZ);
+const SZ=Math.max(gr.cc,Ht)*K*.08,yd=Ht+300+160,tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,Ht+320,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);const ccT="กลาง/กลางเสา "+f3(gr.cc)+" ม.";if(gr.stk)label3d(ccT+"\nเผื่อค่าการทำงานแล้วข้างละ "+f3(Math.round(gr.F.gr))+" ม.",0,yd+230+SZ*.8/K,0,SZ*.8);else label3d(ccT,0,yd+SZ/K/2+230,0,SZ);
 pileObjs=root.children.slice(n0);pileObjs.forEach(o=>{o.visible=showP}); // เสา + เส้นระยะกลาง/กลางเสา ซ่อนได้
 label3d("กว้างแผ่น "+f3(gr.F.WT)+" ม.",0,Ht+SZ*.85/K/2+110,0,SZ*.85);
 let y=0;const shade=[0x9FE1CB,0x7FD3B6];stkX.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);y+=h});

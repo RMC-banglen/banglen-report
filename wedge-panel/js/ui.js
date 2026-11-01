@@ -1,18 +1,19 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101061557";
+import { STD, HS } from "./standards.js?v=20261101063113";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101061557";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101061557";
-import { panelSheet, jointSvg, esc } from "./draw2d.js?v=20261101061557";
-import { createViews } from "./view3d.js?v=20261101061557";
-import { makePdf, downloadSummary } from "./pdf.js?v=20261101061557";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101061557";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101061557";
+} from "./calc.js?v=20261101063113";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101063113";
+import { panelSheet, jointSvg, esc } from "./draw2d.js?v=20261101063113";
+import { createViews } from "./view3d.js?v=20261101063113";
+import { makePdf, downloadSummary } from "./pdf.js?v=20261101063113";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101063113";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101063113";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
 let orderRows = [{ WT: 1370, H: 1000, qty: 10 }];
+let orderAllowance = 20; // มม. ค่าเผื่อทำงานข้างละ (มาตรฐาน 20) ไม่มีช่องให้แก้ ใช้คำนวณระยะกลาง/กลางเสาในหมายเหตุ
 let views = null, cur = "view3d";
 const PANES = ["view3d", "drawing", "production", "table"];
 
@@ -33,9 +34,8 @@ function renderRows() {
   const box = $("orows"); box.innerHTML = "";
   orderRows.forEach((r, i) => {
     const d = document.createElement("div"); d.className = "oitem";
-    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${(r.WT / 1000).toFixed(2)}"></div><div><label>สูง (ม.)</label><select>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div><div class="orow2"><div><label>กลาง/กลางเสาหน้างาน (ม.) ไม่ใส่ก็ได้</label><input type="number" step="0.01" min="0.6" max="6" placeholder="แนะนำให้" value="${r.cc ? (r.cc / 1000).toFixed(2) : ""}"></div><div class="oinfo"></div></div>`;
-    const [w, q, c] = d.querySelectorAll("input"), h = d.querySelector("select");
-    c.oninput = () => { r.cc = c.value ? Math.round(+c.value * 1000) : 0; sched(); };
+    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${(r.WT / 1000).toFixed(2)}"></div><div><label>สูง (ม.)</label><select>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
+    const [w, q] = d.querySelectorAll("input"), h = d.querySelector("select");
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
     h.onchange = () => { r.H = +h.value; run(); };
     q.oninput = () => { r.qty = Math.floor(+q.value) || 0; sched(); };
@@ -44,23 +44,6 @@ function renderRows() {
   });
 }
 $("addRow").onclick = () => { const l = orderRows[orderRows.length - 1] || { WT: 1370, H: 1000 }; orderRows.push({ WT: l.WT, H: l.H, qty: 1 }); renderRows(); run(); };
-// ข้อความแนะนำใต้แต่ละแถว: กลาง/กลางเสาที่แนะนำ หรือถ้ามีค่าหน้างานให้ตรวจและแนะนำลดความกว้าง
-function updateRowInfo(r) {
-  document.querySelectorAll("#orows .oinfo").forEach((el, i) => {
-    const f = r.rowInfo[i];
-    if (!f) { el.className = "oinfo"; el.textContent = ""; return; }
-    if (f.over) {
-      el.className = "oinfo bad";
-      el.innerHTML = `กลาง/กลางเสา ${f2(f.cc)} ม. แผ่นกว้างไปต้องลดเป็น ${f2(f.maxW)} ม. <button type="button">ใช้ ${f2(f.maxW)} ม.</button>`;
-      el.querySelector("button").onclick = () => { orderRows[i].WT = f.maxW; renderRows(); run(); };
-    } else {
-      el.className = "oinfo";
-      el.textContent = f.actual
-        ? `ค่าเผื่อจริง ${f3(f.gr)} ม./ข้าง • เสียบร่อง ${f3(f.ze)} ม. • กว้างได้สูงสุด ${f2(f.maxW)} ม.`
-        : `แนะนำเสาเข็มห่างกัน (กลาง/กลางเสา) ${f2(f.cc)} ม. • เสียบร่อง ${f3(f.ze)} ม.`;
-    }
-  });
-}
 // แสดง/ซ่อนส่วนของแต่ละโหมด
 function applyModeUi(direct) {
   $("wallBox").hidden = direct; $("spanFs").hidden = direct; $("rowsFs").hidden = !direct;
@@ -140,7 +123,7 @@ function run() {
   const truck = +$("tk").value || DEFAULT_TRUCK_KG;
   let r;
   if (direct) {
-    r = calcDirect({ pile: $("pt").value, allowance: Math.round(+$("gpD").value * 1000), rows: orderRows, spec: S, truckKg: truck });
+    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.map((r) => ({ WT: r.WT, H: r.H, qty: r.qty })), spec: S, truckKg: truck });
     r.ref = $("rf").value.trim();
   } else {
     const op = renderStack();
@@ -167,7 +150,6 @@ ${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div 
   renderProd(); drawJoint(); drawPanel();
   if (cur === "view3d") views.buildWall(+$("sel3").value || 0);
   if (cur === "table") views.table.build();
-  if (direct) updateRowInfo(r);
   saveDraft();
 }
 function fillSelect(id, opts) {
@@ -210,22 +192,24 @@ document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => {
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (PANES.includes(h)) show(h); else if (/^p-[a-z0-9]+$/.test(h)) loadProject(h); });
 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
-const FIELDS = ["gpD", "rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "cy", "tk", "lm", "cmx", "lmt"];
+const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "cy", "tk", "lm", "cmx", "lmt"];
 function collect() {
   const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
   o.wh = +o.wh; // บันทึกค่าที่เป็นความยาวเล็กๆ เป็นมม. เสมอ (ช่องกรอกเป็นเมตร)
-  ['gp', 'gpD', 'sv', 'sh'].forEach((k) => { o[k] = Math.round(+o[k] * 1000); });
+  ['gp', 'sv', 'sh'].forEach((k) => { o[k] = Math.round(+o[k] * 1000); });
+  o.ga = orderAllowance;
   return o;
 }
 function apply(d) {
   if (!d) return;
   (d.sm === "man" ? $("smM") : $("smL")).checked = true;
   (d.om === "direct" ? $("omD") : $("omW")).checked = true;
-  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 1370, H: +r.H || 1000, qty: +r.qty || 1, cc: +r.cc || 0 }));
+  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 1370, H: +r.H || 1000, qty: +r.qty || 1 }));
+  orderAllowance = +d.ga > 0 ? +d.ga : 20;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
   if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 1500, n: +s.n || 1 }));
-  ["gp", "gpD", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
+  ["gp", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
   stackSel = +d.stackSel || 0;
   (d.md === "sp" ? $("mdP") : $("mdS")).checked = true;
   renderSpans(); renderRows(); run();
@@ -266,8 +250,8 @@ $("bAdd").onclick = () => {
   if (!STATE || !STATE.list.length) { msg("ยังไม่มีรายการแผ่นให้คัดลอก"); return; }
   const base = $("pj").value.trim() || "โครงการ";
   // เอารายการแผ่นของโครงการเดิมมาเป็นแถวตั้งต้น ให้แก้จำนวนที่ต้องสั่งเพิ่ม
-  orderRows = STATE.list.map((i) => ({ WT: i.WT, H: i.H, qty: i.qty, cc: 0 }));
-  if (!STATE.direct) $("gpD").value = $("gp").value; // ใช้ค่าเผื่อเดียวกับโครงการเดิม
+  orderRows = STATE.list.map((i) => ({ WT: i.WT, H: i.H, qty: i.qty }));
+  orderAllowance = STATE.direct ? STATE.g : Math.round(+$("gp").value * 1000); // ใช้ค่าเผื่อเดียวกับโครงการเดิม
   $("omD").checked = true; $("rf").value = "สั่งเพิ่มจากโครงการ " + base;
   $("pj").value = base.replace(/ (สั่งเพิ่ม)$/, "") + " (สั่งเพิ่ม)";
   curId = null; try { history.replaceState(null, "", "#drawing"); } catch (e) {}

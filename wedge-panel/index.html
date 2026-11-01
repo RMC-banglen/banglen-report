@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261101061557">
+<meta name="app-version" content="20261101063113">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261101061557">
+<link rel="stylesheet" href="css/app.css?v=20261101063113">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -70,8 +70,7 @@
 </fieldset>
 <fieldset id="rowsFs" hidden>
 <legend>รายการแผ่นที่สั่ง</legend>
-<label for="gpD">ค่าเผื่อข้างละ (ม.)</label><input id="gpD" type="number" value="0.020" step="0.005" min="0.005" max="0.04"><p class="hint">มาตรฐานแนะนำข้างละ 0.020 ม. ใช้หาระยะกลาง/กลางเสาที่แนะนำ</p>
-<div id="orows" style="margin-top:10px"></div>
+<div id="orows"></div>
 <button type="button" id="addRow">เพิ่มรายการแผ่น</button>
 <p class="hint">กว้างรวม = ปลายลิ่มถึงปลายลิ่ม (ม.) ความสูงเลือกจากขนาดมาตรฐานบริษัท ใช้กับสั่งขาด สั่งเพิ่ม หรือลูกค้ากำหนดความกว้างและจำนวนมาเอง</p>
 <label for="rf">อ้างอิง / หมายเหตุ</label><input id="rf" type="text" placeholder="เช่น สั่งเพิ่มจากโครงการ กำแพงบ้านคุณสมชาย">
@@ -136,6 +135,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261101061557"></script>
+<script type="module" src="js/ui.js?v=20261101063113"></script>
 </body>
 </html>
