@@ -22,8 +22,8 @@ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(
 function build3d(gi=0){init3d();const st=getState(),gr=st.groups[gi];sc.remove(root);root.traverse(q=>{if(q.geometry)q.geometry.dispose()});root=new THREE.Group();sc.add(root);if(!gr){upd();return}
 const p=st.p,G=st.G,Wb=gr.F.WT-2*G.TP,Ht=st.stk.reduce((a,b)=>a+b,0)||1000,pp=pilePoly(p);
 [-gr.cc/2,gr.cc/2].forEach(cx=>ext(pp.map(q=>[q[0]+cx,q[1]]),Ht+600,-300,0xD3D1C7,1));
-const SZ=Math.max(gr.cc,Ht)*K*.045,yd=Ht+300+160,tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,Ht+320,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);label3d("c/c "+f3(gr.cc)+" ม.",0,yd+60,0,SZ);
-label3d("กว้างแผ่น "+f3(gr.F.WT)+" ม.",0,Ht+90,0,SZ*.8);
+const SZ=Math.max(gr.cc,Ht)*K*.08,yd=Ht+300+160,tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,Ht+320,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);label3d("กลาง/กลางเสา "+f3(gr.cc)+" ม.",0,yd+SZ/K/2+30,0,SZ);
+label3d("กว้างแผ่น "+f3(gr.F.WT)+" ม.",0,Ht+SZ*.85/K/2+40,0,SZ*.85);
 let y=0;const shade=[0x9FE1CB,0x7FD3B6];st.stk.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);y+=h});
 tg.set(0,(Ht+420)/2*K,0);R0=Math.max(gr.cc+p.B,Ht+800)*K*1.75;r=R0;upd()}
 $("b3a").onclick=()=>{th=-.6;ph=1.05;r=R0;upd()};$("b3t").onclick=()=>{th=0;ph=.06;r=R0*.9;upd()};$("b3f").onclick=()=>{th=0;ph=1.5;r=R0;upd()};
