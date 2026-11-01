@@ -1,0 +1,27 @@
+# ใช้ครั้งเดียว: ยกเลิกการปล่อยเว็บ (GitHub Pages) ของ commit 62da429 ที่ค้างสถานะ "in progress"
+# จนบล็อกการปล่อยรอบใหม่ — กดรันเองที่แท็บ Actions > "cancel stuck pages deployment" > Run workflow
+# เมื่อเว็บกลับมาอัปเดตได้ปกติแล้วให้ลบไฟล์นี้ทิ้ง
+name: cancel stuck pages deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  contents: read
+
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel the in-progress Pages deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=62da429247e08722b3e32e96a1c4c16b4b259301
+          echo "สถานะก่อนยกเลิก:"
+          gh api "repos/${{ github.repository }}/pages/deployments/$SHA" || true
+          echo "สั่งยกเลิก:"
+          gh api -X POST "repos/${{ github.repository }}/pages/deployments/$SHA/cancel"
+          echo "สถานะหลังยกเลิก:"
+          gh api "repos/${{ github.repository }}/pages/deployments/$SHA" || true
