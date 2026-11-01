@@ -1,7 +1,7 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { f2, f3, fmt } from "./calc.js?v=20261101064746";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261101064746";
+import { f2, f3, fmt } from "./calc.js?v=20261101065418";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261101065418";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -16,6 +16,7 @@ ce.addEventListener("wheel",e=>{e.preventDefault();r*=1+Math.sign(e.deltaY)*.08;
 new ResizeObserver(()=>{if(!v3.clientWidth)return;ren.setSize(v3.clientWidth,v3.clientHeight);cam.aspect=v3.clientWidth/v3.clientHeight;cam.updateProjectionMatrix();upd()}).observe(v3)}
 function upd(){if(!ren)return;ph=Math.max(.05,Math.min(1.6,ph));r=Math.max(.2,Math.min(30,r));cam.position.set(tg.x+r*Math.sin(ph)*Math.sin(th),tg.y+r*Math.cos(ph),tg.z+r*Math.sin(ph)*Math.cos(th));cam.lookAt(tg);ren.render(sc,cam)}
 const K=.001;function ext(pts,h,y0,col,op){const s=new THREE.Shape();pts.forEach((q,i)=>i?s.lineTo(q[0]*K,q[1]*K):s.moveTo(q[0]*K,q[1]*K));const m=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:h*K,bevelEnabled:false}),new THREE.MeshLambertMaterial({color:col,transparent:op<1,opacity:op,side:THREE.DoubleSide}));m.rotation.x=-Math.PI/2;m.position.y=y0*K;const e=new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry,25),new THREE.LineBasicMaterial({color:0x5F5E5A}));e.rotation.copy(m.rotation);e.position.copy(m.position);root.add(m);root.add(e)}
+function holeAt(x,y,rad,T){const m=new THREE.Mesh(new THREE.CylinderGeometry(rad*K,rad*K,(T+3)*K,28),new THREE.MeshLambertMaterial({color:0x26323A}));m.rotation.x=Math.PI/2;m.position.set(x*K,y*K,0);root.add(m)}
 function line3d(pts){const g=new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p[0]*K,p[1]*K,p[2]*K)));const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x5B6964,depthTest:false}));l.renderOrder=9;root.add(l)}
 function label3d(t,x,y,z,S){const ls=String(t).split("\n"),n=ls.length,c=document.createElement("canvas"),fz=44,fnt="500 "+fz+"px Tahoma,sans-serif";let ctx=c.getContext("2d");ctx.font=fnt;const w=Math.ceil(Math.max(...ls.map(q=>ctx.measureText(q).width)))+48;c.width=w;c.height=n*(fz+14)+8;ctx=c.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,w,c.height);ctx.strokeStyle="#8A9691";ctx.lineWidth=3;ctx.strokeRect(1.5,1.5,w-3,c.height-3);ctx.font=fnt;ctx.fillStyle="#1D2725";ctx.textBaseline="middle";ls.forEach((q,i)=>ctx.fillText(q,24,4+(i+.5)*(fz+14)+2));
 const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));sp.renderOrder=10;sp.scale.set(S*n*w/c.height,S*n,1);sp.position.set(x*K,y*K,z*K);root.add(sp)}
@@ -26,7 +27,7 @@ const n0=root.children.length;
 const SZ=Math.max(gr.cc,Ht)*K*.08,yd=Ht+300+160,tk=40;[-gr.cc/2,gr.cc/2].forEach(x=>{line3d([[x,Ht+320,0],[x,yd+50,0]]);line3d([[x-tk,yd-tk,0],[x+tk,yd+tk,0]])});line3d([[-gr.cc/2,yd,0],[gr.cc/2,yd,0]]);const ccT="กลาง/กลางเสา"+(gr.stk?"ที่แนะนำ ":" ")+f3(gr.cc)+" ม.";if(gr.stk)label3d(ccT+"\nเผื่อค่าการทำงานแล้วข้างละ "+f3(Math.round(gr.F.gr))+" ม.",0,yd+230+SZ*.8/K,0,SZ*.8);else label3d(ccT,0,yd+SZ/K/2+230,0,SZ);
 pileObjs=root.children.slice(n0);pileObjs.forEach(o=>{o.visible=showP}); // เสา + เส้นระยะกลาง/กลางเสา ซ่อนได้
 label3d("กว้างแผ่น "+f3(gr.F.WT)+" ม.",0,Ht+SZ*.85/K/2+110,0,SZ*.85);
-let y=0;const shade=[0x9FE1CB,0x7FD3B6];stkX.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);y+=h});
+let y=0;const shade=[0x9FE1CB,0x7FD3B6];stkX.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);const it=st.list.find(q=>q.H===h&&q.WT===gr.F.WT),pp2=it&&it.P&&it.P.pipe;if(pp2&&pp2.P.length&&st.S.pd)pp2.P.forEach(([px,py])=>holeAt(px-Wb/2,y+py,st.S.pd/2,G.T));y+=h});
 tg.set(0,(Ht+620)/2*K,0);R0=Math.max(gr.cc+p.B,Ht+1050)*K*1.75;r=R0;upd()}
 $("b3p").onclick=()=>{showP=!showP;pileObjs.forEach(o=>{o.visible=showP});$("b3p").textContent=showP?"ซ่อนเสา":"แสดงเสา";upd()};
 $("b3a").onclick=()=>{th=-.6;ph=1.05;r=R0;upd()};$("b3t").onclick=()=>{th=0;ph=.06;r=R0*.9;upd()};$("b3f").onclick=()=>{th=0;ph=1.5;r=R0;upd()};
