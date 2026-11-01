@@ -1,21 +1,21 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101094746";
+import { STD, HS } from "./standards.js?v=20261101095130";
 import {
   calcProject, calcDirect, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101094746";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101094746";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101094746";
-import { createViews } from "./view3d.js?v=20261101094746";
-import { makePdf } from "./pdf.js?v=20261101094746";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101094746";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101094746";
+} from "./calc.js?v=20261101095130";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101095130";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101095130";
+import { createViews } from "./view3d.js?v=20261101095130";
+import { makePdf } from "./pdf.js?v=20261101095130";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101095130";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101095130";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
 const toInt = (v) => Math.floor(Number(String(v).replace(/,/g, "")) || 0);
 document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input.thou")) t.value = t.value.replace(/,/g, ""); });
 document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches("input.thou") && t.value !== "") t.value = toInt(t.value).toLocaleString("th-TH"); });
-let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
+let STATE = null, spans = [{ cc: 0, n: 0 }], stackSel = 0, curId = null, user = null, editable = false;
 let orderRows = [{ WT: 0, H: 0, qty: 0 }];
 let orderAllowance = 20; // มม. ค่าเผื่อทำงานข้างละ (มาตรฐาน 20) ไม่มีช่องให้แก้ ใช้คำนวณระยะกลาง/กลางเสาในหมายเหตุ
 let views = null, cur = "view3d";
@@ -26,7 +26,7 @@ function renderSpans() {
   const box = $("spans"); box.innerHTML = "";
   spans.forEach((s, i) => {
     const d = document.createElement("div"); d.className = "sr";
-    d.innerHTML = `<div><label>ระยะ กลาง/กลางเสา (ม.)</label><input type="number" step="0.01" min="0.6" max="6" value="${(s.cc / 1000).toFixed(2)}"></div><div><label>จำนวนช่วง</label><input type="number" step="1" min="1" value="${s.n}"></div><button type="button" class="iconbtn" aria-label="ลบช่วงนี้">✕</button>`;
+    d.innerHTML = `<div><label>ระยะ กลาง/กลางเสา (ม.)</label><input type="number" step="0.01" min="0.6" max="6" value="${s.cc ? (s.cc / 1000).toFixed(2) : ""}"></div><div><label>จำนวนช่วง</label><input type="number" step="1" min="1" value="${s.n || ""}"></div><button type="button" class="iconbtn" aria-label="ลบช่วงนี้">✕</button>`;
     const [a, b] = d.querySelectorAll("input");
     a.oninput = () => { s.cc = Math.round(+a.value * 1000); sched(); };
     b.oninput = () => { s.n = Math.floor(+b.value) || 0; sched(); };
@@ -54,7 +54,7 @@ function applyModeUi(direct) {
   $("lgPile").textContent = direct ? "หน้าตัดเสาเข็มไอ" : "เสาเข็มและความสูงกำแพง";
   $("omHint").textContent = direct ? "ใส่ความกว้างรวม ความสูงมาตรฐาน และจำนวนแผ่นเอง เหมาะกับสั่งขาดหรือสั่งเพิ่ม" : "ใส่ความยาวกำแพงและระยะเสา ระบบคำนวณความกว้างและจำนวนแผ่นให้";
 }
-$("addSpan").onclick = () => { spans.push({ cc: spans[spans.length - 1].cc, n: 1 }); renderSpans(); run(); };
+$("addSpan").onclick = () => { spans.push({ cc: spans[spans.length - 1].cc, n: 0 }); renderSpans(); run(); };
 
 // ---------------- ความสูงกำแพงและการซ้อนแผ่น ----------------
 function setWh(h) { $("wh").value = (h / 1000).toFixed(2); stackSel = 0; run(); }
@@ -105,7 +105,7 @@ function spec() {
   return { sp: true, dv: +$("dv").value, sv: Math.round(+$("sv").value * 1000), dh: +$("dh").value, sh: Math.round(+$("sh").value * 1000), cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, note: $("nt").value.trim() };
 }
 function currentSpans(al) {
-  if (radio("sm") !== "len") return spans;
+  if (radio("sm") !== "len") return spans.filter((s) => s.cc && s.n); // แถวที่ยังกรอกไม่ครบไม่นำไปคำนวณ (ไม่ขึ้นเตือนแดง)
   const method = $("lmt").value === "eq" ? "eq" : "rest";
   const r = splitSpans(Math.round(+$("lm").value * 1000), Math.round(+$("cmx").value * 1000), method);
   $("lenOut").textContent = "";
@@ -247,7 +247,7 @@ function apply(d) {
   if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 0, H: HS.includes(+r.H) ? +r.H : 0, qty: +r.qty || 0 }));
   orderAllowance = +d.ga > 0 ? +d.ga : 20;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
-  if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 1500, n: +s.n || 1 }));
+  if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 0, n: +s.n || 0 }));
   ["gp", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
   if (!+d.wh) $("wh").value = "";
   if (d.tk !== undefined) $("tk").value = (toInt(d.tk) || DEFAULT_TRUCK_KG).toLocaleString("th-TH");
@@ -310,7 +310,7 @@ const isDirty = () => ($("pj").value.trim() || $("pt").value) && snapshot() !== 
 function resetAll() {
   const seller = $("sa").value;
   $("f").reset(); $("sa").value = seller;
-  spans = [{ cc: 1500, n: 10 }]; orderRows = [{ WT: 0, H: 0, qty: 0 }];
+  spans = [{ cc: 0, n: 0 }]; orderRows = [{ WT: 0, H: 0, qty: 0 }];
   stackSel = 0; curId = null; orderAllowance = 20;
   try { localStorage.removeItem("wp-draft"); } catch (e) {}
   try { history.replaceState(null, "", "#view3d"); } catch (e) {}

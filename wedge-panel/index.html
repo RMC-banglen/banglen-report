@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261101094746">
+<meta name="app-version" content="20261101095130">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261101094746">
+<link rel="stylesheet" href="css/app.css?v=20261101095130">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -59,7 +59,7 @@
 <fieldset id="spanFs">
 <legend>ความยาวกำแพงและระยะเสา</legend>
 <div class="mode"><input type="radio" name="sm" id="smL" value="len" checked><label for="smL">ใส่ความยาวกำแพง</label><input type="radio" name="sm" id="smM" value="man"><label for="smM">ใส่ระยะเสาเอง</label></div>
-<div id="lenBox"><div class="row2"><div><label for="lm">ความยาวกำแพง (ม.)</label><input id="lm" type="number" value="" placeholder="เช่น 15" step="0.01" min="0.6"></div><div><label for="cmx">เสาห่างกัน กลาง-กลาง เสาเข็ม (ม.)</label><input id="cmx" type="number" value="1.50" step="0.01" min="0.6" max="6"></div></div>
+<div id="lenBox"><div class="row2"><div><label for="lm">ความยาวกำแพง (ม.)</label><input id="lm" type="number" value="" placeholder="เช่น 15" step="0.01" min="0.6"></div><div><label for="cmx">เสาห่างกัน กลาง-กลาง เสาเข็ม (ม.)</label><input id="cmx" type="number" value="" placeholder="เช่น 1.50" step="0.01" min="0.6" max="6"></div></div>
 <label for="lmt">แบ่งระยะเสาแบบไหน</label><select id="lmt"><option value="eq" selected>ทุกช่วงห่างเท่ากัน (แนะนำ)</option><option value="fx">ห่างเท่ากัน เหลือเศษช่วงสุดท้าย</option></select>
 <p class="hint">วัดจากกลางเสาต้นแรก ถึงกลางเสาต้นสุดท้าย (กำแพงแนวตรง)</p><div class="std" id="lenOut"></div></div>
 <div id="manBox" hidden><div class="spans" id="spans"></div>
@@ -143,6 +143,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261101094746"></script>
+<script type="module" src="js/ui.js?v=20261101095130"></script>
 </body>
 </html>
