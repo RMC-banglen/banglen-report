@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101120223";
+import { STD, HS } from "./standards.js?v=20261101121134";
 import {
   calcProject, calcDirect, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101120223";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101120223";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101120223";
-import { createViews } from "./view3d.js?v=20261101120223";
-import { makePdf } from "./pdf.js?v=20261101120223";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101120223";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101120223";
+} from "./calc.js?v=20261101121134";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101121134";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101121134";
+import { createViews } from "./view3d.js?v=20261101121134";
+import { makePdf } from "./pdf.js?v=20261101121134";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101121134";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101121134";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -186,7 +186,7 @@ function renderProd() {
     : "ใช้ " + fmt(tn) + " โต๊ะ × " + fmt(cy) + " รอบ/วัน • จำนวนแผ่นที่ 1 โต๊ะผลิตได้ต่อรอบของแต่ละรหัส ดูในตาราง") + " • 1 โต๊ะหล่อได้รหัสเดียวต่อรอบ";
   $("prod").querySelector("tbody").innerHTML = st.list.map((i) => {
     const per = i.tf.R * i.tf.n, pd = per * tn * cy, days = per ? Math.ceil(i.qty / pd) : "-";
-    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${per} แผ่น (${i.tf.R} แถว × ${i.tf.n} แผ่น)` : "วางไม่ได้"}</td><td>${per ? fmt(pd) : "-"}</td><td>${days}</td><td>${fmt(i.P.wt)}</td></tr>`;
+    return `<tr><td class="code">${i.code}</td><td>${fmt(i.qty)}</td><td>${per ? `${fmt(per)} แผ่น` : "วางไม่ได้"}</td><td>${fmt(tn)}</td><td>${per ? fmt(pd) : "-"}</td><td>${days}</td><td>${fmt(i.P.wt)}</td></tr>`;
   }).join("");
   $("mat").querySelector("tbody").innerHTML = st.list.map((i) => {
     const P = i.P, S = st.S;
