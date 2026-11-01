@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=202611010311";
+} from "./standards.js?v=202611010315";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -210,30 +210,62 @@ export function calcProject(input) {
   const items = new Map();
   groups.forEach((gr) => {
     stk.forEach((H) => {
-      const key = gr.F.WT + "|" + H;
-      let it = items.get(key);
-      if (!it) {
-        const P = panelCalc(G, gr.F.WT, H, S), code = mkCode(gr.F.WT, H, G.T, S, P);
-        it = { code, name: mkName(gr.F.WT, H, G.T, S, P), H, WT: gr.F.WT, P, qty: 0, cc: new Set() };
-        items.set(key, it);
-        if (P.pipe.warn) al.push(["w", `${code}: ${P.pipe.warn}`]);
-        it.tf = tableFit(G, P.W, H);
-        if (it.tf.n < 1 || it.tf.R < 1) al.push(["d", `${code}: แผ่นใหญ่เกินโต๊ะหล่อ (ตัวแผ่นยาวได้ไม่เกิน ${f2(it.tf.span)} ม.)`]);
-      }
+      const it = getItem(items, G, S, gr.F.WT, H, al);
       it.qty += gr.n;
       it.cc.add(gr.cc);
     });
   });
   if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
+  return { p, G, g, S, stk, groups, nSpan, nPile, wLen, ...totals(items, input.truckKg), al };
+}
 
+// รายการแผ่นหนึ่งรหัส (กว้างรวม WT, สูง H) สร้างครั้งเดียวต่อคู่ แล้วสะสมจำนวนเข้าไป
+function getItem(items, G, S, WT, H, al) {
+  const key = WT + "|" + H;
+  let it = items.get(key);
+  if (!it) {
+    const P = panelCalc(G, WT, H, S), code = mkCode(WT, H, G.T, S, P);
+    it = { code, name: mkName(WT, H, G.T, S, P), H, WT, P, qty: 0, cc: new Set() };
+    items.set(key, it);
+    if (P.pipe.warn) al.push(["w", `${code}: ${P.pipe.warn}`]);
+    it.tf = tableFit(G, P.W, H);
+    if (it.tf.n < 1 || it.tf.R < 1) al.push(["d", `${code}: แผ่นใหญ่เกินโต๊ะหล่อ (ตัวแผ่นยาวได้ไม่เกิน ${f2(it.tf.span)} ม.)`]);
+  }
+  return it;
+}
+
+function totals(items, truckKg) {
   const list = [...items.values()].sort((a, b) => b.H - a.H || a.WT - b.WT);
   const totQ = list.reduce((s, i) => s + i.qty, 0);
   const totW = list.reduce((s, i) => s + i.qty * i.P.wt, 0);
   const totV = list.reduce((s, i) => s + i.qty * i.P.vol, 0);
   const totS = list.reduce((s, i) => s + i.qty * i.P.kg, 0);
-  const truck = input.truckKg || DEFAULT_TRUCK_KG;
-  const trips = Math.ceil(totW / truck);
-  return { p, G, g, S, stk, groups, list, nSpan, nPile, wLen, totQ, totW, totV, totS, truck, trips, al };
+  const truck = truckKg || DEFAULT_TRUCK_KG;
+  return { list, totQ, totW, totV, totS, truck, trips: Math.ceil(totW / truck) };
+}
+
+// ---------- สั่งตามจำนวนแผ่น (ลูกค้ากำหนดความกว้างและจำนวนมาเอง / สั่งเพิ่ม) ----------
+// in = { pile, rows:[{WT (มม. กว้างรวมปลายลิ่มถึงปลายลิ่ม), H (มม. ต้องเป็นความสูงมาตรฐาน), qty}], spec, truckKg }
+// ไม่มีข้อมูลระยะเสา จึงตรวจการเสียบร่องด้วยค่าเผื่อมาตรฐาน 20 มม./ข้าง (กลาง/กลางเสา = กว้างรวม + เอว + 2×ค่าเผื่อ)
+export function calcDirect(input) {
+  const p = PILES[input.pile], G = WG[p.ty];
+  const S = input.spec || standardSpec();
+  const al = [], items = new Map();
+  (input.rows || []).forEach((r, i) => {
+    const n = i + 1, WT = Math.round(r.WT), H = Math.round(r.H), qty = Math.floor(r.qty);
+    if (!(WT > 0) || !(qty >= 1)) { al.push(["d", `รายการที่ ${n}: ใส่ความกว้างและจำนวนแผ่น (อย่างน้อย 1 แผ่น)`]); return; }
+    if (!HS.includes(H)) { al.push(["d", `รายการที่ ${n}: ความสูงต้องเป็นขนาดมาตรฐาน 0.50 / 0.75 / 1.00 / 1.20 ม.`]); return; }
+    if (WT % 10) al.push(["w", `รายการที่ ${n}: ความกว้าง ${f2(WT)} ม. ไม่ลงทุก 0.01 ม. ปัดลงเป็น ${f2(Math.floor(WT / 10) * 10)} ม.`]);
+    const WTr = Math.floor(WT / 10) * 10;
+    const g = DEFAULT_ALLOWANCE, cc = WTr + p.tw + 2 * g;
+    if (!(cc >= 600 && cc <= 6000)) { al.push(["d", `รายการที่ ${n}: ความกว้าง ${f2(WTr)} ม. อยู่นอกช่วงที่ใช้กับเสาเข็มได้ (กลาง/กลางเสา 0.60–6.00 ม.)`]); return; }
+    const F = fitCalc(p, G, cc, g);
+    if (F.mn < 3) al.push(["d", `รายการที่ ${n}: ลิ่มหนากว่าร่อง แผ่นจะติด`]);
+    const it = getItem(items, G, S, WTr, H, al);
+    it.qty += qty;
+  });
+  if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
+  return { p, G, g: DEFAULT_ALLOWANCE, S, stk: [], groups: [], nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg), al };
 }
 
 // ---------- การผลิต ----------

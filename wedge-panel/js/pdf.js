@@ -1,8 +1,8 @@
 // ส่งออก PDF / ใบสรุป HTML — สร้างในเครื่องผู้ใช้ตอนกดดาวน์โหลด ไม่เก็บไฟล์ลง Storage
 // โครงตามต้นแบบ: หน้า 1 สรุปโครงการ • 1 หน้าต่อ c/c (3D + รูปขยายรอยต่อ) • 1 หน้าต่อรหัส (รูปตัด 2 + รูปด้าน 2)
 // ชิ้นเนื้อหาที่ยาวเกินหน้าจะถูกย่อให้พอดี ไม่ตัดกลางชิ้น
-import { fmt, f2, f3 } from "./calc.js?v=202611010311";
-import { panelSheet, jointSvg, esc } from "./draw2d.js?v=202611010311";
+import { fmt, f2, f3 } from "./calc.js?v=202611010315";
+import { panelSheet, jointSvg, esc } from "./draw2d.js?v=202611010315";
 
 const PRINT = {"--bg":"#FFFFFF","--surface":"#FFFFFF","--surface-2":"#F5F6F4","--ink":"#1D2725","--muted":"#5B6964","--faint":"#8A9691","--line":"#CDD3CF","--accent":"#0F6E56","--accent-soft":"#E1F2EB","--rebar":"#C2522B","--rebar-2":"#B07316","--pipe":"#1E5FA0","--warn":"#9A5B05","--warn-soft":"#FBF0DC","--danger":"#A32D2D","--danger-soft":"#FBE8E8","--concrete":"rgba(93,202,165,.20)"};
 const unvar = (s) => s.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => PRINT[k] || "#1D2725");
@@ -20,13 +20,13 @@ const stackTxt = (st) => st.stk.map((h) => (h / 1000).toFixed(2)).join(" + ");
 export function summaryHtml(st, d, truckKg) {
   const css = `body{font-family:"IBM Plex Sans Thai",Tahoma,sans-serif;color:#1D2725;margin:24px;font-size:13px}h1{font-size:20px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:10px 0}th,td{border:1px solid #CDD3CF;padding:5px 8px;text-align:right}th:first-child,td:first-child{text-align:left}th{background:#F1F3F1}.cap{color:#5B6964;margin:12px 0 2px}.pg{page-break-before:always}svg{width:100%;height:auto}.stamp{border:1px solid;padding:1px 6px;border-radius:4px;font-weight:600}
 :root{--ink:#1D2725;--muted:#5B6964;--faint:#8A9691;--surface-2:#F5F6F4;--accent:#0F6E56;--rebar:#C2522B;--rebar-2:#B07316;--pipe:#1E5FA0;--concrete:rgba(93,202,165,.2)}.tb{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;border-top:1px solid #CDD3CF;padding-top:6px}.hint{color:#5B6964}`;
-  const rows = st.list.map((i) => `<tr><td>${i.code}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ")}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("");
+  const rows = st.list.map((i) => `<tr><td>${i.code}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ") || "-"}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("");
   const sheets = st.list.map((i) => `<div class="pg"><h1>แบบแผ่น ${i.code}</h1>${panelSheet(i, st)}</div>`).join("");
   return `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>ใบสรุป ${esc(d.pj || "แผ่นกันดิน")}</title><style>${css}</style></head><body>
 <h1>ใบสรุปแผ่นกันดินหัวลิ่ม</h1><p>บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด • ${new Date().toLocaleDateString("th-TH")}</p>
 <table><tr><th>โครงการ</th><td>${esc(d.pj || "-")}</td><th>ลูกค้า</th><td>${esc(d.cu || "-")}</td><th>ผู้ขาย</th><td>${esc(d.sa || "-")}</td></tr>
 <tr><th>เสาเข็ม</th><td>${st.p.n}</td><th>หัวลิ่ม</th><td>แบบ ${st.p.ty} (${st.G.d})</td><th>รูปแบบงาน</th><td><span class="stamp">${st.S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</span></td></tr>
-<tr><th>ความสูงกำแพง</th><td>${(+d.wh).toFixed(2)} ม.</td><th>การซ้อน</th><td>${stackTxt(st)} ม.</td><th>ค่าเผื่อ</th><td>ข้างละ ${f3(st.g)} ม.</td></tr></table>
+${st.direct ? `<tr><th>วิธีสั่ง</th><td>สั่งตามจำนวนแผ่น</td><th>อ้างอิง</th><td colspan="3">${esc(d.rf || "-")}</td></tr>` : `<tr><th>ความสูงกำแพง</th><td>${(+d.wh).toFixed(2)} ม.</td><th>การซ้อน</th><td>${stackTxt(st)} ม.</td><th>ค่าเผื่อ</th><td>ข้างละ ${f3(st.g)} ม.</td></tr>`}</table>
 <table><tr><th>รหัสสินค้า</th><th>สูง (ม.)</th><th>กว้างรวม (ม.)</th><th>ช่วง กลาง/กลางเสา (ม.)</th><th>จำนวน (แผ่น)</th><th>นน./แผ่น (กก.)</th><th>คอนกรีต (ลบ.ม.)</th><th>เหล็ก (กก.)</th></tr>${rows}</table>
 <p>รวม ${fmt(st.totQ)} แผ่น • คอนกรีต ${st.totV.toFixed(2)} ลบ.ม. • เหล็กเสริม ${fmt(st.totS)} กก. • น้ำหนัก ${(st.totW / 1000).toFixed(1)} ตัน • รถ ${fmt(truckKg)} กก. ≈ ${st.trips} เที่ยว</p>
 ${st.al.length ? `<p><b>หมายเหตุ</b><br>${st.al.map((a) => esc(a[1])).join("<br>")}</p>` : ""}${st.S.sp && st.S.note ? `<p>รายละเอียดพิเศษ: ${esc(st.S.note)}</p>` : ""}${sheets}</body></html>`;
@@ -38,8 +38,8 @@ export function downloadSummary(st, d, truckKg) {
 
 function pdfSummary(st, d, $) {
   return `<h2 style="font-size:20px;margin:0 0 2px">ใบสรุปแผ่นกันดินหัวลิ่ม</h2><p style="margin:0 0 12px;color:#5B6964">บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด • ${new Date().toLocaleDateString("th-TH")}</p>
-<table class="tbl" style="margin-bottom:12px"><tr><th>โครงการ</th><td>${esc(d.pj || "-")}</td><th>ลูกค้า</th><td>${esc(d.cu || "-")}</td></tr><tr><th>ผู้ขาย</th><td>${esc(d.sa || "-")}</td><th>รูปแบบงาน</th><td>${st.S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</td></tr><tr><th>เสาเข็ม</th><td>${st.p.n}</td><th>หัวลิ่ม</th><td>แบบ ${st.p.ty} • ${st.G.d}</td></tr><tr><th>ความสูงกำแพง</th><td>${(+d.wh).toFixed(2)} ม. (${stackTxt(st)} ม.)</td><th>ค่าเผื่อ</th><td>ข้างละ ${f3(st.g)} ม.</td></tr></table>
-${document.querySelector(".hstd").outerHTML}${$("cards").outerHTML}${st.al.length ? `<div class="alerts">${$("alerts").innerHTML}</div>` : ""}<p class="cap">รายการแผ่น</p>${$("sched").outerHTML}<p class="cap">การผลิตและขนส่ง</p>${$("prod").outerHTML}<p class="cap">วัสดุต่อแผ่น</p>${$("mat").outerHTML}${st.S.sp && st.S.note ? `<p>รายละเอียดพิเศษ: ${esc(st.S.note)}</p>` : ""}`;
+<table class="tbl" style="margin-bottom:12px"><tr><th>โครงการ</th><td>${esc(d.pj || "-")}</td><th>ลูกค้า</th><td>${esc(d.cu || "-")}</td></tr><tr><th>ผู้ขาย</th><td>${esc(d.sa || "-")}</td><th>รูปแบบงาน</th><td>${st.S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</td></tr><tr><th>เสาเข็ม</th><td>${st.p.n}</td><th>หัวลิ่ม</th><td>แบบ ${st.p.ty} • ${st.G.d}</td></tr>${st.direct ? `<tr><th>วิธีสั่ง</th><td>สั่งตามจำนวนแผ่น</td><th>อ้างอิง</th><td>${esc(d.rf || "-")}</td></tr>` : `<tr><th>ความสูงกำแพง</th><td>${(+d.wh).toFixed(2)} ม. (${stackTxt(st)} ม.)</td><th>ค่าเผื่อ</th><td>ข้างละ ${f3(st.g)} ม.</td></tr>`}</table>
+${st.direct ? "" : document.querySelector(".hstd").outerHTML}${$("cards").outerHTML}${st.al.length ? `<div class="alerts">${$("alerts").innerHTML}</div>` : ""}<p class="cap">รายการแผ่น</p>${$("sched").outerHTML}<p class="cap">การผลิตและขนส่ง</p>${$("prod").outerHTML}<p class="cap">วัสดุต่อแผ่น</p>${$("mat").outerHTML}${st.S.sp && st.S.note ? `<p>รายละเอียดพิเศษ: ${esc(st.S.note)}</p>` : ""}`;
 }
 
 // views.snapshot(i) = ภาพ 3 มิติช่วงที่ i เป็น JPEG data URL, onStatus(text) = แจ้งความคืบหน้า

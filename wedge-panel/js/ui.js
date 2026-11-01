@@ -1,17 +1,18 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD } from "./standards.js?v=202611010311";
+import { STD, HS } from "./standards.js?v=202611010315";
 import {
-  calcProject, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2,
-} from "./calc.js?v=202611010311";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=202611010311";
-import { panelSheet, jointSvg, esc } from "./draw2d.js?v=202611010311";
-import { createViews } from "./view3d.js?v=202611010311";
-import { makePdf, downloadSummary } from "./pdf.js?v=202611010311";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=202611010311";
-import { listProjects, getProject, saveProject } from "./db.js?v=202611010311";
+  calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2,
+} from "./calc.js?v=202611010315";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=202611010315";
+import { panelSheet, jointSvg, esc } from "./draw2d.js?v=202611010315";
+import { createViews } from "./view3d.js?v=202611010315";
+import { makePdf, downloadSummary } from "./pdf.js?v=202611010315";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=202611010315";
+import { listProjects, getProject, saveProject } from "./db.js?v=202611010315";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
+let orderRows = [{ WT: 1370, H: 1000, qty: 10 }];
 let views = null, cur = "view3d";
 const PANES = ["view3d", "drawing", "production", "table"];
 
@@ -27,6 +28,28 @@ function renderSpans() {
     d.querySelector("button").onclick = () => { if (spans.length > 1) { spans.splice(i, 1); renderSpans(); run(); } };
     box.appendChild(d);
   });
+}
+function renderRows() {
+  const box = $("orows"); box.innerHTML = "";
+  orderRows.forEach((r, i) => {
+    const d = document.createElement("div"); d.className = "orow";
+    d.innerHTML = `<div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${(r.WT / 1000).toFixed(2)}"></div><div><label>สูง (ม.)</label><select>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button>`;
+    const [w, q] = d.querySelectorAll("input"), h = d.querySelector("select");
+    w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
+    h.onchange = () => { r.H = +h.value; run(); };
+    q.oninput = () => { r.qty = Math.floor(+q.value) || 0; sched(); };
+    d.querySelector("button").onclick = () => { if (orderRows.length > 1) { orderRows.splice(i, 1); renderRows(); run(); } };
+    box.appendChild(d);
+  });
+}
+$("addRow").onclick = () => { const l = orderRows[orderRows.length - 1] || { WT: 1370, H: 1000 }; orderRows.push({ WT: l.WT, H: l.H, qty: 1 }); renderRows(); run(); };
+// แสดง/ซ่อนส่วนของแต่ละโหมด
+function applyModeUi(direct) {
+  $("wallBox").hidden = direct; $("spanFs").hidden = direct; $("rowsFs").hidden = !direct;
+  $("lgPile").textContent = direct ? "หน้าตัดเสาเข็มไอ" : "เสาเข็มและความสูงกำแพง";
+  $("omHint").textContent = direct ? "ใส่ความกว้างรวม ความสูงมาตรฐาน และจำนวนแผ่นเอง เหมาะกับสั่งขาดหรือสั่งเพิ่ม" : "ใส่ความยาวกำแพงและระยะเสา ระบบคำนวณความกว้างและจำนวนแผ่นให้";
+  $("t-view3d").hidden = direct;
+  if (direct && cur === "view3d") show("drawing");
 }
 $("addSpan").onclick = () => { spans.push({ cc: spans[spans.length - 1].cc, n: 1 }); renderSpans(); run(); };
 
@@ -94,26 +117,34 @@ function currentSpans(al) {
 
 // ---------------- คำนวณและแสดงผล ----------------
 function run() {
-  const op = renderStack();
+  const direct = radio("om") === "direct";
+  applyModeUi(direct);
   const S = spec();
   $("stdBox").hidden = S.sp; $("spBox").hidden = !S.sp;
-  const lenMode = radio("sm") === "len";
-  $("lenBox").hidden = !lenMode; $("manBox").hidden = lenMode;
-  const spanAl = [];
-  const sp = currentSpans(spanAl);
-  const stk = op[stackSel] ? [...op[stackSel]] : [];
   const truck = +$("tk").value || DEFAULT_TRUCK_KG;
-  const r = calcProject({ pile: $("pt").value, allowance: Math.round(+$("gp").value * 1000), spans: sp, stack: stk, spec: S, truckKg: truck });
-  r.al = [...r.al.filter((a) => a[1].startsWith("งานสั่งพิเศษ")), ...spanAl, ...r.al.filter((a) => !a[1].startsWith("งานสั่งพิเศษ"))];
+  let r;
+  if (direct) {
+    r = calcDirect({ pile: $("pt").value, rows: orderRows, spec: S, truckKg: truck });
+    r.ref = $("rf").value.trim();
+  } else {
+    const op = renderStack();
+    const lenMode = radio("sm") === "len";
+    $("lenBox").hidden = !lenMode; $("manBox").hidden = lenMode;
+    const spanAl = [];
+    const sp = currentSpans(spanAl);
+    const stk = op[stackSel] ? [...op[stackSel]] : [];
+    r = calcProject({ pile: $("pt").value, allowance: Math.round(+$("gp").value * 1000), spans: sp, stack: stk, spec: S, truckKg: truck });
+    r.al = [...r.al.filter((a) => a[1].startsWith("งานสั่งพิเศษ")), ...spanAl, ...r.al.filter((a) => !a[1].startsWith("งานสั่งพิเศษ"))];
+  }
   STATE = r;
   const { p, G, list, nPile, nSpan, wLen, totQ, totV, totS, totW, trips } = r;
   $("cards").innerHTML = `<div class="card"><div class="k">หัวลิ่ม</div><div class="v">แบบ ${p.ty}</div><div class="s">${G.d} • ${p.n}</div></div>
-<div class="card"><div class="k">เสาเข็มไอ</div><div class="v">${fmt(nPile)} ต้น</div><div class="s">${fmt(nSpan)} ช่วง • กำแพงยาว ${(wLen / 1000).toFixed(2)} ม.</div></div>
+${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div class="v">ตามจำนวนแผ่น</div><div class="s">${esc(r.ref || "ไม่มีข้อมูลระยะเสา")}</div></div>` : `<div class="card"><div class="k">เสาเข็มไอ</div><div class="v">${fmt(nPile)} ต้น</div><div class="s">${fmt(nSpan)} ช่วง • กำแพงยาว ${(wLen / 1000).toFixed(2)} ม.</div></div>`}
 <div class="card"><div class="k">แผ่นทั้งโครงการ</div><div class="v">${fmt(totQ)} แผ่น</div><div class="s">${list.length} รหัส • <span class="stamp ${S.sp ? "sp" : "std"}">${S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</span></div></div>
 <div class="card"><div class="k">คอนกรีตรวม</div><div class="v">${totV.toFixed(2)} ลบ.ม.</div><div class="s">เหล็กเสริม ${fmt(totS)} กก.</div></div>
 <div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${(totW / 1000).toFixed(1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
   $("alerts").innerHTML = r.al.map((a) => `<div class="al ${a[0]}">${esc(a[1])}</div>`).join("");
-  $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ")}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
+  $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ") || "-"}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
   fillSelect("sel3", r.groups.map((gr, i) => [String(i), `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${gr.n} ช่วง`]));
   const optItem = list.map((i) => [i.code, `${i.code} • สูง ${(i.H / 1000).toFixed(2)} × กว้าง ${f2(i.WT)}`]);
   fillSelect("selD", optItem); fillSelect("selT", optItem);
@@ -153,6 +184,7 @@ let tmr; function sched() { clearTimeout(tmr); tmr = setTimeout(run, 220); }
 // ---------------- แท็บ ----------------
 function show(name) {
   if (!PANES.includes(name)) name = "view3d";
+  if (name === "view3d" && STATE && STATE.direct) name = "drawing";
   cur = name;
   PANES.forEach((n) => { $("p-" + n).hidden = n !== name; $("t-" + n).setAttribute("aria-selected", n === name ? "true" : "false"); });
   if (name === "view3d" && STATE) views.buildWall(+$("sel3").value || 0);
@@ -162,9 +194,9 @@ document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => {
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (PANES.includes(h)) show(h); else if (/^p-[a-z0-9]+$/.test(h)) loadProject(h); });
 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
-const FIELDS = ["pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "cy", "tk", "lm", "cmx", "lmt"];
+const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "cy", "tk", "lm", "cmx", "lmt"];
 function collect() {
-  const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm") };
+  const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
   o.wh = +o.wh; // บันทึกค่าที่เป็นความยาวเล็กๆ เป็นมม. เสมอ (ช่องกรอกเป็นเมตร)
   ['gp', 'sv', 'sh'].forEach((k) => { o[k] = Math.round(+o[k] * 1000); });
@@ -173,12 +205,14 @@ function collect() {
 function apply(d) {
   if (!d) return;
   (d.sm === "man" ? $("smM") : $("smL")).checked = true;
+  (d.om === "direct" ? $("omD") : $("omW")).checked = true;
+  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 1370, H: +r.H || 1000, qty: +r.qty || 1 }));
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
   if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 1500, n: +s.n || 1 }));
   ["gp", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
   stackSel = +d.stackSel || 0;
   (d.md === "sp" ? $("mdP") : $("mdS")).checked = true;
-  renderSpans(); run();
+  renderSpans(); renderRows(); run();
 }
 function saveDraft() { try { localStorage.setItem("wp-draft", JSON.stringify(collect())); } catch (e) {} }
 function loadDraft() { try { const d = JSON.parse(localStorage.getItem("wp-draft") || "null"); if (d) apply(d); } catch (e) {} }
@@ -209,7 +243,18 @@ $("bSave").onclick = async () => {
 };
 $("bNew").onclick = () => {
   curId = null; try { history.replaceState(null, "", "#view3d"); } catch (e) {}
-  $("pj").value = ""; $("cu").value = ""; spans = [{ cc: 1500, n: 10 }]; renderSpans(); run(); msg("เริ่มโครงการใหม่แล้ว");
+  $("pj").value = ""; $("cu").value = ""; spans = [{ cc: 1500, n: 10 }]; orderRows = [{ WT: 1370, H: 1000, qty: 10 }]; $("rf").value = ""; $("omW").checked = true; renderSpans(); renderRows(); run(); msg("เริ่มโครงการใหม่แล้ว");
+};
+$("bAdd").onclick = () => {
+  if (!editable) { msg("บัญชีนี้ดูได้อย่างเดียว"); return; }
+  if (!STATE || !STATE.list.length) { msg("ยังไม่มีรายการแผ่นให้คัดลอก"); return; }
+  const base = $("pj").value.trim() || "โครงการ";
+  // เอารายการแผ่นของโครงการเดิมมาเป็นแถวตั้งต้น ให้แก้จำนวนที่ต้องสั่งเพิ่ม
+  orderRows = STATE.list.map((i) => ({ WT: i.WT, H: i.H, qty: i.qty }));
+  $("omD").checked = true; $("rf").value = "สั่งเพิ่มจากโครงการ " + base;
+  $("pj").value = base.replace(/ (สั่งเพิ่ม)$/, "") + " (สั่งเพิ่ม)";
+  curId = null; try { history.replaceState(null, "", "#drawing"); } catch (e) {}
+  renderRows(); run(); msg("คัดลอกเป็นใบสั่งเพิ่มแล้ว • แก้จำนวนแผ่นแล้วกดบันทึกโครงการ (จะบันทึกเป็นโครงการใหม่)");
 };
 $("bDl").onclick = () => {
   if (!STATE || !STATE.list.length) { msg("ยังไม่มีรายการแผ่นให้สรุป"); return; }
@@ -231,7 +276,7 @@ function wire() {
   $("sel3").onchange = () => { drawJoint(); views.buildWall(+$("sel3").value || 0); };
   $("selD").onchange = drawPanel;
   FIELDS.forEach((id) => { $(id).addEventListener("input", sched); $(id).addEventListener("change", sched); });
-  document.querySelectorAll('input[name="md"],input[name="sm"]').forEach((x) => x.addEventListener("change", run));
+  document.querySelectorAll('input[name="md"],input[name="sm"],input[name="om"]').forEach((x) => x.addEventListener("change", run));
 }
 
 function enter(u) {
@@ -241,7 +286,7 @@ function enter(u) {
   editable = canEdit(u);
   $("uName").textContent = u.name; $("roTag").hidden = editable;
   $("bSave").disabled = !editable;
-  renderSpans(); loadDraft(); run();
+  renderSpans(); renderRows(); loadDraft(); run();
   const h0 = location.hash.slice(1);
   show(PANES.includes(h0) ? h0 : "view3d");
   refreshList();

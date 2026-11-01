@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="202611010311">
+<meta name="app-version" content="202611010315">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=202611010311">
+<link rel="stylesheet" href="css/app.css?v=202611010315">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -41,17 +41,22 @@
 <div class="row2"><div><label for="cu">ลูกค้า</label><input id="cu" type="text" placeholder="ชื่อลูกค้า"></div><div><label for="sa">ผู้ขาย</label><input id="sa" type="text" placeholder="ชื่อฝ่ายขาย"></div></div>
 </fieldset>
 <fieldset>
-<legend>เสาเข็มและความสูงกำแพง</legend>
+<legend>วิธีสั่ง</legend>
+<div class="mode"><input type="radio" name="om" id="omW" value="wall" checked><label for="omW">ออกแบบตามกำแพง</label><input type="radio" name="om" id="omD" value="direct"><label for="omD">สั่งตามจำนวนแผ่น</label></div>
+<p class="hint" id="omHint">ใส่ความยาวกำแพงและระยะเสา ระบบคำนวณความกว้างและจำนวนแผ่นให้</p>
+</fieldset>
+<fieldset>
+<legend id="lgPile">เสาเข็มและความสูงกำแพง</legend>
 <label for="pt">หน้าตัดเสาเข็มไอ</label>
 <select id="pt"><optgroup label="มาตรฐานโรงงาน"><option value="F18">I-18 โรงงาน</option><option value="F22">I-22 โรงงาน</option><option value="F26">I-26 โรงงาน</option></optgroup><optgroup label="มอก."><option value="T22">I-22 มอก.</option><option value="T26" selected>I-26 มอก.</option><option value="T30">I-30 มอก.</option></optgroup></select>
-<div class="hstd" role="img" aria-label="ความสูงแผ่นมาตรฐานบริษัท 0.50 0.75 1.00 และ 1.20 เมตร"><div class="t">ความสูงแผ่นมาตรฐานบริษัท มี 4 ขนาด</div><div class="hbars"><div><span style="height:30px"></span><b>0.50</b></div><div><span style="height:45px"></span><b>0.75</b></div><div><span style="height:60px"></span><b>1.00</b></div><div><span style="height:72px"></span><b>1.20</b></div><div class="stv" id="stkVis" aria-live="polite"></div></div></div>
+<div id="wallBox"><div class="hstd" role="img" aria-label="ความสูงแผ่นมาตรฐานบริษัท 0.50 0.75 1.00 และ 1.20 เมตร"><div class="t">ความสูงแผ่นมาตรฐานบริษัท มี 4 ขนาด</div><div class="hbars"><div><span style="height:30px"></span><b>0.50</b></div><div><span style="height:45px"></span><b>0.75</b></div><div><span style="height:60px"></span><b>1.00</b></div><div><span style="height:72px"></span><b>1.20</b></div><div class="stv" id="stkVis" aria-live="polite"></div></div></div>
 <label for="wh">ความสูงกำแพง (ม.)</label><input id="wh" type="number" value="1.00" step="0.05" min="0.5" max="4.8">
 <div class="err" id="whE"></div><div id="whSug"></div>
 <p class="hint" style="margin:10px 0 4px">ความสูงกำแพงที่ทำได้จากการซ้อนแผ่นมาตรฐาน (กดเพื่อเลือก, ม.)</p><div class="chips" id="whStd"></div>
 <label>การซ้อนแผ่น</label>
-<div class="stack" id="stk"></div>
+<div class="stack" id="stk"></div></div>
 </fieldset>
-<fieldset>
+<fieldset id="spanFs">
 <legend>ความยาวกำแพงและระยะเสา</legend>
 <div class="mode"><input type="radio" name="sm" id="smL" value="len" checked><label for="smL">ใส่ความยาวกำแพง</label><input type="radio" name="sm" id="smM" value="man"><label for="smM">ใส่ระยะเสาเอง</label></div>
 <div id="lenBox"><div class="row2"><div><label for="lm">ความยาวกำแพง (ม.)</label><input id="lm" type="number" value="15" step="0.01" min="0.6"></div><div><label for="cmx">เสาห่างกัน กลาง-กลาง เสาเข็ม (ม.)</label><input id="cmx" type="number" value="1.50" step="0.01" min="0.6" max="6"></div></div>
@@ -62,6 +67,13 @@
 <p class="hint">ช่วงที่เสาห่างเท่ากัน ใส่แถวเดียว แล้วบอกจำนวนช่วง</p></div>
 <details class="adv"><summary>ค่าเผื่อการทำงาน</summary>
 <label for="gp">ค่าเผื่อข้างละ (ม.)</label><input id="gp" type="number" value="0.020" step="0.005" min="0.005" max="0.04"><p class="hint">มาตรฐานแนะนำข้างละ 0.020 ม.</p></details>
+</fieldset>
+<fieldset id="rowsFs" hidden>
+<legend>รายการแผ่นที่สั่ง</legend>
+<div id="orows"></div>
+<button type="button" id="addRow">เพิ่มรายการแผ่น</button>
+<p class="hint">กว้างรวม = ปลายลิ่มถึงปลายลิ่ม (ม.) ความสูงเลือกจากขนาดมาตรฐานบริษัท ใช้กับสั่งขาด สั่งเพิ่ม หรือลูกค้ากำหนดความกว้างและจำนวนมาเอง</p>
+<label for="rf">อ้างอิง / หมายเหตุ</label><input id="rf" type="text" placeholder="เช่น สั่งเพิ่มจากโครงการ กำแพงบ้านคุณสมชาย">
 </fieldset>
 <fieldset>
 <legend>รูปแบบงาน</legend>
@@ -81,7 +93,7 @@
 </fieldset>
 <fieldset>
 <legend>บันทึกและแชร์</legend>
-<div class="actions"><button type="button" class="pri" id="bSave">บันทึกโครงการ</button><button type="button" id="bNew">เริ่มโครงการใหม่</button><button type="button" id="bPdf">ส่งออก PDF</button><button type="button" id="bDl">ใบสรุป HTML</button></div>
+<div class="actions"><button type="button" class="pri" id="bSave">บันทึกโครงการ</button><button type="button" id="bNew">เริ่มโครงการใหม่</button><button type="button" id="bAdd">คัดลอกเป็นใบสั่งเพิ่ม</button><button type="button" id="bPdf">ส่งออก PDF</button><button type="button" id="bDl">ใบสรุป HTML</button></div>
 <div class="msg" id="saveMsg"></div>
 <div class="projlist" id="plist"></div>
 </fieldset>
@@ -123,6 +135,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=202611010311"></script>
+<script type="module" src="js/ui.js?v=202611010315"></script>
 </body>
 </html>

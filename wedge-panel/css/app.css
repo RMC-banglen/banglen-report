@@ -137,3 +137,7 @@ header.top{align-items:center;padding:14px 22px}
 #login .err{min-height:20px;margin-top:10px}
 #app[hidden],#login[hidden]{display:none}
 .deny{max-width:520px;margin:60px auto;padding:0 20px;text-align:center;color:var(--muted)}
+
+/* โหมดสั่งตามจำนวนแผ่น */
+.orow{display:grid;grid-template-columns:1.1fr 1fr .8fr auto;gap:6px;align-items:end;margin-bottom:6px}
+.orow label{margin-top:0}
