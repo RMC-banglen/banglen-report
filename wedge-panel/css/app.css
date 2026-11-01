@@ -150,3 +150,11 @@ header.top{align-items:center;padding:14px 22px}
 
 button.danger{color:var(--danger);border-color:var(--danger);background:transparent}
 button.danger:hover{background:var(--danger-soft)}
+
+/* หน้าต่างเลือก */
+.modal{position:fixed;inset:0;z-index:10000;background:rgba(20,28,40,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal__box{background:var(--surface);color:var(--ink);border-radius:12px;padding:20px 22px;max-width:440px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.modal__box h3{margin:0 0 6px;font-size:17px;line-height:1.4}
+.modal__box p{margin:0 0 16px;color:var(--muted);font-size:14px}
+.modal__btns{display:flex;flex-direction:column;gap:8px}
+.modal__btns button{width:100%;min-height:42px}

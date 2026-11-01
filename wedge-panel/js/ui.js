@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101080808";
+import { STD, HS } from "./standards.js?v=20261101081525";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101080808";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101080808";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101080808";
-import { createViews } from "./view3d.js?v=20261101080808";
-import { makePdf } from "./pdf.js?v=20261101080808";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101080808";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101080808";
+} from "./calc.js?v=20261101081525";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101081525";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101081525";
+import { createViews } from "./view3d.js?v=20261101081525";
+import { makePdf } from "./pdf.js?v=20261101081525";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101081525";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101081525";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -252,12 +252,12 @@ function apply(d) {
 function saveDraft() { try { localStorage.setItem("wp-draft", JSON.stringify(collect())); } catch (e) {} }
 function loadDraft() { try { const d = JSON.parse(localStorage.getItem("wp-draft") || "null"); if (d) apply(d); } catch (e) {} }
 
-const msg = (t) => { $("saveMsg").textContent = t; $("bLink").hidden = !curId; $("bDel").hidden = !(curId && editable); };
+const msg = (t) => { $("saveMsg").textContent = t; $("bLink").hidden = !curId; $("bDel").hidden = !(curId && editable); $("bSave").textContent = curId ? "บันทึกการแก้ไข" : "บันทึกโครงการ"; };
 async function refreshList() {
   try {
     const rows = await listProjects(15);
     $("plist").innerHTML = rows.map((r) => `<button type="button" data-id="${esc(r.id)}">${esc(r.name || "ไม่มีชื่อโครงการ")} <span style="color:var(--faint)">• ${esc(r.customer || "")} • ${new Date(r.updated_at || 0).toLocaleDateString("th-TH")}</span></button>`).join("");
-    $("plist").querySelectorAll("button").forEach((b) => (b.onclick = () => { location.hash = "#" + b.dataset.id; }));
+    $("plist").querySelectorAll("button").forEach((b) => (b.onclick = async () => { if (!(await guardUnsaved())) return; location.hash = "#" + b.dataset.id; }));
   } catch (e) { $("plist").innerHTML = ""; }
 }
 async function loadProject(id) {
@@ -267,16 +267,20 @@ async function loadProject(id) {
     apply(row.data); curId = id; lastSaved = snapshot(); msg("เปิดโครงการแล้ว");
   } catch (e) { msg("เปิดโครงการไม่ได้ ลองใหม่อีกครั้ง"); }
 }
-$("bSave").onclick = async () => {
-  if (!editable) { msg("บัญชีนี้ดูได้อย่างเดียว บันทึกไม่ได้"); return; }
-  if (!$("pj").value.trim()) { msg("ใส่ชื่อโครงการก่อนบันทึก"); $("pj").focus(); return; }
+async function saveCurrent() {
+  if (!editable) { msg("บัญชีนี้ดูได้อย่างเดียว บันทึกไม่ได้"); return false; }
+  if (!$("pj").value.trim()) { msg("ใส่ชื่อโครงการก่อนบันทึก"); $("pj").focus(); return false; }
+  const wasNew = !curId;
   try {
     curId = await saveProject({ id: curId, form: collect(), user });
     try { history.replaceState(null, "", "#" + curId); } catch (e) {}
     lastSaved = snapshot();
-    msg("บันทึกแล้ว • กด \"คัดลอกลิงก์โครงการ\" เพื่อส่งให้ทีมเปิดดู (ต้องล็อกอินก่อน)"); refreshList();
-  } catch (e) { msg("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); }
-};
+    msg(wasNew ? "บันทึกแล้ว • กด \"คัดลอกลิงก์โครงการ\" เพื่อส่งให้ทีมเปิดดู (ต้องล็อกอินก่อน)" : "บันทึกการแก้ไขแล้ว");
+    refreshList();
+    return true;
+  } catch (e) { msg("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); return false; }
+}
+$("bSave").onclick = saveCurrent;
 $("bDel").onclick = async () => {
   if (!curId || !editable) return;
   const name = $("pj").value.trim() || "(ไม่มีชื่อ)";
@@ -308,8 +312,38 @@ function resetAll() {
   lastSaved = snapshot();
   msg("เริ่มโครงการใหม่แล้ว");
 }
-$("bNew").onclick = () => {
-  if (isDirty() && !window.confirm("โครงการนี้ยังไม่ได้บันทึก หรือมีการแก้ไขที่ยังไม่ได้บันทึก\nต้องการเริ่มโครงการใหม่และล้างข้อมูลทั้งหมดใช่ไหม")) return;
+// หน้าต่างให้เลือกหลายทาง คืนค่า v ของปุ่มที่กด (Esc / กดพื้นหลัง = cancel)
+function askChoice(title, text, buttons) {
+  return new Promise((resolve) => {
+    const ov = document.createElement("div"); ov.className = "modal";
+    ov.innerHTML = '<div class="modal__box" role="dialog" aria-modal="true"><h3></h3><p></p><div class="modal__btns"></div></div>';
+    ov.querySelector("h3").textContent = title; ov.querySelector("p").textContent = text;
+    const done = (v) => { document.removeEventListener("keydown", onKey); ov.remove(); resolve(v); };
+    const onKey = (e) => { if (e.key === "Escape") done("cancel"); };
+    buttons.forEach((b) => {
+      const el = document.createElement("button"); el.type = "button"; el.textContent = b.t;
+      if (b.pri) el.className = "pri"; if (b.danger) el.className = "danger";
+      el.onclick = () => done(b.v); ov.querySelector(".modal__btns").appendChild(el);
+    });
+    ov.addEventListener("click", (e) => { if (e.target === ov) done("cancel"); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(ov);
+    ov.querySelector("button.pri, button").focus();
+  });
+}
+// มีงานที่ยังไม่บันทึกไหม: ถามว่าจะ บันทึก / ไม่บันทึก(ทิ้ง) / ยกเลิก คืน true เมื่อไปต่อได้
+async function guardUnsaved() {
+  if (!isDirty()) return true;
+  const name = $("pj").value.trim() || "(ยังไม่มีชื่อ)", saved = !!curId;
+  const btns = [];
+  if (editable) btns.push({ v: "save", t: saved ? "บันทึกการแก้ไข" : "บันทึกโครงการ", pri: true });
+  btns.push({ v: "discard", t: saved ? "ไม่บันทึก (ทิ้งการแก้ไข)" : "ไม่บันทึก (ทิ้งข้อมูล)", danger: true }, { v: "cancel", t: "ยกเลิก (กลับไปแก้ต่อ)" });
+  const c = await askChoice(saved ? 'โครงการ "' + name + '" มีการแก้ไขที่ยังไม่ได้บันทึก' : 'โครงการ "' + name + '" ยังไม่ได้บันทึก', "จะทำอย่างไรกับข้อมูลนี้?", btns);
+  if (c === "save") return await saveCurrent();
+  return c === "discard";
+}
+$("bNew").onclick = async () => {
+  if (!(await guardUnsaved())) return;
   resetAll();
 };
 $("bAdd").onclick = () => {
