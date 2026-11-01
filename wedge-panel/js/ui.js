@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101072457";
+import { STD, HS } from "./standards.js?v=20261101073146";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101072457";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101072457";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101072457";
-import { createViews } from "./view3d.js?v=20261101072457";
-import { makePdf } from "./pdf.js?v=20261101072457";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101072457";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101072457";
+} from "./calc.js?v=20261101073146";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101073146";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101073146";
+import { createViews } from "./view3d.js?v=20261101073146";
+import { makePdf } from "./pdf.js?v=20261101073146";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101073146";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101073146";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -238,7 +238,7 @@ function apply(d) {
 function saveDraft() { try { localStorage.setItem("wp-draft", JSON.stringify(collect())); } catch (e) {} }
 function loadDraft() { try { const d = JSON.parse(localStorage.getItem("wp-draft") || "null"); if (d) apply(d); } catch (e) {} }
 
-const msg = (t) => { $("saveMsg").textContent = t; };
+const msg = (t) => { $("saveMsg").textContent = t; $("bLink").hidden = !curId; };
 async function refreshList() {
   try {
     const rows = await listProjects(15);
@@ -259,8 +259,14 @@ $("bSave").onclick = async () => {
   try {
     curId = await saveProject({ id: curId, form: collect(), user });
     try { history.replaceState(null, "", "#" + curId); } catch (e) {}
-    msg("บันทึกแล้ว • ส่งลิงก์หน้านี้ให้ทีมเปิดดูได้"); refreshList();
+    msg("บันทึกแล้ว • กด \"คัดลอกลิงก์โครงการ\" เพื่อส่งให้ทีมเปิดดู (ต้องล็อกอินก่อน)"); refreshList();
   } catch (e) { msg("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); }
+};
+$("bLink").onclick = async () => {
+  if (!curId) return;
+  const url = location.origin + location.pathname + "#" + curId;
+  try { await navigator.clipboard.writeText(url); msg("คัดลอกลิงก์โครงการแล้ว • ส่งให้ทีมเปิดดูได้ (ต้องล็อกอินก่อน)"); }
+  catch (e) { window.prompt("คัดลอกลิงก์นี้", url); }
 };
 $("bNew").onclick = () => {
   curId = null; try { history.replaceState(null, "", "#view3d"); } catch (e) {}
