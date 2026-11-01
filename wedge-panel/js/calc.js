@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261101123256";
+} from "./standards.js?v=20261101123412";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -332,6 +332,17 @@ export function allocateTables(list, tables) {
     const w = ok.reduce((m, i) => (days(i) > days(m) ? i : m), ok[0]);
     if (days(w) <= 1) break; // ทุกรหัสเสร็จภายใน 1 วันแล้ว ไม่ต้องเติมโต๊ะ
     out[w.code]++; left--;
+  }
+  // ปรับให้วันผลิตของแต่ละรหัสใกล้กันที่สุด: ย้ายโต๊ะจากรหัสหนึ่งไปอีกรหัสถ้าทำให้ (วันที่นานสุด, ผลต่างวัน) ดีขึ้น
+  const score = () => { const d = ok.map((i) => days(i)); return [Math.max(...d), Math.max(...d) - Math.min(...d)]; };
+  const better = (x, y) => x[0] < y[0] || (x[0] === y[0] && x[1] < y[1]);
+  for (let moved = true, guard = 0; moved && ok.length > 1 && guard < 200; guard++) {
+    moved = false;
+    for (const f of ok) for (const t of ok) {
+      if (f === t || out[f.code] < 2) continue;
+      const s0 = score(); out[f.code]--; out[t.code]++;
+      if (better(score(), s0)) moved = true; else { out[f.code]++; out[t.code]--; }
+    }
   }
   return out;
 }
