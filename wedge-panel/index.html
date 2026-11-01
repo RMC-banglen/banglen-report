@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261101073146">
+<meta name="app-version" content="20261101080335">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261101073146">
+<link rel="stylesheet" href="css/app.css?v=20261101080335">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -48,9 +48,9 @@
 <fieldset>
 <legend id="lgPile">เสาเข็มและความสูงกำแพง</legend>
 <label for="pt">หน้าตัดเสาเข็มไอ</label>
-<select id="pt"><optgroup label="มาตรฐานโรงงาน"><option value="F18">I-18 โรงงาน</option><option value="F22">I-22 โรงงาน</option><option value="F26">I-26 โรงงาน</option></optgroup><optgroup label="มอก."><option value="T22">I-22 มอก.</option><option value="T26" selected>I-26 มอก.</option><option value="T30">I-30 มอก.</option></optgroup></select>
+<select id="pt"><option value="">— เลือกหน้าตัดเสาเข็ม —</option><optgroup label="มาตรฐานโรงงาน"><option value="F18">I-18 โรงงาน</option><option value="F22">I-22 โรงงาน</option><option value="F26">I-26 โรงงาน</option></optgroup><optgroup label="มอก."><option value="T22">I-22 มอก.</option><option value="T26">I-26 มอก.</option><option value="T30">I-30 มอก.</option></optgroup></select>
 <div id="wallBox"><div class="hstd" role="img" aria-label="ความสูงแผ่นมาตรฐานบริษัท 0.50 0.75 1.00 และ 1.20 เมตร"><div class="t">ความสูงแผ่นมาตรฐานบริษัท มี 4 ขนาด</div><div class="hbars"><div><span style="height:30px"></span><b>0.50</b></div><div><span style="height:45px"></span><b>0.75</b></div><div><span style="height:60px"></span><b>1.00</b></div><div><span style="height:72px"></span><b>1.20</b></div><div class="stv" id="stkVis" aria-live="polite"></div></div></div>
-<label for="wh">ความสูงกำแพง (ม.)</label><input id="wh" type="number" value="1.00" step="0.05" min="0.5" max="4.8">
+<label for="wh">ความสูงกำแพง (ม.)</label><input id="wh" type="number" value="" placeholder="เช่น 1.00" step="0.05" min="0.5" max="4.8">
 <div class="err" id="whE"></div><div id="whSug"></div>
 <p class="hint" style="margin:10px 0 4px">ความสูงกำแพงที่ทำได้จากการซ้อนแผ่นมาตรฐาน (กดเพื่อเลือก, ม.)</p><div class="chips" id="whStd"></div>
 <label>การซ้อนแผ่น</label>
@@ -59,7 +59,7 @@
 <fieldset id="spanFs">
 <legend>ความยาวกำแพงและระยะเสา</legend>
 <div class="mode"><input type="radio" name="sm" id="smL" value="len" checked><label for="smL">ใส่ความยาวกำแพง</label><input type="radio" name="sm" id="smM" value="man"><label for="smM">ใส่ระยะเสาเอง</label></div>
-<div id="lenBox"><div class="row2"><div><label for="lm">ความยาวกำแพง (ม.)</label><input id="lm" type="number" value="15" step="0.01" min="0.6"></div><div><label for="cmx">เสาห่างกัน กลาง-กลาง เสาเข็ม (ม.)</label><input id="cmx" type="number" value="1.50" step="0.01" min="0.6" max="6"></div></div>
+<div id="lenBox"><div class="row2"><div><label for="lm">ความยาวกำแพง (ม.)</label><input id="lm" type="number" value="" placeholder="เช่น 15" step="0.01" min="0.6"></div><div><label for="cmx">เสาห่างกัน กลาง-กลาง เสาเข็ม (ม.)</label><input id="cmx" type="number" value="1.50" step="0.01" min="0.6" max="6"></div></div>
 <label for="lmt">แบ่งระยะเสาแบบไหน</label><select id="lmt"><option value="eq" selected>ทุกช่วงห่างเท่ากัน (แนะนำ)</option><option value="fx">ห่างเท่ากัน เหลือเศษช่วงสุดท้าย</option></select>
 <p class="hint">วัดจากกลางเสาต้นแรก ถึงกลางเสาต้นสุดท้าย (กำแพงแนวตรง)</p><div class="std" id="lenOut"></div></div>
 <div id="manBox" hidden><div class="spans" id="spans"></div>
@@ -100,6 +100,8 @@
 </form>
 </aside>
 <main>
+<div id="emptyMsg" style="text-align:center;color:var(--muted);padding:70px 16px;font-size:16px"><div style="font-size:42px;line-height:1.2">🧱</div><b style="color:var(--ink)">เริ่มออกแบบแผ่นกันดิน</b><br>เลือกหน้าตัดเสาเข็ม แล้วใส่ความสูงและความยาวกำแพง<br>(หรือเลือก "สั่งตามจำนวนแผ่น" แล้วใส่ความกว้าง ความสูง จำนวนแผ่น)<br>เมื่อข้อมูลครบ แบบและผลคำนวณจะแสดงที่นี่</div>
+<div id="results" hidden>
 <div class="cards" id="cards"></div>
 <div class="alerts" id="alerts"></div>
 <div class="tblw"><table class="tbl" id="sched"><thead><tr><th>รหัสสินค้า</th><th style="text-align:left">ชื่อสินค้า</th><th>สูง (ม.)</th><th>กว้างรวม (ม.)</th><th>ช่วง กลาง/กลางเสา (ม.)</th><th>จำนวน (แผ่น)</th><th>นน./แผ่น (กก.)</th><th>คอนกรีต/แผ่น (ลบ.ม.)</th><th>เหล็ก/แผ่น (กก.)</th></tr></thead><tbody></tbody></table></div>
@@ -112,7 +114,7 @@
 <div id="n3"></div>
 <p class="cap">รูปขยายรอยต่อด้านขวา</p>
 <div class="sheet"><svg id="sJ" viewBox="0 0 680 300" role="img" aria-label="รูปขยายรอยต่อเสากับแผ่น"></svg></div>
-<p class="hint" id="jNote"></p>
+
 </section>
 <section class="pane" id="p-drawing" hidden>
 <div class="bar"><div><label for="selD">แผ่นที่แสดง</label><select id="selD"></select></div></div>
@@ -131,6 +133,7 @@
 <div class="tblw"><table class="tbl" id="matTot"><thead><tr><th>รายการ</th><th>จำนวน</th><th>ยาวรวม (ม.)</th><th>ปริมาณ</th></tr></thead><tbody></tbody></table></div>
 <p class="hint">วันผลิตคิดแบบหนึ่งโต๊ะหล่อแผ่นรหัสเดียวต่อรอบ</p>
 </section>
+</div>
 </main>
 </div>
 </div>
@@ -139,6 +142,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261101073146"></script>
+<script type="module" src="js/ui.js?v=20261101080335"></script>
 </body>
 </html>

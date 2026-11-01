@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101073146";
+import { STD, HS } from "./standards.js?v=20261101080335";
 import {
   calcProject, calcDirect, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101073146";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101073146";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101073146";
-import { createViews } from "./view3d.js?v=20261101073146";
-import { makePdf } from "./pdf.js?v=20261101073146";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101073146";
-import { listProjects, getProject, saveProject } from "./db.js?v=20261101073146";
+} from "./calc.js?v=20261101080335";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101080335";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101080335";
+import { createViews } from "./view3d.js?v=20261101080335";
+import { makePdf } from "./pdf.js?v=20261101080335";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101080335";
+import { listProjects, getProject, saveProject } from "./db.js?v=20261101080335";
 
 const $ = (id) => document.getElementById(id);
 let STATE = null, spans = [{ cc: 1500, n: 10 }], stackSel = 0, curId = null, user = null, editable = false;
@@ -34,7 +34,7 @@ function renderRows() {
   const box = $("orows"); box.innerHTML = "";
   orderRows.forEach((r, i) => {
     const d = document.createElement("div"); d.className = "oitem";
-    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${(r.WT / 1000).toFixed(2)}"></div><div><label>สูง (ม.)</label><select>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
+    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input type="number" step="1" min="1" value="${r.qty || ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
     const [w, q] = d.querySelectorAll("input"), h = d.querySelector("select");
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
     h.onchange = () => { r.H = +h.value; run(); };
@@ -73,6 +73,7 @@ function renderStack() {
   const Ht = Math.round(+$("wh").value * 1000);
   $("whE").textContent = ""; $("whSug").innerHTML = ""; renderStdChips(Ht); $("stkVis").innerHTML = "";
   const box = $("stk"); box.innerHTML = "";
+  if ($("wh").value === "") return [];
   if (!(Ht >= 500 && Ht <= 4800)) { $("whE").textContent = "ใส่ความสูงกำแพงระหว่าง 0.50 ถึง 4.80 ม."; return []; }
   const op = stackOptions(Ht);
   if (!op.length) {
@@ -124,6 +125,7 @@ function run() {
   const truck = +$("tk").value || DEFAULT_TRUCK_KG;
   let r;
   if (direct) {
+    if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1)) return showEmpty();
     r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.map((r) => ({ WT: r.WT, H: r.H, qty: r.qty })), spec: S, truckKg: truck });
     r.ref = $("rf").value.trim();
   } else {
@@ -133,10 +135,12 @@ function run() {
     const spanAl = [];
     const sp = currentSpans(spanAl);
     const stk = op[stackSel] ? [...op[stackSel]] : [];
+    if (!$("pt").value || !stk.length || !sp.some((x) => x.cc >= 600 && x.n >= 1)) return showEmpty();
     r = calcProject({ pile: $("pt").value, allowance: Math.round(+$("gp").value * 1000), spans: sp, stack: stk, spec: S, truckKg: truck });
     r.al = [...r.al.filter((a) => a[1].startsWith("งานสั่งพิเศษ")), ...spanAl, ...r.al.filter((a) => !a[1].startsWith("งานสั่งพิเศษ"))];
   }
   STATE = r;
+  $("results").hidden = false; $("emptyMsg").hidden = true; setActions(true);
   const { p, G, list, nPile, nSpan, wLen, totQ, totV, totS, totW, trips } = r;
   $("cards").innerHTML = `<div class="card"><div class="k">หัวลิ่ม</div><div class="v">แบบ ${p.ty}</div><div class="s">${G.d} • ${p.n}</div></div>
 ${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div class="v">ตามจำนวนแผ่น</div><div class="s">${esc(r.ref || "ไม่มีข้อมูลระยะเสา")}</div></div>` : `<div class="card"><div class="k">เสาเข็มไอ</div><div class="v">${fmt(nPile)} ต้น</div><div class="s">${fmt(nSpan)} ช่วง • กำแพงยาว ${(wLen / 1000).toFixed(2)} ม.</div></div>`}
@@ -152,6 +156,16 @@ ${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div 
   if (cur === "view3d") views.buildWall(+$("sel3").value || 0);
   if (cur === "table") views.table.build();
   saveDraft();
+}
+// ยังใส่ข้อมูลไม่ครบ: ซ่อนแบบและผลคำนวณ แสดงข้อความรอ และปิดปุ่มที่ต้องมีแบบ
+function showEmpty() {
+  STATE = null;
+  $("results").hidden = true; $("emptyMsg").hidden = false; setActions(false);
+  saveDraft();
+}
+function setActions(on) {
+  $("bSave").disabled = !(on && editable);
+  ["bPdf", "bPdfC", "bAdd"].forEach((id) => { $(id).disabled = !on; });
 }
 function fillSelect(id, opts) {
   const s = $(id), k = s.value;
@@ -179,7 +193,6 @@ function renderProd() {
 function drawJoint() {
   const gr = STATE.groups[+$("sel3").value || 0], j = jointSvg(STATE, gr);
   $("sJ").outerHTML = j.svg ? j.svg.replace("<svg ", '<svg id="sJ" ') : '<svg id="sJ" viewBox="0 0 680 20"></svg>';
-  $("jNote").textContent = STATE.direct ? "" : j.note; // โหมดสั่งตามจำนวนแผ่น: มีหมายเหตุใต้ภาพ 3 มิติแล้ว ไม่ต้องแสดงข้อมูลตรวจรอยต่อ
   updateNote3d();
 }
 function drawPanel() {
@@ -231,6 +244,7 @@ function apply(d) {
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
   if (Array.isArray(d.spans) && d.spans.length) spans = d.spans.map((s) => ({ cc: +s.cc || 1500, n: +s.n || 1 }));
   ["gp", "sv", "sh"].forEach((k) => { if (d[k] !== undefined) { const v = +d[k]; $(k).value = (v >= 1 ? v / 1000 : v).toFixed(3); } });
+  if (!+d.wh) $("wh").value = "";
   stackSel = +d.stackSel || 0;
   (d.md === "sp" ? $("mdP") : $("mdS")).checked = true;
   renderSpans(); renderRows(); run();
@@ -250,7 +264,7 @@ async function loadProject(id) {
   try {
     const row = await getProject(id);
     if (!row) { msg("ไม่พบโครงการนี้"); return; }
-    apply(row.data); curId = id; msg("เปิดโครงการแล้ว");
+    apply(row.data); curId = id; lastSaved = snapshot(); msg("เปิดโครงการแล้ว");
   } catch (e) { msg("เปิดโครงการไม่ได้ ลองใหม่อีกครั้ง"); }
 }
 $("bSave").onclick = async () => {
@@ -259,6 +273,7 @@ $("bSave").onclick = async () => {
   try {
     curId = await saveProject({ id: curId, form: collect(), user });
     try { history.replaceState(null, "", "#" + curId); } catch (e) {}
+    lastSaved = snapshot();
     msg("บันทึกแล้ว • กด \"คัดลอกลิงก์โครงการ\" เพื่อส่งให้ทีมเปิดดู (ต้องล็อกอินก่อน)"); refreshList();
   } catch (e) { msg("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); }
 };
@@ -268,9 +283,24 @@ $("bLink").onclick = async () => {
   try { await navigator.clipboard.writeText(url); msg("คัดลอกลิงก์โครงการแล้ว • ส่งให้ทีมเปิดดูได้ (ต้องล็อกอินก่อน)"); }
   catch (e) { window.prompt("คัดลอกลิงก์นี้", url); }
 };
+// เริ่มโครงการใหม่: ล้างทุกช่อง (เก็บชื่อผู้ขายไว้) ช่องเสาเข็มกลับเป็นว่าง และไม่แสดงแบบจนกว่าจะเลือกและใส่ขนาด
+const snapshot = () => JSON.stringify(collect());
+let lastSaved = null; // snapshot ล่าสุดที่บันทึก/เปิด/เริ่มใหม่ ใช้ถามยืนยันเมื่อมีงานค้าง
+const isDirty = () => ($("pj").value.trim() || $("pt").value) && snapshot() !== lastSaved;
+function resetAll() {
+  const seller = $("sa").value;
+  $("f").reset(); $("sa").value = seller;
+  spans = [{ cc: 1500, n: 10 }]; orderRows = [{ WT: 0, H: 1000, qty: 0 }];
+  stackSel = 0; curId = null; orderAllowance = 20;
+  try { localStorage.removeItem("wp-draft"); } catch (e) {}
+  try { history.replaceState(null, "", "#view3d"); } catch (e) {}
+  renderSpans(); renderRows(); show("view3d"); run();
+  lastSaved = snapshot();
+  msg("เริ่มโครงการใหม่แล้ว");
+}
 $("bNew").onclick = () => {
-  curId = null; try { history.replaceState(null, "", "#view3d"); } catch (e) {}
-  $("pj").value = ""; $("cu").value = ""; spans = [{ cc: 1500, n: 10 }]; orderRows = [{ WT: 1370, H: 1000, qty: 10 }]; $("rf").value = ""; $("omW").checked = true; renderSpans(); renderRows(); run(); msg("เริ่มโครงการใหม่แล้ว");
+  if (isDirty() && !window.confirm("โครงการนี้ยังไม่ได้บันทึก หรือมีการแก้ไขที่ยังไม่ได้บันทึก\nต้องการเริ่มโครงการใหม่และล้างข้อมูลทั้งหมดใช่ไหม")) return;
+  resetAll();
 };
 $("bAdd").onclick = () => {
   if (!editable) { msg("บัญชีนี้ดูได้อย่างเดียว"); return; }
@@ -313,8 +343,8 @@ function enter(u) {
   $("deny").hidden = true; $("app").hidden = false;
   editable = canEdit(u);
   $("uName").textContent = u.name; $("roTag").hidden = editable;
-  $("bSave").disabled = !editable;
-  renderSpans(); renderRows(); loadDraft(); run();
+  setActions(!!STATE);
+  renderSpans(); renderRows(); lastSaved = snapshot(); loadDraft(); run();
   const h0 = location.hash.slice(1);
   show(PANES.includes(h0) ? h0 : "view3d");
   refreshList();
@@ -325,7 +355,7 @@ function boot() {
   const out = () => { logout(); location.reload(); };
   $("bOut").onclick = out; $("bDenyOut").onclick = out;
   const s = getSession();
-  if (s) { enter(s); syncSession(s).then((fresh) => { if (fresh !== s && JSON.stringify(fresh) !== JSON.stringify(s)) { user = fresh; editable = canEdit(fresh); $("roTag").hidden = editable; $("bSave").disabled = !editable; if (!canUse(fresh)) enter(fresh); } }); }
+  if (s) { enter(s); syncSession(s).then((fresh) => { if (fresh !== s && JSON.stringify(fresh) !== JSON.stringify(s)) { user = fresh; editable = canEdit(fresh); $("roTag").hidden = editable; setActions(!!STATE); if (!canUse(fresh)) enter(fresh); } }); }
   else showLogin($("login"), enter);
 }
 boot();
