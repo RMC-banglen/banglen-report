@@ -1,7 +1,7 @@
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010303";
-import { fmt, f2, f3 } from "./calc.js?v=202611010303";
+import { WG, PIPE_NAME as PN, barName as NM } from "./standards.js?v=202611010305";
+import { fmt, f2, f3 } from "./calc.js?v=202611010305";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -25,7 +25,7 @@ const bx=X(x0+12);A(`<polyline points="${bx},${Y(-G.T/2)-6} ${bx},${Y(-8)} ${bx-
 L(X(pf),Y(-m),X(pf),Y(m),"var(--muted)",.6,"3 3");
 dimLine(X(te-G.TP),X(te),Y(-G.T/4),"ลิ่ม "+f3(G.TP));
 const yc=Y(G.T/4);L(X(pf),yc,X(wf),yc);[pf,te,wf].forEach(x=>tick(X(x),yc));TX(X((pf+te)/2),yc-8,"เสียบ "+f3(F.ze));TX(X(wf)-6,yc+18,f3(F.gr),"end");
-const xs=X(cx+b);chainV([[xs,Y(-m)],[xs,Y(m)]],xs+24,["ปาก "+f3(2*m)]);chainV([[X(cx+p.tw/2),Y(-p.c/2)],[X(cx+p.tw/2),Y(p.c/2)]],xs+62,["ก้น "+f3(p.c)]);
+const xs=X(cx+b);chainV([[xs,Y(-m)],[xs,Y(m)]],xs+24,["ปาก "+f3(2*m)]);chainV([[X(cx+p.tw/2),Y(-p.c/2)],[X(cx+p.tw/2),Y(p.c/2)]],X(cx+p.tw/2)+30,["ก้น "+f3(p.c)]);chainV([[xs,Y(-b)],[xs,Y(b)]],xs+56,["กว้างหน้าตัดเสา "+f3(p.B)]);
 chainV([[bx,Y(-G.T/2)],[bx,Y(G.T/2)]],bx-26,["หนา "+f3(G.T)]);
 chainH([[X(cx-b),Y(-b)],[X(cx+b),Y(-b)]],Y(-b)-26,["กว้างหน้าตัดเสา "+f3(p.B)]);
 const yb=Y(b)+22;chainH([[X(pf),Y(b)],[X(wf),Y(p.c/2)+4]],yb,["ลึกร่อง "+f3(p.dg)]);
