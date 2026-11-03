@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261103031222";
-import { f2, f3, fmt } from "./calc.js?v=20261103031222";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261103031222";
+import { SHOULDER } from "./standards.js?v=20261103075107";
+import { f2, f3, fmt } from "./calc.js?v=20261103075107";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261103075107";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -44,11 +44,10 @@ const KK=.001,RHSC=0x0F6E56,FBC=0x5DCAA5,HBC=0x378ADD,PSTC=0x085041,AGL=0x3B6D11
 const rect=(u0,u1,v0,v1)=>[[u0,v0],[u1,v0],[u1,v1],[u0,v1]];
 const boxU=a=>[rect(a,a+4.5,0,100),rect(a+45.5,a+50,0,100),rect(a+4.5,a+45.5,0,4.5),rect(a+4.5,a+45.5,95.5,100)];
 const angU=a=>[[a,0],[a+50,0],[a+50,5],[a+5,5],[a+5,50],[a,50]];
-const KB=[[50,0],[90,0],[90,4],[54,4],[54,40],[50,40]];
 const RAIL={A:[[0,110],[70,94.1],[70,15.9],[0,0],[0,5.2],[65,20],[65,90],[0,104.8]],B:[[0,0],[17.7,0],[90,21.2],[90,78.8],[17.7,100],[0,100],[85,75],[85,25]]};
 const RIB={A:H=>[[-H,110],[H,110],[H-70,94.1],[H-70,15.9],[H,0],[-H,0],[-(H-70),15.9],[-(H-70),94.1]],B:H=>[[-(H-17.7),100],[H-17.7,100],[H-90,78.8],[H-90,21.2],[H-17.7,0],[-(H-17.7),0],[-(H-90),21.2],[-(H-90),78.8]]};
 const CLIP=[[106,13.5],[112,13.5],[119,10.5],[123,3],[123,-6],[119,-13],[112,-16],[90,-16],[76,-16],[71,-20],[71,-30],[71,-55]];
-const SU=57,MU=150.5,MG=211,CS=55,HOLES=[-75,-25,25,75],BLK=23;
+const SU=57,MU=160.5,MG=221,CS=55,HOLES=[-75,-25,25,75],BLK=23;
 let ren=null,sc,cam,g3,th=-.7,ph=.95,rr=7,R0=7,showC=true,concs=[],secTh=0;const tg=new THREE.Vector3(),T0=new THREE.Vector3();const MM={};
 const mat=c=>MM[c]||(MM[c]=new THREE.MeshLambertMaterial({color:c,side:THREE.DoubleSide}));
 const cMat=new THREE.MeshLambertMaterial({color:0x9FE1CB,transparent:true,opacity:.8,side:THREE.DoubleSide});
@@ -62,7 +61,7 @@ function clipAt(g,off,zl,dy){tube(g,CLIP.map(q=>new THREE.Vector3((q[0]+off)*KK,
 function lugAt(g,thk,zl){const l=new THREE.Mesh(new THREE.BoxGeometry(45*KK,10*KK,80*KK),mat(PBC));l.position.set((thk-22.5)*KK,-5*KK,zl*KK);g.add(l)}
 function railT(P,fz,cd,x0,L){const g=new THREE.Group();if(cd>0){g.position.set(x0*KK,0,fz*KK);g.rotation.y=Math.PI/2}else{g.position.set((x0+L)*KK,0,fz*KK);g.rotation.y=-Math.PI/2}P.add(g);return g}
 function side(G,ty,fz,cd,x0,L,bot,Tt){const zl=x=>cd>0?x-x0:x0+L-x,b=railT(G,fz,cd,x0,L);boxU(0).forEach(p=>ex(b,p,0,L,RHSC));ex(b,rect(0,50,0,100),0,6,CAP);ex(b,rect(0,50,0,100),L-6,6,CAP);if(ty==="A")ex(b,rect(0,50,100,110),0,L,FBC);
-ex(b,bot?angU(50):KB,0,L,AGL);ex(b,rect(64,114,Tt-10,Tt),0,L,SLT);const sp=[];for(let p=75;p<L;p+=150){ex(b,bot?rect(50,114,50,Tt-10):rect(50,114,66,Tt-10),p-3,6,SLT);sp.push(cd>0?x0+p:x0+L-p)}
+ex(b,angU(50),0,L,AGL);ex(b,rect(64,114,Tt-10,Tt),0,L,SLT);const sp=[];for(let p=75;p<L;p+=150){ex(b,bot?rect(50,114,50,Tt-10):rect(50,114,66,Tt-10),p-3,6,SLT);sp.push(cd>0?x0+p:x0+L-p)}
 return{zl,sp,g:b}}
 function wedge(G,ty,TD,fx,cd,z0,H,bot){const g=new THREE.Group();g.position.set(fx*KK,0,z0*KK);if(cd>0)g.scale.x=-1;G.add(g);ex(g,RAIL[ty],0,H,0x888780);boxU(TD).forEach(p=>ex(g,p,0,H,RHSC));if(ty==="A")ex(g,rect(TD,TD+50,100,110),0,H,FBC);ex(g,rect(TD,TD+50,0,100),0,6,CAP);ex(g,rect(TD,TD+50,0,100),H-6,6,CAP);if(bot)ex(g,angU(TD+50),0,H,AGL);return g}
 function post(g,cx,zf,dir,Tt){const za=dir>0?zf+9:zf-59,zw=dir>0?zf+9:zf-14;bx(g,cx-70,zw,140,5,0,Tt,PSTC);bx(g,cx-70,za,5,50,0,Tt,PSTC);bx(g,cx+65,za,5,50,0,Tt,PSTC)}
@@ -74,7 +73,7 @@ const zB0=dir>0?zf-120:zf+10;bx(G,cx-105,zB0,210,110,Tt,Tt+10,PBC);bx(G,cx-22,zf
 const ok=HOLES.map(o=>cx+o).filter(h=>!sp.some(s=>Math.abs(h-s)<BLK)),use=ok.length>=2?[ok[0],ok[ok.length-1]]:ok;use.forEach(x=>bolt(G,x,zf,dir,Tt+10,Tt));
 cylZ(G,10,100,cx,PY,zf+dir*25,RED);cylX(G,10,45,cx-22,PY,zf-dir*25,RED)}
 function magnet(G,zf,xc,Tt){const mc=zf+MU;bx(G,xc-160,mc-60,320,120,0,60,0x444441);cyl(G,31.5,35,xc,77,mc,0xD3D1C7);cyl(G,10,4,xc,96,mc,RED);
-[xc-135,xc+135].forEach(ax=>{bx(G,ax-25,zf+40,50,130,Tt+21,Tt+25,BRC);bx(G,ax-25,zf+40,5,130,Tt,Tt+21,BRC);bx(G,ax+20,zf+40,5,130,Tt,Tt+21,BRC);cyl(G,15,Tt-60,ax,(Tt+60)/2,mc,0x888780);cyl(G,13,8,ax,Tt+29,mc,RED,6);bolt(G,ax,zf,-1,Tt+25,Tt)})}
+[xc-135,xc+135].forEach(ax=>{bx(G,ax-25,zf+40,50,140,Tt+21,Tt+25,BRC);bx(G,ax-25,zf+40,5,140,Tt,Tt+21,BRC);bx(G,ax+20,zf+40,5,140,Tt,Tt+21,BRC);cyl(G,15,Tt-60,ax,(Tt+60)/2,mc,0x888780);cyl(G,13,8,ax,Tt+29,mc,RED,6);bolt(G,ax,zf,-1,Tt+25,Tt)})}
 function hX(G,x0,x1,ze,dir){const z=dir>0?ze:ze-75;bx(G,x0,z,x1-x0,75,-16,-9,HBC);bx(G,x0,z+35,x1-x0,5,-159,-16,HBC);bx(G,x0,z,x1-x0,75,-166,-159,HBC)}
 function hZ(G,z0,z1,xe,dir){const x=dir>0?xe:xe-75;bx(G,x,z0,75,z1-z0,-16,-9,HBC);bx(G,x+35,z0,5,z1-z0,-159,-16,HBC);bx(G,x,z0,75,z1-z0,-166,-159,HBC)}
 function upd(){if(!ren)return;ph=Math.max(.05,Math.min(1.6,ph));rr=Math.max(.12,Math.min(30,rr));cam.position.set(tg.x+rr*Math.sin(ph)*Math.sin(th),tg.y+rr*Math.cos(ph),tg.z+rr*Math.sin(ph)*Math.cos(th));cam.lookAt(tg);ren.render(sc,cam)}

@@ -47,7 +47,7 @@ export const PIPE_NAME = { 34: '1"', 48: '1½"', 60: '2"', 76: '2½"', 89: '3"' 
 export const STD = { dv: 6, sv: 200, dh: 9, sh: 200, cv: 25, oh: 25, pd: 48 };
 
 // โต๊ะหล่อ 5×20 ฟุต
-export const TABLE = { TL: 6096, TW: 1524, LF: 6000, CS: 55, MG: 211, TDV: 60 };
+export const TABLE = { TL: 6096, TW: 1524, LF: 6000, CS: 55, MG: 221, TDV: 60 };
 
 export const CONCRETE_DENSITY = 2400; // กก./ลบ.ม.
 export const DEFAULT_ALLOWANCE = 20; // ค่าเผื่อ มม./ข้าง
