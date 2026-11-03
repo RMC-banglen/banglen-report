@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261101124857";
+} from "./standards.js?v=20261103031222";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -288,7 +288,8 @@ export function calcDirect(input) {
     const n = i + 1, WT = Math.round(r.WT), H = Math.round(r.H), qty = Math.floor(r.qty);
     if (!(WT > 0) || !(qty >= 1)) { al.push(["d", `รายการที่ ${n}: ใส่ความกว้างและจำนวนแผ่น (อย่างน้อย 1 แผ่น)`]); return; }
     if (!HS.includes(H)) { al.push(["d", `รายการที่ ${n}: ความสูงต้องเป็นขนาดมาตรฐาน 0.50 / 0.75 / 1.00 / 1.20 ม.`]); return; }
-    const WTr = Math.floor(WT / 10) * 10;
+    const WTr = Math.floor(WT / 10) * 10, sk = Math.min(MAX_STACK, Math.max(1, Math.floor(r.st) || 1));
+    if (qty % sk) al.push(["w", `รายการที่ ${n}: ซ้อนกัน ${sk} แผ่น แต่จำนวน ${fmt(qty)} แผ่นหารไม่ลงตัว`]);
     if (WT % 10) al.push(["w", `รายการที่ ${n}: ความกว้าง ${f2(WT)} ม. ไม่ลงทุก 0.01 ม. ปัดลงเป็น ${f2(WTr)} ม.`]);
     // กลาง/กลางเสา: ถ้าใส่ค่าหน้างานมาใช้ค่านั้น ไม่ใส่ = แนะนำจากกว้างรวม + เอวเสา + 2×ค่าเผื่อ
     const actual = r.cc > 0 ? Math.round(r.cc) : null;
@@ -303,8 +304,8 @@ export function calcDirect(input) {
     const it = getItem(items, G, S, WTr, H, al);
     it.qty += qty;
     it.cc.add(cc);
-    const key = cc + "|" + WTr + "|" + H;
-    const gr = groups.get(key) || { cc, n: 0, F, stk: [H], WT: WTr };
+    const key = cc + "|" + WTr + "|" + H + "|" + sk;
+    const gr = groups.get(key) || { cc, n: 0, F, stk: Array(sk).fill(H), WT: WTr };
     gr.n += qty; groups.set(key, gr);
   });
   if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);

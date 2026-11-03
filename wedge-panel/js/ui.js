@@ -1,14 +1,14 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS } from "./standards.js?v=20261101124857";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261103031222";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261101124857";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261101124857";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261101124857";
-import { createViews } from "./view3d.js?v=20261101124857";
-import { makePdf } from "./pdf.js?v=20261101124857";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261101124857";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261101124857";
+} from "./calc.js?v=20261103031222";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261103031222";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261103031222";
+import { createViews } from "./view3d.js?v=20261103031222";
+import { makePdf } from "./pdf.js?v=20261103031222";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261103031222";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261103031222";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -39,8 +39,9 @@ function renderRows() {
   const box = $("orows"); box.innerHTML = "";
   orderRows.forEach((r, i) => {
     const d = document.createElement("div"); d.className = "oitem";
-    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select><option value="" ${r.H ? "" : "selected"}>เลือก</option>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>`;
-    const [w, q] = d.querySelectorAll("input"), h = d.querySelector("select");
+    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select><option value="" ${r.H ? "" : "selected"}>เลือก</option>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div><div class="orow2"><label>ซ้อนกันกี่แผ่น (1 = ไม่ซ้อน)</label><input type="number" class="stk" min="1" max="${MAX_STACK}" step="1" value="${r.st || 1}"></div>`;
+    const [w, q, sk] = d.querySelectorAll("input"), h = d.querySelector("select");
+    sk.oninput = () => { r.st = Math.min(MAX_STACK, Math.max(1, Math.floor(+sk.value) || 1)); sched(); };
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
     h.onchange = () => { r.H = +h.value || 0; run(); };
     q.oninput = () => { r.qty = toInt(q.value); sched(); };
@@ -68,6 +69,8 @@ function renderStdChips(Ht) {
   }
   box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.h === Ht ? "true" : "false"));
 }
+// ข้อความความสูงของกลุ่มในโหมดสั่งตามจำนวนแผ่น: แผ่นเดียว = "สูง 1.00 ม." / ซ้อน = "ซ้อน 2 แผ่น สูงรวม 2.00 ม."
+const stkTxt = (gr) => (gr.stk.length > 1 ? `ซ้อน ${gr.stk.length} แผ่น สูงรวม ${f2(gr.stk.reduce((a, b) => a + b, 0))} ม.` : `สูง ${f2(gr.stk[0])} ม.`);
 function drawStackVis(a) {
   const v = $("stkVis");
   if (!a) { v.innerHTML = ""; return; }
@@ -131,7 +134,7 @@ function run() {
   let r;
   if (direct) {
     if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1 && HS.includes(x.H))) return showEmpty();
-    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, H: r.H, qty: r.qty })), spec: S, truckKg: truck });
+    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, H: r.H, qty: r.qty, st: r.st || 1 })), spec: S, truckKg: truck });
     r.ref = $("rf").value.trim();
   } else {
     const op = renderStack();
@@ -153,7 +156,7 @@ ${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div 
 <div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${nf(totW / 1000, 1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
   $("alerts").innerHTML = r.al.map((a) => `<div class="al ${a[0]}">${esc(a[1])}</div>`).join("");
   $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ") || "-"}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
-  fillSelect("sel3", r.groups.map((gr, i) => [String(i), gr.stk ? `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • สูง ${f2(gr.stk[0])} ม. • ${fmt(gr.n)} แผ่น` : `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${fmt(gr.n)} ช่วง`]));
+  fillSelect("sel3", r.groups.map((gr, i) => [String(i), gr.stk ? `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${stkTxt(gr)} • ${fmt(gr.n)} แผ่น` : `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${fmt(gr.n)} ช่วง`]));
   const optItem = list.map((i) => [i.code, `${i.code} • สูง ${(i.H / 1000).toFixed(2)} × กว้าง ${f2(i.WT)}`]);
   fillSelect("selD", optItem); fillSelect("selT", optItem);
   renderProd(); drawJoint(); drawPanel();
@@ -273,7 +276,7 @@ function apply(d) {
   (d.sm === "man" ? $("smM") : $("smL")).checked = true;
   (d.om === "direct" ? $("omD") : $("omW")).checked = true;
   $("shOn").checked = !!d.shOn; if (d.shMode) $("shMode").value = d.shMode; if (d.shDrop !== undefined) $("shDrop").value = (+d.shDrop / 1000).toFixed(2);
-  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 0, H: HS.includes(+r.H) ? +r.H : 0, qty: +r.qty || 0 }));
+  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 0, H: HS.includes(+r.H) ? +r.H : 0, qty: +r.qty || 0, st: Math.min(MAX_STACK, Math.max(1, Math.floor(+r.st) || 1)) }));
   orderAllowance = +d.ga > 0 ? +d.ga : 20;
   tableAlloc = d.ta && typeof d.ta === "object" ? { ...d.ta } : null;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
