@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-03a';
+var APP_VERSION='2026-11-03b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4811,7 +4811,7 @@ window.__dataReady.then(data => {
         let s=FORMULA_SHAPES[n]||SHAPES[i%SHAPES.length];
         if(used.has(c+'|'+s)){
           for(let k=0;k<COLORS.length*SHAPES.length;k++){
-            const c2=COLORS[k%COLORS.length], s2=SHAPES[k%SHAPES.length];
+            const c2=COLORS[k%COLORS.length], s2=SHAPES[Math.floor(k/COLORS.length)%SHAPES.length];
             if(!used.has(c2+'|'+s2)){c=c2;s=s2;break;}
           }
         }
@@ -4931,11 +4931,12 @@ window.__dataReady.then(data => {
 
     // แจกสี/รูปจากรายการเส้นที่จะวาดจริง (สูตร × อายุ) ด้วยตัวเดียวกับกราฟอื่น
     // เดิมคิด index เอง แล้วสีกับรูปชนกันได้เหมือนกราฟ Strength Curve
+    const c1Forms=activeForms.filter(f=>activeAges.some(a=>filt.some(r=>fm(r)===f&&ag(r)===a)));   // สูตรที่มีเส้นในกราฟจริง
     const c1Labels=[];
-    activeForms.forEach(f=>activeAges.forEach(a=>c1Labels.push(f+'|'+a)));
+    c1Forms.forEach(f=>activeAges.forEach(a=>c1Labels.push(f+'|'+a)));
     const c1Style=styleFor(c1Labels);
     const c1Series=[];
-    activeForms.forEach(f=>{
+    c1Forms.forEach(f=>{
       activeAges.forEach(a=>{
         const st=c1Style[f+'|'+a];
         const label=activeAges.length>1?`${f} Day${a}`:f;
