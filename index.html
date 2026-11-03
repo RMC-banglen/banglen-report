@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-03b';
+var APP_VERSION='2026-11-03c';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -10994,6 +10994,7 @@ window.__dataReady.then(data => {
     const [spareTargetChoice,setSpareTargetChoice]=useState({}); // key เดียวกับ spareAssign -> "vt||driverName" ปลายทางที่เลือกเอง (ถ้าไม่เลือก ใช้ spareTargetFor อัตโนมัติ)
     const [spareDayAssign,setSpareDayAssign]=useState({}); // key -> {day: จำนวนเที่ยวที่ระบุเจาะจงวัน} ถ้ามีจะใช้แทนยอดรวมแบบหักอัตโนมัติ
     const [expandSpareDay,setExpandSpareDay]=useState(null); // key ของแถวที่กำลังเปิดแก้ไขวันที่
+    const [extraMoves,setExtraMoves]=useState({}); // key คนขับ -> จำนวนรถสำรองที่ไปขับเพิ่มจากคันแรก (คันที่ 2,3,... ใช้ key เป็น "key#2", "key#3")
     const allDrivers=[...new Map(rows.map(r=>[r.vehicle_type+'||'+r.driver_name,{vt:r.vehicle_type,name:r.driver_name}])).values()];
     // หาปลายทางรถสำรองให้เหมาะกับคนขับต้นทาง: ถ้าเป็นกลุ่ม "บ่อตะกั่ว" ให้ไปรถบ่อตะกั่วของ 10ล้อ-12ล้อ ไม่งั้นไปรถสำรองปกติ
     const spareTargetFor=(driverName,vt)=>{
@@ -11282,7 +11283,7 @@ window.__dataReady.then(data => {
           const snapped=parsed.filter(r=>{const dim=daysInMonth(r.year,r.month);return maxDayOf[r.year+'|'+r.month]>=dim?true:r.day<=15;});
           const dropped=parsed.filter(r=>!snapped.includes(r));
           setImportDropped(dropped.length?{trips:dropped.reduce((s,r)=>s+r.trips,0),days:[...new Set(dropped.map(r=>r.day))].sort((a,b)=>a-b),months:[...new Set(dropped.map(r=>MO[r.month-1]))]}:null);
-          setImportRows(snapped);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);setShowImport(true);
+          setImportRows(snapped);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);setExtraMoves({});setShowImport(true);
         }catch(err){alert('อ่านไฟล์ไม่สำเร็จ: '+err.message);}
       };
       reader.readAsArrayBuffer(file);
@@ -11295,7 +11296,7 @@ window.__dataReady.then(data => {
       Object.entries(spareAssign).forEach(([key,amount])=>{
         amount=Number(amount)||0;
         if(amount<=0)return;
-        const [vt,name]=key.split('|');
+        const [vt,name]=key.replace(/#\d+$/,'').split('|');   // key#2 = รถสำรองคันที่ 2 ของคนขับเดียวกัน
         const choice=spareTargetChoice[key];
         if(!choice)return;
         // choice = "veh:<id>" (เลือกเป็นทะเบียน หาแถวของคนขับประจำตามวันที่ของเที่ยว) หรือ "vt||ชื่อแถว" แบบเดิม
@@ -11412,7 +11413,7 @@ window.__dataReady.then(data => {
       if(ins.length)({error:insErr}=await insertTrips(ins));
       setImporting(false);
       if(insErr){alert('นำเข้าไม่สำเร็จ: '+insErr.message);return;}
-      setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);fetch();
+      setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);setExtraMoves({});fetch();
     }
 
     function openEdit(type,name){
@@ -12213,7 +12214,7 @@ window.__dataReady.then(data => {
         </div>
       </div>}
 
-      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);}}}>
+      {showImport&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onMouseDown={e=>{if(e.target===e.currentTarget)e.currentTarget._bd=true;}} onClick={e=>{if(e.currentTarget._bd){e.currentTarget._bd=false;setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);setExtraMoves({});}}}>
         <div style={{background:'#fff',borderRadius:16,padding:24,width:'100%',maxWidth:640,maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
           <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>ตรวจสอบข้อมูลก่อนนำเข้า</div>
           {(()=>{
@@ -12316,21 +12317,14 @@ window.__dataReady.then(data => {
                     <th style={{textAlign:'right',padding:'6px 8px',borderBottom:'1px solid #e2e8f0'}}>จำนวนเที่ยวที่ไปขับแทน</th>
                   </tr></thead>
                   <tbody>
-                    {drivers.map((d,i)=>{
-                      const key=d.vt+'|'+d.name;
-                      const choice=spareTargetChoice[key]||'';
-                      return<tr key={key} style={{background:i%2?'#fcfcfd':'#fff'}}>
-                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
-                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name.startsWith(UNKNOWN_PREFIX)?d.name:nameOnly(d.name)}</td>
-                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',color:(d.name.match(PLATE_RE)||[])[1]?'#1e293b':'#94a3b8'}}>{(d.name.match(PLATE_RE)||[])[1]||'–'}</td>
-                        <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
-                        <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
+                    {(()=>{
+                      const selectCell=(d,mk)=>{const choice=spareTargetChoice[mk]||'';return(
                         <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
                           <select value={choice} onChange={e=>{
                             const v=e.target.value;
-                            setSpareTargetChoice(s=>{const n={...s};if(v)n[key]=v;else delete n[key];return n;});
-                            if(v&&!spareAssign[key])setSpareAssign(s=>({...s,[key]:1}));
-                            if(!v)setSpareAssign(s=>{const n={...s};delete n[key];return n;});
+                            setSpareTargetChoice(s=>{const n={...s};if(v)n[mk]=v;else delete n[mk];return n;});
+                            if(v&&!spareAssign[mk])setSpareAssign(s=>({...s,[mk]:1}));
+                            if(!v)setSpareAssign(s=>{const n={...s};delete n[mk];return n;});
                           }} style={{width:'100%',padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11}}>
                             <option value="">-- ไม่ย้าย --</option>
                             {master.vehicles.length?(()=>{
@@ -12355,18 +12349,48 @@ window.__dataReady.then(data => {
                               </optgroup>);
                             })():allDrivers.filter(o=>!(o.vt===d.vt&&o.name===d.name)).map(o=><option key={o.vt+'||'+o.name} value={o.vt+'||'+o.name}>{o.name} ({o.vt})</option>)}
                           </select>
+                          {(()=>{const base=mk.replace(/#\d+$/,''),myN=mk===base?1:Number(mk.split('#')[1]),lastN=1+(extraMoves[base]||0);
+                            return<div style={{display:'flex',gap:8,marginTop:3,flexWrap:'wrap'}}>
+                              {choice&&myN===lastN&&<button onClick={()=>setExtraMoves(x=>({...x,[base]:(x[base]||0)+1}))} style={{padding:'1px 8px',border:'1px dashed #93c5fd',borderRadius:5,background:'#eff6ff',color:'#1d4ed8',fontSize:10.5,cursor:'pointer'}}>+ ไปขับรถสำรองอีกคัน</button>}
+                              {myN>1&&<button onClick={()=>{setExtraMoves(x=>({...x,[base]:Math.max(0,(x[base]||0)-1)}));setSpareTargetChoice(x=>{const n={...x};delete n[mk];return n;});setSpareAssign(x=>{const n={...x};delete n[mk];return n;});setSpareDayAssign(x=>{const n={...x};delete n[mk];return n;});if(expandSpareDay===mk)setExpandSpareDay(null);}} style={{padding:'1px 8px',border:'1px solid #fecaca',borderRadius:5,background:'#fff',color:'#dc2626',fontSize:10.5,cursor:'pointer'}}>✕ เอาคันนี้ออก</button>}
+                            </div>;})()}
                         </td>
+
+                      );};
+                      const countCell=(d,mk)=>{const choice=spareTargetChoice[mk]||'';return(
                         <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>
                           {choice?<div style={{display:'flex',alignItems:'center',gap:6,justifyContent:'flex-end'}}>
-                            <input type="number" min="0" max={d.total} value={spareAssign[key]} onChange={e=>setSpareAssign(s=>({...s,[key]:e.target.value}))} style={{width:50,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>
-                            <button onClick={()=>setExpandSpareDay(expandSpareDay===key?null:key)} style={{padding:'2px 6px',border:'1px solid #c7d2fe',borderRadius:5,background:expandSpareDay===key?'#e0e7ff':'#fff',color:'#3730a3',fontSize:10,cursor:'pointer',whiteSpace:'nowrap'}}>{expandSpareDay===key?'ปิด':'ระบุวันที่'}</button>
+                            <input type="number" min="0" max={d.total} value={spareAssign[mk]??''} onChange={e=>setSpareAssign(s=>({...s,[mk]:e.target.value}))} style={{width:50,padding:'3px 6px',border:'1px solid #e2e8f0',borderRadius:6,fontSize:11,textAlign:'right'}}/>
+                            <button onClick={()=>setExpandSpareDay(expandSpareDay===mk?null:mk)} style={{padding:'2px 6px',border:'1px solid #c7d2fe',borderRadius:5,background:expandSpareDay===mk?'#e0e7ff':'#fff',color:'#3730a3',fontSize:10,cursor:'pointer',whiteSpace:'nowrap'}}>{expandSpareDay===mk?'ปิด':'ระบุวันที่'}</button>
                           </div>:'–'}
                         </td>
-                      </tr>;
-                    })}
-                    {expandSpareDay&&drivers.some(d=>d.vt+'|'+d.name===expandSpareDay)&&(()=>{
+
+                      );};
+                      return drivers.map((d,i)=>{
+                        const key=d.vt+'|'+d.name;
+                        const extra=extraMoves[key]||0;
+                        const bg=i%2?'#fcfcfd':'#fff';
+                        return<React.Fragment key={key}>
+                          <tr style={{background:bg}}>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.vt}</td>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9'}}>{d.name.startsWith(UNKNOWN_PREFIX)?d.name:nameOnly(d.name)}</td>
+                        <td style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',whiteSpace:'nowrap',color:(d.name.match(PLATE_RE)||[])[1]?'#1e293b':'#94a3b8'}}>{(d.name.match(PLATE_RE)||[])[1]||'–'}</td>
+                        <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',fontWeight:700}}>{d.total}</td>
+                        <td style={{textAlign:'right',padding:'5px 8px',borderBottom:'1px solid #f1f5f9',color:'#94a3b8'}}>{d.days}</td>
+                            {selectCell(d,key)}
+                            {countCell(d,key)}
+                          </tr>
+                          {Array.from({length:extra},(_,n)=>{const mk=key+'#'+(n+2);return<tr key={mk} style={{background:bg}}>
+                            <td colSpan={5} style={{padding:'5px 8px',borderBottom:'1px solid #f1f5f9',textAlign:'right',color:'#64748b',fontSize:10.5}}>↳ {nameOnly(d.name)} ไปขับรถสำรองคันที่ {n+2}</td>
+                            {selectCell(d,mk)}
+                            {countCell(d,mk)}
+                          </tr>;})}
+                        </React.Fragment>;
+                      });
+                    })()}
+                    {expandSpareDay&&drivers.some(d=>d.vt+'|'+d.name===expandSpareDay.replace(/#\d+$/,''))&&(()=>{
                       const key=expandSpareDay;
-                      const [dvt,dname]=key.split('|');
+                      const [dvt,dname]=key.replace(/#\d+$/,'').split('|');
                       // รวมแถวที่วันเดียวกัน (มาจากคนละชุดเลขที่บิล) เป็นวันเดียว โชว์ยอดรวมเที่ยวของวันนั้น
                       const dayTotals={};
                       importRows.filter(r=>r.vehicle_type===dvt&&r.driver_name===dname).forEach(r=>{dayTotals[r.day]=(dayTotals[r.day]||0)+r.trips;});
@@ -12399,7 +12423,7 @@ window.__dataReady.then(data => {
             </>;
           })()}
           <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-            <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
+            <button onClick={()=>{setShowImport(false);setImportRows([]);setSpareAssign({});setSpareTargetChoice({});setSpareDayAssign({});setExpandSpareDay(null);setExtraMoves({});}} style={{padding:'9px 18px',borderRadius:8,border:'1px solid #e2e8f0',background:'#f8fafc',color:'#64748b',fontSize:14,cursor:'pointer'}}>ยกเลิก</button>
             {(()=>{const blocked=importRows.some(r=>r.driver_name.startsWith(UNKNOWN_PREFIX));return<button onClick={confirmImport} disabled={importing||blocked} title={blocked?'เลือกชื่อที่ไม่มีในระบบให้ครบก่อน':undefined} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#2f5fd0',color:'#fff',fontSize:14,fontWeight:700,cursor:blocked?'not-allowed':'pointer',opacity:importing||blocked?0.5:1}}>{importing?'กำลังนำเข้า...':'ยืนยันนำเข้า'}</button>;})()}
           </div>
         </div>
