@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-29o';
+var APP_VERSION='2026-11-03a';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4763,6 +4763,8 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  // ชื่อสูตรคอนกรีต: "NP 325" กับ "NP325" คือสูตรเดียวกัน (พิมพ์เว้นวรรคต่างกัน) → รวมเป็นชื่อเดียว · ส่วนต่อท้ายที่เป็นสูตรแยกจริง เช่น "NP315 CK" "NP360 P" ยังแยกไว้
+  const normFormula=s=>String(s==null?'':s).replace(/[\s\u00a0]+/g,' ').trim().replace(/^([A-Za-z]{1,3})\s+(?=\d)/,'$1');
   function ConcreteView({year,canEdit}){
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
@@ -4826,7 +4828,7 @@ window.__dataReady.then(data => {
         db.from('concrete_results').select('*').order('sample_date'),
         db.from('materials_daily').select('*').order('id')
       ]).then(([cr,mr])=>{
-        const data=cr.data||[];
+        const data=(cr.data||[]).map(r=>r.formula_name==null?r:{...r,formula_name:normFormula(r.formula_name)});
         const mats=mr.data||[];
         setRows(data);
         setMaterials(mats);
@@ -4950,7 +4952,7 @@ window.__dataReady.then(data => {
     });
 
     // แอมป์รอบเก็บก้อน ต่อ (วันเก็บ × สูตร) — หลายรอบในวันเดียวกันใช้ค่าเฉลี่ย · สี/รูปเดียวกับเส้นกำลังอัดของสูตรนั้น
-    const nf=s=>String(s||'').trim().toUpperCase();
+    const nf=s=>normFormula(s).toUpperCase();
     const c1AmpSeries=activeForms.filter(f=>cubeAmp.some(a=>nf(a.formula)===nf(f)&&c1Dates.includes(String(a.d).slice(0,10)))).map(f=>{
       const st=c1Style[f+'|'+activeAges[0]]||{};
       return{label:f+' แอมป์',color:st.color||'#0f766e',shape:st.shape,
@@ -5417,7 +5419,7 @@ window.__dataReady.then(data => {
   // แสดง: จุดรายวัน · ค่าเฉลี่ยกำลังอัดที่แอมป์แต่ละค่า (ปัดเป็นจำนวนเต็ม A) · เส้นแนวโน้ม · แอมป์ที่ควรตั้งเพื่อให้ได้ตามเกณฑ์
   // ============================================================
   function AmpStrengthSection({rows}){
-    const nf=s=>String(s||'').trim().toUpperCase();
+    const nf=s=>normFormula(s).toUpperCase();
     const day=v=>String(v||'').slice(0,10);
     const [amps,setAmps]=useState(null);
     const [selF,setSelF]=useState('');

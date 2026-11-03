@@ -180,6 +180,8 @@ async function postToGas(url,body){
 }
 
 // เกณกำลังอัดตามอายุ (ตรงกับ index.html)
+// ชื่อสูตร: "NP 325" = "NP325" (เว้นวรรคต่างกัน) → บันทึกเป็นชื่อเดียว
+const normFormula=s=>String(s==null?'':s).replace(/[\s\u00a0]+/g,' ').trim().replace(/^([A-Za-z]{1,3})\s+(?=\d)/,'$1');
 function strengthTarget(formula,age){
   const TARGET_NORMAL={1:350,3:415,5:435,7:450};
   const TARGET_NP280={1:340,7:420};
@@ -265,7 +267,7 @@ function ConcreteForm({prefill,onDone,onBack}){
     setErr('');setSaving(true);
     const body={
       cast_date:castDate,test_date:testDate,age,
-      formula:formula.trim(),cube_size:cubeSize,
+      formula:normFormula(formula),cube_size:cubeSize,
       luk1:Number(luk1)||0,luk2:Number(luk2)||0,luk3:Number(luk3)||0,
       avg_kn:res?res.avgKN:0, avg_mpa:res?res.avgMPa:0, avg_ksc:res?res.avgKSC:0,
       w1:Number(w1)||'', w2:Number(w2)||'', w3:Number(w3)||''
@@ -273,7 +275,7 @@ function ConcreteForm({prefill,onDone,onBack}){
     try{
       const r=await postToGas(gasUrl,body);
       if(!r.ok){setErr('บันทึกไม่สำเร็จ: '+r.message);return;}
-      onDone({cast_date:castDate,test_date:testDate,formula:formula.trim(),age,res,note:r.skipped?r.message:''});
+      onDone({cast_date:castDate,test_date:testDate,formula:normFormula(formula),age,res,note:r.skipped?r.message:''});
     }catch(e){
       setErr('บันทึกไม่สำเร็จ: '+e.message);
     }finally{setSaving(false);}

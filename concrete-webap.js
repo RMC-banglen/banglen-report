@@ -42,7 +42,7 @@ function doPost(e) {
     var sampleDate  = data.cast_date   || data.sample_date  || '';
     var testDate    = data.test_date   || '';
     var ageDays     = data.age         || data.age_days     || '';
-    var formulaName = data.formula     || data.formula_name || '';
+    var formulaName = normFormula(data.formula     || data.formula_name || '');
     var cubeSize    = data.cube_size   || '15x15';
     var r1          = data.luk1 != null ? data.luk1 : data.result1_kn;
     var r2          = data.luk2 != null ? data.luk2 : data.result2_kn;
@@ -747,6 +747,11 @@ var SPECIAL_OK  = 386;   // ถึงเท่านี้ = ปรับลด�
 
 function isNP280Formula(f) { return String(f || '').toUpperCase().indexOf('280') >= 0; }
 
+// ชื่อสูตร: "NP 325" = "NP325" (เว้นวรรคต่างกัน) · ส่วนต่อท้ายที่เป็นสูตรแยกจริง เช่น "NP315 CK" ยังแยก
+function normFormula(s) {
+  return String(s == null ? '' : s).replace(/[\s\u00a0]+/g, ' ').trim().replace(/^([A-Za-z]{1,3})\s+(?=\d)/, '$1');
+}
+
 function day1History(formula) {
   var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
   var rows = sh.getDataRange().getValues();
@@ -755,12 +760,12 @@ function day1History(formula) {
   var iAge  = ci['อายุ(วัน)'] !== undefined ? ci['อายุ(วัน)'] : (ci['อายุ (วัน)'] !== undefined ? ci['อายุ (วัน)'] : 2);
   var iForm = ci['ชื่อสูตร'] !== undefined ? ci['ชื่อสูตร'] : 3;
   var iKsc  = ci['เฉลี่ย KSC'] !== undefined ? ci['เฉลี่ย KSC'] : 10;
-  var key = String(formula || '').trim().toUpperCase();
+  var key = normFormula(formula).toUpperCase();
   var byDate = {};
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
     if (Number(r[iAge]) !== 1) continue;
-    if (String(r[iForm] || '').trim().toUpperCase() !== key) continue;
+    if (normFormula(r[iForm]).toUpperCase() !== key) continue;
     var v = Number(r[iKsc]), d = fmtDate(r[0]);
     if (!d || !isFinite(v) || v <= 0) continue;
     (byDate[d] = byDate[d] || []).push(v);
