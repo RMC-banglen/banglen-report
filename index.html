@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-03c';
+var APP_VERSION='2026-11-03d';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -11965,7 +11965,8 @@ window.__dataReady.then(data => {
       {view==='daily'&&TYPES.map(t=>{
         const {items,dayRows,dayCell,dayOwn,dayRowTotal,dayColTotal,dayGrand,dayHelped,dayHelpedTotal,dayExtraPersons}=getTypeData(t.k);
         const NON_CO=['รถบ่อตะกั่ว','รับเอง','รถร่วม'];
-        const dayItems=[...items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth)),
+        const dayItems=[...items.filter(it=>NON_CO.some(nc=>it.name===nc||it.name.startsWith(nc))||dayRows.some(r=>r.driver_name===it.name&&r.month===selDayMonth)
+            ||dayHelpedTotal(it.name)>0),   // คนที่เที่ยวทั้งเดือนย้ายไปรถสำรองหมด (ไม่มีเที่ยวทะเบียนตัวเอง) ต้องยังขึ้นแถว ไม่งั้นเที่ยวที่ได้เครดิตหายจากตาราง
           ...dayExtraPersons.map(n=>({name:n,extra:true}))]
           .filter(it=>!hideEmptyDay||dayRowTotal(it.name)>0);
         // ประเภทรถประจำของคนที่มาช่วยขับ ใช้เปิดฟอร์มแก้ของคนนั้น
