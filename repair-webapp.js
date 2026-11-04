@@ -775,6 +775,7 @@ function handlePileMessage(m) {
     var t0 = String(m.text || m.caption || '').trim();
     if (/^\/foremanchat(@\w+)?\b/i.test(t0)) { foremanRegisterChat(m); return; }
     if (t0 && m.reply_to_message && isForemanChat(m.chat.id) && /^แก้\s/.test(t0)) { handleForemanEdit(m, t0); return; }
+    if (t0 && isForemanChat(m.chat.id) && isBlowMsg(t0)) { handleBlowCount(m, t0); return; }   // นับ Blow count 30 ฟุต → ตอบระดับดิน
     if (t0 && isForemanChat(m.chat.id) && /แจ้ง\s*เสา\s*เฟล|เสาเฟล/.test(t0.split('\n')[0])) {
       handleForemanText(m, t0, m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : '');
       return;
@@ -942,6 +943,52 @@ function foremanRegisterChat(m) {
   if (st !== 'creator' && st !== 'administrator') { tgReply(m.chat.id, '⚠️ ตั้งกลุ่มรับรายงานโฟร์แมนได้เฉพาะผู้ดูแลกลุ่ม', m.message_id); return; }
   PropertiesService.getScriptProperties().setProperty('FOREMAN_CHAT_ID', String(m.chat.id));
   tgReply(m.chat.id, '✅ ตั้งกลุ่มนี้เป็นกลุ่มรับรายงานเสาเฟลจากโฟร์แมนแล้ว — ส่งข้อความขึ้นต้น "แจ้งเสาเฟล" ได้เลย ระบบบันทึกเข้าแท็บ "รายงานโฟร์แมน" ให้', m.message_id);
+}
+// ── นับ Blow count 30 ฟุต: โฟร์แมนส่งข้อความ (หน่วยงาน / เสา / นับ 30 ฟุต / รวม N ครั้ง) → บอทตอบระดับดินกลับ ──────────
+// ดินอ่อน ≤ 300 · ดินปานกลาง 301–599 แบ่งเฝ้าระวัง 3 ระดับเท่าๆ กัน · ดินแข็ง ≥ 600 = ต้องเพิ่มสเตรงปูนช่วย (เกณฑ์เดียวกับแท็บ "นับ Blow count" ในหน้ารายงานโฟร์แมน)
+var BLOW_SOFT = 300, BLOW_HARD = 600;
+var BLOW_LEVELS = [
+  { e: '🟢', name: 'ดินอ่อน', tag: 'ปกติ', act: 'ตอกตามปกติ' },
+  { e: '🟡', name: 'ดินปานกลาง', tag: 'เฝ้าระวังระดับ 1', act: 'เฝ้าระวัง — ตอกต่อตามปกติ ติดตามค่านับเสาต้นถัดไป' },
+  { e: '🟠', name: 'ดินปานกลาง', tag: 'เฝ้าระวังระดับ 2', act: 'เฝ้าระวังใกล้ชิด — แจ้งฝ่ายผลิตเตรียมสูตรสเตรงสูง ตรวจหัวเสา/ปลายเสาทุกต้น' },
+  { e: '🔶', name: 'ดินปานกลาง', tag: 'เฝ้าระวังระดับ 3 (ใกล้ดินแข็ง)', act: 'ใกล้ดินแข็ง — แจ้งฝ่ายผลิตปรับเป็นสเตรงสูงสำหรับเสาล็อตถัดไป' },
+  { e: '🔴', name: 'ดินแข็ง', tag: 'ต้องเพิ่มสเตรงปูน', act: 'ถึงเกณฑ์ดินแข็ง — ต้องเพิ่มสเตรงปูนช่วย แจ้งฝ่ายผลิตเปลี่ยนเป็นสูตรสเตรงสูงทันที' }
+];
+function isBlowMsg(t) { return /นับ\s*\d{2,3}\s*ฟุต/.test(t) && /\d{2,4}\s*ครั้ง/.test(t) && !/แจ้ง\s*เสา\s*เฟล/.test(t.split('\n')[0]); }
+function blowParse(text) {
+  var lines = String(text).replace(/\r/g, '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+  var pileRe = /(?:^|\s)(?:เสา(?:เข็ม)?\s*)?(I|ไอ|S|สี่เหลี่ยม)\s*-?\s*(0?\.\d{2}|\d{2})\s*[x×*]\s*(?:0?\.\d{2}\s*[x×*]\s*)?(\d+(?:\.\d+)?)\s*(?:เมตร|ม\.?|m\.?)?\s*(.*)$/i;
+  var pile = '', pi = -1;
+  lines.forEach(function (l, i) {
+    if (pi >= 0) return;
+    var m = l.match(pileRe);
+    if (m) { pi = i; var sz = parseFloat(m[2]); pile = (/^(S|สี่)/i.test(m[1]) ? 'S' : 'I') + Math.round(sz < 1 ? sz * 100 : sz) + ' × ' + parseFloat(m[3]).toFixed(2) + ' ม.' + (m[4] ? ' ' + m[4].replace(/^[\s,.:]+/, '').trim() : ''); }
+  });
+  var site = (pi >= 0 ? lines.slice(0, pi) : lines.filter(function (l) { return !/ครั้ง|ฟุต/.test(l); })).map(function (l) { return l.replace(/^(?:หน่วยงาน|โครงการ|หน้างาน)\s*[:：]?\s*/, ''); }).filter(Boolean).join(' ');
+  var all = lines.join(' ');
+  var cm = all.match(/(?:รวม|ได้|นับได้)\D{0,12}(\d{2,4})\s*(?:ครั้ง|blow)/i) || all.match(/(\d{2,4})\s*ครั้ง/);
+  var fm = all.match(/(\d{2,3})\s*ฟุต/);
+  return { site: site, pile: pile, count: cm ? Number(cm[1]) : null, feet: fm ? Number(fm[1]) : 30 };
+}
+function blowLevelIdx(n) {
+  var step = (BLOW_HARD - BLOW_SOFT) / 3;
+  if (n <= BLOW_SOFT) return 0;
+  if (n >= BLOW_HARD) return 4;
+  return n <= Math.round(BLOW_SOFT + step) ? 1 : n <= Math.round(BLOW_SOFT + 2 * step) ? 2 : 3;
+}
+function handleBlowCount(m, text) {
+  var b = blowParse(text);
+  if (b.count == null) { tgReply(m.chat.id, '⚠️ อ่านจำนวนครั้งไม่ได้ — ระบุเช่น "นับ 30 ฟุต รวม 382 ครั้ง"', m.message_id); return; }
+  var idx = blowLevelIdx(b.count), lv = BLOW_LEVELS[idx], step = (BLOW_HARD - BLOW_SOFT) / 3;
+  var e1 = Math.round(BLOW_SOFT + step), e2 = Math.round(BLOW_SOFT + 2 * step);
+  var out = '🔨 <b>ผลนับ Blow count ' + b.feet + ' ฟุต</b>'
+    + (b.site ? '\nหน่วยงาน : ' + esc(b.site) : '') + (b.pile ? '\nเสา : ' + esc(b.pile) : '')
+    + '\nนับได้ : <b>' + b.count + ' ครั้ง</b> / ' + b.feet + ' ฟุต (เฉลี่ย ' + (b.count / b.feet).toFixed(1) + ' ครั้ง/ฟุต)'
+    + '\nผล : ' + lv.e + ' <b>' + lv.name + ' — ' + lv.tag + '</b>'
+    + '\nการดำเนินการ : ' + lv.act
+    + (idx < 4 ? '\n(อีก ' + (BLOW_HARD - b.count) + ' ครั้งถึงเกณฑ์ดินแข็ง)' : '')
+    + '\n<i>เกณฑ์ ครั้ง/30 ฟุต: ≤' + BLOW_SOFT + ' ดินอ่อน · ' + (BLOW_SOFT + 1) + '–' + e1 + ' เฝ้าระวัง 1 · ' + (e1 + 1) + '–' + e2 + ' เฝ้าระวัง 2 · ' + (e2 + 1) + '–' + (BLOW_HARD - 1) + ' เฝ้าระวัง 3 · ≥' + BLOW_HARD + ' ดินแข็ง</i>';
+  tgReply(m.chat.id, out, m.message_id);
 }
 function handleForemanText(m, text, sender) {
   var d = new Date((m.date || Math.floor(Date.now() / 1000)) * 1000);
