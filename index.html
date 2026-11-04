@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-04b';
+var APP_VERSION='2026-11-04c';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13403,7 +13403,7 @@ window.__dataReady.then(data => {
     if(f.site)lines.push('หน่วยงาน : '+f.site);
     if(f.pile)lines.push('เสา : '+f.pile);
     if(okN)lines.push('นับได้ : '+n+' ครั้ง / '+feet+' ฟุต (เฉลี่ย '+(n/feet).toFixed(1)+' ครั้ง/ฟุต)');
-    if(lv){lines.push('ผล : '+lv.e+' '+lv.name+' — '+lv.tag);lines.push('การดำเนินการ : '+acts[lvIdx]);}
+    if(lv){lines.push('ผล : '+lv.e+' '+lv.name+' — '+lv.tag);if(lvIdx>=2)lines.push('การดำเนินการ : '+acts[lvIdx]);}   // ปกติ/เฝ้าระวัง 1 ไม่ต้องมีบรรทัดการดำเนินการ
     if(f.note)lines.push('หมายเหตุ : '+f.note);
     lines.push('(เกณฑ์ ครั้ง/30 ฟุต: ≤'+soft+' ดินอ่อน · '+(soft+1)+'–'+edges[1]+' เฝ้าระวัง 1 · '+(edges[1]+1)+'–'+edges[2]+' เฝ้าระวัง 2 · '+(edges[2]+1)+'–'+(hard-1)+' เฝ้าระวัง 3 · ≥'+hard+' ดินแข็ง)');
     const out=lines.join('\n');
@@ -13435,8 +13435,8 @@ window.__dataReady.then(data => {
             <div style={{fontSize:30,fontWeight:900,color:lv.col,fontFamily:'var(--num)'}}>{n}<span style={{fontSize:14,fontWeight:600}}> ครั้ง</span></div>
             <div style={{flex:'1 1 240px'}}>
               <div style={{fontSize:16,fontWeight:800,color:lv.col}}>{lv.e} {lv.name} — {lv.tag}</div>
-              <div style={{fontSize:13.5,color:'#334155'}}>{acts[lvIdx]}</div>
-              <div style={{fontSize:12,color:'#64748b'}}>เฉลี่ย {(n/feet).toFixed(1)} ครั้ง/ฟุต{lvIdx<4&&hard>n?' · อีก '+(hard-n)+' ครั้งถึงเกณฑ์ดินแข็ง':''}</div>
+              {lvIdx>=2&&<div style={{fontSize:13.5,color:'#334155'}}>{acts[lvIdx]}</div>}
+              <div style={{fontSize:12,color:'#64748b'}}>เฉลี่ย {(n/feet).toFixed(1)} ครั้ง/ฟุต</div>
             </div>
           </div>
           <div style={{position:'relative',display:'flex',height:14,borderRadius:7,overflow:'hidden',marginTop:12}}>

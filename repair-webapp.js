@@ -985,8 +985,7 @@ function handleBlowCount(m, text) {
     + (b.site ? '\nหน่วยงาน : ' + esc(b.site) : '') + (b.pile ? '\nเสา : ' + esc(b.pile) : '')
     + '\nนับได้ : <b>' + b.count + ' ครั้ง</b> / ' + b.feet + ' ฟุต (เฉลี่ย ' + (b.count / b.feet).toFixed(1) + ' ครั้ง/ฟุต)'
     + '\nผล : ' + lv.e + ' <b>' + lv.name + ' — ' + lv.tag + '</b>'
-    + '\nการดำเนินการ : ' + lv.act
-    + (idx < 4 ? '\n(อีก ' + (BLOW_HARD - b.count) + ' ครั้งถึงเกณฑ์ดินแข็ง)' : '')
+    + (idx >= 2 ? '\nการดำเนินการ : ' + lv.act : '')   // ปกติ/เฝ้าระวัง 1 ไม่ต้องมีบรรทัดนี้ · เฝ้าระวัง 2 ขึ้นไปบอกสิ่งที่ต้องทำ
     + '\n<i>เกณฑ์ ครั้ง/30 ฟุต: ≤' + BLOW_SOFT + ' ดินอ่อน · ' + (BLOW_SOFT + 1) + '–' + e1 + ' เฝ้าระวัง 1 · ' + (e1 + 1) + '–' + e2 + ' เฝ้าระวัง 2 · ' + (e2 + 1) + '–' + (BLOW_HARD - 1) + ' เฝ้าระวัง 3 · ≥' + BLOW_HARD + ' ดินแข็ง</i>';
   tgReply(m.chat.id, out, m.message_id);
 }
