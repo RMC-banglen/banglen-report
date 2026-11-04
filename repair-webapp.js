@@ -964,11 +964,13 @@ function blowParse(text) {
     var m = l.match(pileRe);
     if (m) { pi = i; var sz = parseFloat(m[2]); psize = (/^(S|สี่)/i.test(m[1]) ? 'S' : 'I') + Math.round(sz < 1 ? sz * 100 : sz); plen = parseFloat(m[3]); pile = (/^(S|สี่)/i.test(m[1]) ? 'S' : 'I') + Math.round(sz < 1 ? sz * 100 : sz) + ' × ' + parseFloat(m[3]).toFixed(2) + ' ม.' + (m[4] ? ' ' + m[4].replace(/^[\s,.:]+/, '').trim() : ''); }
   });
-  var site = (pi >= 0 ? lines.slice(0, pi) : lines.filter(function (l) { return !/ครั้ง|ฟุต/.test(l); })).map(function (l) { return l.replace(/^(?:หน่วยงาน|โครงการ|หน้างาน)\s*[:：]?\s*/, ''); }).filter(Boolean).join(' ');
+  var rep = '';
+  lines.forEach(function (l) { var r0 = l.match(/^(?:ผู้แจ้ง|โฟร์?แมน|ผู้รายงาน)\s*[:：]\s*(.+)$/); if (r0) rep = r0[1].trim(); });
+  var site = (pi >= 0 ? lines.slice(0, pi) : lines.filter(function (l) { return !/ครั้ง|ฟุต/.test(l); })).filter(function (l) { return !/^(?:ผู้แจ้ง|โฟร์?แมน|ผู้รายงาน)\s*[:：]/.test(l); }).map(function (l) { return l.replace(/^(?:หน่วยงาน|โครงการ|หน้างาน)\s*[:：]?\s*/, ''); }).filter(Boolean).join(' ');
   var all = lines.join(' ');
   var cm = all.match(/(?:รวม|ได้|นับได้)\D{0,12}(\d{2,4})\s*(?:ครั้ง|blow)/i) || all.match(/(\d{2,4})\s*ครั้ง/);
   var fm = all.match(/(\d{2,3})\s*ฟุต/);
-  return { site: site, pile: pile, size: psize, length_m: plen, count: cm ? Number(cm[1]) : null, feet: fm ? Number(fm[1]) : 30 };
+  return { site: site, pile: pile, size: psize, length_m: plen, count: cm ? Number(cm[1]) : null, feet: fm ? Number(fm[1]) : 30, reporter: rep };
 }
 function blowLevelIdx(n) {
   var step = (BLOW_HARD - BLOW_SOFT) / 3;
@@ -978,18 +980,20 @@ function blowLevelIdx(n) {
 }
 function handleBlowCount(m, text) {
   var b = blowParse(text);
+  var nameSrc = '', reporter = b.reporter;
+  if (!reporter) { var fwdN = foremanForwardName(m); reporter = fwdN || (m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : ''); nameSrc = fwdN ? 'ชื่อต้นทางที่ส่งต่อมา' : 'ชื่อผู้ส่งข้อความ'; }
   if (b.count == null) { tgReply(m.chat.id, '⚠️ อ่านจำนวนครั้งไม่ได้ — ระบุเช่น "นับ 30 ฟุต รวม 382 ครั้ง"', m.message_id); return; }
   var idx = blowLevelIdx(b.count), lv = BLOW_LEVELS[idx], step = (BLOW_HARD - BLOW_SOFT) / 3;
   var e1 = Math.round(BLOW_SOFT + step), e2 = Math.round(BLOW_SOFT + 2 * step);
   var out = '🔨 <b>ผลนับ Blow count ' + b.feet + ' ฟุต</b>'
     + (b.site ? '\nหน่วยงาน : ' + esc(b.site) : '') + (b.pile ? '\nเสา : ' + esc(b.pile) : '')
     + '\nนับได้ : <b>' + b.count + ' ครั้ง</b> / ' + b.feet + ' ฟุต (เฉลี่ย ' + (b.count / b.feet).toFixed(1) + ' ครั้ง/ฟุต)'
+    + (reporter ? '\nผู้แจ้ง : ' + esc(reporter) + (nameSrc ? ' (' + nameSrc + ')' : '') : '')
     + '\nผล : ' + lv.e + ' <b>' + lv.name + ' — ' + lv.tag + '</b>'
     + (idx >= 2 ? '\nการดำเนินการ : ' + lv.act : '')   // ปกติ/เฝ้าระวัง 1 ไม่ต้องมีบรรทัดนี้ · เฝ้าระวัง 2 ขึ้นไปบอกสิ่งที่ต้องทำ
     + '\n<i>เกณฑ์ ครั้ง/30 ฟุต: ≤' + BLOW_SOFT + ' ดินอ่อน · ' + (BLOW_SOFT + 1) + '–' + e1 + ' เฝ้าระวัง 1 · ' + (e1 + 1) + '–' + e2 + ' เฝ้าระวัง 2 · ' + (e2 + 1) + '–' + (BLOW_HARD - 1) + ' เฝ้าระวัง 3 · ≥' + BLOW_HARD + ' ดินแข็ง</i>';
   // บันทึกประวัติ (ตาราง blow_counts — รัน supabase-blow-counts.sql) · ข้อความเดียวกันซ้ำไม่บันทึกซ้ำ
   var day = Utilities.formatDate(new Date((m.date || Math.floor(Date.now() / 1000)) * 1000), 'Asia/Bangkok', 'yyyy-MM-dd');
-  var reporter = foremanForwardName(m) || (m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : '');
   var note = '';
   try {
     var q = 'blow_counts?select=id&count_date=eq.' + day + '&blows=eq.' + b.count + (b.site ? '&site=eq.' + encodeURIComponent(b.site) : '');
@@ -997,8 +1001,10 @@ function handleBlowCount(m, text) {
     if (ex.getResponseCode() >= 300) note = '\n⚠️ <i>ยังไม่ได้บันทึกประวัติ (ยังไม่ได้รัน supabase-blow-counts.sql)</i>';
     else if (JSON.parse(ex.getContentText() || '[]').length) note = '\nℹ️ <i>มีรายการนี้ในประวัติแล้ว</i>';
     else {
-      var ins = sb('post', 'blow_counts', [{ count_date: day, site: b.site || null, pile: b.pile || null, size: b.size || null, length_m: b.length_m, blows: b.count, feet: b.feet, reporter: reporter || null, source: 'telegram' }]);
+      var ins = sb('post', 'blow_counts', [{ count_date: day, site: b.site || null, pile: b.pile || null, size: b.size || null, length_m: b.length_m, blows: b.count, feet: b.feet, reporter: reporter || null, source: 'telegram' }], true);
       if (ins.getResponseCode() >= 300) { Logger.log('blow insert: ' + ins.getContentText()); note = '\n⚠️ <i>บันทึกประวัติไม่สำเร็จ</i>'; }
+      else { var bid = ''; try { bid = JSON.parse(ins.getContentText() || '[]')[0].id; } catch (e2) {}
+        if (bid) note = '\nรหัส Blow count #' + bid + '\n<i>ข้อมูลไม่ตรง (เช่น ผู้แจ้ง)? ตอบ (Reply) ข้อความนี้ว่า เช่น\nแก้ ผู้แจ้ง ชื่อโฟร์แมน\nแก้ วันที่ 3/11/69\nแก้ หน่วยงาน ชื่อใหม่</i>'; }
     }
   } catch (err) { Logger.log('blow save: ' + err.message); }
   tgReply(m.chat.id, out + note, m.message_id);
@@ -1050,8 +1056,28 @@ function foremanIso(s) {   // 28/10/69 · 28/10/2569 · 28-10-26 → 2026-10-28 
 }
 // แก้รายการที่บอทบันทึกให้ โดยตอบข้อความของบอท: "แก้ โฟร์แมน ชานนท์" · "แก้ วันที่ตอก 28/10/69" ฯลฯ (เขียนได้หลายบรรทัด)
 var FOREMAN_EDIT_FIELDS = { 'โฟร์แมน': 'foreman', 'วันที่ตอก': 'drive_date', 'วันที่หน้าเสา': 'cast_dates', 'โรงงาน': 'factory', 'ลูกค้า': 'customer', 'หน้างาน': 'site', 'ปัญหา': 'remark', 'สาเหตุที่คิด': 'cause', 'สาเหตุ': 'cause', 'เฟลจาก': 'fail_of', 'เฟล': 'fail_of', 'แก้ไข': 'fix', 'วิธีแก้': 'fix', 'ท่อน': 'segs', 'ท่อนต่อ': 'segs', 'ปั้นจั่น': 'crane', 'ประเภท': 'kind', 'ขนาด': 'size', 'ยาว': 'length_m', 'ความยาว': 'length_m' };
+var BLOW_EDIT_FIELDS = { 'ผู้แจ้ง': 'reporter', 'โฟร์แมน': 'reporter', 'ผู้รายงาน': 'reporter', 'วันที่': 'count_date', 'หน่วยงาน': 'site', 'หน้างาน': 'site', 'เสา': 'pile', 'นับได้': 'blows', 'จำนวน': 'blows', 'ครั้ง': 'blows', 'ระยะ': 'feet', 'ฟุต': 'feet', 'หมายเหตุ': 'note' };
+function handleBlowEdit(m, text, id) {
+  var chat = m.chat.id, patch = {}, done = [], bad = [];
+  text.split(/\n/).forEach(function (l) {
+    var mm = l.trim().match(/^แก้\s*(ผู้แจ้ง|โฟร์แมน|ผู้รายงาน|วันที่|หน่วยงาน|หน้างาน|เสา|นับได้|จำนวน|ครั้ง|ระยะ|ฟุต|หมายเหตุ)\s*[:：]?\s*(.+)$/);
+    if (!mm) return;
+    var col = BLOW_EDIT_FIELDS[mm[1]], v = mm[2].trim();
+    if (col === 'count_date') { v = foremanIso(v); if (!v) { bad.push('วันที่ (อ่านวันที่ไม่ได้ เช่น 3/11/69)'); return; } }
+    else if (col === 'blows' || col === 'feet') { var nn = parseInt(String(v).replace(/[^0-9]/g, ''), 10); if (!isFinite(nn)) { bad.push(mm[1]); return; } v = nn; }
+    patch[col] = v; done.push(mm[1] + ' → ' + (col === 'count_date' ? foremanThDate(v) : v));
+  });
+  if (!done.length) { tgReply(chat, '⚠️ อ่านคำสั่งแก้ไม่ได้' + (bad.length ? ' — ' + bad.join(', ') : '') + '\nตัวอย่าง: แก้ ผู้แจ้ง ชื่อโฟร์แมน · แก้ นับได้ 400', m.message_id); return; }
+  patch.updated_at = new Date().toISOString();
+  var up = sb('patch', 'blow_counts?id=eq.' + id, patch);
+  if (up.getResponseCode() >= 300) { Logger.log('blow edit: ' + up.getContentText()); tgReply(chat, '⚠️ แก้ไม่สำเร็จ (' + up.getResponseCode() + ')', m.message_id); return; }
+  var lvLine = patch.blows != null ? '\nผลใหม่ : ' + BLOW_LEVELS[blowLevelIdx(patch.blows)].e + ' ' + BLOW_LEVELS[blowLevelIdx(patch.blows)].name + ' — ' + BLOW_LEVELS[blowLevelIdx(patch.blows)].tag : '';
+  tgReply(chat, '✏️ <b>แก้รายการ Blow count #' + id + ' แล้ว</b>\n' + done.map(function (x) { return '• ' + esc(x); }).join('\n') + lvLine + (bad.length ? '\n⚠️ ข้าม: ' + esc(bad.join(', ')) : ''), m.message_id);
+}
 function handleForemanEdit(m, text) {
   var rm = m.reply_to_message, chat = m.chat.id;
+  var bm = rm && rm.from && rm.from.is_bot ? String(rm.text || '').match(/รหัส Blow count\s*#(\d+)/) : null;
+  if (bm) { handleBlowEdit(m, text, bm[1]); return; }   // ตอบข้อความผล Blow count → แก้ประวัติ Blow count
   var idm = rm && rm.from && rm.from.is_bot ? String(rm.text || '').match(/รหัสรายการ\s*#(\d+)/) : null;
   if (!idm) { tgReply(chat, 'ℹ️ ต้องตอบ (Reply) ข้อความ "บันทึกรายงานเสาเฟลแล้ว" ของบอท ถึงจะแก้รายการนั้นได้', m.message_id); return; }
   var patch = {}, done = [], bad = [];
