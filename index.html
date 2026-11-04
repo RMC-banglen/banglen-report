@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-04e';
+var APP_VERSION='2026-11-04f';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13349,7 +13349,7 @@ window.__dataReady.then(data => {
 
   // ============================================================
   // นับ Blow count 30 ฟุต — ประวัติที่โฟร์แมนส่งในกลุ่ม Telegram (บอทอ่านแล้วบันทึกลงตาราง blow_counts และตอบระดับดินกลับ)
-  // ระดับ: ดินอ่อน ≤ 300 · ดินปานกลาง 301–599 แบ่งเฝ้าระวัง 3 ระดับเท่าๆ กัน · ดินแข็ง ≥ 600 = ต้องเพิ่มสเตรงปูนช่วย (เกณฑ์เดียวกับบอท)
+  // ระดับ: ดินอ่อน ≤ 300 · ดินปานกลาง 301–599 แบ่งเฝ้าระวัง 3 ระดับเท่าๆ กัน · ดินแข็ง ≥ 600 = ต้องเพิ่มสเต็งคอนกรีตช่วย (เกณฑ์เดียวกับบอท)
   // ============================================================
   function BlowCountPanel({canEdit}){
     const db=DB;
@@ -13380,7 +13380,7 @@ window.__dataReady.then(data => {
       {e:'🟡',name:'ดินปานกลาง',tag:'เฝ้าระวัง 1',col:'#a16207',bg:'#fef9c3'},
       {e:'🟠',name:'ดินปานกลาง',tag:'เฝ้าระวัง 2',col:'#c2410c',bg:'#ffedd5'},
       {e:'🔶',name:'ดินปานกลาง',tag:'เฝ้าระวัง 3 (ใกล้ดินแข็ง)',col:'#b91c1c',bg:'#fee2e2'},
-      {e:'🔴',name:'ดินแข็ง',tag:'ต้องเพิ่มสเตรงปูน',col:'#991b1b',bg:'#fecaca'},
+      {e:'🔴',name:'ดินแข็ง',tag:'ต้องเพิ่มสเต็งคอนกรีต',col:'#991b1b',bg:'#fecaca'},
     ];
     const lvOf=n=>n<=SOFT?0:n>=HARD?4:n<=e1?1:n<=e2?2:3;
     const months=[...new Set(rows.map(r=>String(r.count_date).slice(0,7)))].sort().reverse();
@@ -13414,7 +13414,7 @@ window.__dataReady.then(data => {
       const{error}=await db.from('blow_counts').delete().eq('id',r.id);if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}load();};
     const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
     return<div className="grid">
-      <ChartCard span="full" title="🔨 นับ Blow count 30 ฟุต" subtitle={'ข้อมูลมาจากกลุ่ม Telegram (โฟร์แมนส่ง "นับ 30 ฟุต รวม N ครั้ง" บอทบันทึกและตอบระดับดินให้) · ≤'+SOFT+' ดินอ่อน · '+(SOFT+1)+'–'+(HARD-1)+' เฝ้าระวัง 3 ระดับ · ≥'+HARD+' ดินแข็ง ต้องเพิ่มสเตรงปูนช่วย'}
+      <ChartCard span="full" title="🔨 นับ Blow count 30 ฟุต" subtitle={'ข้อมูลมาจากกลุ่ม Telegram (โฟร์แมนส่ง "นับ 30 ฟุต รวม N ครั้ง" บอทบันทึกและตอบระดับดินให้) · ≤'+SOFT+' ดินอ่อน · '+(SOFT+1)+'–'+(HARD-1)+' เฝ้าระวัง 3 ระดับ · ≥'+HARD+' ดินแข็ง ต้องเพิ่มสเต็งคอนกรีตช่วย'}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           <select value={fMonth} onChange={e=>setFMonth(e.target.value)} style={sel}><option value="">ทุกเดือน</option>{months.map(m=><option key={m} value={m}>{monthLabel(m)}</option>)}</select>
           {canEdit&&<button style={btnP} onClick={openNew}>＋ เพิ่มรายการ</button>}
