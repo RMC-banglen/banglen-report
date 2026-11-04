@@ -1,5 +1,5 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261104095407";
+import { pilePoly, esc } from "./draw2d.js?v=20261104094258";
 import { TITLE_BLOCK } from "./pile-data.js";
 import { m2 } from "./pile-calc.js";
 
