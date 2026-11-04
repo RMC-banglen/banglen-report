@@ -2,8 +2,8 @@
 import { planPile, autoSplit, m2 } from "./pile-calc.js";
 import { pileSheet } from "./pile-draw.js";
 import { PILE_SECTIONS } from "./pile-data.js";
-import { download } from "./pdf.js?v=20261104053849";
-import { esc } from "./draw2d.js?v=20261104053849";
+import { download } from "./pdf.js?v=20261104054039";
+import { esc } from "./draw2d.js?v=20261104054039";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";

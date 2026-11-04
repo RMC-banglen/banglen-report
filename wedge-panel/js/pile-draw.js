@@ -1,5 +1,5 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261104053849";
+import { pilePoly, esc } from "./draw2d.js?v=20261104054039";
 import { TITLE_BLOCK } from "./pile-data.js";
 import { m2 } from "./pile-calc.js";
 
@@ -233,13 +233,13 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   o += stirrupDetail(742, cyA + 6, sd + 0.1);
   o += liftingPoints(872, rowA + 10, 270);
   // แถวล่าง: หัวต่อ + ตาราง + รูปขยายบ่า
-  const rowB = rowA + 20 + 220 * sd + 92, cyB = rowB + 8 + 110 * sd;
+  const sw = np === 2 ? 0.46 : sd, rowB = rowA + 20 + 220 * sd + 112, cyB = rowB + 8 + 110 * sw;
   let xcur = 170;
   const dowels = plan.full ? [plan.rows[0] && plan.rows[0].dowel] : [...new Map(plan.pieces.map((p) => [p.rule ? p.rule.dowel.n + "-" + p.rule.dowel.d : "x", p])).values()].map((p) => p.rule && p.rule.dowel);
   if (plan.joint) {
     const list = plan.full ? [null] : dowels.slice(0, 2);
-    list.forEach((d, i) => { o += weldingPlate(d, xcur, cyB, sd, !plan.full && list.length > 1 ? `${m2(plan.pieces.filter((p) => p.rule && p.rule.dowel === d)[0]?.len || plan.pieces[i].len)} m.` : ""); xcur += 250; });
-    o += weldSide(list[0], xcur - 100, cyB - 110 * sd, sd);
+    list.forEach((d, i) => { o += weldingPlate(d, xcur, cyB, sw, !plan.full && list.length > 1 ? `${m2(plan.pieces.filter((p) => p.rule && p.rule.dowel === d)[0]?.len || plan.pieces[i].len)} m.` : ""); xcur += 250; });
+    o += weldSide(list[0], xcur - 100, cyB - 110 * sw, sw);
     xcur += 220;
   }
   const tw = 360, tx = 1168 - 12 - tw, tY = rowB - 6;
