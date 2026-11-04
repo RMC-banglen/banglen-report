@@ -1,5 +1,5 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261104054039";
+import { pilePoly, esc } from "./draw2d.js?v=20261104054233";
 import { TITLE_BLOCK } from "./pile-data.js";
 import { m2 } from "./pile-calc.js";
 
@@ -48,18 +48,22 @@ function sectionA(plan, cx, cy, s, simple) {
   [[0, 70, "0.070"], [70, 150, "0.08"], [150, 220, "0.070"]].forEach(([a, b, t]) => { o += L(x0 + a * s, y1 + 14, x0 + b * s, y1 + 14, 0.9) + tick(x0 + a * s, y1 + 14) + tick(x0 + b * s, y1 + 14) + T(x0 + ((a + b) / 2) * s, y1 + 25, t, { size: 9.5 }); });
   o += T(cx, y1 + 40, "0.22", { size: 10.5 }) + T(cx - 30, y1 + 56, "SECTION", { size: 10.5, weight: 400 }) + T(cx + 38, y1 + 56, "A", { size: 10.5 }) + L(cx - 60, y1 + 59, cx + 60, y1 + 59, 0.9);
   // ป้ายชี้
-  const lx = x1 + 22;
+  // ป้ายชี้เรียงเป็นคอลัมน์ด้านขวา แต่ละป้ายอยู่คนละระดับ เส้นไม่ไขว้กัน (บนลงล่าง: 4mm, 5mm, DB บน, ปลอก, DB ล่าง, 4mm, 5mm)
+  const lx = x1 + 26, Y = (mm) => cy + mm * s;
   if (simple) {
-    o += leader(cx + 75 * s, cy - 75 * s, lx + 10, cy - 105 * s, "SEE TABLE", { len: 66 });
+    o += leader(cx + 75 * s, cy - 75 * s, lx, Y(-100), "SEE TABLE", { len: 66 });
   } else {
-    o += leader(cx - 40 * s, cy - 75 * s, lx, y0 - 14, "1-PC.WIRE 5mm.", { len: 82 });
-    o += leader(cx + 75 * s, cy - 75 * s, lx, y0 + 2, "2-PC.WIRE 4mm.", { len: 82 });
-    o += leader(cx - 75 * s, cy + 75 * s, lx, y1 + 2, "2-PC.WIRE 4mm.", { len: 82 });
-    o += leader(cx + 40 * s, cy + 75 * s, lx, y1 + 18, "1-PC.WIRE 5mm.", { len: 82 });
+    o += leader(cx + 75 * s, cy - 75 * s, cx + 75 * s, y0 - 28, "2-PC.WIRE 4mm.", { len: 82 });
+    o += leader(cx - 40 * s, cy - 75 * s, cx - 40 * s, y0 - 12, "1-PC.WIRE 5mm.", { len: 82 });
+    o += leader(cx + 75 * s, cy + 75 * s, lx, Y(80), "2-PC.WIRE 4mm.", { len: 82 });
+    o += leader(cx + 40 * s, cy + 75 * s, lx, Y(118), "1-PC.WIRE 5mm.", { len: 82 });
   }
-  const web = cx + 12 * s;
-  o += leader(web, cy, lx - 2, cy, "CDØ2.8mm.@0.17m.", { len: 96 });
-  plan.extras.forEach((e, i) => { o += leader(cx + 75 * s, cy - 60 * s, lx + 8, cy - 28 * s - i * 12, `${Math.ceil(e.n / 2)}-DB${e.d}`, { len: 52, size: 10 }) + leader(cx + 75 * s, cy + 60 * s, lx + 8, cy + 38 * s + i * 12, `${e.n - Math.ceil(e.n / 2)}-DB${e.d}`, { len: 52, size: 10 }); });
+  o += leader(cx + 12 * s, cy, lx, cy, "CDØ2.8mm.@0.17m.", { len: 96 });
+  plan.extras.forEach((e, i) => {
+    const top = Math.ceil(e.n / 2), bot = e.n - top;
+    o += leader(cx + 75 * s, cy - 60 * s, lx, Y(-32 - i * 14), `${top}-DB${e.d}`, { len: 56, size: 10 });
+    if (bot) o += leader(cx + 75 * s, cy + 60 * s, lx, Y(32 + i * 14), `${bot}-DB${e.d}`, { len: 56, size: 10 });
+  });
   return o;
 }
 
@@ -238,9 +242,9 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   const dowels = plan.full ? [plan.rows[0] && plan.rows[0].dowel] : [...new Map(plan.pieces.map((p) => [p.rule ? p.rule.dowel.n + "-" + p.rule.dowel.d : "x", p])).values()].map((p) => p.rule && p.rule.dowel);
   if (plan.joint) {
     const list = plan.full ? [null] : dowels.slice(0, 2);
-    list.forEach((d, i) => { o += weldingPlate(d, xcur, cyB, sw, !plan.full && list.length > 1 ? `${m2(plan.pieces.filter((p) => p.rule && p.rule.dowel === d)[0]?.len || plan.pieces[i].len)} m.` : ""); xcur += 250; });
-    o += weldSide(list[0], xcur - 100, cyB - 110 * sw, sw);
-    xcur += 220;
+    list.forEach((d, i) => { o += weldingPlate(d, xcur, cyB, sw, !plan.full && list.length > 1 ? `${m2(plan.pieces.filter((p) => p.rule && p.rule.dowel === d)[0]?.len || plan.pieces[i].len)} m.` : ""); xcur += 285; });
+    o += weldSide(list[0], xcur - 70, cyB - 110 * sw, sw);
+    xcur += 250;
   }
   const tw = 360, tx = 1168 - 12 - tw, tY = rowB - 6;
   const tb = table(plan, tx, tY, tw);
