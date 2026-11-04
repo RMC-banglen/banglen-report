@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-03d';
+var APP_VERSION='2026-11-04b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13348,6 +13348,130 @@ window.__dataReady.then(data => {
   }
 
   // ============================================================
+  // นับ Blow count 30 ฟุต (แท็บในหน้ารายงานโฟร์แมน)
+  // วัตถุประสงค์: ดูว่าดินที่ตอกอยู่แข็งแค่ไหน — ถึงเกณฑ์ดินแข็ง (≥ 600 ครั้ง) ต้องเพิ่มสเตรงปูนช่วย
+  // ระดับ: ดินอ่อน ≤ 300 · ดินปานกลาง 301–599 แบ่งเฝ้าระวัง 3 ระดับ (แบ่งเท่าๆ กันระหว่างเกณฑ์อ่อน–แข็ง) · ดินแข็ง ≥ 600
+  // วางข้อความโฟร์แมน ("หน่วยงาน ... I0.30x22.00 ม. ต/ช (ธรรมดา) นับ 30 ฟุต รวม 382 ครั้ง") → ระบบอ่านใส่ช่อง → ได้ข้อความผลพร้อมกดคัดลอกไปวางในกลุ่ม Telegram
+  // ============================================================
+  function BlowCountPanel(){
+    const LS='bc_settings_v1';
+    const DEF_ACT=['ตอกตามปกติ','เฝ้าระวัง — ตอกต่อตามปกติ ติดตามค่านับเสาต้นถัดไป','เฝ้าระวังใกล้ชิด — แจ้งฝ่ายผลิตเตรียมสูตรสเตรงสูง ตรวจหัวเสา/ปลายเสาทุกต้น','ใกล้ดินแข็ง — แจ้งฝ่ายผลิตปรับเป็นสเตรงสูงสำหรับเสาล็อตถัดไป','ถึงเกณฑ์ดินแข็ง — ต้องเพิ่มสเตรงปูนช่วย แจ้งฝ่ายผลิตเปลี่ยนเป็นสูตรสเตรงสูงทันที'];
+    const saved=(()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}');}catch(e){return {};}})();
+    const [text,setText]=useState('');
+    const [readMsg,setReadMsg]=useState('');
+    const [f,setF]=useState({site:'',pile:'',count:'',feet:'30',note:''});
+    const [thSoft,setThSoft]=useState(saved.soft||300);
+    const [thHard,setThHard]=useState(saved.hard||600);
+    const [acts,setActs]=useState(saved.acts&&saved.acts.length===5?saved.acts:DEF_ACT);
+    const [showCfg,setShowCfg]=useState(false);
+    const [copied,setCopied]=useState(false);
+    useEffect(()=>{try{localStorage.setItem(LS,JSON.stringify({soft:thSoft,hard:thHard,acts}));}catch(e){}},[thSoft,thHard,acts]);
+    const inp={padding:'8px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
+    const lbl={fontSize:12.5,color:'#475569',fontWeight:600,marginBottom:3,display:'block'};
+    const btn={padding:'7px 14px',borderRadius:8,border:'1px solid #d6d8e0',background:'#fff',cursor:'pointer',fontSize:13.5,fontWeight:600,color:'#475569'};
+    const btnP={...btn,background:'#2f5fd0',borderColor:'#2f5fd0',color:'#fff'};
+    // อ่านข้อความโฟร์แมน: บรรทัดก่อนบรรทัดเสา = หน่วยงาน/ที่อยู่ · บรรทัดเสา I0.30x22.00 ม. ต/ช (ธรรมดา) · "นับ 30 ฟุต" · "รวม 382 ครั้ง"
+    const parse=()=>{
+      const lines0=String(text).replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(Boolean);
+      if(!lines0.length){setReadMsg('วางข้อความก่อน');return;}
+      const pileRe=/(?:^|\s)(?:เสา(?:เข็ม)?\s*)?(I|ไอ|S|สี่เหลี่ยม)\s*-?\s*(0?\.\d{2}|\d{2})\s*[x×*]\s*(?:0?\.\d{2}\s*[x×*]\s*)?(\d+(?:\.\d+)?)\s*(?:เมตร|ม\.?|m\.?)?\s*(.*)$/i;
+      let pile='',pi=-1;
+      lines0.forEach((l,i)=>{if(pi>=0)return;const m=l.match(pileRe);if(m){pi=i;const sz=parseFloat(m[2]);pile=(/^(S|สี่)/i.test(m[1])?'S':'I')+Math.round(sz<1?sz*100:sz)+' × '+parseFloat(m[3]).toFixed(2)+' ม.'+(m[4]?' '+m[4].replace(/^[\s,.:]+/,'').trim():'');}});
+      const site=(pi>=0?lines0.slice(0,pi):lines0.filter(l=>!/ครั้ง|ฟุต/.test(l))).map(l=>l.replace(/^(?:หน่วยงาน|โครงการ|หน้างาน)\s*[:：]?\s*/,'')).filter(Boolean).join(' ');
+      const all=lines0.join(' ');
+      const cm=all.match(/(?:รวม|ได้|นับได้)\D{0,12}(\d{2,4})\s*(?:ครั้ง|blow)/i)||all.match(/(\d{2,4})\s*ครั้ง/);
+      const fm=all.match(/(\d{2,3})\s*ฟุต/);
+      setF(x=>({...x,site:site||x.site,pile:pile||x.pile,count:cm?cm[1]:x.count,feet:fm?fm[1]:x.feet}));
+      const miss=[!cm&&'จำนวนครั้ง',!site&&'หน่วยงาน',pi<0&&'ขนาดเสา'].filter(Boolean);
+      setReadMsg(miss.length?'⚠️ อ่านได้บางส่วน ยังไม่พบ: '+miss.join(' · ')+' — กรอกเพิ่มในช่องด้านล่าง':'✅ อ่านข้อความแล้ว ตรวจช่องด้านล่างก่อนคัดลอก');
+    };
+    // ระดับ 0..4: ดินอ่อน / เฝ้าระวัง 1 / 2 / 3 / ดินแข็ง
+    const soft=Number(thSoft)||0,hard=Number(thHard)||0,step=hard>soft?(hard-soft)/3:0;
+    const edges=[soft,Math.round(soft+step),Math.round(soft+2*step),hard];   // ขอบบนของระดับ 0,1,2 และขอบล่างของดินแข็ง
+    const LV=[
+      {e:'🟢',name:'ดินอ่อน',tag:'ปกติ',col:'#15803d',bg:'#dcfce7'},
+      {e:'🟡',name:'ดินปานกลาง',tag:'เฝ้าระวังระดับ 1',col:'#a16207',bg:'#fef9c3'},
+      {e:'🟠',name:'ดินปานกลาง',tag:'เฝ้าระวังระดับ 2',col:'#c2410c',bg:'#ffedd5'},
+      {e:'🔶',name:'ดินปานกลาง',tag:'เฝ้าระวังระดับ 3 (ใกล้ดินแข็ง)',col:'#b91c1c',bg:'#fee2e2'},
+      {e:'🔴',name:'ดินแข็ง',tag:'ต้องเพิ่มสเตรงปูน',col:'#991b1b',bg:'#fecaca'},
+    ];
+    const n=Number(f.count),feet=Number(f.feet)||30,okN=Number.isFinite(n)&&f.count!=='';
+    const lvIdx=!okN?-1:n<=soft?0:n>=hard?4:n<=edges[1]?1:n<=edges[2]?2:3;
+    const lv=lvIdx>=0?LV[lvIdx]:null;
+    const lines=[];
+    lines.push('🔨 ผลนับ Blow count '+feet+' ฟุต');
+    if(f.site)lines.push('หน่วยงาน : '+f.site);
+    if(f.pile)lines.push('เสา : '+f.pile);
+    if(okN)lines.push('นับได้ : '+n+' ครั้ง / '+feet+' ฟุต (เฉลี่ย '+(n/feet).toFixed(1)+' ครั้ง/ฟุต)');
+    if(lv){lines.push('ผล : '+lv.e+' '+lv.name+' — '+lv.tag);lines.push('การดำเนินการ : '+acts[lvIdx]);}
+    if(f.note)lines.push('หมายเหตุ : '+f.note);
+    lines.push('(เกณฑ์ ครั้ง/30 ฟุต: ≤'+soft+' ดินอ่อน · '+(soft+1)+'–'+edges[1]+' เฝ้าระวัง 1 · '+(edges[1]+1)+'–'+edges[2]+' เฝ้าระวัง 2 · '+(edges[2]+1)+'–'+(hard-1)+' เฝ้าระวัง 3 · ≥'+hard+' ดินแข็ง)');
+    const out=lines.join('\n');
+    const copy=async()=>{
+      try{await navigator.clipboard.writeText(out);}
+      catch(e){const ta=document.createElement('textarea');ta.value=out;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e2){}document.body.removeChild(ta);}
+      setCopied(true);setTimeout(()=>setCopied(false),2000);
+    };
+    const Fld=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={f[k]} onChange={e=>setF({...f,[k]:e.target.value})} {...(props||{})}/></div>;
+    // แถบสเกล: ตำแหน่งค่าที่นับได้บนระดับทั้ง 5
+    const maxS=Math.max(hard*1.25,n||0,1);
+    const segs=[[0,soft],[soft,edges[1]],[edges[1],edges[2]],[edges[2],hard],[hard,maxS]];
+    return<div className="grid">
+      <ChartCard span="full" title="🔨 นับ Blow count 30 ฟุต" subtitle={'ดูความแข็งของดินจากจำนวนครั้งที่นับ · ถึง '+hard+' ครั้ง (ดินแข็ง) ต้องเพิ่มสเตรงปูนช่วย · วางข้อความจากโฟร์แมน แล้วกดคัดลอกไปวางในกลุ่ม Telegram'}>
+        <div style={{marginBottom:14,padding:12,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10}}>
+          <label style={{...lbl,color:'#0369a1'}}>วางข้อความที่โฟร์แมนส่งมา แล้วให้ระบบอ่านใส่ช่องให้</label>
+          <textarea value={text} onChange={e=>setText(e.target.value)} rows={5} placeholder={'หน่วยงาน หจก.สุวรรณกิจเข็มเจาะ\nแขวงหนองค้างพลู\nเขตหนองแขมกรุงเทพฯ\nI0.30x22.00 ม. ต/ช (ธรรมดา)\nนับ 30 ฟุต ครับ\nรวม 382 ครั้ง'} style={{...inp,fontFamily:'inherit'}}/>
+          <div style={{display:'flex',gap:10,alignItems:'center',marginTop:6,flexWrap:'wrap'}}><button style={btnP} onClick={parse}>🔍 อ่านข้อความ</button><span style={{fontSize:13,color:readMsg.startsWith('✅')?'#15803d':'#b45309'}}>{readMsg}</span></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10,marginBottom:14}}>
+          {Fld('site','หน่วยงาน')}
+          {Fld('pile','เสา (ขนาด × ยาว)',{placeholder:'I30 × 22.00 ม. ต/ช (ธรรมดา)'})}
+          {Fld('count','นับได้ (ครั้ง)',{type:'number',inputMode:'numeric',placeholder:'382'})}
+          {Fld('feet','ระยะที่นับ (ฟุต)',{type:'number',inputMode:'numeric'})}
+          {Fld('note','หมายเหตุ (ไม่บังคับ)')}
+        </div>
+        {lv&&<div style={{marginBottom:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',padding:'12px 14px',borderRadius:10,background:lv.bg,border:'1px solid '+lv.col}}>
+            <div style={{fontSize:30,fontWeight:900,color:lv.col,fontFamily:'var(--num)'}}>{n}<span style={{fontSize:14,fontWeight:600}}> ครั้ง</span></div>
+            <div style={{flex:'1 1 240px'}}>
+              <div style={{fontSize:16,fontWeight:800,color:lv.col}}>{lv.e} {lv.name} — {lv.tag}</div>
+              <div style={{fontSize:13.5,color:'#334155'}}>{acts[lvIdx]}</div>
+              <div style={{fontSize:12,color:'#64748b'}}>เฉลี่ย {(n/feet).toFixed(1)} ครั้ง/ฟุต{lvIdx<4&&hard>n?' · อีก '+(hard-n)+' ครั้งถึงเกณฑ์ดินแข็ง':''}</div>
+            </div>
+          </div>
+          <div style={{position:'relative',display:'flex',height:14,borderRadius:7,overflow:'hidden',marginTop:12}}>
+            {segs.map((sg,i)=><div key={i} style={{flex:Math.max(0.0001,sg[1]-sg[0]),background:['#86efac','#fde047','#fdba74','#f87171','#b91c1c'][i]}} title={LV[i].name+' '+LV[i].tag}/>)}
+          </div>
+          <div style={{position:'relative',height:22}}>
+            <div style={{position:'absolute',left:Math.min(99,Math.max(1,n/maxS*100))+'%',transform:'translateX(-50%)',fontSize:12,fontWeight:800,color:lv.col}}>▲ {n}</div>
+          </div>
+        </div>}
+        <label style={lbl}>ข้อความที่จะคัดลอกไปวางใน Telegram</label>
+        <textarea readOnly value={out} rows={Math.min(10,lines.length+1)} style={{...inp,fontFamily:'inherit',background:'#f8fafc',lineHeight:1.6}} onFocus={e=>e.target.select()}/>
+        <div style={{display:'flex',gap:10,alignItems:'center',marginTop:8,flexWrap:'wrap'}}>
+          <button style={btnP} onClick={copy}>{copied?'✅ คัดลอกแล้ว':'📋 คัดลอกข้อความ'}</button>
+          <span style={{fontSize:12.5,color:'#64748b'}}>เปิด Telegram กลุ่มโฟร์แมน แล้ววาง (Ctrl+V)</span>
+          <span style={{flex:1}}/>
+          <button style={btn} onClick={()=>setShowCfg(!showCfg)}>{showCfg?'ซ่อนการตั้งค่า':'⚙️ ปรับเกณฑ์/ข้อความ'}</button>
+        </div>
+        {!okN&&<div style={{marginTop:10,fontSize:13,color:'#b45309'}}>ใส่จำนวนครั้งที่นับได้ก่อน ระบบจึงจะบอกระดับของดิน</div>}
+        {showCfg&&<div style={{marginTop:12,padding:12,border:'1px solid #e2e8f0',borderRadius:10,background:'#fafbfd'}}>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',marginBottom:10,fontSize:13,color:'#475569'}}>
+            <label style={{display:'flex',gap:6,alignItems:'center'}}>ดินอ่อน ≤ <input type="number" value={thSoft} onChange={e=>setThSoft(Number(e.target.value)||0)} style={{...inp,width:80}}/> ครั้ง</label>
+            <label style={{display:'flex',gap:6,alignItems:'center'}}>ดินแข็ง ≥ <input type="number" value={thHard} onChange={e=>setThHard(Number(e.target.value)||0)} style={{...inp,width:80}}/> ครั้ง</label>
+            <span style={{fontSize:12,color:'#64748b'}}>ช่วงดินปานกลางแบ่งเฝ้าระวัง 3 ระดับเท่าๆ กัน: {soft+1}–{edges[1]} · {edges[1]+1}–{edges[2]} · {edges[2]+1}–{hard-1}</span>
+          </div>
+          {LV.map((l,i)=><div key={i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
+            <span style={{minWidth:200,fontSize:12.5,fontWeight:700,color:l.col}}>{l.e} {l.name} — {l.tag}</span>
+            <input style={inp} value={acts[i]} onChange={e=>setActs(a=>a.map((x,j)=>j===i?e.target.value:x))}/>
+          </div>)}
+          <div style={{fontSize:12,color:'#64748b',marginTop:6}}>ข้อความ "การดำเนินการ" แก้ได้ตามที่ใช้จริง · จำไว้ในเครื่องนี้ (เบราว์เซอร์) · <button style={{...btn,padding:'1px 8px',fontSize:12}} onClick={()=>{setThSoft(300);setThHard(600);setActs(DEF_ACT);}}>คืนค่าเริ่มต้น</button></div>
+        </div>}
+      </ChartCard>
+    </div>;
+  }
+
+  // ============================================================
   // รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน (เดิมกรอกในไฟล์ Excel "รายงานโฟร์แมน")
   // กรอกเอง / วางข้อความ "แจ้งเสาเฟล" ให้ระบบอ่านใส่ฟอร์ม / นำเข้าจาก Excel / (Telegram: ส่งข้อความเข้ากลุ่ม บอทบันทึกให้)
   // ตาราง foreman_reports (รัน supabase-foreman-reports.sql)
@@ -13364,6 +13488,7 @@ window.__dataReady.then(data => {
     const [fSize,setFSize]=useState('');
     const [fMan,setFMan]=useState('');
     const [fMonth,setFMonth]=useState(0);      // 0 = ทุกเดือน
+    const [fview,setFview]=useState('fail');   // fail = รายงานเสาเฟล · blow = นับ Blow count 30 ฟุต
     const [fPend,setFPend]=useState(false);    // true = แสดงเฉพาะงานที่ยัง "รอสรุป"
     const tblRef=useRef(null);
     const [q,setQ]=useState('');
@@ -13500,7 +13625,8 @@ window.__dataReady.then(data => {
         <select style={inp} value={custom?'__other':v} onChange={e=>{const x=e.target.value;if(x==='__other'){setOth({...oth,[k]:true});setForm({...form,[k]:custom?v:''});}else{setOth({...oth,[k]:false});setForm({...form,[k]:x});}}}>
           <option value="">— เลือก —</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}<option value="__other">อื่นๆ (พิมพ์เอง)</option></select>
         {custom&&<input style={{...inp,marginTop:6}} value={v} placeholder={ph||'พิมพ์เอง'} onChange={e=>setForm({...form,[k]:e.target.value})}/>}</div>;};
-    return<div className="grid">
+    if(fview==='blow')return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'}]} value={fview} onChange={setFview}/></div><BlowCountPanel/></div>;
+    return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'}]} value={fview} onChange={setFview}/></div><div className="grid">
       <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
         subtitle={`ปี ${year?year+543:'ทั้งหมด'}${fMonth?' · เดือน'+MF[fMonth-1]:''} · ${list0.length} รายการ · แซมรวม ${totalFix} ต้น${fPend?' · แสดงเฉพาะรอสรุป '+list.length+' รายการ':''}`}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
@@ -13587,7 +13713,7 @@ window.__dataReady.then(data => {
           </div>
         </div>
       </div>}
-    </div>;
+    </div></div>;
   }
 
   function WedgePanelRedirect(){React.useEffect(()=>{location.href='wedge-panel/';},[]);return <div style={{padding:24}}>กำลังเปิดหน้าออกแบบแผ่นกันดิน…</div>;}
