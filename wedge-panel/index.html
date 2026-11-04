@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261104094258">
+<meta name="app-version" content="20261104095407">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261104094258">
+<link rel="stylesheet" href="css/app.css?v=20261104095407">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -147,7 +147,6 @@
 </fieldset>
 <fieldset><legend>เสาเข็ม</legend>
 <label for="psec">หน้าตัดเสา</label><select id="psec"></select>
-<div class="mode" style="margin-top:10px"><input type="radio" name="pt" id="ptL" value="len" checked><label for="ptL">ระบุความยาว</label><input type="radio" name="pt" id="ptF" value="full"><label for="ptF">แบบเต็ม (ทุกความยาว)</label></div>
 <div id="pLbox"><label for="pL">ความยาวเสา (ม.)</label><input id="pL" type="number" step="0.01" min="1" max="40"></div>
 <div id="pnBox"><label for="pnS">จำนวนท่อนต่อเชื่อม</label><select id="pnS"><option value="1">ท่อนเดี่ยว</option><option value="2">2 ท่อน</option><option value="3">3 ท่อน</option><option value="4">4 ท่อน</option><option value="5">5 ท่อน</option><option value="6">6 ท่อน</option></select></div>
 <div id="plSplit" hidden><div class="row2"><div><label for="plA">ท่อนบน (ม.)</label><input id="plA" type="number" step="0.01" min="0"></div><div><label for="plB">ท่อนล่าง (ม.)</label><input id="plB" type="number" step="0.01" min="0"></div></div><p class="hint">ไม่ใส่ = แบ่งอัตโนมัติ (17 ม. → 8 + 9) ใส่เองได้ เช่น 7 + 10</p></div>
@@ -164,6 +163,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261104094258"></script>
+<script type="module" src="js/ui.js?v=20261104095407"></script>
 </body>
 </html>
