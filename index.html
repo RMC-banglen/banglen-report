@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-04c';
+var APP_VERSION='2026-11-04d';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13348,126 +13348,119 @@ window.__dataReady.then(data => {
   }
 
   // ============================================================
-  // นับ Blow count 30 ฟุต (แท็บในหน้ารายงานโฟร์แมน)
-  // วัตถุประสงค์: ดูว่าดินที่ตอกอยู่แข็งแค่ไหน — ถึงเกณฑ์ดินแข็ง (≥ 600 ครั้ง) ต้องเพิ่มสเตรงปูนช่วย
-  // ระดับ: ดินอ่อน ≤ 300 · ดินปานกลาง 301–599 แบ่งเฝ้าระวัง 3 ระดับ (แบ่งเท่าๆ กันระหว่างเกณฑ์อ่อน–แข็ง) · ดินแข็ง ≥ 600
-  // วางข้อความโฟร์แมน ("หน่วยงาน ... I0.30x22.00 ม. ต/ช (ธรรมดา) นับ 30 ฟุต รวม 382 ครั้ง") → ระบบอ่านใส่ช่อง → ได้ข้อความผลพร้อมกดคัดลอกไปวางในกลุ่ม Telegram
+  // นับ Blow count 30 ฟุต — ประวัติที่โฟร์แมนส่งในกลุ่ม Telegram (บอทอ่านแล้วบันทึกลงตาราง blow_counts และตอบระดับดินกลับ)
+  // ระดับ: ดินอ่อน ≤ 300 · ดินปานกลาง 301–599 แบ่งเฝ้าระวัง 3 ระดับเท่าๆ กัน · ดินแข็ง ≥ 600 = ต้องเพิ่มสเตรงปูนช่วย (เกณฑ์เดียวกับบอท)
   // ============================================================
-  function BlowCountPanel(){
-    const LS='bc_settings_v1';
-    const DEF_ACT=['ตอกตามปกติ','เฝ้าระวัง — ตอกต่อตามปกติ ติดตามค่านับเสาต้นถัดไป','เฝ้าระวังใกล้ชิด — แจ้งฝ่ายผลิตเตรียมสูตรสเตรงสูง ตรวจหัวเสา/ปลายเสาทุกต้น','ใกล้ดินแข็ง — แจ้งฝ่ายผลิตปรับเป็นสเตรงสูงสำหรับเสาล็อตถัดไป','ถึงเกณฑ์ดินแข็ง — ต้องเพิ่มสเตรงปูนช่วย แจ้งฝ่ายผลิตเปลี่ยนเป็นสูตรสเตรงสูงทันที'];
-    const saved=(()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}');}catch(e){return {};}})();
-    const [text,setText]=useState('');
-    const [readMsg,setReadMsg]=useState('');
-    const [f,setF]=useState({site:'',pile:'',count:'',feet:'30',note:''});
-    const [thSoft,setThSoft]=useState(saved.soft||300);
-    const [thHard,setThHard]=useState(saved.hard||600);
-    const [acts,setActs]=useState(saved.acts&&saved.acts.length===5?saved.acts:DEF_ACT);
-    const [showCfg,setShowCfg]=useState(false);
-    const [copied,setCopied]=useState(false);
-    useEffect(()=>{try{localStorage.setItem(LS,JSON.stringify({soft:thSoft,hard:thHard,acts}));}catch(e){}},[thSoft,thHard,acts]);
-    const inp={padding:'8px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
+  function BlowCountPanel({canEdit}){
+    const db=DB;
+    const SOFT=300,HARD=600;
+    const pad2=n=>String(n).padStart(2,'0');
+    const todayIso=()=>{const n=new Date();return n.getFullYear()+'-'+pad2(n.getMonth()+1)+'-'+pad2(n.getDate());};
+    const EMPTY=()=>({count_date:todayIso(),site:'',pile:'',blows:'',feet:'30',reporter:'',note:''});
+    const [rows,setRows]=useState(null);
+    const [noTable,setNoTable]=useState(false);
+    const [fMonth,setFMonth]=useState('');
+    const [fLevel,setFLevel]=useState('');
+    const [q,setQ]=useState('');
+    const [form,setForm]=useState(null);
+    const [editId,setEditId]=useState(null);
+    const [saving,setSaving]=useState(false);
+    const [err,setErr]=useState('');
+    const load=()=>{db.from('blow_counts').select('*').order('count_date',{ascending:false}).order('id',{ascending:false}).limit(3000)
+      .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
+    useEffect(load,[]);
+    if(rows===null)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
+    if(noTable)return <div className="grid"><ChartCard span="full" title="🔨 นับ Blow count 30 ฟุต">
+      <div style={{padding:'12px 14px',fontSize:14,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-blow-counts.sql</b> หนึ่งครั้ง จากนั้นรีเฟรชหน้านี้ · ข้อความที่โฟร์แมนส่งในกลุ่ม Telegram จะถูกบันทึกที่นี่เอง</div>
+    </ChartCard></div>;
+    const step=(HARD-SOFT)/3;
+    const e1=Math.round(SOFT+step),e2=Math.round(SOFT+2*step);
+    const LV=[
+      {e:'🟢',name:'ดินอ่อน',tag:'ปกติ',col:'#15803d',bg:'#dcfce7'},
+      {e:'🟡',name:'ดินปานกลาง',tag:'เฝ้าระวัง 1',col:'#a16207',bg:'#fef9c3'},
+      {e:'🟠',name:'ดินปานกลาง',tag:'เฝ้าระวัง 2',col:'#c2410c',bg:'#ffedd5'},
+      {e:'🔶',name:'ดินปานกลาง',tag:'เฝ้าระวัง 3 (ใกล้ดินแข็ง)',col:'#b91c1c',bg:'#fee2e2'},
+      {e:'🔴',name:'ดินแข็ง',tag:'ต้องเพิ่มสเตรงปูน',col:'#991b1b',bg:'#fecaca'},
+    ];
+    const lvOf=n=>n<=SOFT?0:n>=HARD?4:n<=e1?1:n<=e2?2:3;
+    const months=[...new Set(rows.map(r=>String(r.count_date).slice(0,7)))].sort().reverse();
+    const MF=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    const monthLabel=ym=>MF[Number(ym.slice(5,7))-1]+' '+(Number(ym.slice(0,4))+543);
+    const qq=q.trim().toLowerCase();
+    const base=rows.filter(r=>(!fMonth||String(r.count_date).slice(0,7)===fMonth)&&(!qq||[r.site,r.pile,r.reporter,r.note].some(x=>String(x||'').toLowerCase().includes(qq))));
+    const list=base.filter(r=>fLevel===''||(fLevel==='mid'?[1,2,3].includes(lvOf(r.blows)):lvOf(r.blows)===Number(fLevel)));
+    const cnt=[0,0,0,0,0];base.forEach(r=>{cnt[lvOf(r.blows)]++;});
+    const fmtD=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return Number(p[2])+'/'+Number(p[1])+'/'+String(Number(p[0])+543).slice(2);};
+    const inp={padding:'7px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
     const lbl={fontSize:12.5,color:'#475569',fontWeight:600,marginBottom:3,display:'block'};
     const btn={padding:'7px 14px',borderRadius:8,border:'1px solid #d6d8e0',background:'#fff',cursor:'pointer',fontSize:13.5,fontWeight:600,color:'#475569'};
     const btnP={...btn,background:'#2f5fd0',borderColor:'#2f5fd0',color:'#fff'};
-    // อ่านข้อความโฟร์แมน: บรรทัดก่อนบรรทัดเสา = หน่วยงาน/ที่อยู่ · บรรทัดเสา I0.30x22.00 ม. ต/ช (ธรรมดา) · "นับ 30 ฟุต" · "รวม 382 ครั้ง"
-    const parse=()=>{
-      const lines0=String(text).replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(Boolean);
-      if(!lines0.length){setReadMsg('วางข้อความก่อน');return;}
-      const pileRe=/(?:^|\s)(?:เสา(?:เข็ม)?\s*)?(I|ไอ|S|สี่เหลี่ยม)\s*-?\s*(0?\.\d{2}|\d{2})\s*[x×*]\s*(?:0?\.\d{2}\s*[x×*]\s*)?(\d+(?:\.\d+)?)\s*(?:เมตร|ม\.?|m\.?)?\s*(.*)$/i;
-      let pile='',pi=-1;
-      lines0.forEach((l,i)=>{if(pi>=0)return;const m=l.match(pileRe);if(m){pi=i;const sz=parseFloat(m[2]);pile=(/^(S|สี่)/i.test(m[1])?'S':'I')+Math.round(sz<1?sz*100:sz)+' × '+parseFloat(m[3]).toFixed(2)+' ม.'+(m[4]?' '+m[4].replace(/^[\s,.:]+/,'').trim():'');}});
-      const site=(pi>=0?lines0.slice(0,pi):lines0.filter(l=>!/ครั้ง|ฟุต/.test(l))).map(l=>l.replace(/^(?:หน่วยงาน|โครงการ|หน้างาน)\s*[:：]?\s*/,'')).filter(Boolean).join(' ');
-      const all=lines0.join(' ');
-      const cm=all.match(/(?:รวม|ได้|นับได้)\D{0,12}(\d{2,4})\s*(?:ครั้ง|blow)/i)||all.match(/(\d{2,4})\s*ครั้ง/);
-      const fm=all.match(/(\d{2,3})\s*ฟุต/);
-      setF(x=>({...x,site:site||x.site,pile:pile||x.pile,count:cm?cm[1]:x.count,feet:fm?fm[1]:x.feet}));
-      const miss=[!cm&&'จำนวนครั้ง',!site&&'หน่วยงาน',pi<0&&'ขนาดเสา'].filter(Boolean);
-      setReadMsg(miss.length?'⚠️ อ่านได้บางส่วน ยังไม่พบ: '+miss.join(' · ')+' — กรอกเพิ่มในช่องด้านล่าง':'✅ อ่านข้อความแล้ว ตรวจช่องด้านล่างก่อนคัดลอก');
+    const sel={...btn,padding:'6px 8px',fontWeight:500};
+    const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
+    const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
+    const openNew=()=>{setForm(EMPTY());setEditId(null);setErr('');};
+    const openEdit=r=>{setForm({count_date:String(r.count_date).slice(0,10),site:r.site||'',pile:r.pile||'',blows:r.blows==null?'':String(r.blows),feet:r.feet==null?'30':String(r.feet),reporter:r.reporter||'',note:r.note||''});setEditId(r.id);setErr('');};
+    const save=async()=>{
+      if(!form.count_date){setErr('กรุณาใส่วันที่');return;}
+      if(form.blows===''||!Number.isFinite(Number(form.blows))){setErr('กรุณาใส่จำนวนครั้งที่นับได้');return;}
+      setSaving(true);setErr('');
+      const row={count_date:form.count_date,site:form.site||null,pile:form.pile||null,blows:Number(form.blows),feet:Number(form.feet)||30,reporter:form.reporter||null,note:form.note||null,updated_at:new Date().toISOString()};
+      const res=editId?await db.from('blow_counts').update(row).eq('id',editId):await db.from('blow_counts').insert([{...row,source:'form'}]);
+      setSaving(false);
+      if(res.error){setErr('บันทึกไม่สำเร็จ: '+res.error.message);return;}
+      setForm(null);setEditId(null);load();
     };
-    // ระดับ 0..4: ดินอ่อน / เฝ้าระวัง 1 / 2 / 3 / ดินแข็ง
-    const soft=Number(thSoft)||0,hard=Number(thHard)||0,step=hard>soft?(hard-soft)/3:0;
-    const edges=[soft,Math.round(soft+step),Math.round(soft+2*step),hard];   // ขอบบนของระดับ 0,1,2 และขอบล่างของดินแข็ง
-    const LV=[
-      {e:'🟢',name:'ดินอ่อน',tag:'ปกติ',col:'#15803d',bg:'#dcfce7'},
-      {e:'🟡',name:'ดินปานกลาง',tag:'เฝ้าระวังระดับ 1',col:'#a16207',bg:'#fef9c3'},
-      {e:'🟠',name:'ดินปานกลาง',tag:'เฝ้าระวังระดับ 2',col:'#c2410c',bg:'#ffedd5'},
-      {e:'🔶',name:'ดินปานกลาง',tag:'เฝ้าระวังระดับ 3 (ใกล้ดินแข็ง)',col:'#b91c1c',bg:'#fee2e2'},
-      {e:'🔴',name:'ดินแข็ง',tag:'ต้องเพิ่มสเตรงปูน',col:'#991b1b',bg:'#fecaca'},
-    ];
-    const n=Number(f.count),feet=Number(f.feet)||30,okN=Number.isFinite(n)&&f.count!=='';
-    const lvIdx=!okN?-1:n<=soft?0:n>=hard?4:n<=edges[1]?1:n<=edges[2]?2:3;
-    const lv=lvIdx>=0?LV[lvIdx]:null;
-    const lines=[];
-    lines.push('🔨 ผลนับ Blow count '+feet+' ฟุต');
-    if(f.site)lines.push('หน่วยงาน : '+f.site);
-    if(f.pile)lines.push('เสา : '+f.pile);
-    if(okN)lines.push('นับได้ : '+n+' ครั้ง / '+feet+' ฟุต (เฉลี่ย '+(n/feet).toFixed(1)+' ครั้ง/ฟุต)');
-    if(lv){lines.push('ผล : '+lv.e+' '+lv.name+' — '+lv.tag);if(lvIdx>=2)lines.push('การดำเนินการ : '+acts[lvIdx]);}   // ปกติ/เฝ้าระวัง 1 ไม่ต้องมีบรรทัดการดำเนินการ
-    if(f.note)lines.push('หมายเหตุ : '+f.note);
-    lines.push('(เกณฑ์ ครั้ง/30 ฟุต: ≤'+soft+' ดินอ่อน · '+(soft+1)+'–'+edges[1]+' เฝ้าระวัง 1 · '+(edges[1]+1)+'–'+edges[2]+' เฝ้าระวัง 2 · '+(edges[2]+1)+'–'+(hard-1)+' เฝ้าระวัง 3 · ≥'+hard+' ดินแข็ง)');
-    const out=lines.join('\n');
-    const copy=async()=>{
-      try{await navigator.clipboard.writeText(out);}
-      catch(e){const ta=document.createElement('textarea');ta.value=out;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e2){}document.body.removeChild(ta);}
-      setCopied(true);setTimeout(()=>setCopied(false),2000);
-    };
-    const Fld=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={f[k]} onChange={e=>setF({...f,[k]:e.target.value})} {...(props||{})}/></div>;
-    // แถบสเกล: ตำแหน่งค่าที่นับได้บนระดับทั้ง 5
-    const maxS=Math.max(hard*1.25,n||0,1);
-    const segs=[[0,soft],[soft,edges[1]],[edges[1],edges[2]],[edges[2],hard],[hard,maxS]];
+    const del=async r=>{if(!window.confirm('ลบรายการนี้ ?\n'+fmtD(r.count_date)+' · '+(r.site||'')+' · '+r.blows+' ครั้ง'))return;
+      const{error}=await db.from('blow_counts').delete().eq('id',r.id);if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}load();};
+    const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
     return<div className="grid">
-      <ChartCard span="full" title="🔨 นับ Blow count 30 ฟุต" subtitle={'ดูความแข็งของดินจากจำนวนครั้งที่นับ · ถึง '+hard+' ครั้ง (ดินแข็ง) ต้องเพิ่มสเตรงปูนช่วย · วางข้อความจากโฟร์แมน แล้วกดคัดลอกไปวางในกลุ่ม Telegram'}>
-        <div style={{marginBottom:14,padding:12,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10}}>
-          <label style={{...lbl,color:'#0369a1'}}>วางข้อความที่โฟร์แมนส่งมา แล้วให้ระบบอ่านใส่ช่องให้</label>
-          <textarea value={text} onChange={e=>setText(e.target.value)} rows={5} placeholder={'หน่วยงาน หจก.สุวรรณกิจเข็มเจาะ\nแขวงหนองค้างพลู\nเขตหนองแขมกรุงเทพฯ\nI0.30x22.00 ม. ต/ช (ธรรมดา)\nนับ 30 ฟุต ครับ\nรวม 382 ครั้ง'} style={{...inp,fontFamily:'inherit'}}/>
-          <div style={{display:'flex',gap:10,alignItems:'center',marginTop:6,flexWrap:'wrap'}}><button style={btnP} onClick={parse}>🔍 อ่านข้อความ</button><span style={{fontSize:13,color:readMsg.startsWith('✅')?'#15803d':'#b45309'}}>{readMsg}</span></div>
+      <ChartCard span="full" title="🔨 นับ Blow count 30 ฟุต" subtitle={'ข้อมูลมาจากกลุ่ม Telegram (โฟร์แมนส่ง "นับ 30 ฟุต รวม N ครั้ง" บอทบันทึกและตอบระดับดินให้) · ≤'+SOFT+' ดินอ่อน · '+(SOFT+1)+'–'+(HARD-1)+' เฝ้าระวัง 3 ระดับ · ≥'+HARD+' ดินแข็ง ต้องเพิ่มสเตรงปูนช่วย'}
+        right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          <select value={fMonth} onChange={e=>setFMonth(e.target.value)} style={sel}><option value="">ทุกเดือน</option>{months.map(m=><option key={m} value={m}>{monthLabel(m)}</option>)}</select>
+          {canEdit&&<button style={btnP} onClick={openNew}>＋ เพิ่มรายการ</button>}
+        </div>}>
+        <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',marginBottom:14}}>
+          <div className="kpi" role="button" tabIndex={0} style={{cursor:'pointer',borderColor:fLevel===''?'#2f5fd0':undefined}} onClick={()=>setFLevel('')}><div className="kpi__label">ทั้งหมด (ครั้งที่นับ)</div><div className="kpi__value">{base.length}</div></div>
+          {[[0,'0'],[1,'mid'],[4,'4']].map(([i,k])=>{const c=k==='mid'?cnt[1]+cnt[2]+cnt[3]:cnt[i];const L=k==='mid'?{e:'🟡',col:'#a16207',bg:'#fef9c3'}:LV[i];return<div key={k} className="kpi" role="button" tabIndex={0} style={{cursor:'pointer',borderColor:fLevel===k?L.col:undefined,background:fLevel===k?L.bg:undefined}} onClick={()=>setFLevel(fLevel===k?'':k)}><div className="kpi__label">{k==='mid'?'🟡 ดินปานกลาง (เฝ้าระวัง)':LV[i].e+' '+LV[i].name}</div><div className="kpi__value" style={{color:L.col}}>{c}</div></div>;})}
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10,marginBottom:14}}>
-          {Fld('site','หน่วยงาน')}
-          {Fld('pile','เสา (ขนาด × ยาว)',{placeholder:'I30 × 22.00 ม. ต/ช (ธรรมดา)'})}
-          {Fld('count','นับได้ (ครั้ง)',{type:'number',inputMode:'numeric',placeholder:'382'})}
-          {Fld('feet','ระยะที่นับ (ฟุต)',{type:'number',inputMode:'numeric'})}
-          {Fld('note','หมายเหตุ (ไม่บังคับ)')}
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา หน่วยงาน / เสา / ผู้แจ้ง" style={{...inp,marginBottom:10}}/>
+        <div className="table-wrap" style={{margin:0,maxHeight:'70vh',overflow:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
+          <table style={{width:'100%',borderCollapse:'collapse',minWidth:760}}>
+            <thead><tr>{['วันที่','หน่วยงาน','เสา','นับได้ (ครั้ง)','ระดับ','ผู้แจ้ง','หมายเหตุ',canEdit?'':null].filter(h=>h!==null).map(h=><th key={h||'x'} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{list.map((r,i)=>{const L=LV[lvOf(r.blows)];return<tr key={r.id} className={canEdit?'fm-row':''} title={canEdit?'คลิกเพื่อแก้ไข':undefined} style={{background:i%2?'#fafbfd':'#fff'}} onClick={()=>{if(!canEdit)return;if(window.getSelection&&window.getSelection().toString())return;openEdit(r);}}>
+              <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.count_date)}</td>
+              <td style={{...td,minWidth:200}}>{r.site||''}</td>
+              <td style={{...td,minWidth:140}}>{r.pile||''}</td>
+              <td style={{...td,whiteSpace:'nowrap',fontWeight:800,textAlign:'right',color:L.col}}>{r.blows}<span style={{fontWeight:500,color:'#94a3b8',fontSize:12}}> /{r.feet||30} ฟุต</span></td>
+              <td style={{...td,whiteSpace:'nowrap'}}><span style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.name==='ดินปานกลาง'?L.tag:L.name+(L.tag==='ปกติ'?'':' · '+L.tag)}</span></td>
+              <td style={{...td,whiteSpace:'nowrap'}}>{r.reporter||''}</td>
+              <td style={{...td,minWidth:120}}>{r.note||''}</td>
+              {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={e=>{e.stopPropagation();del(r);}}>ลบ</button></td>}
+            </tr>;})}
+            {!list.length&&<tr><td colSpan={8} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>ยังไม่มีรายการ — เมื่อโฟร์แมนส่งข้อความ Blow count ในกลุ่ม Telegram บอทจะบันทึกให้ที่นี่</td></tr>}</tbody>
+          </table>
         </div>
-        {lv&&<div style={{marginBottom:14}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',padding:'12px 14px',borderRadius:10,background:lv.bg,border:'1px solid '+lv.col}}>
-            <div style={{fontSize:30,fontWeight:900,color:lv.col,fontFamily:'var(--num)'}}>{n}<span style={{fontSize:14,fontWeight:600}}> ครั้ง</span></div>
-            <div style={{flex:'1 1 240px'}}>
-              <div style={{fontSize:16,fontWeight:800,color:lv.col}}>{lv.e} {lv.name} — {lv.tag}</div>
-              {lvIdx>=2&&<div style={{fontSize:13.5,color:'#334155'}}>{acts[lvIdx]}</div>}
-              <div style={{fontSize:12,color:'#64748b'}}>เฉลี่ย {(n/feet).toFixed(1)} ครั้ง/ฟุต</div>
-            </div>
-          </div>
-          <div style={{position:'relative',display:'flex',height:14,borderRadius:7,overflow:'hidden',marginTop:12}}>
-            {segs.map((sg,i)=><div key={i} style={{flex:Math.max(0.0001,sg[1]-sg[0]),background:['#86efac','#fde047','#fdba74','#f87171','#b91c1c'][i]}} title={LV[i].name+' '+LV[i].tag}/>)}
-          </div>
-          <div style={{position:'relative',height:22}}>
-            <div style={{position:'absolute',left:Math.min(99,Math.max(1,n/maxS*100))+'%',transform:'translateX(-50%)',fontSize:12,fontWeight:800,color:lv.col}}>▲ {n}</div>
-          </div>
-        </div>}
-        <label style={lbl}>ข้อความที่จะคัดลอกไปวางใน Telegram</label>
-        <textarea readOnly value={out} rows={Math.min(10,lines.length+1)} style={{...inp,fontFamily:'inherit',background:'#f8fafc',lineHeight:1.6}} onFocus={e=>e.target.select()}/>
-        <div style={{display:'flex',gap:10,alignItems:'center',marginTop:8,flexWrap:'wrap'}}>
-          <button style={btnP} onClick={copy}>{copied?'✅ คัดลอกแล้ว':'📋 คัดลอกข้อความ'}</button>
-          <span style={{fontSize:12.5,color:'#64748b'}}>เปิด Telegram กลุ่มโฟร์แมน แล้ววาง (Ctrl+V)</span>
-          <span style={{flex:1}}/>
-          <button style={btn} onClick={()=>setShowCfg(!showCfg)}>{showCfg?'ซ่อนการตั้งค่า':'⚙️ ปรับเกณฑ์/ข้อความ'}</button>
-        </div>
-        {!okN&&<div style={{marginTop:10,fontSize:13,color:'#b45309'}}>ใส่จำนวนครั้งที่นับได้ก่อน ระบบจึงจะบอกระดับของดิน</div>}
-        {showCfg&&<div style={{marginTop:12,padding:12,border:'1px solid #e2e8f0',borderRadius:10,background:'#fafbfd'}}>
-          <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',marginBottom:10,fontSize:13,color:'#475569'}}>
-            <label style={{display:'flex',gap:6,alignItems:'center'}}>ดินอ่อน ≤ <input type="number" value={thSoft} onChange={e=>setThSoft(Number(e.target.value)||0)} style={{...inp,width:80}}/> ครั้ง</label>
-            <label style={{display:'flex',gap:6,alignItems:'center'}}>ดินแข็ง ≥ <input type="number" value={thHard} onChange={e=>setThHard(Number(e.target.value)||0)} style={{...inp,width:80}}/> ครั้ง</label>
-            <span style={{fontSize:12,color:'#64748b'}}>ช่วงดินปานกลางแบ่งเฝ้าระวัง 3 ระดับเท่าๆ กัน: {soft+1}–{edges[1]} · {edges[1]+1}–{edges[2]} · {edges[2]+1}–{hard-1}</span>
-          </div>
-          {LV.map((l,i)=><div key={i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
-            <span style={{minWidth:200,fontSize:12.5,fontWeight:700,color:l.col}}>{l.e} {l.name} — {l.tag}</span>
-            <input style={inp} value={acts[i]} onChange={e=>setActs(a=>a.map((x,j)=>j===i?e.target.value:x))}/>
-          </div>)}
-          <div style={{fontSize:12,color:'#64748b',marginTop:6}}>ข้อความ "การดำเนินการ" แก้ได้ตามที่ใช้จริง · จำไว้ในเครื่องนี้ (เบราว์เซอร์) · <button style={{...btn,padding:'1px 8px',fontSize:12}} onClick={()=>{setThSoft(300);setThHard(600);setActs(DEF_ACT);}}>คืนค่าเริ่มต้น</button></div>
-        </div>}
       </ChartCard>
+      {form&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setForm(null);}}>
+        <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:560,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
+          <div style={{fontSize:17,fontWeight:800,color:'#1a2540',marginBottom:12}}>{editId?'แก้ไขรายการ Blow count':'เพิ่มรายการ Blow count'}</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10}}>
+            {F('count_date','วันที่',{type:'date'})}
+            {F('blows','นับได้ (ครั้ง)',{type:'number',inputMode:'numeric',placeholder:'382'})}
+            {F('feet','ระยะที่นับ (ฟุต)',{type:'number',inputMode:'numeric'})}
+            {F('reporter','ผู้แจ้ง')}
+            {F('site','หน่วยงาน')}
+            {F('pile','เสา (ขนาด × ยาว)',{placeholder:'I30 × 22.00 ม. ต/ช (ธรรมดา)'})}
+            {F('note','หมายเหตุ')}
+          </div>
+          {form.blows!==''&&Number.isFinite(Number(form.blows))&&<div style={{marginTop:10,fontSize:13.5,fontWeight:700,color:LV[lvOf(Number(form.blows))].col}}>{LV[lvOf(Number(form.blows))].e} {LV[lvOf(Number(form.blows))].name} — {LV[lvOf(Number(form.blows))].tag}</div>}
+          {err&&<div style={{marginTop:10,color:'#dc2626',fontSize:13.5}}>{err}</div>}
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:16}}>
+            <button style={btn} onClick={()=>setForm(null)}>ยกเลิก</button>
+            <button style={btnP} disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'💾 บันทึก'}</button>
+          </div>
+        </div>
+      </div>}
     </div>;
   }
 
@@ -13625,7 +13618,7 @@ window.__dataReady.then(data => {
         <select style={inp} value={custom?'__other':v} onChange={e=>{const x=e.target.value;if(x==='__other'){setOth({...oth,[k]:true});setForm({...form,[k]:custom?v:''});}else{setOth({...oth,[k]:false});setForm({...form,[k]:x});}}}>
           <option value="">— เลือก —</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}<option value="__other">อื่นๆ (พิมพ์เอง)</option></select>
         {custom&&<input style={{...inp,marginTop:6}} value={v} placeholder={ph||'พิมพ์เอง'} onChange={e=>setForm({...form,[k]:e.target.value})}/>}</div>;};
-    if(fview==='blow')return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'}]} value={fview} onChange={setFview}/></div><BlowCountPanel/></div>;
+    if(fview==='blow')return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'}]} value={fview} onChange={setFview}/></div><BlowCountPanel canEdit={canEdit}/></div>;
     return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'}]} value={fview} onChange={setFview}/></div><div className="grid">
       <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
         subtitle={`ปี ${year?year+543:'ทั้งหมด'}${fMonth?' · เดือน'+MF[fMonth-1]:''} · ${list0.length} รายการ · แซมรวม ${totalFix} ต้น${fPend?' · แสดงเฉพาะรอสรุป '+list.length+' รายการ':''}`}

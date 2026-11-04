@@ -958,17 +958,17 @@ function isBlowMsg(t) { return /นับ\s*\d{2,3}\s*ฟุต/.test(t) && /\d{
 function blowParse(text) {
   var lines = String(text).replace(/\r/g, '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
   var pileRe = /(?:^|\s)(?:เสา(?:เข็ม)?\s*)?(I|ไอ|S|สี่เหลี่ยม)\s*-?\s*(0?\.\d{2}|\d{2})\s*[x×*]\s*(?:0?\.\d{2}\s*[x×*]\s*)?(\d+(?:\.\d+)?)\s*(?:เมตร|ม\.?|m\.?)?\s*(.*)$/i;
-  var pile = '', pi = -1;
+  var pile = '', pi = -1, psize = '', plen = null;
   lines.forEach(function (l, i) {
     if (pi >= 0) return;
     var m = l.match(pileRe);
-    if (m) { pi = i; var sz = parseFloat(m[2]); pile = (/^(S|สี่)/i.test(m[1]) ? 'S' : 'I') + Math.round(sz < 1 ? sz * 100 : sz) + ' × ' + parseFloat(m[3]).toFixed(2) + ' ม.' + (m[4] ? ' ' + m[4].replace(/^[\s,.:]+/, '').trim() : ''); }
+    if (m) { pi = i; var sz = parseFloat(m[2]); psize = (/^(S|สี่)/i.test(m[1]) ? 'S' : 'I') + Math.round(sz < 1 ? sz * 100 : sz); plen = parseFloat(m[3]); pile = (/^(S|สี่)/i.test(m[1]) ? 'S' : 'I') + Math.round(sz < 1 ? sz * 100 : sz) + ' × ' + parseFloat(m[3]).toFixed(2) + ' ม.' + (m[4] ? ' ' + m[4].replace(/^[\s,.:]+/, '').trim() : ''); }
   });
   var site = (pi >= 0 ? lines.slice(0, pi) : lines.filter(function (l) { return !/ครั้ง|ฟุต/.test(l); })).map(function (l) { return l.replace(/^(?:หน่วยงาน|โครงการ|หน้างาน)\s*[:：]?\s*/, ''); }).filter(Boolean).join(' ');
   var all = lines.join(' ');
   var cm = all.match(/(?:รวม|ได้|นับได้)\D{0,12}(\d{2,4})\s*(?:ครั้ง|blow)/i) || all.match(/(\d{2,4})\s*ครั้ง/);
   var fm = all.match(/(\d{2,3})\s*ฟุต/);
-  return { site: site, pile: pile, count: cm ? Number(cm[1]) : null, feet: fm ? Number(fm[1]) : 30 };
+  return { site: site, pile: pile, size: psize, length_m: plen, count: cm ? Number(cm[1]) : null, feet: fm ? Number(fm[1]) : 30 };
 }
 function blowLevelIdx(n) {
   var step = (BLOW_HARD - BLOW_SOFT) / 3;
@@ -987,7 +987,21 @@ function handleBlowCount(m, text) {
     + '\nผล : ' + lv.e + ' <b>' + lv.name + ' — ' + lv.tag + '</b>'
     + (idx >= 2 ? '\nการดำเนินการ : ' + lv.act : '')   // ปกติ/เฝ้าระวัง 1 ไม่ต้องมีบรรทัดนี้ · เฝ้าระวัง 2 ขึ้นไปบอกสิ่งที่ต้องทำ
     + '\n<i>เกณฑ์ ครั้ง/30 ฟุต: ≤' + BLOW_SOFT + ' ดินอ่อน · ' + (BLOW_SOFT + 1) + '–' + e1 + ' เฝ้าระวัง 1 · ' + (e1 + 1) + '–' + e2 + ' เฝ้าระวัง 2 · ' + (e2 + 1) + '–' + (BLOW_HARD - 1) + ' เฝ้าระวัง 3 · ≥' + BLOW_HARD + ' ดินแข็ง</i>';
-  tgReply(m.chat.id, out, m.message_id);
+  // บันทึกประวัติ (ตาราง blow_counts — รัน supabase-blow-counts.sql) · ข้อความเดียวกันซ้ำไม่บันทึกซ้ำ
+  var day = Utilities.formatDate(new Date((m.date || Math.floor(Date.now() / 1000)) * 1000), 'Asia/Bangkok', 'yyyy-MM-dd');
+  var reporter = foremanForwardName(m) || (m.from ? ((m.from.first_name || '') + ' ' + (m.from.last_name || '')).trim() || m.from.username || '' : '');
+  var note = '';
+  try {
+    var q = 'blow_counts?select=id&count_date=eq.' + day + '&blows=eq.' + b.count + (b.site ? '&site=eq.' + encodeURIComponent(b.site) : '');
+    var ex = sb('get', q);
+    if (ex.getResponseCode() >= 300) note = '\n⚠️ <i>ยังไม่ได้บันทึกประวัติ (ยังไม่ได้รัน supabase-blow-counts.sql)</i>';
+    else if (JSON.parse(ex.getContentText() || '[]').length) note = '\nℹ️ <i>มีรายการนี้ในประวัติแล้ว</i>';
+    else {
+      var ins = sb('post', 'blow_counts', [{ count_date: day, site: b.site || null, pile: b.pile || null, size: b.size || null, length_m: b.length_m, blows: b.count, feet: b.feet, reporter: reporter || null, source: 'telegram' }]);
+      if (ins.getResponseCode() >= 300) { Logger.log('blow insert: ' + ins.getContentText()); note = '\n⚠️ <i>บันทึกประวัติไม่สำเร็จ</i>'; }
+    }
+  } catch (err) { Logger.log('blow save: ' + err.message); }
+  tgReply(m.chat.id, out + note, m.message_id);
 }
 function handleForemanText(m, text, sender) {
   var d = new Date((m.date || Math.floor(Date.now() / 1000)) * 1000);
