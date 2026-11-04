@@ -2,8 +2,8 @@
 import { planPile, autoSplit, m2 } from "./pile-calc.js";
 import { pileSheet } from "./pile-draw.js";
 import { PILE_SECTIONS } from "./pile-data.js";
-import { download } from "./pdf.js?v=20261104054233";
-import { esc } from "./draw2d.js?v=20261104054233";
+import { download } from "./pdf.js?v=20261104094258";
+import { esc } from "./draw2d.js?v=20261104094258";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -11,10 +11,11 @@ const DB_SIZES = [10, 12, 16, 20, 25];
 let extras = [], started = false;
 
 const num = (id) => { const v = parseFloat($(id).value); return v > 0 ? v : 0; };
+const pnVal = () => Math.min(6, Math.max(1, +$("pnS").value || 1));
 const radio = (n) => (document.querySelector(`input[name="${n}"]:checked`) || {}).value;
 
 function read() {
-  const full = radio("pt") === "full", pieces = radio("pn") === "2" ? 2 : 1;
+  const full = radio("pt") === "full", pieces = pnVal();
   const a = num("plA"), b = num("plB");
   return {
     section: $("psec").value, full, L: num("pL"), pieces, joint: $("pjoint").checked,
@@ -22,7 +23,7 @@ function read() {
     extras: extras.map((e) => ({ ...e })),
     shoulder: $("psh").checked ? num("pshAt") : 0,
     project: { pj: $("ppj").value.trim(), ow: $("pow").value.trim(), lo: $("plo").value.trim() },
-    _raw: { a: $("plA").value, b: $("plB").value, shOn: $("psh").checked, shAt: $("pshAt").value, pt: radio("pt"), pn: radio("pn") },
+    _raw: { a: $("plA").value, b: $("plB").value, shOn: $("psh").checked, shAt: $("pshAt").value, pt: radio("pt"), pn: String(pnVal()) },
   };
 }
 
@@ -30,8 +31,9 @@ function renderExtras() {
   const box = $("pxs"); box.innerHTML = "";
   extras.forEach((e, i) => {
     const d = document.createElement("div"); d.className = "pxrow";
-    d.innerHTML = `<div><label>ขนาด</label><select>${DB_SIZES.map((s) => `<option value="${s}" ${s === e.d ? "selected" : ""}>DB${s}</option>`).join("")}</select></div><div><label>ยาว (ม.)</label><input type="number" step="0.01" min="0" value="${e.len || ""}" placeholder="เต็มท่อน"></div><div><label>จำนวน (เส้น)</label><input type="number" step="1" min="1" max="8" value="${e.n || ""}"></div><button type="button" class="iconbtn" aria-label="ลบเหล็กเสริมนี้">✕</button>`;
-    const sel = d.querySelector("select"), [len, n] = d.querySelectorAll("input");
+    d.innerHTML = `<div><label>ขนาด</label><select>${DB_SIZES.map((s) => `<option value="${s}" ${s === e.d ? "selected" : ""}>DB${s}</option>`).join("")}</select></div><div><label>ยาว (ม.)</label><input type="number" step="0.01" min="0" value="${e.len || ""}" placeholder="เต็มท่อน"></div><div><label>จำนวน (เส้น)</label><input type="number" step="1" min="1" max="8" value="${e.n || ""}"></div><div><label>ใช้กับท่อน</label><select class="xp"><option value="0" ${!e.pieces ? "selected" : ""}>ทุกท่อน</option>${Array.from({ length: pnVal() }, (_, q) => q + 1).map((k) => `<option value="${k}" ${e.pieces === k ? "selected" : ""}>ท่อนที่ ${k}${pnVal() > 1 ? (k === 1 ? " (บน)" : k === pnVal() ? " (ล่าง)" : "") : ""}</option>`).join("")}</select></div><button type="button" class="iconbtn" aria-label="ลบเหล็กเสริมนี้">✕</button>`;
+    const [sel, xp] = d.querySelectorAll("select"), [len, n] = d.querySelectorAll("input");
+    xp.onchange = () => { e.pieces = +xp.value || 0; render(); };
     sel.onchange = () => { e.d = +sel.value; render(); };
     len.oninput = () => { e.len = parseFloat(len.value) || 0; render(); };
     n.oninput = () => { e.n = Math.floor(+n.value) || 0; render(); };
@@ -41,7 +43,7 @@ function renderExtras() {
 }
 
 function syncUi() {
-  const full = radio("pt") === "full", two = radio("pn") === "2";
+  const full = radio("pt") === "full", two = pnVal() === 2;
   $("pLbox").hidden = full; $("pnBox").hidden = full; $("plSplit").hidden = full || !two;
   $("pshBox").hidden = full; $("pxBox").hidden = full; $("pshAtBox").hidden = !$("psh").checked || full;
   const L = num("pL");
@@ -67,10 +69,10 @@ function restore() {
     $("pL").value = d.L || ""; $("pjoint").checked = d.joint !== false;
     $("ppj").value = (d.project && d.project.pj) || ""; $("pow").value = (d.project && d.project.ow) || ""; $("plo").value = (d.project && d.project.lo) || "";
     const r = d._raw || {};
-    const pt = document.querySelector(`input[name="pt"][value="${r.pt || "len"}"]`), pn = document.querySelector(`input[name="pn"][value="${r.pn || "1"}"]`);
-    if (pt) pt.checked = true; if (pn) pn.checked = true;
+    const pt = document.querySelector(`input[name="pt"][value="${r.pt || "len"}"]`);
+    if (pt) pt.checked = true; $("pnS").value = String(Math.min(6, Math.max(1, +r.pn || 1)));
     $("plA").value = r.a || ""; $("plB").value = r.b || ""; $("psh").checked = !!r.shOn; $("pshAt").value = r.shAt || "";
-    extras = (d.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0 }));
+    extras = (d.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces > 0 ? +e.pieces : 0 }));
   } catch (e) {}
 }
 
@@ -111,8 +113,8 @@ export function initPile() {
   restore(); renderExtras();
   ["pL", "plA", "plB", "pshAt", "ppj", "pow", "plo"].forEach((id) => $(id).addEventListener("input", sched));
   ["pjoint", "psh", "psec"].forEach((id) => $(id).addEventListener("change", render));
-  document.querySelectorAll('input[name="pt"],input[name="pn"]').forEach((x) => x.addEventListener("change", render));
-  $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0 }); renderExtras(); render(); };
+  document.querySelectorAll('input[name="pt"],#pnS').forEach((x) => x.addEventListener("change", () => { renderExtras(); render(); }));
+  $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };
   $("bPilePdf").onclick = pdf;
   $("m-wall").onclick = () => setMode("wall"); $("m-pile").onclick = () => setMode("pile");
   let m = "wall"; try { m = sessionStorage.getItem(MKEY) || "wall"; } catch (e) {}

@@ -177,7 +177,7 @@ nav.modes button[aria-selected="true"]{color:var(--accent);border-bottom-color:v
 .pilesheet svg{min-width:900px}
 .chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;color:var(--ink);font-size:14px}
 .chk input{margin-top:3px}
-.pxrow{display:grid;grid-template-columns:.9fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:6px}
+.pxrow{display:grid;grid-template-columns:.9fr 1fr .9fr 1.3fr auto;gap:6px;align-items:end;margin-bottom:6px}
 .pxrow label{margin-top:0}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 

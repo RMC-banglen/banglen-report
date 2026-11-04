@@ -9,10 +9,13 @@ export function ruleFor(sec, len) {
   return sec.rules.find((r) => len <= r.to + 1e-9) || null;
 }
 
-// แบ่งเป็น 2 ท่อนอัตโนมัติ: ท่อนบน = เมตรเต็มครึ่งล่าง (17 ม. → 8 + 9, 19 ม. → 9 + 10)
-export function autoSplit(L) {
-  const a = Math.floor(L / 2 + 1e-9);
-  return [a, r2(L - a)];
+// แบ่งเป็น n ท่อนอัตโนมัติ: เมตรเต็มเท่ากัน เศษไปเพิ่มท่อนท้าย (17 ม. 2 ท่อน → 8+9, 19 → 9+10, 28 ม. 3 ท่อน → 9+9+10)
+export function autoSplit(L, n = 2) {
+  const base = Math.floor(L / n + 1e-9), lens = Array(n).fill(base);
+  let extra = r2(L - base * n);
+  for (let i = n - 1; i >= 0 && extra >= 1 - 1e-9; i--) { lens[i] += 1; extra = r2(extra - 1); }
+  lens[n - 1] = r2(lens[n - 1] + extra);
+  return lens.map(r2);
 }
 
 // input = { section, L, pieces (1|2), split ([a,b] ใส่เอง หรือว่าง), full (แบบเต็ม), joint (มีหัวต่อ), extras [{d,n,len}], shoulder (ระยะจากหัว ม. หรือว่าง), project {pj,ow,lo} }
@@ -27,11 +30,13 @@ export function planPile(input) {
   if (full) {
     pieces = [{ full: true, len: null, mid: null }];
   } else {
-    if (!(L >= sec.minL && L <= sec.maxL * (input.pieces === 2 ? 2 : 1))) warn.push(`ความยาว ${m2(L)} ม. อยู่นอกช่วง ${m2(sec.minL)}–${m2(sec.maxL * (input.pieces === 2 ? 2 : 1))} ม.`);
+    const np = input.pieces > 1 ? Math.min(6, Math.floor(input.pieces)) : 1;
+    if (!(L >= sec.minL && L <= sec.maxL * np)) warn.push(`ความยาว ${m2(L)} ม. อยู่นอกช่วง ${m2(sec.minL)}–${m2(sec.maxL * np)} ม.`);
     let lens = [L];
-    if (input.pieces === 2) {
-      const sp = Array.isArray(input.split) && input.split.length === 2 && input.split.every((v) => +v > 0) ? input.split.map((v) => r2(+v)) : autoSplit(L);
-      if (Math.abs(sp[0] + sp[1] - L) > 0.005) warn.push(`ความยาวสองท่อนรวม ${m2(sp[0] + sp[1])} ม. ไม่เท่ากับความยาวรวม ${m2(L)} ม.`);
+    if (np > 1) {
+      const sp = Array.isArray(input.split) && input.split.length === np && input.split.every((v) => +v > 0) ? input.split.map((v) => r2(+v)) : autoSplit(L, np);
+      const sum = r2(sp.reduce((t, v) => t + v, 0));
+      if (Math.abs(sum - L) > 0.005) warn.push(`ความยาวรวมของ ${np} ท่อน ${m2(sum)} ม. ไม่เท่ากับความยาวรวม ${m2(L)} ม.`);
       lens = sp;
     }
     pieces = lens.map((len) => {
@@ -43,8 +48,13 @@ export function planPile(input) {
     });
   }
   // เหล็กเสริมพิเศษ: ความยาวว่าง = ยาวเท่าท่อน
-  const extras = (input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), len: +e.len > 0 ? r2(+e.len) : null }));
+  const extras = (input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), pieces: +e.pieces > 0 ? Math.floor(+e.pieces) : (input.pieces > 1 ? 1 : "all"), len: +e.len > 0 ? r2(+e.len) : null }));
   extras.forEach((e) => { if (e.n % 2) warn.push(`เหล็กเสริม DB${e.d} ${e.n} เส้น เป็นเลขคี่ จัดวางบน/ล่างไม่เท่ากัน`); });
+  // เหล็กเสริมแต่ละรายการใช้กับ "ทุกท่อน" หรือท่อนที่ระบุ (นับจากท่อนบน = 1)
+  extras.forEach((e) => { if (e.pieces !== "all" && e.pieces > pieces.length) warn.push(`เหล็กเสริม DB${e.d} ระบุท่อนที่ ${e.pieces} แต่มีแค่ ${pieces.length} ท่อน`); });
+  pieces.forEach((p, i) => { p.extras = extras.filter((e) => e.pieces === "all" || e.pieces === i + 1); });
+  // แบบขยายหน้าตัด: A = ไม่มีเหล็กเสริม (มีเสมอ), B = มีเหล็กเสริม (ขึ้นเมื่อมีเหล็กเสริม) ไม่มีเหล็กเสริมเลย = A อย่างเดียว มีเหล็กเสริม = A และ B
+  const kinds = { A: true, B: pieces.some((p) => p.extras.length > 0) };
   // บ่า: อ้างระยะจากหัวเสา (ท่อนบน)
   let shoulder = null;
   if (+input.shoulder > 0) {
@@ -63,9 +73,9 @@ export function planPile(input) {
   }
   const sz = `${sec.label} ${sec.size.replace("x", "x")}`;
   const lenTxt = full ? "1.00-20.00" : m2(L);
-  let jt = joint ? (input.pieces === 2 && !full ? `2 ท่อนต่อเชื่อม ${pieces.map((p) => r2(p.len)).join("+")}` : "มีหัวต่อ") : "ไม่มีหัวต่อเชื่อม";
+  let jt = joint ? (input.pieces > 1 && !full ? `${pieces.length} ท่อนต่อเชื่อม ${pieces.map((p) => r2(p.len)).join("+")}` : "มีหัวต่อ") : "ไม่มีหัวต่อเชื่อม";
   if (full) jt = "มีหัวต่อ";
   const xt = extras.map((e) => `${e.n}-DB${e.d}x${e.len ? m2(e.len) : (full ? "L" : m2(pieces[0].len))}m.`).join(" ");
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
-  return { sec, full, joint, pieces, extras, shoulder, rows, warn, title, L, project: input.project || {} };
+  return { sec, full, joint, pieces, extras, kinds, shoulder, rows, warn, title, L, project: input.project || {} };
 }
