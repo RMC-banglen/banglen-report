@@ -2,13 +2,13 @@
 import { planPile, autoSplit, m2 } from "./pile-calc.js";
 import { pileSheet } from "./pile-draw.js";
 import { PILE_SECTIONS } from "./pile-data.js";
-import { download } from "./pdf.js?v=20261104094258";
-import { esc } from "./draw2d.js?v=20261104094258";
+import { download } from "./pdf.js?v=20261104095837";
+import { esc } from "./draw2d.js?v=20261104095837";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
 const DB_SIZES = [10, 12, 16, 20, 25];
-let extras = [], started = false;
+let extras = [], splits = [], started = false;
 
 const num = (id) => { const v = parseFloat($(id).value); return v > 0 ? v : 0; };
 const pnVal = () => Math.min(6, Math.max(1, +$("pnS").value || 1));
@@ -16,14 +16,15 @@ const radio = (n) => (document.querySelector(`input[name="${n}"]:checked`) || {}
 
 function read() {
   const full = radio("pt") === "full", pieces = pnVal();
-  const a = num("plA"), b = num("plB");
+  const sp = splits.slice(0, pieces).map((v) => (parseFloat(v) > 0 ? parseFloat(v) : 0));
   return {
-    section: $("psec").value, full, L: num("pL"), pieces, joint: $("pjoint").checked,
-    split: pieces === 2 && a && b ? [a, b] : null,
+    section: $("psec").value, full, L: num("pL"), pieces, joint: full || pieces >= 2, // 2 ท่อนขึ้นไป = มีหัวต่อ, ท่อนเดี่ยว = ไม่มีหัวต่อ (แบบเต็มแสดงหัวต่อ)
+   
+    split: pieces >= 2 && sp.length === pieces && sp.every((v) => v > 0) ? sp : null,
     extras: extras.map((e) => ({ ...e })),
     shoulder: $("psh").checked ? num("pshAt") : 0,
     project: { pj: $("ppj").value.trim(), ow: $("pow").value.trim(), lo: $("plo").value.trim() },
-    _raw: { a: $("plA").value, b: $("plB").value, shOn: $("psh").checked, shAt: $("pshAt").value, pt: radio("pt"), pn: String(pnVal()) },
+    _raw: { splits: splits.slice(0, pieces), shOn: $("psh").checked, shAt: $("pshAt").value, pt: radio("pt"), pn: String(pnVal()) },
   };
 }
 
@@ -44,10 +45,25 @@ function renderExtras() {
 
 function syncUi() {
   const full = radio("pt") === "full", two = pnVal() === 2;
-  $("pLbox").hidden = full; $("pnBox").hidden = full; $("plSplit").hidden = full || !two;
+  $("pLbox").hidden = full; $("pnBox").hidden = full; $("plSplit").hidden = full || pnVal() < 2; renderSplitRows(); $("pjHint").textContent = full ? "" : (pnVal() >= 2 ? "เสา 2 ท่อนขึ้นไป มีหัวต่อเชื่อม (แผ่นเหล็กและเหล็กเดือย) ทุกรอยต่อ" : "ท่อนเดี่ยว ไม่มีหัวต่อเชื่อม");
   $("pshBox").hidden = full; $("pxBox").hidden = full; $("pshAtBox").hidden = !$("psh").checked || full;
   const L = num("pL");
-  if (two && L) { const [a, b] = autoSplit(L); $("plA").placeholder = m2(a); $("plB").placeholder = m2(b); }
+  
+}
+
+// ช่องความยาวแต่ละท่อน (ว่าง = แบ่งอัตโนมัติ) สร้างตามจำนวนท่อน ค่าอัตโนมัติแสดงเป็น placeholder
+function renderSplitRows() {
+  const n = pnVal(), box = $("plRows"), L = num("pL"), auto = n >= 2 && L ? autoSplit(L, n) : [];
+  if (box.dataset.n !== String(n)) {
+    box.dataset.n = String(n); box.innerHTML = "";
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement("div"); d.className = "splr";
+      d.innerHTML = `<label>ท่อนที่ ${i + 1}${i === 0 ? " (บน)" : i === n - 1 ? " (ล่าง)" : ""} (ม.)</label><input type="number" step="0.01" min="0" value="${splits[i] || ""}">`;
+      const inp = d.querySelector("input"); inp.oninput = () => { splits[i] = inp.value; sched(); };
+      box.appendChild(d);
+    }
+  }
+  [...box.querySelectorAll("input")].forEach((inp, i) => { inp.placeholder = auto[i] ? m2(auto[i]) : ""; });
 }
 
 let tmr; const sched = () => { clearTimeout(tmr); tmr = setTimeout(render, 150); };
@@ -66,12 +82,12 @@ function restore() {
     const d = JSON.parse(localStorage.getItem(DKEY) || "null");
     if (!d) return;
     $("psec").value = d.section in PILE_SECTIONS ? d.section : "T22";
-    $("pL").value = d.L || ""; $("pjoint").checked = d.joint !== false;
+    $("pL").value = d.L || "";
     $("ppj").value = (d.project && d.project.pj) || ""; $("pow").value = (d.project && d.project.ow) || ""; $("plo").value = (d.project && d.project.lo) || "";
     const r = d._raw || {};
     const pt = document.querySelector(`input[name="pt"][value="${r.pt || "len"}"]`);
     if (pt) pt.checked = true; $("pnS").value = String(Math.min(6, Math.max(1, +r.pn || 1)));
-    $("plA").value = r.a || ""; $("plB").value = r.b || ""; $("psh").checked = !!r.shOn; $("pshAt").value = r.shAt || "";
+    splits = Array.isArray(r.splits) ? r.splits.map((v) => (+v > 0 ? String(v) : "")) : []; $("psh").checked = !!r.shOn; $("pshAt").value = r.shAt || "";
     extras = (d.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces > 0 ? +e.pieces : 0 }));
   } catch (e) {}
 }
@@ -111,8 +127,8 @@ export function initPile() {
   if (started) return; started = true;
   $("psec").innerHTML = Object.values(PILE_SECTIONS).map((s) => `<option value="${s.key}">${s.label} มอก. (${s.size} ม.)</option>`).join("");
   restore(); renderExtras();
-  ["pL", "plA", "plB", "pshAt", "ppj", "pow", "plo"].forEach((id) => $(id).addEventListener("input", sched));
-  ["pjoint", "psh", "psec"].forEach((id) => $(id).addEventListener("change", render));
+  ["pL", "pshAt", "ppj", "pow", "plo"].forEach((id) => $(id).addEventListener("input", sched));
+  ["psh", "psec"].forEach((id) => $(id).addEventListener("change", render));
   document.querySelectorAll('input[name="pt"],#pnS').forEach((x) => x.addEventListener("change", () => { renderExtras(); render(); }));
   $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };
   $("bPilePdf").onclick = pdf;
