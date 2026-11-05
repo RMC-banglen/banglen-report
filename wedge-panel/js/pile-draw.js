@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105030706";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105030706";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105030706";
+import { pilePoly, esc } from "./draw2d.js?v=20261105030825";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105030825";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105030825";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -148,7 +148,7 @@ function dowelPts(dowel) {
   return { top: xs(top).map((x) => [x, -65]), bot: xs(bot).map((x) => [x, 65]), nTop: top, nBot: bot };
 }
 export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
-  const P = dowelPts(dowel), lbl = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "SEE TABLE");
+  const P = dowelPts(dowel), lbl = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง");
   // collar หนา 3 × กว้าง 50 มม. เป็นแถบรอบขอบเพลท (วาดหนาเกินจริงให้เห็น) ตัดด้วย clipPath ให้อยู่ในขอบ
   const cid = "cl" + Math.round(cx * 7 + cy * 13), pg = secPts(PILE22, cx, cy, s);
   let o = `<defs><clipPath id="${cid}"><polygon points="${pg}"/></clipPath></defs><polygon points="${pg}" fill="#fff"/><polygon points="${pg}" fill="none" stroke="#555" stroke-width="11" clip-path="url(#${cid})"/><polygon points="${pg}" fill="none" stroke="${INK}" stroke-width="1.4"/>`;
@@ -157,7 +157,7 @@ export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
   if (compact) {
     // สัญลักษณ์ + legend แทนป้ายชี้ (เหมือนหน้าตัด) ชื่อภาพอยู่ใต้รูป
     const lx = xr + 24, y0l = cy - 110 * s + 12, rows = [
-      [`<circle cx="${lx + 8}" cy="${y0l - 4}" r="4" fill="#fff" stroke="${INK}" stroke-width="1"/>`, dowel ? `${dowel.n}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "SEE TABLE"],
+      [`<circle cx="${lx + 8}" cy="${y0l - 4}" r="4" fill="#fff" stroke="${INK}" stroke-width="1"/>`, dowel ? `${dowel.n}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง"],
       [`<rect x="${lx}" y="${y0l + 16 - 8}" width="16" height="7" fill="#555" stroke="${INK}" stroke-width="0.8"/>`, "COLLAR 3x50mm."],
       [`<rect x="${lx}" y="${y0l + 36 - 8}" width="16" height="7" fill="#fff" stroke="${INK}" stroke-width="1.2"/>`, "PLATE 9mm."],
     ];
@@ -200,7 +200,7 @@ export function weldSide(dowel, x, y, s, compact = false) {
     pts.forEach(([sx, px, py]) => { r += L(sx, yL, px, py, 0.8) + tri(px, py, (Math.atan2(py - yL, px - sx) * 180) / Math.PI, 7); });
     return r;
   };
-  const lab = (k) => `${k}DB${dowel ? dowel.d : 12}mm.x${dowel ? Math.round(dowel.len * 100) : 30}cm.`;
+  const lab = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง"); // แบบเต็ม: เหล็กเดือยขึ้นกับความยาว ให้ดูตาราง
   if (compact) { [[yT, P.nTop], [yB, P.nBot]].forEach(([yy2, k]) => { o += T(x0 + len + 8, yy2 + 5, lab(k), { size: 14, anchor: "start" }); }); return o + T(x - 20, y + h + 28, "WELDING PLATE SID VIEW", { size: 14, anchor: "start" }) + L(x - 28, y + h + 32, x + 190, y + h + 32, 0.9); }
   o += row(yT - 26, lab(P.nTop), [[x0 + len * 0.3, yT]]);
   o += L(x + pw / 2, y + h / 2, x0 + 14, y + h / 2, 0.9) + tri(x + pw / 2, y + h / 2, 180, 7) + T(x0 + 20, y + h / 2 - 4, "PLATE 9mm.", { size: 14, anchor: "start" }) + L(x0 + 14, y + h / 2, x0 + 20 + tw("PLATE 9mm."), y + h / 2, 0.9);
