@@ -1,7 +1,7 @@
 // ล็อกอินด้วย PIN จากตาราง worktrack_users ชุดเดียวกับเว็บรายงานการผลิต
 // session เก็บใน sessionStorage คีย์ wt_user (ใช้ร่วมกับเว็บเดิมได้เมื่ออยู่โดเมนเดียวกัน)
-import { SESSION_KEY, PERM_KEY } from "./config.js?v=20261105012615";
-import { listUsers, refreshUser } from "./db.js?v=20261105012615";
+import { SESSION_KEY, PERM_KEY } from "./config.js?v=20261105012833";
+import { listUsers, refreshUser } from "./db.js?v=20261105012833";
 
 export function getSession() {
   try { const u = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); return u && u.id ? u : null; } catch (e) { return null; }
@@ -26,7 +26,7 @@ export async function syncSession(u) {
 // วาดหน้าล็อกอินลงใน root แล้วเรียก onLogin(user)
 export async function showLogin(root, onLogin) {
   root.hidden = false;
-  root.innerHTML = '<div class="box"><img src="assets/logo.png" alt="RMC"><h2>ออกแบบแผ่นกันดิน</h2><div id="lgBody">กำลังโหลดรายชื่อ…</div></div>';
+  root.innerHTML = '<div class="box"><img src="assets/logo.png" alt="RMC"><h2>ออกแบบและเขียนแบบ</h2><div id="lgBody">กำลังโหลดรายชื่อ…</div></div>';
   const body = root.querySelector("#lgBody");
   let users = [];
   try { users = await listUsers(); } catch (e) { body.innerHTML = '<div class="err">เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้า</div>'; return; }
