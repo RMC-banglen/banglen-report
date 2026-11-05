@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105014702";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105014702";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105014702";
+import { pilePoly, esc } from "./draw2d.js?v=20261105014840";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105014840";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105014840";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -239,8 +239,8 @@ export function shoulderDetail(sh, x, y) {
     o += L(sxs[0], ly, tX + 80, ly, 0.9) + T(tX, ly - 5, `${sh.bars}-DB${sh.d}mm.`, { size: 14, anchor: "start" });
     xsB.forEach((px, i) => { o += L(sxs[i], ly, px + 1.5, cy + 5, 0.8) + tri(px + 1.5, cy + 5, (Math.atan2(cy + 5 - ly, px + 1.5 - sxs[i]) * 180) / Math.PI, 7); });
     // ป้ายส่วนต่างๆ ทางขวา (ลูกศรชี้ปีกเสา / ลาด / ท้องร่อง)
-    const tx = xe + 56, tag = (ty, txt, tgY) => L(tx - 6, ty, xe + 14, tgY, 0.8) + tri(xe + 14, tgY, (Math.atan2(tgY - ty, xe + 14 - (tx - 6)) * 180) / Math.PI, 6) + T(tx, ty + 4, txt, { size: 12, anchor: "start" });
-    o += tag(fl1 - 10, "ปีกเสา", fl1) + tag(cy + 2, "ร่องข้างเสา", (ys[2] + ys[3]) / 2) + tag(ys[4] + 26, "ปีกเสา", (ys[4] + bot) / 2);
+    const tx = xe + 56, tag = (ty, txt, tgY) => L(tx - 6, ty, xe + 14, tgY, 0.8) + tri(xe + 14, tgY, (Math.atan2(tgY - ty, xe + 14 - (tx - 6)) * 180) / Math.PI, 6) + T(tx, ty + 4, txt, { size: 12, anchor: "start", halo: true });
+    o += tag(fl1, "ปีกเสา", fl1) + tag(cy, "ร่องข้างเสา", cy) + tag((ys[4] + bot) / 2, "ปีกเสา", (ys[4] + bot) / 2); // ป้ายอยู่กลางแถบแต่ละส่วน ไม่ทับเส้น
     edges.slice(0, -1).forEach((m, i) => { o += dimH(bx + m * kx, bx + edges[i + 1] * kx, bot + 66, "", {}) + T(bx + ((m + edges[i + 1]) / 2) * kx, bot + 61, m2(edges[i + 1] - m), { size: 9 }); });
     o += dimH(bx, bx + aW, bot + 90, "0.20", { size: 14 }) + dimH(bx + aW, xe, bot + 90, "0.10", { size: 14 });
   }
