@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-05a';
+var APP_VERSION='2026-11-05b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -189,6 +189,27 @@ var APP_VERSION='2026-11-05a';
   /* table */
   .table-wrap { overflow-x: auto; margin: 0 4px; }
   .fm-row { cursor: pointer; }
+  /* ส่งออก PDF รายงานเที่ยวรถขนส่ง: หน้าจอปกติซ่อนไว้ · ตอนพิมพ์ซ่อนทั้งแอปแล้วพิมพ์เฉพาะรายงาน (A4 แนวนอน) */
+  #tt-print-host { display: none; }
+  @media print {
+    @page { size: A4 landscape; margin: 9mm; }
+    body.tt-printing > *:not(#tt-print-host) { display: none !important; }
+    body.tt-printing #tt-print-host { display: block !important; background: #fff; color: #111; font-family: 'IBM Plex Sans Thai','Sarabun',Tahoma,sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #tt-print-host .pp-head { margin: 0 0 6px; border-bottom: 2px solid #2f5fd0; padding-bottom: 4px; }
+    #tt-print-host .pp-co { font-size: 11px; color: #475569; }
+    #tt-print-host .pp-title { font-size: 17px; font-weight: 800; color: #1e293b; }
+    #tt-print-host .pp-date { font-size: 10px; color: #64748b; }
+    #tt-print-host .pp-sec { page-break-inside: auto; margin-top: 10px; }
+    #tt-print-host .pp-sec h2 { font-size: 13px; margin: 0 0 3px; }
+    #tt-print-host table { width: 100% !important; min-width: 0 !important; table-layout: auto !important; border-collapse: collapse; font-size: 10px; }
+    #tt-print-host table.pp-day { font-size: 8px; }
+    #tt-print-host th, #tt-print-host td { position: static !important; left: auto !important; top: auto !important; padding: 2px 4px !important; border: 1px solid #cbd5e1 !important; white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.35 !important; }
+    #tt-print-host table.pp-day th, #tt-print-host table.pp-day td { padding: 1.5px 2px !important; text-align: center !important; }
+    #tt-print-host th:first-child, #tt-print-host td:first-child { text-align: left !important; white-space: normal !important; }
+    #tt-print-host table * { font-size: inherit !important; text-decoration: none !important; cursor: auto !important; }   /* ขนาดตัวอักษรเท่ากันทั้งตาราง · ไม่มีขีดเส้นใต้/มือชี้ของปุ่มบนจอ */
+    #tt-print-host thead { display: table-header-group; }
+    #tt-print-host tr { page-break-inside: avoid; }
+  }
   .fm-row:hover td { background: #eef4ff; }
   .dt { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--num); }
   .dt th,.dt td { padding: 9px 10px; text-align: right; white-space: nowrap; }
@@ -10707,6 +10728,36 @@ window.__dataReady.then(data => {
     const fmt=n=>n==null||n===''||n===0?'–':Number(n).toLocaleString('th-TH');
     const [showPlate,setShowPlate]=useState(false);
     // รถสำรองไม่มีคนขับประจำ ชื่อซ้ำกันได้หลายคัน -> แสดงทะเบียนเสมอ
+    // ---- ส่งออก PDF: คัดลอกตาราง "รายเดือน"/"รายวัน" ที่เห็นอยู่ (ตามตัวเลือกแสดงทะเบียน/เดือนล่าสุดที่ติ๊กไว้) → พิมพ์ A4 แนวนอน → เลือก "บันทึกเป็น PDF" ในหน้าต่างพิมพ์ ----
+    function exportPdf(){
+      const isDay=view==='daily';
+      const tables=[...document.querySelectorAll(isDay?'.tt-scroll-d table':'.tt-scroll-m table')];
+      if(!tables.length){alert('ไม่พบตารางให้ส่งออก');return;}
+      const esc=x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      const title=isDay?'รายงานเที่ยวรถขนส่ง — รายวัน '+MO[selDayMonth-1]+' '+selYear:'รายงานเที่ยวรถขนส่ง — รายเดือน ปี '+selYear;
+      const host=document.createElement('div');host.id='tt-print-host';
+      host.innerHTML='<div class="pp-head"><div class="pp-co">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div class="pp-title">'+esc(title)+'</div><div class="pp-date">พิมพ์เมื่อ '+new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'})+'</div></div>';
+      tables.forEach((tb,i)=>{
+        const c=tb.cloneNode(true);
+        c.removeAttribute('class');c.removeAttribute('style');
+        if(isDay)c.classList.add('pp-day');
+        c.querySelectorAll('colgroup,button,input,select').forEach(e=>e.remove());
+        // คอลัมน์สุดท้ายที่หัวว่าง = คอลัมน์ปุ่ม แก้/ลบ/ลำดับ (เฉพาะคนมีสิทธิ์แก้ไข) → ตัดออก
+        const ths=[...c.querySelectorAll('thead tr:first-child th')];
+        if(ths.length&&!ths[ths.length-1].textContent.trim())c.querySelectorAll('tr').forEach(tr=>{const k=tr.children;if(k.length&&!k[k.length-1].hasAttribute('colspan'))tr.removeChild(k[k.length-1]);});
+        c.querySelectorAll('[title]').forEach(e=>e.removeAttribute('title'));
+        c.innerHTML=c.innerHTML.replace(/\(กดดูที่มา\)/g,'').replace(/▸\s?/g,'');   // ข้อความบอกวิธีใช้ปุ่มบนจอ ไม่ต้องอยู่ใน PDF
+        const sec=document.createElement('div');sec.className='pp-sec';
+        const h=document.createElement('h2');h.textContent=((TYPES[i]||{}).k||('ตารางที่ '+(i+1)))+(isDay?' · '+MO[selDayMonth-1]+' '+selYear+' (รายวัน)':' · ปี '+selYear);
+        h.style.color=(TYPES[i]||{}).color||'#1e293b';
+        sec.appendChild(h);sec.appendChild(c);host.appendChild(sec);
+      });
+      document.body.appendChild(host);document.body.classList.add('tt-printing');
+      const oldTitle=document.title;document.title=(isDay?'เที่ยวรถขนส่ง-รายวัน-'+MO[selDayMonth-1]+selYear:'เที่ยวรถขนส่ง-รายเดือน-'+selYear);
+      const done=()=>{document.body.classList.remove('tt-printing');host.remove();document.title=oldTitle;window.removeEventListener('afterprint',done);};
+      window.addEventListener('afterprint',done);
+      setTimeout(()=>window.print(),200);
+    }
     const dispName=n=>showPlate||String(n||'').includes('สำรอง')?String(n||''):String(n||'').replace(/\s*\/\s*\d{2}-\d{4}\s*$/,'').trim();
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
@@ -11491,6 +11542,7 @@ window.__dataReady.then(data => {
         <button onClick={()=>setView('dashboard')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='dashboard'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='dashboard'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📈 Dashboard</button>
         <button onClick={()=>setView('daily')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='daily'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='daily'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📆 รายวัน</button>
         <button onClick={()=>setView('summary')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='summary'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='summary'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>📊 สรุปทั้งปี</button>
+        {(view==='monthly'||view==='daily')&&<button onClick={exportPdf} title={'ส่งออกตาราง'+(view==='daily'?'รายวัน':'รายเดือน')+'ที่เห็นอยู่เป็น PDF (เลือก "บันทึกเป็น PDF" ในหน้าต่างพิมพ์)'} style={{marginLeft:'auto',alignSelf:'center',padding:'7px 16px',borderRadius:8,border:'1.5px solid #2f5fd0',background:'#fff',color:'#2f5fd0',fontSize:13.5,fontWeight:700,cursor:'pointer'}}>📄 ส่งออก PDF</button>}
         <button onClick={()=>setView('master')} style={{padding:'10px 18px',border:'none',borderBottom:`3px solid ${view==='master'?'#2f5fd0':'transparent'}`,background:'transparent',color:view==='master'?'#2f5fd0':'#94a3b8',fontSize:14,fontWeight:700,cursor:'pointer'}}>🔗 รถ / คนขับ</button>
       </div>
       {view==='master'&&<TransportMasterPanel canEdit={canEdit} onDataChanged={fetch}/>}
