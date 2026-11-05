@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105015903";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105015903";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105015903";
+import { pilePoly, esc } from "./draw2d.js?v=20261105020438";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105020438";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105020438";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -350,7 +350,7 @@ export function elevation(plan, piece, y0, opts) {
     brk += `<path d="${lc} ${back}" fill="#fff" stroke="none"/><path d="${lc}" fill="none" stroke="${INK}" stroke-width="1.2"/><path d="${rc}" fill="none" stroke="${INK}" stroke-width="1.2"/>`; }
   // จุดตัดหน้าตัด: มีเหล็กเสริม = อยู่กลางช่วงเหล็กเสริม (ตรงเหล็กเส้น) ไม่มี = หลังรอยหักกลาง ตัวอักษร B เฉพาะเสาหลายท่อนที่ท่อนนี้มีเหล็กเสริมแต่ท่อนอื่นไม่มี
   let xm = cx + 60;
-  if (ex.length) { const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)); xm = (X0 + F(bl)) / 2; if (xs.some((q) => Math.abs(q - xm) < 16)) xm += 22; }
+  if (ex.length) { const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)); xm = X0 + (F(bl) - X0) * 0.22; for (let t = 0; t < 6 && xs.some((q) => Math.abs(q - xm) < 16); t++) xm += 22; } // ขีดตัดอยู่ใกล้ปลายเหล็กด้านซ้าย ไม่ใช่กลางท่อน (กลางท่อนเป็นรอยหัก)
   const letter = plan.kinds && plan.kinds.B && ex.length ? "B" : "A";
   o += `<circle cx="${f1(xm)}" cy="${yTop - 12}" r="8" fill="#fff" stroke="${INK}" stroke-width="1"/>` + T(xm, yTop - 8, letter, { size: 13 }) + L(xm, yTop - 4, xm, yTop + sh, 0.9);
   o += dimV(X0 - 18, yTop, yTop + sh, "0.22", { size: 13 });

@@ -1,9 +1,9 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261105015903";
-import { pileSheet } from "./pile-draw.js?v=20261105015903";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261105015903";
-import { download } from "./pdf.js?v=20261105015903";
-import { esc } from "./draw2d.js?v=20261105015903";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261105020438";
+import { pileSheet } from "./pile-draw.js?v=20261105020438";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261105020438";
+import { download } from "./pdf.js?v=20261105020438";
+import { esc } from "./draw2d.js?v=20261105020438";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -125,6 +125,9 @@ function setMode(m) {
   try { sessionStorage.setItem(MKEY, m); } catch (e) {}
   if (pile) render();
 }
+
+// เลื่อนล้อเมาส์บนช่องตัวเลขที่โฟกัสอยู่ ห้ามเปลี่ยนค่า
+document.addEventListener("wheel", (e) => { const t = e.target; if (t && t.tagName === "INPUT" && t.type === "number" && document.activeElement === t) t.blur(); }, { passive: true });
 
 export function initPile() {
   if (started) return; started = true;

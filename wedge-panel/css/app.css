@@ -177,12 +177,13 @@ nav.modes button[aria-selected="true"]{color:var(--accent);border-bottom-color:v
 .pilesheet svg{min-width:900px}
 .chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;color:var(--ink);font-size:14px}
 .chk input{margin-top:3px}
-.pxrow{display:grid;grid-template-columns:minmax(92px,1.1fr) minmax(80px,1fr) minmax(70px,.9fr) minmax(120px,1.4fr) auto;gap:6px;align-items:end;margin-bottom:6px}
+.pxrow{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr) 44px;gap:6px;align-items:end;margin-bottom:6px}
 .pxrow select,.pxrow input{min-width:0;width:100%;text-overflow:clip}
 .pxrow select{padding-left:8px;padding-right:22px}
-.pxrow.nosel{grid-template-columns:minmax(92px,1.1fr) minmax(80px,1fr) minmax(70px,.9fr) auto}
+.pxrow.nosel{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr) 44px}
 @media (max-width:560px){.pxrow{grid-template-columns:1fr 1fr 1fr;}.pxrow>div:nth-child(4){grid-column:1/3}}
-.pxrow label{margin-top:0}
+.pxrow label{margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.pxrow .iconbtn{width:44px;min-width:0;padding:0}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 
 .wrap[hidden]{display:none}
