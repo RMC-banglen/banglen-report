@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105021400";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105021400";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105021400";
+import { pilePoly, esc } from "./draw2d.js?v=20261105030417";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105030417";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105030417";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -357,6 +357,7 @@ export function elevation(plan, piece, y0, opts) {
     const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)), zs = F(Math.min(0.99 + 0.05, piece.len)), ze = F(bl);
     xm = ze - zs > 40 ? (zs + ze) / 2 : Math.max(X0 + 10, ze - 8);
     if (plan.shoulder && opts.first && !piece.full) { const xsh = F(Math.min(plan.shoulder.at, piece.len)); if (Math.abs(xm - xsh) < 38) xm = xsh + 40 <= ze ? xsh + 40 : xsh - 38; }
+    if (Math.abs(xm - cx) < 30) xm = cx + 34 <= ze ? cx + 34 : cx - 34; // ไม่ทับรอยหักกลางและตัวเลขระยะกลาง
     for (let t = 0; t < 6 && xs.some((q) => Math.abs(q - xm) < 14); t++) xm += 20;
   }
   const letter = plan.kinds && plan.kinds.B && ex.length ? "B" : "A";
@@ -379,19 +380,32 @@ export function elevation(plan, piece, y0, opts) {
   // เหล็กเสริมพิเศษ (เหล็กข้ออ้อย DB): มองด้านข้างเห็น 2 แนว (บน = เหล็กด้านบนซ้อนกัน, ล่าง = เหล็กด้านล่างซ้อนกัน) ชี้ทั้งสองแนว
   const TAN60 = Math.tan((60 * Math.PI) / 180);
   const ribbed = (x1, x2, y) => L(x1, y, x2, y, 2.6); // เหล็ก DB เส้นดำทึบ อยู่ในปลอก (ไม่ทึบทับเส้นปลอก)
+  let dbLow = false;
   ex.forEach((e, i) => {
     const len = e.len || (piece.full ? null : piece.len), xe = piece.full || !len ? X0 + TW : F(Math.min(len, piece.len));
-    const topN = Math.ceil(e.n / 2), botN = e.n - topN, yT = yTop + my(45), yB = yTop + sh - my(45), ly = sy + 6 + i * 30;
+    const topN = Math.ceil(e.n / 2), botN = e.n - topN, yT = yTop + my(45), yB = yTop + sh - my(45); let ly = sy + 6 + i * 30;
     o += ribbed(X0, xe, yT) + (botN ? ribbed(X0, xe, yB) : "");
     let tx = X0 + (xe - X0) * (plan.shoulder && opts.first && !piece.full ? 0.36 : 0.62);
     if (plan.shoulder && opts.first && !piece.full) tx = Math.max(X0 + 60, Math.min(tx, F(Math.min(plan.shoulder.at, piece.len)) - 200)); // ป้ายเหล็กอยู่ซ้ายวงบ่า (เส้นชี้บ่าไปทางขวา)
+    // ตรวจจับการทับกัน: ป้ายเหล็กเสริม (แถวแรก) ห้ามซ้อนกับป้ายปลอก CD หรือวงบ่า → สแกนหาตำแหน่งที่ว่างใกล้ค่าตั้งต้นที่สุด ถ้าไม่มีที่ว่างเลย ลดลงไปแถวใต้ป้ายปลอก
+    const lblTxt = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`, wTxt = Math.max(tw(lblTxt), tw("เหล็กข้ออ้อย")) + 14;
+    const spanOf = (t) => { const s1 = t + (ly - yT) / TAN60, s2 = t + 44 + (ly - yB) / TAN60, r = Math.max(s1, botN ? s2 : s1) + wTxt; return [Math.min(t, s1), r]; };
+    const zones = [X0 + 48, l2, cx, xs[3] + b / 2 - 14, X0 + TW - 48].map((c) => [c - 58, c + 58]);
+    if (plan.shoulder && opts.first && !piece.full) { const xsh = F(Math.min(plan.shoulder.at, piece.len)); zones.push([xsh - 42, xsh + 42]); }
+    const okAt = (t) => { const [p, q] = spanOf(t); return (botN ? t + 44 : t) <= xe - 6 && zones.every(([z0, z1]) => q < z0 || p > z1); };
+    if (i === 0 && !okAt(tx)) {
+      let best = null;
+      for (let t = X0 + 14; t <= xe - 6; t += 4) if (okAt(t) && (best === null || Math.abs(t - tx) < Math.abs(best - tx))) best = t;
+      if (best !== null) tx = best; else { ly = sy + 40; dbLow = true; } // ไม่มีที่ว่างในแถวเดียวกับป้ายปลอก → ลงไปแถวใต้ป้ายปลอก
+    }
     const lbl = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`;
-    const tx2 = tx + 44, sxT = tx + (ly - yT) / TAN60, sxB = tx2 + (ly - yB) / TAN60;
+    const lblDup = 0, tx2 = tx + 44, sxT = tx + (ly - yT) / TAN60, sxB = tx2 + (ly - yB) / TAN60;
     let r = L(Math.min(sxT, botN ? sxB : 1e9), ly, Math.max(sxT, sxB) + tw(lbl), ly, 0.9) + T(Math.max(sxT, sxB) + 10, ly - 4, lbl, { size: 13, anchor: "start" }) + T(Math.max(sxT, sxB) + 10, ly + 14, "เหล็กข้ออ้อย", { size: 12, anchor: "start" });
     r += L(sxT, ly, tx, yT, 0.8) + tri(tx, yT, (Math.atan2(yT - ly, tx - sxT) * 180) / Math.PI, 7);
     if (botN) r += L(sxB, ly, tx2, yB, 0.8) + tri(tx2, yB, (Math.atan2(yB - ly, tx2 - sxB) * 180) / Math.PI, 7);
     o += r;
   });
+  if (dbLow) yy = Math.max(yy, sy + 62);
   if (ex.length > 1) yy += (ex.length - 1) * 30; // ป้ายเหล็กเสริมอยู่แถวเดียวกับป้ายปลอก (ใต้ท่อน) ไม่ลากเส้นยาว
   // บ่า: ระยะจากหัวเสา (ท่อนบนเท่านั้น) วงกลมชัดๆ + ป้ายอ้างอิงแบบขยายบ่า
   if (plan.shoulder && opts.first && !piece.full) {
