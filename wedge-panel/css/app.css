@@ -182,3 +182,7 @@ nav.modes button[aria-selected="true"]{color:var(--accent);border-bottom-color:v
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 
 .wrap[hidden]{display:none}
+
+/* ช่องตัวเลขไม่มีปุ่มลูกศรขึ้น-ลง (กดแล้วปัดเศษ) พิมพ์ตัวเลขเองเท่านั้น */
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
