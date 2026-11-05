@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105013836";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105013836";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105013836";
+import { pilePoly, esc } from "./draw2d.js?v=20261105014342";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105014342";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105014342";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -248,6 +248,46 @@ export function shoulderDetail(sh, x, y) {
   return o;
 }
 
+// ภาพ 3 มิติบ่า (ไม่แสดงเหล็ก): ท่อนเสาไอวางนอน มองเห็นร่องข้างเสาถูกถมด้วยบ่า 0.20 ม. + ลาด 0.10 ม. ที่ระยะ at จากหัวเสา
+// ฉายแบบ oblique: แกนเสา = แนวนอนจอ, ความลึกของหน้าตัด (u) เฉียงขึ้นขวา, ความสูงหน้าตัด (v) แนวตั้ง
+export function shoulder3D(sh, x, y, s = 0.42) {
+  const P = pilePoly(PILE22), LZ = 780, zs = 260, ku = 0.38, kv = 0.32;
+  const pj = (z, u, v) => [x + 20 + z * s + (u + 110) * ku * s, y + 60 + (v + 110) * s - (u + 110) * kv * s];
+  const pt = (arr) => arr.map((q) => q.map((n) => f1(n)).join(",")).join(" ");
+  const cx = P.reduce((a, q) => a + q[0], 0) / P.length, cy = P.reduce((a, q) => a + q[1], 0) / P.length;
+  const faces = [];
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], b = P[(i + 1) % P.length], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+    if (len < 0.5) continue;
+    let nx = dy / len, ny = -dx / len; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    if (nx * (mx - cx) + ny * (my - cy) < 0) { nx = -nx; ny = -ny; }
+    const vis = nx * -1 + ny * -0.6; // เห็นด้านหน้า (−u) และด้านบน (−v)
+    if (vis > 0.05) faces.push({ a, b, mx, vis });
+  }
+  faces.sort((p, q) => q.mx - p.mx); // ไกลก่อน
+  let o = "";
+  faces.forEach((f) => {
+    const sh2 = Math.round(236 - 40 * (1 - Math.min(1, f.vis)));
+    o += `<polygon points="${pt([pj(0, f.a[0], f.a[1]), pj(0, f.b[0], f.b[1]), pj(LZ, f.b[0], f.b[1]), pj(LZ, f.a[0], f.a[1])])}" fill="rgb(${sh2},${sh2},${sh2 - 3})" stroke="${INK}" stroke-width="1"/>`;
+  });
+  // รอยหักปลายซ้าย/ขวา
+  const brk = (z) => { const a = pj(z, -110, -110), b = pj(z, -110, 110), c = pj(z, 110, 110), d = pj(z, 110, -110); return `<polyline points="${pt([a, b])}" fill="none" stroke="${INK}" stroke-width="1"/>`; };
+  o += brk(0) + brk(LZ);
+  // บ่า: ถมร่องด้านหน้า (u = −110) ตั้งแต่ปากร่องบนถึงล่าง ยาว 0.20 ม. แล้วลาดลง 0.10 ม. ถึงก้นร่อง
+  const b = 110, m = 45, h = 25, w = 40, a1 = zs, a2 = zs + sh.a * 1000, a3 = a2 + sh.b * 1000;
+  o += `<polygon points="${pt([pj(a1, -b, -m), pj(a2, -b, -m), pj(a2, -b, m), pj(a1, -b, m)])}" fill="#fff"/><polygon points="${pt([pj(a1, -b, -m), pj(a2, -b, -m), pj(a2, -b, m), pj(a1, -b, m)])}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.4"/>`;
+  o += `<polygon points="${pt([pj(a2, -b, -m), pj(a3, -w, -h), pj(a3, -w, h), pj(a2, -b, m)])}" fill="#fff"/><polygon points="${pt([pj(a2, -b, -m), pj(a3, -w, -h), pj(a3, -w, h), pj(a2, -b, m)])}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.4"/>`;
+  // ขนาด: ระยะบ่าจากหัวเสา (ซ้าย) • 0.20 • 0.10 ใต้ภาพ
+  const yb = pj(0, -110, 110)[1] + 28, xz = (z) => pj(z, -110, 110)[0];
+  o += dimH(xz(0), xz(a1), yb, "") + T((xz(0) + xz(a1)) / 2, yb - 5, m2(sh.at), { size: 13 });
+  o += dimH(xz(a1), xz(a2), yb, "") + T((xz(a1) + xz(a2)) / 2, yb - 5, "0.20", { size: 13 });
+  o += dimH(xz(a2), xz(a3), yb, "") + T((xz(a2) + xz(a3)) / 2, yb - 5, "0.10", { size: 13 });
+  o += T(x + 20, yb + 36, "ภาพ 3 มิติบ่า", { size: 17, weight: 700, anchor: "start" }) + L(x + 20, yb + 41, x + 150, yb + 41, 0.9);
+  const lp = pj(a1, -b, 0); // ป้ายบ่า: ลูกศรชี้ขอบซ้ายของบ่าจากด้านซ้าย
+  o += L(lp[0] - 30, lp[1], lp[0] - 2, lp[1], 0.9) + tri(lp[0] - 2, lp[1], 0, 7) + T(lp[0] - 34, lp[1] + 6, "บ่า", { size: 16, anchor: "end", weight: 700 });
+  return o;
+}
+
 // รูปด้านท่อนเสา: ปลายละ 0.33 (@0.05) + 0.66 (@0.07) ส่วนกลาง (@0.17) — ไม่ได้มาตราส่วนจริง
 export function elevation(plan, piece, y0, opts) {
   const ex = piece.extras || [], sp = plan.sec.spiral, X0 = 110, TW = 960, a = 56, b = 116, mid = TW - 2 * (a + b), yTop = y0 + 42, sh = 44, kk = sh / 220, my = (mm) => mm * kk; // my = มม. จริงของหน้าตัดเป็นพิกเซลแนวตั้ง
@@ -399,7 +439,13 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   const TSC = 0.72, tb0 = table(plan, 1168 - TW3, 742 - table(plan, 0, 0, TW3).h, TW3), tb = { h: tb0.h * TSC, svg: `<g transform="translate(1168,742) scale(${TSC}) translate(-1168,-742)">${tb0.svg}</g>` }; // ตารางลวดติดมุมขวาล่าง ชิดตารางชื่อแบบ
   const yRow3 = y;
   let hRight = 0;
-  if (plan.shoulder) {
+  const bigSh = !!plan.shoulder && !hasJ; // ท่อนเดี่ยว (ไม่มีหัวต่อ): แถวล่างว่าง → วางภาพ 3 มิติบ่าและแบบขยายบ่าใหญ่ๆ
+  if (bigSh) {
+    const sy = y + 4, sc = 0.92, sx = 480;
+    g += shoulder3D(plan.shoulder, 70, sy + 24, 0.37);
+    g += `<g transform="translate(${sx},${sy}) scale(${sc}) translate(-${sx},-${sy})">${shoulderDetail(plan.shoulder, sx, sy)}</g>`;
+    hRight = 236;
+  } else if (plan.shoulder) {
     const sc = 0.62, sx = rx + 105, sy = y + 4;
     g += `<g transform="translate(${sx},${sy}) scale(${sc}) translate(-${sx},-${sy})">${shoulderDetail(plan.shoulder, sx, sy)}</g>`;
     hRight = 196;
@@ -409,7 +455,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   // ---- ย่อให้พอดี: พื้นที่ใช้ได้ = เหนือตารางชื่อแบบ ----
   const top = 90, avail = 742 - top - 10;
   let k = Math.min(1, avail / y);
-  if (plan.shoulder) k = Math.min(k, (742 - tb.h - 8 - top) / (yRow3 + 200)); // แบบขยายบ่าอยู่เหนือตารางพอดี
+  if (plan.shoulder && !bigSh) k = Math.min(k, (742 - tb.h - 8 - top) / (yRow3 + 200)); // แบบขยายบ่าอยู่เหนือตารางพอดี
   const tx = (W / 2) * (1 - k);
   let o = `<defs><pattern id="stipple" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="0.8" fill="#222"/><circle cx="4.5" cy="4.5" r="0.8" fill="#222"/></pattern></defs>`;
   o += `<rect width="${W}" height="${H}" fill="#fff"/><rect x="20" y="20" width="1148" height="800" fill="none" stroke="${INK}" stroke-width="1.8"/>`;
