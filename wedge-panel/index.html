@@ -3,18 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261105013131">
+<meta name="app-version" content="20261105013720">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
-  var cur=document.querySelector('meta[name="app-version"]').content;
-  fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
-    var m=t.match(/name="app-version" content="([^"]+)"/);
-    if(!m||m[1]===cur)return;
-    var k='wp-reloaded-'+m[1];
-    try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,'1');}catch(e){}
-    location.replace(location.pathname+'?v='+m[1]+location.hash);
-  }).catch(function(){});
+  var cur=document.querySelector('meta[name="app-version"]').content, last=0;
+  function check(first){
+    fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
+      var m=t.match(/name="app-version" content="([^"]+)"/);
+      if(!m||m[1]===cur)return;
+      if(first){
+        var k='wp-reloaded-'+m[1];
+        try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,'1');}catch(e){}
+        location.replace(location.pathname+'?v='+m[1]+location.hash);
+      } else if(!document.getElementById('verBar')){
+        // เปิดหน้าค้างไว้นาน: แจ้งว่ามีเวอร์ชันใหม่ ให้กดโหลดใหม่ (ไม่รีโหลดเองเพื่อไม่ให้งานที่กำลังกรอกหาย)
+        var d=document.createElement('div');d.id='verBar';
+        d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#0F6E56;color:#fff;padding:10px 16px;text-align:center;font-size:14px;cursor:pointer';
+        d.textContent='มีเวอร์ชันใหม่ของโปรแกรม กดที่นี่เพื่อโหลดใหม่';
+        d.onclick=function(){location.replace(location.pathname+'?v='+m[1]+location.hash);};
+        document.body.appendChild(d);
+      }
+    }).catch(function(){});
+  }
+  check(true);
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'&&Date.now()-last>60000){last=Date.now();check(false);} });
 })();
 </script>
 <title>ออกแบบและเขียนแบบ • RMC บางเลน</title>
@@ -23,7 +36,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261105013131">
+<link rel="stylesheet" href="css/app.css?v=20261105013720">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -164,6 +177,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261105013131"></script>
+<script type="module" src="js/ui.js?v=20261105013720"></script>
 </body>
 </html>
