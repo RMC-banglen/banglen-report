@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105020709";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105020709";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105020709";
+import { pilePoly, esc } from "./draw2d.js?v=20261105021136";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105021136";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105021136";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -268,10 +268,12 @@ export function shoulder3D(sh, x, y, s = 0.36) {
   }
   faces.sort((p, q) => p.key - q.key); // ไกลผู้ดูก่อน
   let o = "";
-  faces.forEach((f) => {
+  const drawFace = (f) => {
     const g2 = Math.round(244 - 46 * (1 - Math.min(1, f.vis / 0.8)));
-    o += `<polygon points="${pt([pj(0, f.a1[0], f.a1[1]), pj(0, f.b1[0], f.b1[1]), pj(LZ, f.b1[0], f.b1[1]), pj(LZ, f.a1[0], f.a1[1])])}" fill="rgb(${g2},${g2},${g2 - 3})" stroke="${INK}" stroke-width="1" stroke-linejoin="round"/>`;
-  });
+    return `<polygon points="${pt([pj(0, f.a1[0], f.a1[1]), pj(0, f.b1[0], f.b1[1]), pj(LZ, f.b1[0], f.b1[1]), pj(LZ, f.a1[0], f.a1[1])])}" fill="rgb(${g2},${g2},${g2 - 3})" stroke="${INK}" stroke-width="1" stroke-linejoin="round"/>`;
+  };
+  // ผิวด้านไกล/ในร่องวาดก่อน แล้วบ่า+ส่วนลาด แล้วผิวปีกเสาด้านหน้าทับ (ส่วนลาดที่ลึกเข้าร่องต้องถูกขอบปีกเสาบังไม่ให้ทะลุเส้นเสา)
+  faces.filter((f) => f.key < 100).forEach((f) => { o += drawFace(f); });
   // บ่า: บล็อกเม็ดทรายถมร่องด้านที่เห็น (u = +b) ยาว 0.20 ม. ที่ระยะ at จากหัวเสา
   const bb = 110, m = 45, wv = 40, hv = 25, z1 = zs, z2 = zs + sh.a * 1000, z3 = z2 + sh.b * 1000;
   const blk = pt([pj(z1, bb, -m), pj(z2, bb, -m), pj(z2, bb, m), pj(z1, bb, m)]);
@@ -279,6 +281,7 @@ export function shoulder3D(sh, x, y, s = 0.36) {
   // ส่วนลาด 0.10 ม.: ผิวบ่าลาดจากระดับปากร่อง (u = +b) ลงถึงก้นร่อง (u = +w) แคบลงจาก ±m เป็น ±h
   const rmp = pt([pj(z2, bb, -m), pj(z3, wv, -hv), pj(z3, wv, hv), pj(z2, bb, m)]);
   o += `<polygon points="${rmp}" fill="#fff"/><polygon points="${rmp}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.4"/>`;
+  faces.filter((f) => f.key >= 100).forEach((f) => { o += drawFace(f); });
   // หน้าตัดปลายเสา (เม็ดทราย) วาดหน้าสุด
   const end = pt(P.map(([u, v]) => pj(0, u, v)));
   o += `<polygon points="${end}" fill="#fff"/><polygon points="${end}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`;
@@ -375,7 +378,9 @@ export function elevation(plan, piece, y0, opts) {
     const len = e.len || (piece.full ? null : piece.len), xe = piece.full || !len ? X0 + TW : F(Math.min(len, piece.len));
     const topN = Math.ceil(e.n / 2), botN = e.n - topN, yT = yTop + my(45), yB = yTop + sh - my(45), ly = sy + 6 + i * 30;
     o += ribbed(X0, xe, yT) + (botN ? ribbed(X0, xe, yB) : "");
-    const tx = X0 + (xe - X0) * (plan.shoulder && opts.first && !piece.full ? 0.36 : 0.62), lbl = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`;
+    let tx = X0 + (xe - X0) * (plan.shoulder && opts.first && !piece.full ? 0.36 : 0.62);
+    if (plan.shoulder && opts.first && !piece.full) tx = Math.max(X0 + 60, Math.min(tx, F(Math.min(plan.shoulder.at, piece.len)) - 200)); // ป้ายเหล็กอยู่ซ้ายวงบ่า (เส้นชี้บ่าไปทางขวา)
+    const lbl = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`;
     const tx2 = tx + 44, sxT = tx + (ly - yT) / TAN60, sxB = tx2 + (ly - yB) / TAN60;
     let r = L(Math.min(sxT, botN ? sxB : 1e9), ly, Math.max(sxT, sxB) + tw(lbl), ly, 0.9) + T(Math.max(sxT, sxB) + 10, ly - 4, lbl, { size: 13, anchor: "start" }) + T(Math.max(sxT, sxB) + 10, ly + 14, "เหล็กข้ออ้อย", { size: 12, anchor: "start" });
     r += L(sxT, ly, tx, yT, 0.8) + tri(tx, yT, (Math.atan2(yT - ly, tx - sxT) * 180) / Math.PI, 7);
@@ -388,7 +393,7 @@ export function elevation(plan, piece, y0, opts) {
     const at = Math.min(plan.shoulder.at, piece.len), xs0 = F(at), cyS = yTop + sh / 2, rS = 30;
     o += `<circle cx="${f1(xs0)}" cy="${f1(cyS)}" r="${rS}" fill="none" stroke="${INK}" stroke-width="1.6" stroke-dasharray="7 3"/>`;
     // ป้ายบ่าอยู่ซ้ายล่างของวง (ถ้ามีที่พอ) เพื่อไม่ชนป้ายเหล็กเสริมทางขวา ไม่งั้นอยู่ขวาล่าง
-    const dn = ex.length ? 22 : 0, left = xs0 - X0 >= 215, ly = sy + 34 + dn, // มีป้ายเหล็กเสริมอยู่แถวบน → ป้ายบ่าลงไปอีกแถว
+    const dn = ex.length ? 22 : 0, left = ex.length ? xs0 + 190 > X0 + TW : xs0 - X0 >= 215, ly = sy + 34 + dn, // มีป้ายเหล็กเสริมอยู่แถวบน → ป้ายบ่าลงไปอีกแถว
        ty = cyS + rS, sx = left ? xs0 - (ly - ty) / TAN60 : xs0 + (ly - ty) / TAN60;
     o += L(sx, ly, xs0, ty, 0.9) + tri(xs0, ty, (Math.atan2(ty - ly, xs0 - sx) * 180) / Math.PI, 7);
     o += left ? L(sx, ly, sx - 175, ly, 0.9) + T(sx - 6, ly - 4, "บ่า (ดูแบบขยายบ่า)", { size: 14, anchor: "end", weight: 700 }) : L(sx, ly, sx + 170, ly, 0.9) + T(sx + 6, ly - 4, "บ่า (ดูแบบขยายบ่า)", { size: 14, anchor: "start", weight: 700 });
