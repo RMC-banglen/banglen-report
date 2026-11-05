@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261105012833";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261105013131";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -9,13 +9,16 @@ export function ruleFor(sec, len) {
   return sec.rules.find((r) => len <= r.to + 1e-9) || null;
 }
 
-// ตำแหน่งลวด PC ในหน้าตัดไอ (มม. จากศูนย์กลาง): แถวบน y=−75 แถวล่าง y=+75 (ห่างขอบ 35 มม.)
-// 4mm×4 + 5mm×2 = แบบมาตรฐาน (ลวด 4 มม. ที่มุม ลวด 5 มม. สลับบน/ล่าง) • จำนวนอื่น = กระจายเท่าๆ กันครึ่งบน ครึ่งล่าง ระหว่าง x=±75
+// ตำแหน่งลวด PC ในหน้าตัดไอ (มม. จากศูนย์กลาง): แถวบน y=−75 แถวล่าง y=+75 (ห่างขอบ 35 มม.) ระยะลวดห่างกัน 35 มม. (ตามแบบ AutoCAD: 3.5 ซม. ต่อเนื่อง)
+// แถวบนนับจากขอบขวา แถวล่างนับจากขอบซ้าย: ลวดที่ 1, 2, 3 ห่างขอบ 3.5, 7.0, 10.5 ซม. และอีกฝั่งที่เหลือนับจากขอบตรงข้าม (10 เส้น = แถวละ 5: บน −75,−40,+5,+40,+75 ล่าง −75,−40,−5,+40,+75)
+// 4mm×4 + 5mm×2 = แบบมาตรฐาน (ลวด 4 มม. ที่มุม ลวด 5 มม. สลับบน/ล่าง) ซึ่งตรงกับกฎเดียวกัน
 export function wireLayout(w4, w5) {
   if (w4 === 4 && w5 === 2) return { w4: [[-75, -75], [75, -75], [-75, 75], [75, 75]], w5: [[-40, -75], [40, 75]], n4: 4, n5: 2, std: true };
-  const row = (n) => { const k = Math.max(1, Math.round(n / 2)); return k === 1 ? [0] : Array.from({ length: k }, (_, i) => -75 + (150 / (k - 1)) * i); };
-  const mk = (n) => (n > 0 ? row(n).flatMap((x) => [[x, -75], [x, 75]]) : []);
-  return { w4: mk(w4), w5: mk(w5), n4: w4, n5: w5, std: false, per: Math.max(1, Math.round(Math.max(w4, w5) / 2)) };
+  const k = Math.max(1, Math.round(Math.max(w4, w5) / 2)), nl = Math.floor(k / 2), nr = Math.ceil(k / 2);
+  const top = [...Array(nl)].map((_, i) => -110 + 35 * (i + 1)).concat([...Array(nr)].map((_, j) => 110 - 35 * (j + 1))).sort((p, q) => p - q);
+  const bot = top.map((x) => -x).sort((p, q) => p - q);
+  const mk = (n) => (n > 0 ? top.map((x) => [x, -75]).concat(bot.map((x) => [x, 75])) : []);
+  return { w4: mk(w4), w5: mk(w5), n4: w4, n5: w5, std: false, per: k };
 }
 
 // แบ่งเป็น n ท่อนอัตโนมัติ: เมตรเต็มเท่ากัน เศษไปเพิ่มท่อนท้าย (17 ม. 2 ท่อน → 8+9, 19 → 9+10, 28 ม. 3 ท่อน → 9+9+10)

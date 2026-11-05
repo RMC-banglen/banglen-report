@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105012833";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105012833";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105012833";
+import { pilePoly, esc } from "./draw2d.js?v=20261105013131";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105013131";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105013131";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -88,14 +88,13 @@ function wiresDetail(cx, cy, s, lay = wireLayout(4, 2)) {
   lay.w4.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(3.5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
   lay.w5.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(2.2 * s)}" fill="${INK}"/>`; });
   const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-110), x1 = X(110), y0 = Y(-110), y1 = Y(110), ft = 8;
-  const per = lay.per, pitch = per > 1 ? 150 / (per - 1) : 0, pt = (Math.round(pitch * 10) / 10 / 1000).toFixed(pitch % 1 ? 4 : 3).replace(/0$/, (m) => (pitch % 1 ? m : ""));
-  const dimS = (xa, xb, yd, yRef, txt) => L(xa, yRef, xa, yd + (yd < yRef ? -5 : 5), 0.6) + L(xb, yRef, xb, yd + (yd < yRef ? -5 : 5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, yd - 5, txt, { size: ft });
-  // บน: ขอบซ้าย → ลวดแรก (0.035) และ ลวดแรก → ลวดสุดท้าย (ระยะเท่ากัน)
-  o += dimS(x0, X(-75), y0 - 26, Y(-75), "0.035");
-  if (per > 1) o += dimS(X(-75), X(75), y0 - 26, Y(-75), `${per - 1}@${pt}`);
-  // ล่าง: ขอบขวา → ลวดสุดท้าย และ ระยะเท่ากัน
-  o += dimS(x1, X(75), y1 + 32, Y(75), "0.035").replace(/y="[^"]*"/, (m) => m);
-  if (per > 1) o += dimS(X(75), X(-75), y1 + 32, Y(75), `${per - 1}@${pt}`);
+  const per = lay.per, cnt = Math.ceil(per / 2);
+  const dimS = (xa, xb, yd, yRef) => L(xa, yRef, xa, yd + (yd < yRef ? -5 : 5), 0.6) + L(xb, yRef, xb, yd + (yd < yRef ? -5 : 5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, yd - 5, "0.035", { size: ft });
+  // ระยะ 0.035 ต่อเนื่อง: แถวบนวัดจากขอบขวา แถวล่างวัดจากขอบซ้าย (จุดละ 3.5 ซม. ตามแบบ)
+  for (let i = 0; i < cnt; i++) {
+    o += dimS(X(110 - 35 * i), X(110 - 35 * (i + 1)), y0 - 26, Y(-75));
+    o += dimS(X(-110 + 35 * i), X(-110 + 35 * (i + 1)), y1 + 32, Y(75));
+  }
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });
   o += vd(x1 + 28, y0, Y(-75), x1);
   o += `<g>${dimV(x0 - 28, Y(75), y1, "")}${L(x0, Y(75), x0 - 33, Y(75), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(75) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
