@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261104100205";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261105012615";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -7,6 +7,15 @@ export const m2 = (v) => r2(v).toFixed(2);
 // กฎลวดตามความยาวท่อน: ช่วงแรกที่ L ≤ to
 export function ruleFor(sec, len) {
   return sec.rules.find((r) => len <= r.to + 1e-9) || null;
+}
+
+// ตำแหน่งลวด PC ในหน้าตัดไอ (มม. จากศูนย์กลาง): แถวบน y=−75 แถวล่าง y=+75 (ห่างขอบ 35 มม.)
+// 4mm×4 + 5mm×2 = แบบมาตรฐาน (ลวด 4 มม. ที่มุม ลวด 5 มม. สลับบน/ล่าง) • จำนวนอื่น = กระจายเท่าๆ กันครึ่งบน ครึ่งล่าง ระหว่าง x=±75
+export function wireLayout(w4, w5) {
+  if (w4 === 4 && w5 === 2) return { w4: [[-75, -75], [75, -75], [-75, 75], [75, 75]], w5: [[-40, -75], [40, 75]], n4: 4, n5: 2, std: true };
+  const row = (n) => { const k = Math.max(1, Math.round(n / 2)); return k === 1 ? [0] : Array.from({ length: k }, (_, i) => -75 + (150 / (k - 1)) * i); };
+  const mk = (n) => (n > 0 ? row(n).flatMap((x) => [[x, -75], [x, 75]]) : []);
+  return { w4: mk(w4), w5: mk(w5), n4: w4, n5: w5, std: false, per: Math.max(1, Math.round(Math.max(w4, w5) / 2)) };
 }
 
 // แบ่งเป็น n ท่อนอัตโนมัติ: เมตรเต็มเท่ากัน เศษไปเพิ่มท่อนท้าย (17 ม. 2 ท่อน → 8+9, 19 → 9+10, 28 ม. 3 ท่อน → 9+9+10)
@@ -77,5 +86,6 @@ export function planPile(input) {
   if (full) jt = "มีหัวต่อ";
   const xt = extras.map((e) => `${e.n}-DB${e.d}x${e.len ? m2(e.len) : (full ? "L" : m2(pieces[0].len))}m.`).join(" ");
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
-  return { sec, full, joint, pieces, extras, kinds, shoulder, rows, warn, title, L, project: input.project || {} };
+  const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5) : null;
+  return { sec, full, joint, pieces, extras, kinds, layout, shoulder, rows, warn, title, L, project: input.project || {} };
 }
