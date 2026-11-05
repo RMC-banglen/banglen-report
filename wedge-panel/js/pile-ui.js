@@ -1,9 +1,9 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261105014550";
-import { pileSheet } from "./pile-draw.js?v=20261105014550";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261105014550";
-import { download } from "./pdf.js?v=20261105014550";
-import { esc } from "./draw2d.js?v=20261105014550";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261105014702";
+import { pileSheet } from "./pile-draw.js?v=20261105014702";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261105014702";
+import { download } from "./pdf.js?v=20261105014702";
+import { esc } from "./draw2d.js?v=20261105014702";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -87,7 +87,8 @@ function restore() {
     const r = d._raw || {};
     const pt = document.querySelector(`input[name="pt"][value="${r.pt || "len"}"]`);
     if (pt) pt.checked = true; $("pnS").value = String(Math.min(6, Math.max(1, +r.pn || 1)));
-    splits = Array.isArray(r.splits) ? r.splits.map((v) => (+v > 0 ? String(v) : "")) : []; $("psh").checked = !!r.shOn; $("pshAt").value = r.shAt || "";
+    splits = Array.isArray(r.splits) ? r.splits.map((v) => (+v > 0 ? String(v) : "")) : []; // บ่า: ไม่กู้ค่าจากร่าง — เข้าหน้าใหม่ทุกครั้งต้องไม่ติ๊กบ่า (ติ๊กเองเมื่อมีบ่าเท่านั้น)
+    $("psh").checked = false; $("pshAt").value = "";
     extras = (d.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces > 0 ? +e.pieces : 0 }));
   } catch (e) {}
 }
