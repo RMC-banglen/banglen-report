@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105020438";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105020438";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105020438";
+import { pilePoly, esc } from "./draw2d.js?v=20261105020641";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105020641";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105020641";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -375,7 +375,7 @@ export function elevation(plan, piece, y0, opts) {
     const len = e.len || (piece.full ? null : piece.len), xe = piece.full || !len ? X0 + TW : F(Math.min(len, piece.len));
     const topN = Math.ceil(e.n / 2), botN = e.n - topN, yT = yTop + my(45), yB = yTop + sh - my(45), ly = sy + 6 + i * 30;
     o += ribbed(X0, xe, yT) + (botN ? ribbed(X0, xe, yB) : "");
-    const tx = X0 + (xe - X0) * 0.62, lbl = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`;
+    const tx = X0 + (xe - X0) * (plan.shoulder && opts.first && !piece.full ? 0.36 : 0.62), lbl = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`;
     const tx2 = tx + 44, sxT = tx + (ly - yT) / TAN60, sxB = tx2 + (ly - yB) / TAN60;
     let r = L(Math.min(sxT, botN ? sxB : 1e9), ly, Math.max(sxT, sxB) + tw(lbl), ly, 0.9) + T(Math.max(sxT, sxB) + 10, ly - 4, lbl, { size: 13, anchor: "start" }) + T(Math.max(sxT, sxB) + 10, ly + 14, "เหล็กข้ออ้อย", { size: 12, anchor: "start" });
     r += L(sxT, ly, tx, yT, 0.8) + tri(tx, yT, (Math.atan2(yT - ly, tx - sxT) * 180) / Math.PI, 7);
