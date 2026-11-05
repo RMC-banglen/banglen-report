@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261105014840";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261105015746";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -65,8 +65,8 @@ export function planPile(input) {
   // เหล็กเสริมแต่ละรายการใช้กับ "ทุกท่อน" หรือท่อนที่ระบุ (นับจากท่อนบน = 1)
   extras.forEach((e) => { if (e.pieces !== "all" && e.pieces > pieces.length) warn.push(`เหล็กเสริม DB${e.d} ระบุท่อนที่ ${e.pieces} แต่มีแค่ ${pieces.length} ท่อน`); });
   pieces.forEach((p, i) => { p.extras = extras.filter((e) => e.pieces === "all" || e.pieces === i + 1); });
-  // แบบขยายหน้าตัด: A = ไม่มีเหล็กเสริม (มีเสมอ), B = มีเหล็กเสริม (ขึ้นเมื่อมีเหล็กเสริม) ไม่มีเหล็กเสริมเลย = A อย่างเดียว มีเหล็กเสริม = A และ B
-  const kinds = { A: true, B: pieces.some((p) => p.extras.length > 0) };
+  // แบบขยายหน้าตัด: มี A อย่างเดียวเสมอ (เสาท่อนเดี่ยวหรือทุกท่อนมีเหล็กเสริมเหมือนกัน แสดงเหล็กเสริมใน A) ยกเว้นเสาหลายท่อนที่ท่อนหนึ่งมีเหล็กเสริมและอีกท่อนไม่มี = A (ไม่มีเหล็กเสริม) และ B (มีเหล็กเสริม)
+  const kinds = { A: true, B: pieces.length > 1 && pieces.some((p) => p.extras.length > 0) && pieces.some((p) => !p.extras.length) };
   // บ่า: อ้างระยะจากหัวเสา (ท่อนบน)
   let shoulder = null;
   if (+input.shoulder > 0) {

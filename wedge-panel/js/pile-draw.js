@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105014840";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105014840";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105014840";
+import { pilePoly, esc } from "./draw2d.js?v=20261105015746";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261105015746";
+import { m2, wireLayout } from "./pile-calc.js?v=20261105015746";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -251,7 +251,7 @@ export function shoulderDetail(sh, x, y) {
 // ภาพ 3 มิติบ่า (ไม่แสดงเหล็ก) แบบไอโซเมตริก ตามภาพตัวอย่าง AutoCAD: เห็นหน้าตัดไอที่ปลายเสา (หน้าซ้าย) แกนเสาพุ่งขึ้นขวา
 // บ่าเป็นบล็อกเม็ดทรายในร่องข้างเสาด้านที่เห็น ห่างจากหัวเสา at ยาว 0.20 ม. มีเส้นบอก 0.22 ความสูง/ความกว้าง และระยะบ่า
 export function shoulder3D(sh, x, y, s = 0.36) {
-  const P = pilePoly(PILE22), LZ = 600, zs = 250, CZ = 0.866, SZ = 0.5;
+  const P = pilePoly(PILE22), LZ = 680, zs = 230, CZ = 0.866, SZ = 0.5;
   const X0 = x + 56, Y0 = y + 36 + LZ * SZ * s;
   const pj = (z, u, v) => [X0 + (z * CZ + (u + 110) * CZ) * s, Y0 + (v + 110) * s - z * SZ * s + (u + 110) * SZ * s];
   const pt = (arr) => arr.map((q) => q.map((n) => f1(n)).join(",")).join(" ");
@@ -273,9 +273,12 @@ export function shoulder3D(sh, x, y, s = 0.36) {
     o += `<polygon points="${pt([pj(0, f.a1[0], f.a1[1]), pj(0, f.b1[0], f.b1[1]), pj(LZ, f.b1[0], f.b1[1]), pj(LZ, f.a1[0], f.a1[1])])}" fill="rgb(${g2},${g2},${g2 - 3})" stroke="${INK}" stroke-width="1" stroke-linejoin="round"/>`;
   });
   // บ่า: บล็อกเม็ดทรายถมร่องด้านที่เห็น (u = +b) ยาว 0.20 ม. ที่ระยะ at จากหัวเสา
-  const bb = 110, m = 45, z1 = zs, z2 = zs + sh.a * 1000;
+  const bb = 110, m = 45, wv = 40, hv = 25, z1 = zs, z2 = zs + sh.a * 1000, z3 = z2 + sh.b * 1000;
   const blk = pt([pj(z1, bb, -m), pj(z2, bb, -m), pj(z2, bb, m), pj(z1, bb, m)]);
   o += `<polygon points="${blk}" fill="#fff"/><polygon points="${blk}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.5"/>`;
+  // ส่วนลาด 0.10 ม.: ผิวบ่าลาดจากระดับปากร่อง (u = +b) ลงถึงก้นร่อง (u = +w) แคบลงจาก ±m เป็น ±h
+  const rmp = pt([pj(z2, bb, -m), pj(z3, wv, -hv), pj(z3, wv, hv), pj(z2, bb, m)]);
+  o += `<polygon points="${rmp}" fill="#fff"/><polygon points="${rmp}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.4"/>`;
   // หน้าตัดปลายเสา (เม็ดทราย) วาดหน้าสุด
   const end = pt(P.map(([u, v]) => pj(0, u, v)));
   o += `<polygon points="${end}" fill="#fff"/><polygon points="${end}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`;
@@ -294,6 +297,8 @@ export function shoulder3D(sh, x, y, s = 0.36) {
   // 0.20 ความยาวบ่า (ใต้บล็อก)
   { const p1 = sh0(pj(z1, bb, 110), 8, 20), p2 = sh0(pj(z2, bb, 110), 8, 20), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
     o += arrow(p1, p2) + `<text x="${f1(mid[0] + 6)}" y="${f1(mid[1] + 20)}" font-size="15" text-anchor="middle" transform="rotate(-30 ${f1(mid[0] + 6)} ${f1(mid[1] + 20)})" ${FONT}>0.20</text>`; }
+  { const p1 = sh0(pj(z2, bb, 110), 8, 20), p2 = sh0(pj(z3, bb, 110), 8, 20), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+    o += arrow(p1, p2) + `<text x="${f1(mid[0] + 6)}" y="${f1(mid[1] + 20)}" font-size="15" text-anchor="middle" transform="rotate(-30 ${f1(mid[0] + 6)} ${f1(mid[1] + 20)})" ${FONT}>0.10</text>`; }
   { const ty = y + 36 + LZ * SZ * s + 220 * s * 1.5 + 54; o += T(x + 120, ty, "ภาพ 3 มิติบ่า", { size: 17, weight: 700, anchor: "start" }) + L(x + 120, ty + 5, x + 250, ty + 5, 0.9); }
   return o;
 }
@@ -303,6 +308,9 @@ export function elevation(plan, piece, y0, opts) {
   const ex = piece.extras || [], sp = plan.sec.spiral, X0 = 110, TW = 960, a = 56, b = 116, mid = TW - 2 * (a + b), yTop = y0 + 42, sh = 44, kk = sh / 220, my = (mm) => mm * kk; // my = มม. จริงของหน้าตัดเป็นพิกเซลแนวตั้ง
   const ls = piece.full ? "L = 1.00-20.00 m." : m2(piece.len);
   let o = "";
+  // ตำแหน่งตามระยะจริงจากหัวเสา (เหล็กเสริม/บ่า): ช่วงซ้ายถึงรอยหักกลางใช้สเกลเดียวกับโซนปลอก 0.33/0.66 ส่วนที่เหลือย่อให้พอดีด้านขวา
+  const k1 = (a + b) / (sp.endLen + sp.nearLen), mL = (TW / 2 - 30) / k1, cxF = X0 + TW / 2;
+  const F = (m) => (piece.full || !piece.len ? X0 + TW : m <= mL ? X0 + m * k1 : piece.len <= mL ? X0 + TW : cxF + 30 + ((m - mL) / (piece.len - mL)) * (X0 + TW - (cxF + 30)));
   o += dimH(X0, X0 + TW, y0 + 4, "", {}) + T(X0 + TW / 2, y0 - 2, ls, { size: 15 }); // ความยาวรวมของท่อน อยู่เหนือเส้น 0.33/0.66
   const xs = [X0, X0 + a, X0 + a + b, X0 + a + b + mid, X0 + a + b + mid + b, X0 + TW];
   const labs = [m2(sp.endLen), m2(sp.nearLen), piece.full ? "L-1.98" : m2(piece.mid), m2(sp.nearLen), m2(sp.endLen)];
@@ -340,7 +348,11 @@ export function elevation(plan, piece, y0, opts) {
   { const by0 = yTop, by1 = yTop + sh, bh = by1 - by0, c1 = (dx) => `${f1(cx + dx)},${f1(by0)} C ${f1(cx + dx + 9)},${f1(by0 + bh * 0.3)} ${f1(cx + dx - 9)},${f1(by0 + bh * 0.7)} ${f1(cx + dx)},${f1(by1)}`;
     const lc = `M ${c1(-7)}`, rc = `M ${c1(7)}`, back = `L ${f1(cx + 7)},${f1(by1)} C ${f1(cx + 7 - 9)},${f1(by0 + bh * 0.7)} ${f1(cx + 7 + 9)},${f1(by0 + bh * 0.3)} ${f1(cx + 7)},${f1(by0)} Z`;
     brk += `<path d="${lc} ${back}" fill="#fff" stroke="none"/><path d="${lc}" fill="none" stroke="${INK}" stroke-width="1.2"/><path d="${rc}" fill="none" stroke="${INK}" stroke-width="1.2"/>`; }
-  o += `<circle cx="${cx + 60}" cy="${yTop - 12}" r="8" fill="#fff" stroke="${INK}" stroke-width="1"/>` + T(cx + 60, yTop - 8, ex.length ? "B" : "A", { size: 13 }) + L(cx + 60, yTop - 4, cx + 60, yTop + sh, 0.9);
+  // จุดตัดหน้าตัด: มีเหล็กเสริม = อยู่กลางช่วงเหล็กเสริม (ตรงเหล็กเส้น) ไม่มี = หลังรอยหักกลาง ตัวอักษร B เฉพาะเสาหลายท่อนที่ท่อนนี้มีเหล็กเสริมแต่ท่อนอื่นไม่มี
+  let xm = cx + 60;
+  if (ex.length) { const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)); xm = (X0 + F(bl)) / 2; if (xs.some((q) => Math.abs(q - xm) < 16)) xm += 22; }
+  const letter = plan.kinds && plan.kinds.B && ex.length ? "B" : "A";
+  o += `<circle cx="${f1(xm)}" cy="${yTop - 12}" r="8" fill="#fff" stroke="${INK}" stroke-width="1"/>` + T(xm, yTop - 8, letter, { size: 13 }) + L(xm, yTop - 4, xm, yTop + sh, 0.9);
   o += dimV(X0 - 18, yTop, yTop + sh, "0.22", { size: 13 });
   // ป้ายปลอกเกลียว
   const sy = yTop + sh + 18;
@@ -348,22 +360,22 @@ export function elevation(plan, piece, y0, opts) {
   lbl += T(X0 + 48, sy, "2-CD.Ø2.8mm.", { size: 13, halo: true }) + T(X0 + 48, sy + 15, "@0.05m.", { size: 13, halo: true });
   // ป้ายโซน 0.66 ซ้าย: ถ้าวงบ่าอยู่ทับป้าย ให้เลื่อนป้ายไปทางขวาของวง (วงและเส้นชี้บ่าไม่บังตัวหนังสือ)
   let l2 = X0 + a + b / 2 + 14;
-  if (plan.shoulder && opts.first && !piece.full) { const xsh = X0 + (Math.min(plan.shoulder.at, piece.len) / piece.len) * TW; if (Math.abs(xsh - l2) < 62) l2 = xsh + 100; }
+  if (plan.shoulder && opts.first && !piece.full) { const xsh = F(Math.min(plan.shoulder.at, piece.len)); if (Math.abs(xsh - l2) < 62) l2 = xsh + 100; }
   lbl += T(l2, sy, "CD.Ø2.8mm.", { size: 13, halo: true }) + T(l2, sy + 15, "@0.07m.", { size: 13, halo: true });
   lbl += T(cx, sy, "CD.Ø2.8mm.", { size: 13, halo: true }) + T(cx, sy + 15, "@0.17m.", { size: 13, halo: true });
   lbl += T(xs[3] + b / 2 - 14, sy, "CD.Ø2.8mm.", { size: 13, halo: true }) + T(xs[3] + b / 2 - 14, sy + 15, "@0.07m.", { size: 13, halo: true });
   lbl += T(X0 + TW - 48, sy, "2-CD.Ø2.8mm.", { size: 13, halo: true }) + T(X0 + TW - 48, sy + 15, "@0.05m.", { size: 13, halo: true });
   const hasSh = !!(plan.shoulder && opts.first && !piece.full);
-  let yy = sy + 30 + (hasSh ? 22 : 0); // ระยะบ่าอยู่ใต้ป้ายปลอกทันที
+  let yy = sy + 30 + (hasSh ? 38 + (ex.length ? 22 : 0) : 0); // ระยะบ่าอยู่ใต้ป้ายปลอกทันที
   // ไม่มีป้ายชี้หัวต่อในรูปด้านท่อนเสา (ประหยัดพื้นที่) รายละเอียดอยู่ในแบบขยายแผ่นเหล็กหัวต่อด้านล่าง
   // เหล็กเสริมพิเศษ (เหล็กข้ออ้อย DB): มองด้านข้างเห็น 2 แนว (บน = เหล็กด้านบนซ้อนกัน, ล่าง = เหล็กด้านล่างซ้อนกัน) ชี้ทั้งสองแนว
   const TAN60 = Math.tan((60 * Math.PI) / 180);
   const ribbed = (x1, x2, y) => L(x1, y, x2, y, 2.6); // เหล็ก DB เส้นดำทึบ อยู่ในปลอก (ไม่ทึบทับเส้นปลอก)
   ex.forEach((e, i) => {
-    const len = e.len || (piece.full ? null : piece.len), frac = piece.full || !len ? 1 : Math.min(1, len / piece.len), xe = X0 + TW * frac;
+    const len = e.len || (piece.full ? null : piece.len), xe = piece.full || !len ? X0 + TW : F(Math.min(len, piece.len));
     const topN = Math.ceil(e.n / 2), botN = e.n - topN, yT = yTop + my(45), yB = yTop + sh - my(45), ly = sy + 6 + i * 30;
     o += ribbed(X0, xe, yT) + (botN ? ribbed(X0, xe, yB) : "");
-    const tx = X0 + TW * 0.62, lbl = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`;
+    const tx = X0 + (xe - X0) * 0.62, lbl = `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`;
     const tx2 = tx + 44, sxT = tx + (ly - yT) / TAN60, sxB = tx2 + (ly - yB) / TAN60;
     let r = L(Math.min(sxT, botN ? sxB : 1e9), ly, Math.max(sxT, sxB) + tw(lbl), ly, 0.9) + T(Math.max(sxT, sxB) + 10, ly - 4, lbl, { size: 13, anchor: "start" }) + T(Math.max(sxT, sxB) + 10, ly + 14, "เหล็กข้ออ้อย", { size: 12, anchor: "start" });
     r += L(sxT, ly, tx, yT, 0.8) + tri(tx, yT, (Math.atan2(yT - ly, tx - sxT) * 180) / Math.PI, 7);
@@ -373,15 +385,17 @@ export function elevation(plan, piece, y0, opts) {
   if (ex.length > 1) yy += (ex.length - 1) * 30; // ป้ายเหล็กเสริมอยู่แถวเดียวกับป้ายปลอก (ใต้ท่อน) ไม่ลากเส้นยาว
   // บ่า: ระยะจากหัวเสา (ท่อนบนเท่านั้น) วงกลมชัดๆ + ป้ายอ้างอิงแบบขยายบ่า
   if (plan.shoulder && opts.first && !piece.full) {
-    const at = Math.min(plan.shoulder.at, piece.len), xs0 = X0 + (at / piece.len) * TW, cyS = yTop + sh / 2, rS = 30;
+    const at = Math.min(plan.shoulder.at, piece.len), xs0 = F(at), cyS = yTop + sh / 2, rS = 30;
     o += `<circle cx="${f1(xs0)}" cy="${f1(cyS)}" r="${rS}" fill="none" stroke="${INK}" stroke-width="1.6" stroke-dasharray="7 3"/>`;
-    const ly = sy + 34, ty = cyS + rS, sx = xs0 + (ly - ty) / TAN60;
+    // ป้ายบ่าอยู่ซ้ายล่างของวง (ถ้ามีที่พอ) เพื่อไม่ชนป้ายเหล็กเสริมทางขวา ไม่งั้นอยู่ขวาล่าง
+    const dn = ex.length ? 22 : 0, left = xs0 - X0 >= 215, ly = sy + 34 + dn, // มีป้ายเหล็กเสริมอยู่แถวบน → ป้ายบ่าลงไปอีกแถว
+       ty = cyS + rS, sx = left ? xs0 - (ly - ty) / TAN60 : xs0 + (ly - ty) / TAN60;
     o += L(sx, ly, xs0, ty, 0.9) + tri(xs0, ty, (Math.atan2(ty - ly, xs0 - sx) * 180) / Math.PI, 7);
-    o += L(sx, ly, sx + 170, ly, 0.9) + T(sx + 6, ly - 4, "บ่า (ดูแบบขยายบ่า)", { size: 14, anchor: "start", weight: 700 });
-    o += dimH(X0, xs0, sy + 40, `ระยะบ่า ${m2(plan.shoulder.at)}`, { size: 13 });
+    o += left ? L(sx, ly, sx - 175, ly, 0.9) + T(sx - 6, ly - 4, "บ่า (ดูแบบขยายบ่า)", { size: 14, anchor: "end", weight: 700 }) : L(sx, ly, sx + 170, ly, 0.9) + T(sx + 6, ly - 4, "บ่า (ดูแบบขยายบ่า)", { size: 14, anchor: "start", weight: 700 });
+    o += dimH(X0, xs0, sy + 56 + dn, `ระยะบ่า ${m2(plan.shoulder.at)}`, { size: 13 });
   }
   o += lbl;
-  if (hasSh) yy = Math.max(yy, sy + 50); // เผื่อที่ให้ป้าย "บ่า" ไม่ชนท่อนถัดไป
+  if (hasSh) yy = Math.max(yy, sy + 66 + (ex.length ? 22 : 0)); // เผื่อที่ให้ป้าย "บ่า" ไม่ชนท่อนถัดไป
   o += brk; // รอยหักวาดทับท้ายสุด เพื่อตัดเหล็ก/ปลอก/ขอบท่อนให้ขาดตรงกลางเรียบๆ
   return { svg: o, h: yy - y0 + 6 };
 }
@@ -419,7 +433,7 @@ function titleBlock(plan, logoHref) {
 export function pileSheet(plan, logoHref = "assets/logo.png") {
   if (!plan.sec) return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"></svg>`;
   const np = plan.pieces.length, simple = plan.full || plan.pieces.length === 0 || !plan.layout, lay = plan.layout || wireLayout(4, 2); // ลวดตามตาราง: ตามความยาวท่อนแรก
-  const kinds = plan.kinds || { A: true, B: false }, two = kinds.A && kinds.B, hasX = kinds.B;
+  const kinds = plan.kinds || { A: true, B: false }, two = kinds.A && kinds.B, hasX = plan.extras.length > 0;
   const colBx = 640;
   let g = "", y = 0; // y = ตำแหน่งแนวตั้งของเนื้อหา (หน่วยก่อนย่อ)
   // ---- แถว 1: รูปด้านท่อนเสา ----
@@ -432,7 +446,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   if (two) {
     g += sectionA(plan, 190, cyA, sa, simple, [], "A", false, lay) + sectionA(plan, 610, cyA, sa, simple, plan.extras, "B", true, lay);
   } else {
-    g += sectionA(plan, 230, cyA, sa, simple, hasX ? plan.extras : [], hasX ? "B" : "A", false, lay) + wiresDetail(colBx, cyA, sa, lay); // ไม่มีดีเทลปลอก (DETAIL OF STIRRUP)
+    g += sectionA(plan, 230, cyA, sa, simple, plan.extras, "A", false, lay) + wiresDetail(colBx, cyA, sa, lay); // ไม่มีดีเทลปลอก (DETAIL OF STIRRUP)
   }
   g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - 110 * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;
@@ -452,7 +466,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   const bigSh = !!plan.shoulder && !hasJ; // ท่อนเดี่ยว (ไม่มีหัวต่อ): แถวล่างว่าง → วางภาพ 3 มิติบ่าและแบบขยายบ่าใหญ่ๆ
   if (bigSh) {
     const sy = y + 4, sc = 0.92, sx = 480;
-    g += shoulder3D(plan.shoulder, 60, sy - 6, 0.28);
+    g += shoulder3D(plan.shoulder, 60, sy - 12, 0.26);
     g += `<g transform="translate(${sx},${sy}) scale(${sc}) translate(-${sx},-${sy})">${shoulderDetail(plan.shoulder, sx, sy)}</g>`;
     hRight = 262;
   } else if (plan.shoulder) {
