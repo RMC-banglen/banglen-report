@@ -1,9 +1,9 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261105015746";
-import { pileSheet } from "./pile-draw.js?v=20261105015746";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261105015746";
-import { download } from "./pdf.js?v=20261105015746";
-import { esc } from "./draw2d.js?v=20261105015746";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261105015903";
+import { pileSheet } from "./pile-draw.js?v=20261105015903";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261105015903";
+import { download } from "./pdf.js?v=20261105015903";
+import { esc } from "./draw2d.js?v=20261105015903";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -31,12 +31,14 @@ function read() {
 function renderExtras() {
   const box = $("pxs"); box.innerHTML = "";
   extras.forEach((e, i) => {
-    const d = document.createElement("div"); d.className = "pxrow";
-    d.innerHTML = `<div><label>ขนาด</label><select>${DB_SIZES.map((s) => `<option value="${s}" ${s === e.d ? "selected" : ""}>DB${s}</option>`).join("")}</select></div><div><label>ยาว (ม.)</label><input type="number" step="0.01" min="0" value="${e.len || ""}" placeholder="เต็มท่อน"></div><div><label>จำนวน (เส้น)</label><input type="number" step="1" min="1" max="8" value="${e.n || ""}"></div><div><label>ใช้กับท่อน</label><select class="xp"><option value="0" ${!e.pieces ? "selected" : ""}>ทุกท่อน</option>${Array.from({ length: pnVal() }, (_, q) => q + 1).map((k) => `<option value="${k}" ${e.pieces === k ? "selected" : ""}>ท่อนที่ ${k}${pnVal() > 1 ? (k === 1 ? " (บน)" : k === pnVal() ? " (ล่าง)" : "") : ""}</option>`).join("")}</select></div><button type="button" class="iconbtn" aria-label="ลบเหล็กเสริมนี้">✕</button>`;
+    const multi = pnVal() > 1, showSel = multi && !(e.len > 0); // ท่อนเดี่ยว: ไม่ต้องเลือก • ระบุความยาวสั้นกว่าเสา: ท่อนบนเสมอ • ไม่ระบุ(เต็มท่อน): เลือกท่อนบน/ทุกท่อน
+    if (!multi) e.pieces = 0; else if (e.len > 0 || !e.pieces) e.pieces = 1;
+    const d = document.createElement("div"); d.className = "pxrow" + (showSel ? "" : " nosel");
+    d.innerHTML = `<div><label>ขนาด</label><select>${DB_SIZES.map((s) => `<option value="${s}" ${s === e.d ? "selected" : ""}>DB${s}</option>`).join("")}</select></div><div><label>ยาว (ม.)</label><input type="number" step="0.01" min="0" value="${e.len || ""}" placeholder="เต็มท่อน"></div><div><label>จำนวน (เส้น)</label><input type="number" step="1" min="1" max="8" value="${e.n || ""}"></div>${showSel ? `<div><label>ใช้กับท่อน</label><select class="xp"><option value="1" ${e.pieces !== -1 ? "selected" : ""}>ท่อนบน</option><option value="-1" ${e.pieces === -1 ? "selected" : ""}>ทั้ง ${pnVal()} ท่อน</option></select></div>` : ""}<button type="button" class="iconbtn" aria-label="ลบเหล็กเสริมนี้">✕</button>`;
     const [sel, xp] = d.querySelectorAll("select"), [len, n] = d.querySelectorAll("input");
-    xp.onchange = () => { e.pieces = +xp.value || 0; render(); };
+    if (xp) xp.onchange = () => { e.pieces = +xp.value; render(); };
     sel.onchange = () => { e.d = +sel.value; render(); };
-    len.oninput = () => { e.len = parseFloat(len.value) || 0; render(); };
+    len.oninput = () => { const had = e.len > 0; e.len = parseFloat(len.value) || 0; if ((e.len > 0) !== had) renderExtras(); render(); };
     n.oninput = () => { e.n = Math.floor(+n.value) || 0; render(); };
     d.querySelector("button").onclick = () => { extras.splice(i, 1); renderExtras(); render(); };
     box.appendChild(d);
@@ -89,7 +91,7 @@ function restore() {
     if (pt) pt.checked = true; $("pnS").value = String(Math.min(6, Math.max(1, +r.pn || 1)));
     splits = Array.isArray(r.splits) ? r.splits.map((v) => (+v > 0 ? String(v) : "")) : []; // บ่า: ไม่กู้ค่าจากร่าง — เข้าหน้าใหม่ทุกครั้งต้องไม่ติ๊กบ่า (ติ๊กเองเมื่อมีบ่าเท่านั้น)
     $("psh").checked = false; $("pshAt").value = "";
-    extras = (d.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces > 0 ? +e.pieces : 0 }));
+    extras = (d.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces || 0 }));
   } catch (e) {}
 }
 

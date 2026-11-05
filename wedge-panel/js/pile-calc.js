@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261105015746";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261105015903";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -60,7 +60,7 @@ export function planPile(input) {
     });
   }
   // เหล็กเสริมพิเศษ: ความยาวว่าง = ยาวเท่าท่อน
-  const extras = (input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), pieces: +e.pieces > 0 ? Math.floor(+e.pieces) : (input.pieces > 1 ? 1 : "all"), len: +e.len > 0 ? r2(+e.len) : null }));
+  const extras = (input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), pieces: +e.pieces < 0 ? "all" : +e.pieces > 0 ? Math.floor(+e.pieces) : (input.pieces > 1 ? 1 : "all"), len: +e.len > 0 ? r2(+e.len) : null }));
   extras.forEach((e) => { if (e.n % 2) warn.push(`เหล็กเสริม DB${e.d} ${e.n} เส้น เป็นเลขคี่ จัดวางบน/ล่างไม่เท่ากัน`); });
   // เหล็กเสริมแต่ละรายการใช้กับ "ทุกท่อน" หรือท่อนที่ระบุ (นับจากท่อนบน = 1)
   extras.forEach((e) => { if (e.pieces !== "all" && e.pieces > pieces.length) warn.push(`เหล็กเสริม DB${e.d} ระบุท่อนที่ ${e.pieces} แต่มีแค่ ${pieces.length} ท่อน`); });
