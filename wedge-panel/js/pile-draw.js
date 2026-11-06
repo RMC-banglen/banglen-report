@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261105030825";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261105030825";
-import { m2, wireLayout } from "./pile-calc.js?v=20261105030825";
+import { pilePoly, esc } from "./draw2d.js?v=20261106095217";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261106095217";
+import { m2, wireLayout } from "./pile-calc.js?v=20261106095217";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -346,6 +346,8 @@ export function elevation(plan, piece, y0, opts) {
   { const wy = my(35), wy2 = ex.length ? 1.3 : 1.8; o += L(X0, yTop + wy, X0 + TW, yTop + wy, wy2) + L(X0, yTop + sh - wy, X0 + TW, yTop + sh - wy, wy2); }
   // รอยหักกลาง + จุดตัด A
   const cx = X0 + TW / 2;
+  // เหล็กเสริมที่สั้นกว่าท่อน วาดถึงแค่รอยหักกลางภาพ (ไม่ข้ามรอยตัด) • เต็มท่อนวาดตลอด
+  const barEnd = (len) => (!len || len >= piece.len - 1e-9 ? X0 + TW : Math.min(F(len), cx - 8));
   // รอยหัก (ภาพต่อ): เส้นโค้งตัว S คู่ขนานเรียบๆ พื้นขาวตรงกลางปิดเส้นปลอก
   let brk = "";
   { const by0 = yTop, by1 = yTop + sh, bh = by1 - by0, c1 = (dx) => `${f1(cx + dx)},${f1(by0)} C ${f1(cx + dx + 9)},${f1(by0 + bh * 0.3)} ${f1(cx + dx - 9)},${f1(by0 + bh * 0.7)} ${f1(cx + dx)},${f1(by1)}`;
@@ -354,7 +356,7 @@ export function elevation(plan, piece, y0, opts) {
   // จุดตัดหน้าตัด: มีเหล็กเสริม = อยู่กลางช่วงเหล็กเสริม (ตรงเหล็กเส้น) ไม่มี = หลังรอยหักกลาง ตัวอักษร B เฉพาะเสาหลายท่อนที่ท่อนนี้มีเหล็กเสริมแต่ท่อนอื่นไม่มี
   let xm = cx + 60;
   if (ex.length) { // ขีดตัดต้องอยู่บนเส้นเหล็ก และอยู่ในช่วงปลอก @0.17 (หลัง 0.99 ม. จากปลาย) เพราะแบบขยายระบุ CD@0.17
-    const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)), zs = F(Math.min(0.99 + 0.05, piece.len)), ze = F(bl);
+    const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)), zs = F(Math.min(0.99 + 0.05, piece.len)), ze = barEnd(bl);
     xm = ze - zs > 40 ? (zs + ze) / 2 : Math.max(X0 + 10, ze - 8);
     if (plan.shoulder && opts.first && !piece.full) { const xsh = F(Math.min(plan.shoulder.at, piece.len)); if (Math.abs(xm - xsh) < 38) xm = xsh + 40 <= ze ? xsh + 40 : xsh - 38; }
     if (Math.abs(xm - cx) < 30) xm = cx + 34 <= ze ? cx + 34 : cx - 34; // ไม่ทับรอยหักกลางและตัวเลขระยะกลาง
@@ -382,7 +384,7 @@ export function elevation(plan, piece, y0, opts) {
   const ribbed = (x1, x2, y) => L(x1, y, x2, y, 2.6); // เหล็ก DB เส้นดำทึบ อยู่ในปลอก (ไม่ทึบทับเส้นปลอก)
   let dbLow = false;
   ex.forEach((e, i) => {
-    const len = e.len || (piece.full ? null : piece.len), xe = piece.full || !len ? X0 + TW : F(Math.min(len, piece.len));
+    const len = e.len || (piece.full ? null : piece.len), xe = piece.full || !len ? X0 + TW : barEnd(len);
     const topN = Math.ceil(e.n / 2), botN = e.n - topN, yT = yTop + my(45), yB = yTop + sh - my(45); let ly = sy + 6 + i * 30;
     o += ribbed(X0, xe, yT) + (botN ? ribbed(X0, xe, yB) : "");
     let tx = X0 + (xe - X0) * (plan.shoulder && opts.first && !piece.full ? 0.36 : 0.62);
