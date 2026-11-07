@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107071440";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107071440";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107071440";
+import { pilePoly, esc } from "./draw2d.js?v=20261107071841";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107071841";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107071841";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -486,13 +486,25 @@ export function table(plan, x, y, w) {
   return { svg: o, h: H };
 }
 
+// ข้อความในช่องตารางชื่อแบบ ต้องไม่ล้นกรอบ: ลดขนาดตัวอักษร → ขึ้น 2 บรรทัด → บีบความกว้างอัตโนมัติ
+function fitVal(cx, yy, w, v) {
+  const est = (t, sz) => [...t].reduce((a, ch) => a + (/[ัิ-ฺ็-๎]/.test(ch) ? 0 : /[A-Z0-9]/.test(ch) ? 0.62 : 0.5) * sz, 0);
+  for (const sz of [13, 12, 11, 10]) if (est(v, sz) <= w) return T(cx, yy + 31, v, { size: sz });
+  const sp = [...v.matchAll(/s/g)].map((m) => m.index).sort((p, q) => Math.abs(p - v.length / 2) - Math.abs(q - v.length / 2))[0];
+  if (sp > 0) { const l1 = v.slice(0, sp).trim(), l2 = v.slice(sp).trim(); if (est(l1, 9.5) <= w && est(l2, 9.5) <= w) return T(cx, yy + 24, l1, { size: 9.5 }) + T(cx, yy + 35, l2, { size: 9.5 }); }
+  const sz = 9.5, one = est(v, sz) > w;
+  const txt = (t, y) => `<text x="${f1(cx)}" y="${y}" font-size="${sz}" text-anchor="middle" fill="${INK}" ${FONT}${est(t, sz) > w ? ` textLength="${f1(w)}" lengthAdjust="spacingAndGlyphs"` : ""}>${esc(t)}</text>`;
+  if (!one) return txt(v, yy + 31);
+  const h = Math.ceil(v.length / 2); return txt(v.slice(0, h), yy + 24) + txt(v.slice(h), yy + 35);
+}
+
 function titleBlock(plan, logoHref) {
   const y = 742, p = plan.project || {}, tb = TITLE_BLOCK, cols = [20, 470, 760, 970, 1168];
   let o = `<rect x="20" y="${y}" width="1148" height="78" fill="#fff" stroke="${INK}" stroke-width="1.4"/>`;
   o += L(cols[1], y + 39, 1168, y + 39, 1) + cols.slice(1, 4).map((x) => L(x, y, x, y + 78, 1)).join("");
   o += `<image href="${logoHref}" x="30" y="${y + 8}" width="96" height="62" preserveAspectRatio="xMidYMid meet"/>`;
   o += T(140, y + 26, tb.company, { size: 18, anchor: "start", weight: 700 }) + T(140, y + 44, tb.companyEn, { size: 10, anchor: "start" });
-  const cell = (x1, x2, yy, label, val) => T(x1 + 6, yy + 13, label, { size: 8.5, anchor: "start", fill: "#444" }) + T((x1 + x2) / 2, yy + 31, val || "", { size: 13 });
+  const cell = (x1, x2, yy, label, val) => T(x1 + 6, yy + 13, label, { size: 8.5, anchor: "start", fill: "#444" }) + fitVal((x1 + x2) / 2, yy, x2 - x1 - 12, val || "");
   o += cell(cols[1], cols[2], y, "PROJECT", p.pj) + cell(cols[2], cols[3], y, "LOCATION", p.lo) + cell(cols[3], cols[4], y, "DESIGN BY :", tb.designBy);
   o += cell(cols[1], cols[2], y + 39, "OWNER", p.ow) + cell(cols[2], cols[3], y + 39, "DRAWING BY :", tb.drawBy) + cell(cols[3], cols[4], y + 39, "APPROVED BY :", `${tb.approveBy} ${tb.licence}`);
   o += L(470, y + 39, 470, y + 78, 1);
