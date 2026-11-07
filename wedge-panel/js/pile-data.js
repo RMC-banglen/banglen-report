@@ -12,12 +12,12 @@ export const PILE_SECTIONS = {
     geo: { B: 220, f: 65, c: 50, dg: 70, tw: 80 }, // รูปหน้าตัดไอ (มม.): กว้าง, ปีก, ก้นร่อง, ลึกร่อง, เอว
     shoulder: true, // มีแบบบ่าในต้นแบบ (ขนาดบ่ายังมีเฉพาะ I-22)
     // ตารางลวดอัดแรงและเหล็กเดือยหัวต่อ ตามช่วงความยาวท่อน (ม.): to = ความยาวสูงสุดของช่วง
-    // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
+    // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 ตัดความยาวลง 1 ซม. (เผื่อความยาวเชื่อมเข้าไปในเพลท) → 30/40/45/50 ซม.
     rules: [
-      { to: 12, w4: 4, w5: 2, dowel: { n: 4, d: 12, len: 0.31 } },
-      { to: 16, w4: 8, w5: 0, dowel: { n: 4, d: 12, len: 0.31 } },
-      { to: 18, w4: 10, w5: 0, dowel: { n: 4, d: 16, len: 0.41 } },
-      { to: 20, w4: 0, w5: 8, dowel: { n: 6, d: 16, len: 0.41 } },
+      { to: 12, w4: 4, w5: 2, dowel: { n: 4, d: 12, len: 0.3 } },
+      { to: 16, w4: 8, w5: 0, dowel: { n: 4, d: 12, len: 0.3 } },
+      { to: 18, w4: 10, w5: 0, dowel: { n: 4, d: 16, len: 0.4 } },
+      { to: 20, w4: 0, w5: 8, dowel: { n: 6, d: 16, len: 0.4 } },
     ],
     // ปลอกเกลียว CD Ø2.8 มม.: ปลายทั้งสองข้าง 0.33 ม. @0.05 แล้ว 0.66 ม. @0.07 ส่วนกลาง @0.17 (กลาง = L − 1.98)
     spiral: { wire: 2.8, endLen: 0.33, endStep: 0.05, nearLen: 0.66, nearStep: 0.07, midStep: 0.17 },
@@ -34,9 +34,9 @@ export const PILE_SECTIONS = {
     shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 10, w4: 2, w5: 2, dowel: { n: 4, d: 12, len: 0.31 } },
-      { to: 11, w4: 6, w5: 0, dowel: { n: 4, d: 12, len: 0.31 } },
-      { to: 12, w4: 4, w5: 2, dowel: { n: 4, d: 12, len: 0.31 } },
+      { to: 10, w4: 2, w5: 2, dowel: { n: 4, d: 12, len: 0.3 } },
+      { to: 11, w4: 6, w5: 0, dowel: { n: 4, d: 12, len: 0.3 } },
+      { to: 12, w4: 4, w5: 2, dowel: { n: 4, d: 12, len: 0.3 } },
     ],
     // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
     spiral: { wire: 2.8, endLen: 0.27, endStep: 0.03, nearLen: 0.54, nearStep: 0.075, midStep: 0.13 },
@@ -53,10 +53,10 @@ export const PILE_SECTIONS = {
     shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 12, w4: 0, w5: 6, dowel: { n: 6, d: 12, len: 0.31 } },
-      { to: 16, w4: 4, w5: 4, dowel: { n: 6, d: 12, len: 0.31 } },
-      { to: 18, w4: 0, w5: 8, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 20, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.41 } },
+      { to: 12, w4: 0, w5: 6, dowel: { n: 6, d: 12, len: 0.3 } },
+      { to: 16, w4: 4, w5: 4, dowel: { n: 6, d: 12, len: 0.3 } },
+      { to: 18, w4: 0, w5: 8, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 20, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.4 } },
     ],
     // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
     spiral: { wire: 2.8, endLen: 0.39, endStep: 0.05, nearLen: 0.78, nearStep: 0.065, midStep: 0.16 },
@@ -73,9 +73,9 @@ export const PILE_SECTIONS = {
     shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 16, w4: 2, w5: 6, dowel: { n: 5, d: 16, len: 0.41 } },
-      { to: 18, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 20, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.41 } },
+      { to: 16, w4: 2, w5: 6, dowel: { n: 5, d: 16, len: 0.4 } },
+      { to: 18, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 20, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.4 } },
     ],
     // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
     spiral: { wire: 3.0, endLen: 0.45, endStep: 0.055, nearLen: 0.9, nearStep: 0.0675, midStep: 0.17 },
@@ -92,10 +92,10 @@ export const PILE_SECTIONS = {
     shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 11, w4: 2, w5: 8, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 14, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 18, w4: 0, w5: 12, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 20, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.41 } },
+      { to: 11, w4: 2, w5: 8, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 14, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 18, w4: 0, w5: 12, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 20, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.4 } },
     ],
     // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
     spiral: { wire: 3.0, endLen: 0.525, endStep: 0.045, nearLen: 1.05, nearStep: 0.06, midStep: 0.15 },
@@ -114,9 +114,9 @@ export const PILE_SECTIONS = {
     extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 10, w4: 6, w5: 0, dowel: { n: 4, d: 12, len: 0.31 } },
-      { to: 12, w4: 4, w5: 2, dowel: { n: 4, d: 12, len: 0.31 } },
-      { to: 14, w4: 4, w5: 2, dowel: { n: 5, d: 12, len: 0.31 } },
+      { to: 10, w4: 6, w5: 0, dowel: { n: 4, d: 12, len: 0.3 } },
+      { to: 12, w4: 4, w5: 2, dowel: { n: 4, d: 12, len: 0.3 } },
+      { to: 14, w4: 4, w5: 2, dowel: { n: 5, d: 12, len: 0.3 } },
     ],
     spiral: { wire: 3.0, endLen: 0.27, endStep: 0.04, nearLen: 0.54, nearStep: 0.05, midStep: 0.13 },
     lift: 0.207,
@@ -134,11 +134,11 @@ export const PILE_SECTIONS = {
     extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 12, w4: 0, w5: 6, dowel: { n: 4, d: 16, len: 0.41 } },
-      { to: 14, w4: 4, w5: 4, dowel: { n: 4, d: 16, len: 0.41 } },
-      { to: 16, w4: 4, w5: 4, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 18, w4: 2, w5: 10, dowel: { n: 4, d: 20, len: 0.46 } },
-      { to: 20, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.46 } },
+      { to: 12, w4: 0, w5: 6, dowel: { n: 4, d: 16, len: 0.4 } },
+      { to: 14, w4: 4, w5: 4, dowel: { n: 4, d: 16, len: 0.4 } },
+      { to: 16, w4: 4, w5: 4, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 18, w4: 2, w5: 10, dowel: { n: 4, d: 20, len: 0.45 } },
+      { to: 20, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.45 } },
     ],
     spiral: { wire: 4.0, endLen: 0.33, endStep: 0.065, nearLen: 0.66, nearStep: 0.08, midStep: 0.17 },
     lift: 0.207,
@@ -156,10 +156,10 @@ export const PILE_SECTIONS = {
     extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 14, w4: 2, w5: 6, dowel: { n: 5, d: 16, len: 0.41 } },
-      { to: 16, w4: 2, w5: 8, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 18, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.41 } },
-      { to: 20, w4: 0, w5: 16, dowel: { n: 6, d: 20, len: 0.41 } },
+      { to: 14, w4: 2, w5: 6, dowel: { n: 5, d: 16, len: 0.4 } },
+      { to: 16, w4: 2, w5: 8, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 18, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.4 } },
+      { to: 20, w4: 0, w5: 16, dowel: { n: 6, d: 20, len: 0.4 } },
     ],
     spiral: { wire: 4.0, endLen: 0.39, endStep: 0.06, nearLen: 0.78, nearStep: 0.075, midStep: 0.19 },
     lift: 0.207,
@@ -177,10 +177,10 @@ export const PILE_SECTIONS = {
     extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 14, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.41 } },
-      { to: 16, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.41 } },
-      { to: 18, w4: 0, w5: 16, dowel: { n: 6, d: 20, len: 0.41 } },
-      { to: 20, w4: 0, w5: 20, dowel: { n: 7, d: 20, len: 0.41 } },
+      { to: 14, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 16, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.4 } },
+      { to: 18, w4: 0, w5: 16, dowel: { n: 6, d: 20, len: 0.4 } },
+      { to: 20, w4: 0, w5: 20, dowel: { n: 7, d: 20, len: 0.4 } },
     ],
     spiral: { wire: 4.0, endLen: 0.45, endStep: 0.05, nearLen: 0.9, nearStep: 0.06, midStep: 0.15 },
     lift: 0.207,
@@ -198,9 +198,9 @@ export const PILE_SECTIONS = {
     extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
-      { to: 16, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.46 } },
-      { to: 18, w4: 0, w5: 18, dowel: { n: 7, d: 20, len: 0.46 } },
-      { to: 20, w4: 0, w5: 22, dowel: { n: 8, d: 20, len: 0.46 } },
+      { to: 16, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.45 } },
+      { to: 18, w4: 0, w5: 18, dowel: { n: 7, d: 20, len: 0.45 } },
+      { to: 20, w4: 0, w5: 22, dowel: { n: 8, d: 20, len: 0.45 } },
     ],
     spiral: { wire: 4.0, endLen: 0.525, endStep: 0.045, nearLen: 1.05, nearStep: 0.06, midStep: 0.15 },
     lift: 0.207,
