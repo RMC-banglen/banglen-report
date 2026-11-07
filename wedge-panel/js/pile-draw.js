@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107061019";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107061019";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107061019";
+import { pilePoly, esc } from "./draw2d.js?v=20261107061300";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107061300";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107061300";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -70,7 +70,7 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   o += dimV(dx - 56, y0, y1, "") + T(dx - 62, cy + 4.5, c2(G.B), { size: 14, anchor: "end" });
   // ขนาดแนวนอนด้านล่าง
   const yd = y1 + 26;
-  (G.sq ? [[0, 35, "0.035"], [35, 70, "0.035"], [G.B - 35, G.B, "0.035"]] : [[0, G.dg, cm3(G.dg)], [G.dg, G.dg + G.tw, G.tw % 10 === 0 ? c2(G.tw) : cm3(G.tw)], [G.dg + G.tw, G.B, cm3(G.dg)]]).forEach(([a, b, t], i) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, yd + 16 + (G.sq && i === 1 ? 14 : 0), t, { size: 13 }); }); // เสาสี่เหลี่ยม: ตัวเลขช่วงที่ 2 ลดลงไม่ชนช่วงแรก
+  (G.sq ? [[0, 35, "0.035"], [35, 70, "0.035"], [G.B - 35, G.B, "0.035"]] : [[0, G.dg, cm3(G.dg)], [G.dg, G.dg + G.tw, G.tw % 10 === 0 ? c2(G.tw) : cm3(G.tw)], [G.dg + G.tw, G.B, cm3(G.dg)]]).forEach(([a, b, t], i) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, G.sq && i === 1 ? yd - 6 : yd + 16, t, { size: 13 }); }); // เสาสี่เหลี่ยม: ตัวเลขช่วงที่ 2 อยู่เหนือเส้น ไม่ชนช่วงแรกและเส้นขนาดรวม
   o += dimH(x0, x1, yd + 24, "") + T(cx, yd + 40, c2(G.B), { size: 14 });
   o += T(cx - 34, yd + 62, "SECTION", { size: 16 }) + T(cx + 50, yd + 62, `${letter}-${letter}`, { size: 16 }) + L(cx - 76, yd + 67, cx + 84, yd + 67, 0.9);
   // ป้ายชี้: เส้นใต้ตัวหนังสือยาวไปทางขวา เส้นชี้เฉียงลงที่ลวด หัวลูกศรทึบ
@@ -116,9 +116,10 @@ function wiresDetail(cx, cy, s, lay = wireLayout(4, 2)) {
   lay.w5.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(2.2 * s)}" fill="${INK}"/>`; });
   const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-HBv), x1 = X(HBv), y0 = Y(-HBv), y1 = Y(HBv), ft = 8;
   const per = lay.per, nl = lay.br ?? Math.floor(per / 2), nr = lay.bl ?? Math.ceil(per / 2); // แถวบน: ซ้าย nl เส้น (วัดจากขอบซ้าย) ขวา nr เส้น (วัดจากขอบขวา) • แถวล่างสลับข้าง
-  const dimS = (xa, xb, yd, yRef, lift = 0, below = false) => L(xa, yRef, xa, yd + (below ? 5 : -5), 0.6) + L(xb, yRef, xb, yd + (below ? 5 : -5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, below ? yd + 11 + lift : yd - 5 - lift, "0.035", { size: ft - 1 });
+  const dimS = (xa, xb, yd, yRef, lift = 0, below = false, txt = "0.035") => L(xa, yRef, xa, yd + (below ? 5 : -5), 0.6) + L(xb, yRef, xb, yd + (below ? 5 : -5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, below ? yd + 11 + lift : yd - 5 - lift, txt, { size: ft - 1 });
   // ใส่ระยะ 0.035 ทุกช่วงตามตำแหน่งลวดจริง (สลับความสูงตัวเลขไม่ให้ชนกัน)
-  const chain = (x0c, dir, n, yd, yRef, below) => { let o2 = ""; for (let i = 0; i < n; i++) o2 += dimS(X(x0c + dir * 35 * i), X(x0c + dir * 35 * (i + 1)), yd, yRef, (i % 2) * 9, below); return o2; };
+  const pp = lay.pitch || 35, off = (i) => (i === 0 ? 0 : 35 + pp * (i - 1)); // ตำแหน่งลวดที่ i = 35 + pp×i จากขอบ
+  const chain = (x0c, dir, n, yd, yRef, below) => { let o2 = ""; for (let i = 0; i < n; i++) o2 += dimS(X(x0c + dir * off(i)), X(x0c + dir * (35 + pp * i)), yd, yRef, (i % 2) * 9, below, i === 0 ? "0.035" : (pp / 1000).toFixed(3)); return o2; };
   o += chain(-HBv, 1, nl, y0 - 26, Y(-W35), false) + chain(HBv, -1, nr, y0 - 26, Y(-W35), false);
   o += chain(-HBv, 1, nr, y1 + 26, Y(W35), true) + chain(HBv, -1, nl, y1 + 26, Y(W35), true);
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });

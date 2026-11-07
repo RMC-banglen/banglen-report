@@ -49,7 +49,7 @@ export const PILE_SECTIONS = {
     std: "TIS 396-2549",
     minL: 1,
     maxL: 20,
-    geo: { B: 260, f: 65, c: 90, dg: 85, tw: 90, wl: 3 },
+    geo: { B: 260, f: 65, c: 90, dg: 85, tw: 90, wl: 3, p4: 70 },
     shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
@@ -69,7 +69,7 @@ export const PILE_SECTIONS = {
     std: "TIS 396-2549",
     minL: 1,
     maxL: 20,
-    geo: { B: 300, f: 75, c: 90, dg: 100, tw: 100, wl: 3 },
+    geo: { B: 300, f: 75, c: 90, dg: 100, tw: 100, wl: 3, p4: 70 },
     shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
@@ -111,7 +111,6 @@ export const PILE_SECTIONS = {
     maxL: 14,
     geo: { sq: true, B: 180, ch: 20, dIn: 55, pat: { 6: { row: ["L0","L1","R0"] } } }, // เสาสี่เหลี่ยมมุมตัด 20 มม.; dIn = ระยะเหล็กเดือยจากผิวแผ่น
     shoulder: false,
-    extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 10, w4: 6, w5: 0, dowel: { n: 4, d: 12, len: 0.3 } },
@@ -131,7 +130,6 @@ export const PILE_SECTIONS = {
     maxL: 20,
     geo: { sq: true, B: 220, ch: 20, dIn: 50, pat: { 6: { row: ["L0","L1","R0"] } } }, // เสาสี่เหลี่ยมมุมตัด 20 มม.; dIn = ระยะเหล็กเดือยจากผิวแผ่น
     shoulder: false,
-    extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 12, w4: 0, w5: 6, dowel: { n: 4, d: 16, len: 0.4 } },
@@ -153,7 +151,6 @@ export const PILE_SECTIONS = {
     maxL: 20,
     geo: { sq: true, B: 260, ch: 20, dIn: 50, pat: { 8: { row: ["L0","L1","R1","R0"] } } }, // เสาสี่เหลี่ยมมุมตัด 20 มม.; dIn = ระยะเหล็กเดือยจากผิวแผ่น
     shoulder: false,
-    extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 14, w4: 2, w5: 6, dowel: { n: 5, d: 16, len: 0.4 } },
@@ -174,7 +171,6 @@ export const PILE_SECTIONS = {
     maxL: 20,
     geo: { sq: true, B: 300, ch: 20, dIn: 55, pat: { 10: { row: ["L0","L1","L2","R2","R0"] } } }, // เสาสี่เหลี่ยมมุมตัด 20 มม.; dIn = ระยะเหล็กเดือยจากผิวแผ่น
     shoulder: false,
-    extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 14, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.4 } },
@@ -195,7 +191,6 @@ export const PILE_SECTIONS = {
     maxL: 20,
     geo: { sq: true, B: 350, ch: 20, dIn: 55, pat: { 14: { row: ["L0","L1","L2","R2","R0"], extra: [["L0",1],["R0",1]] } } }, // เสาสี่เหลี่ยมมุมตัด 20 มม.; dIn = ระยะเหล็กเดือยจากผิวแผ่น
     shoulder: false,
-    extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 16, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.45 } },
@@ -234,7 +229,6 @@ export const PILE_SECTIONS = {
     maxL: 20,
     geo: { sq: true, B: 400, ch: 20, dIn: 55, two: true },
     shoulder: false,
-    extras: false,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางผู้ใช้ 7 พ.ย. 2569 ตัดสั้นลง 1 ซม. • ปลอก/ขนาดจาก 40.dxf
     rules: [
       { to: 14, w4: 0, w5: 18, dowel: { n: 5, d: 25, len: 0.5 } },
