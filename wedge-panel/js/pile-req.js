@@ -1,6 +1,6 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107070825";
-import { esc } from "./draw2d.js?v=20261107070825";
+import { autoSplit } from "./pile-calc.js?v=20261107071153";
+import { esc } from "./draw2d.js?v=20261107071153";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -22,6 +22,22 @@ Qa. 23 t.
 
 const n = (s) => parseFloat(s);
 
+const LOC_KEY = /แขวง|เขต|(^|\s)(ต|อ|จ)\.|ตำบล|อำเภอ|จังหวัด|ถนน|ซอย|หมู่/;
+const LABEL = /(หน่วยงาน|ชื่องาน|โครงการ|เจ้าของโครงการ|เจ้าของ|สถานที่ก่อสร้าง|สถานที่)/;
+// 1 บรรทัดมีได้หลายป้าย เช่น "หน่วยงาน ... เจ้าของ ..." หน่วยงาน = โครงการ ; บรรทัดไม่มีป้าย = สถานที่
+function parseHeadLine(l, p) {
+  const parts = l.split(LABEL), clean = (t) => t.replace(/^[\s:]+/, "").replace(/\.{4,}/g, "").trim();
+  if (parts.length === 1) { const t = clean(l); if (t) p.lo = (p.lo ? p.lo + " " : "") + t; return; }
+  if (clean(parts[0])) p.lo = (p.lo ? p.lo + " " : "") + clean(parts[0]);
+  for (let i = 1; i < parts.length; i += 2) {
+    const lab = parts[i], t = clean(parts[i + 1] || "");
+    if (lab === "โครงการ") p.pj = t ? "โครงการ" + t : "";
+    else if (lab === "หน่วยงาน" || lab === "ชื่องาน") p.pj = t;
+    else if (/^เจ้าของ/.test(lab)) p.ow = t;
+    else p.lo = (p.lo ? p.lo + " " : "") + t;
+  }
+}
+
 // → { project:{pj,ow,lo}, piles:[{section,sizeCm,L,pieces,split,W,Qa,H,text,errs[]}] }
 export function parseRequest(text, secs) {
   const blocks = String(text || "").split(/\n\s*[_\-=]{3,}\s*(?:\n|$)/).map((b) => b.split("\n").map((l) => l.trim()).filter(Boolean)).filter((b) => b.length);
@@ -30,11 +46,15 @@ export function parseRequest(text, secs) {
   blocks.forEach((lines) => {
     const idx = lines.findIndex((l) => pileRe.test(l));
     const head = idx < 0 ? lines : lines.slice(0, idx);
-    head.forEach((l) => {
-      if (/โครงการ/.test(l)) project.pj = l.replace(/^.*?โครงการ\s*[:：]?\s*/, "โครงการ").replace(/^โครงการ\s*\.{3,}.*$/, "");
-      else if (/เจ้าของ/.test(l)) project.ow = l.replace(/^.*?เจ้าของ(โครงการ)?\s*[:：]?\s*/, "").replace(/^[.\s]+$/, "");
-      else project.lo = (project.lo ? project.lo + " " : "") + l.replace(/^สถานที่\s*[:：]?\s*/, "").replace(/^[.\s]+$|\.{4,}/g, "");
-    });
+    head.reduce((a, l) => { if (a.length && /(คุณ|นาย|นาง|นางสาว|น\.ส\.)$/.test(a[a.length - 1])) a[a.length - 1] += l; else a.push(l); return a; }, []) // ชื่อที่ขึ้นบรรทัดใหม่หลังคำนำหน้า ต่อกลับเป็นบรรทัดเดียว
+      .forEach((l) => parseHeadLine(l, project));
+    if (project.ow) { // ชื่อเจ้าของตัดเฉพาะชื่อ ส่วนที่ต่อจากนั้น (แขวง/เขต/ต./อ./จ. ...) เป็นสถานที่
+      const k = project.ow.search(LOC_KEY);
+      if (k > 0) { project.lo = (project.ow.slice(k) + (project.lo ? " " + project.lo : "")).trim(); project.ow = project.ow.slice(0, k).trim(); }
+    }
+    project.lo = project.lo.replace(/(แขวง|เขต)\.\s*/g, "$1").replace(/\s+/g, " ").trim();
+    if (/^(คุณ|นาย|นาง|นางสาว)?$/.test(project.ow)) project.ow = "";
+    if (/^[ต./อจ\s]*$/.test(project.lo)) project.lo = ""; // เหลือแต่ "ต./อ./จ." จากฟอร์มเปล่า
     if (idx < 0) return;
     const body = lines.slice(idx).join("\n"), m = lines[idx].match(pileRe);
     const kind = /^[Ii]|ไอ/.test(m[2]) ? "T" : "S", sizeCm = Math.round(n(m[3]) < 1 ? n(m[3]) * 100 : n(m[3])), L = n(m[4]);
@@ -43,7 +63,7 @@ export function parseRequest(text, secs) {
     const ex = body.match(/(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)(?:\s*\+\s*(\d+(?:\.\d+)?))?/);
     let pieces = 1, split = null;
     if (ex) { split = ex.slice(1).filter(Boolean).map(n); pieces = split.length; if (Math.abs(split.reduce((a, b) => a + b, 0) - L) > 0.01) errs.push("ความยาวแต่ละท่อนรวมไม่เท่าความยาวเสา"); }
-    else if (/ต\s*[\/.]?\s*ช|ต่อ/.test(body)) pieces = 2;
+    else if (/ต\s*[\/.]?\s*[ชซ]|ต่อ/.test(body)) pieces = 2;
     const get = (re) => { const x = body.match(re); return x ? n(x[1]) : 0; };
     const W = get(/ตุ้ม\s*[:.]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:=]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.]?\s*(\d+(?:\.\d+)?)/);
     if (!W) errs.push("ไม่พบน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่พบ Qa"); if (!H) errs.push("ไม่พบระยะยก");
