@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107084645";
-import { pileSheet } from "./pile-draw.js?v=20261107084645";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107084645";
-import { download } from "./pdf.js?v=20261107084645";
-import { esc } from "./draw2d.js?v=20261107084645";
-import { getSession, canEdit } from "./auth.js?v=20261107084645";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107084645";
-import { db } from "./db.js?v=20261107084645";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107084645";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107084859";
+import { pileSheet } from "./pile-draw.js?v=20261107084859";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107084859";
+import { download } from "./pdf.js?v=20261107084859";
+import { esc } from "./draw2d.js?v=20261107084859";
+import { getSession, canEdit } from "./auth.js?v=20261107084859";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107084859";
+import { db } from "./db.js?v=20261107084859";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107084859";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -88,7 +88,14 @@ function renderSplitRows() {
 let tmr; const sched = () => { clearTimeout(tmr); tmr = setTimeout(render, 150); };
 function render() {
   syncUi();
-  const inp = read(), plan = planPile(inp);
+  const inp = read();
+  if (!inp.section) { // ยังไม่เลือกหน้าตัดเสา (เช่นเริ่มงานใหม่) ไม่แสดงแบบ
+    $("pileSheet").innerHTML = ""; $("pileWarn").innerHTML = '<div class="al w">เลือกหน้าตัดเสาและใส่ความยาว เพื่อเขียนแบบ</div>';
+    $("bPilePdf").disabled = true; $("bPileDraw").disabled = true;
+    try { localStorage.setItem(DKEY, JSON.stringify({ ...inp, _job: curJobId })); } catch (e) {}
+    return;
+  }
+  const plan = planPile(inp);
   $("pileSheet").innerHTML = pileSheet(plan);
   const empty = !inp.full && !inp.L;
   $("pileWarn").innerHTML = empty ? '<div class="al w">ใส่ความยาวเสา (ม.) เพื่อเขียนแบบ</div>' : plan.warn.map((w) => `<div class="al w">${esc(w)}</div>`).join("");
@@ -100,7 +107,7 @@ function restore() {
   try {
     const d = JSON.parse(localStorage.getItem(DKEY) || "null");
     if (!d) return;
-    $("psec").value = [...$("psec").options].some((o) => o.value === d.section) ? d.section : "T22";
+    $("psec").value = [...$("psec").options].some((o) => o.value === d.section) ? d.section : "";
     $("pL").value = d.L || "";
     $("ppj").value = (d.project && d.project.pj) || ""; $("pow").value = (d.project && d.project.ow) || ""; $("plo").value = (d.project && d.project.lo) || "";
     const r = d._raw || {};
@@ -209,7 +216,7 @@ function jobPiles() {
   syncActive();
   if (queue.length) return queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]).map(slim);
   const i = read();
-  return i.full || !i.L ? [] : [slim({ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder })];
+  return i.full || !i.L || !i.section ? [] : [slim({ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder })];
 }
 const jobSnap = () => JSON.stringify({ project: projectNow(), piles: jobPiles() });
 const isDirty = () => { const p = projectNow(); return (p.pj || jobPiles().length) && jobSnap() !== lastSaved; };
@@ -301,7 +308,7 @@ function resetJob() {
   queue = []; active = null; curJobId = null; curCode = null;
   $("preq").value = ""; $("preqList").innerHTML = ""; $("preqMsg").textContent = "";
   ["ppj", "pow", "plo", "pL", "pW", "pQa", "pH", "pshAt"].forEach((id) => { $(id).value = ""; });
-  $("psh").checked = false; $("pnS").value = "1"; splits = []; extras = [];
+  $("psec").value = ""; $("psh").checked = false; $("pnS").value = "1"; splits = []; extras = [];
   const pt = document.querySelector('input[name="pt"][value="len"]'); if (pt) pt.checked = true;
   $("plRows").dataset.n = ""; renderExtras(); // ล้างทุกช่อง เริ่มงานใหม่ต้องว่างทั้งหมด
   try { history.replaceState(null, "", "#view3d"); } catch (e) {}
@@ -368,7 +375,7 @@ document.addEventListener("wheel", (e) => { const t = e.target; if (t && t.tagNa
 
 export function initPile() {
   if (started) return; started = true;
-  $("psec").innerHTML = Object.values(PILE_SECTIONS).filter((s) => !s.draft || /[?&]draft/.test(location.search)).sort((a, b) => (a.geo.sq ? 1 : 0) - (b.geo.sq ? 1 : 0) || a.geo.B - b.geo.B).map((s) => `<option value="${s.key}">${s.menu || s.label} มอก. (${s.size} ม.)</option>`).join("");
+  $("psec").innerHTML = '<option value="">— เลือกหน้าตัดเสา —</option>' + Object.values(PILE_SECTIONS).filter((s) => !s.draft || /[?&]draft/.test(location.search)).sort((a, b) => (a.geo.sq ? 1 : 0) - (b.geo.sq ? 1 : 0) || a.geo.B - b.geo.B).map((s) => `<option value="${s.key}">${s.menu || s.label} มอก. (${s.size} ม.)</option>`).join("");
   restore(); renderExtras();
   ["pL", "pshAt", "ppj", "pow", "plo", "pW", "pQa", "pH"].forEach((id) => $(id).addEventListener("input", sched));
   $("pL").addEventListener("input", renderExtras); // ความยาวท่อนเปลี่ยน → ตัวเลือกท่อนของเหล็กเสริมอัปเดต
