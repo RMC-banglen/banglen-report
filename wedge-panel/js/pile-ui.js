@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107073333";
-import { pileSheet } from "./pile-draw.js?v=20261107073333";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107073333";
-import { download } from "./pdf.js?v=20261107073333";
-import { esc } from "./draw2d.js?v=20261107073333";
-import { getSession, canEdit } from "./auth.js?v=20261107073333";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject } from "./db.js?v=20261107073333";
-import { db } from "./db.js?v=20261107073333";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107073333";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107073757";
+import { pileSheet } from "./pile-draw.js?v=20261107073757";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107073757";
+import { download } from "./pdf.js?v=20261107073757";
+import { esc } from "./draw2d.js?v=20261107073757";
+import { getSession, canEdit } from "./auth.js?v=20261107073757";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107073757";
+import { db } from "./db.js?v=20261107073757";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107073757";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -93,7 +93,7 @@ function render() {
   const empty = !inp.full && !inp.L;
   $("pileWarn").innerHTML = empty ? '<div class="al w">ใส่ความยาวเสา (ม.) เพื่อเขียนแบบ</div>' : plan.warn.map((w) => `<div class="al w">${esc(w)}</div>`).join("");
   $("bPilePdf").disabled = empty;
-  try { localStorage.setItem(DKEY, JSON.stringify(inp)); } catch (e) {}
+  try { localStorage.setItem(DKEY, JSON.stringify({ ...inp, _job: curJobId })); } catch (e) {}
 }
 
 function restore() {
@@ -138,7 +138,7 @@ function loadPile(p, project) {
   $("ppj").value = project.pj; $("pow").value = project.ow; $("plo").value = project.lo;
   $("plRows").dataset.n = ""; renderExtras(); render();
 }
-function readReq() { curJobId = null; curCode = null; showQueue(parseRequest($("preq").value, PILE_SECTIONS)); }
+async function readReq() { const r = parseRequest($("preq").value, PILE_SECTIONS); if (!(await guardUnsaved())) return; curJobId = null; curCode = null; lastSaved = ""; showQueue(r); jmsg(""); }
 
 // รายการคำขอจากหน้า "ติดตามรายการคำนวณเสาเข็ม" (อ่านอย่างเดียว ไม่แก้สถานะในระบบนั้น)
 async function loadTracker() {
@@ -151,7 +151,7 @@ async function loadTracker() {
     rows.forEach((r) => {
       const b = document.createElement("button"); b.type = "button"; b.style.cssText = "display:block;width:100%;text-align:left;margin:3px 0";
       b.textContent = (r.code ? r.code + " " : "") + (r.project || "(ไม่มีชื่อโครงการ)") + " — " + r.items.length + " รายการ";
-      b.onclick = () => { curJobId = null; curCode = null; showQueue(fromTracker(r)); }; box.appendChild(b);
+      b.onclick = async () => { if (!(await guardUnsaved())) return; curJobId = null; curCode = null; lastSaved = ""; showQueue(fromTracker(r)); jmsg(""); }; box.appendChild(b);
     });
   } catch (e) { msg.textContent = "ดึงรายการขอไม่สำเร็จ: " + (e.message || e); }
 }
@@ -183,6 +183,11 @@ function showQueue(r) {
   msg.textContent = queue.length ? "พบ " + queue.length + " ต้น กดแถวเพื่อดูแบบ" : "ไม่พบรายการเสา (ต้องมีบรรทัดแบบ I 0.22×19.00 ม.)";
   if (queue[0] && PILE_SECTIONS[queue[0].section]) loadPile(queue[0], proj);
 }
+// ---- บันทึกงาน: ใช้วิธีเดียวกับหน้าแผ่นกันดิน (บันทึก/บันทึกการแก้ไข • รายการงาน • ถังขยะ • คัดลอกลิงก์ • ถามเมื่อมีงานค้าง) ----
+let lastSaved = "", listRows = [];
+const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+const editable = () => canEdit(getSession());
+
 // เสาที่เปิดอยู่ในฟอร์ม → เก็บค่าที่แก้ล่าสุดกลับเข้ารายการ
 function syncActive() {
   if (!active || !queue.includes(active)) return;
@@ -190,60 +195,112 @@ function syncActive() {
   Object.assign(active, { section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, kind: i.section[0], sizeCm: +i.section.slice(1) });
 }
 const slim = (p) => ({ section: p.section, L: p.L, pieces: p.pieces, split: p.split || null, W: p.W, Qa: p.Qa, H: p.H, extras: p.extras || [], shoulder: p.shoulder || 0 });
-async function saveJob() {
-  const msg = $("pjMsg"), b = $("bPjSave");
-  if (!canEdit(getSession())) { msg.textContent = "บัญชีนี้บันทึกไม่ได้ (ดูได้อย่างเดียว)"; return; }
+const projectNow = () => ({ pj: $("ppj").value.trim(), ow: $("pow").value.trim(), lo: $("plo").value.trim() });
+function jobPiles() {
   syncActive();
-  let piles = queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]).map(slim);
-  if (!queue.length) { const i = read(); if (i.full || !i.L) { msg.textContent = "ใส่ความยาวเสาก่อนบันทึก"; return; } piles = [slim({ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder })]; }
-  if (!piles.length) { msg.textContent = "ไม่มีเสาที่ข้อมูลครบให้บันทึก"; return; }
-  b.disabled = true; msg.textContent = "กำลังบันทึก…";
-  try {
-    if (!curCode) curCode = await nextPileCode();
-    const project = { pj: $("ppj").value.trim(), ow: $("pow").value.trim(), lo: $("plo").value.trim() };
-    curJobId = await savePileJob({ id: curJobId, job: { code: curCode, project, piles }, user: getSession() });
-    msg.textContent = "บันทึกแล้ว รหัส " + curCode + " (" + piles.length + " ต้น)";
-    refreshJobs();
-  } catch (e) { msg.textContent = "บันทึกไม่สำเร็จ: " + (e.message || e); }
-  b.disabled = false;
+  if (queue.length) return queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]).map(slim);
+  const i = read();
+  return i.full || !i.L ? [] : [slim({ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder })];
 }
-function newJob() { // เริ่มงานใหม่: ล้างรายการเสาและรหัสที่เปิดอยู่ (ฟอร์มเสาคงไว้)
-  queue = []; active = null; curJobId = null; curCode = null; $("preq").value = ""; $("preqList").innerHTML = ""; $("preqPdf").hidden = true; $("preqMsg").textContent = "";
-  ["ppj", "pow", "plo"].forEach((id) => { $(id).value = ""; }); render();
-  $("pjMsg").textContent = "เริ่มงานใหม่ (บันทึกครั้งหน้าจะได้รหัสใหม่)";
+const jobSnap = () => JSON.stringify({ project: projectNow(), piles: jobPiles() });
+const isDirty = () => { const p = projectNow(); return (p.pj || jobPiles().length) && jobSnap() !== lastSaved; };
+
+const jmsg = (t) => {
+  $("pjMsg").textContent = t; $("bPjLink").hidden = !curJobId;
+  $("bPjSave").textContent = curJobId ? "บันทึกการแก้ไข" : "บันทึกงาน"; renderJobList();
+};
+function renderJobList() {
+  const box = $("pjList"); if (!box) return;
+  box.innerHTML = listRows.map((r) => {
+    const d = r.data || {}, cur = r.id === curJobId;
+    return '<div class="prow' + (cur ? " cur" : "") + '"><button type="button" class="pbtn" data-id="' + esc(r.id) + '">' + esc((d.code || "") + " " + ((d.project && d.project.pj) || r.name || "ไม่มีชื่อโครงการ")) + ' <span style="color:var(--faint)">• ' + (d.piles || []).length + " ต้น</span></button>" +
+      (cur && editable() ? '<button type="button" class="ptrash" title="ลบงานนี้" aria-label="ลบงานนี้">' + TRASH_SVG + "</button>" : "") + "</div>";
+  }).join("") || '<p class="hint">ยังไม่มีงานที่บันทึก</p>';
+  box.querySelectorAll(".pbtn").forEach((b) => (b.onclick = async () => { if (!(await guardUnsaved())) return; openJob(b.dataset.id); }));
+  const t = box.querySelector(".ptrash"); if (t) t.onclick = deleteJob;
 }
 async function refreshJobs() {
-  const box = $("pjList"); if (!box) return;
-  try {
-    const rows = await listPileJobs(20); box.innerHTML = "";
-    rows.forEach((row) => {
-      const d = row.data || {}, wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:4px;margin:3px 0";
-      const b = document.createElement("button"); b.type = "button"; b.style.cssText = "flex:1;text-align:left";
-      b.textContent = (d.code || row.name) + " " + ((d.project && d.project.pj) || "") + " — " + ((d.piles || []).length) + " ต้น";
-      b.onclick = () => openJob(row);
-      const x = document.createElement("button"); x.type = "button"; x.className = "iconbtn"; x.textContent = "ลบ"; x.setAttribute("aria-label", "ลบงาน " + (d.code || ""));
-      x.onclick = () => delJob(row);
-      wrap.append(b, x); box.appendChild(wrap);
+  try { listRows = await listPileJobs(15); } catch (e) { listRows = []; }
+  renderJobList();
+}
+function askChoice(title, text, buttons) {
+  return new Promise((resolve) => {
+    const ov = document.createElement("div"); ov.className = "modal";
+    ov.innerHTML = '<div class="modal__box" role="dialog" aria-modal="true"><h3></h3><p></p><div class="modal__btns"></div></div>';
+    ov.querySelector("h3").textContent = title; ov.querySelector("p").textContent = text;
+    const done = (v) => { document.removeEventListener("keydown", onKey); ov.remove(); resolve(v); };
+    const onKey = (e) => { if (e.key === "Escape") done("cancel"); };
+    buttons.forEach((b) => {
+      const el = document.createElement("button"); el.type = "button"; el.textContent = b.t;
+      if (b.pri) el.className = "pri"; if (b.danger) el.className = "danger";
+      el.onclick = () => done(b.v); ov.querySelector(".modal__btns").appendChild(el);
     });
-    if (!rows.length) box.textContent = "ยังไม่มีงานที่บันทึก";
-  } catch (e) { box.textContent = "โหลดรายการไม่สำเร็จ"; }
+    ov.addEventListener("click", (e) => { if (e.target === ov) done("cancel"); });
+    document.addEventListener("keydown", onKey); document.body.appendChild(ov); ov.querySelector("button.pri, button").focus();
+  });
 }
-function openJob(row) {
-  const d = row.data || {};
-  const piles = (d.piles || []).map((p) => ({ ...p, kind: p.section[0], sizeCm: +p.section.slice(1), errs: [] }));
-  showQueue({ project: d.project || { pj: "", ow: "", lo: "" }, piles });
-  curJobId = row.id; curCode = d.code || null;
-  $("pjMsg").textContent = "เปิดงาน " + curCode + " แก้ไขแล้วกดบันทึกเพื่อเก็บทับรหัสเดิม";
+async function guardUnsaved() {
+  if (!isDirty()) return true;
+  const name = $("ppj").value.trim() || "(ยังไม่มีชื่อ)", saved = !!curJobId, btns = [];
+  if (editable()) btns.push({ v: "save", t: saved ? "บันทึกการแก้ไข" : "บันทึกงาน", pri: true });
+  btns.push({ v: "discard", t: saved ? "ไม่บันทึก (ทิ้งการแก้ไข)" : "ไม่บันทึก (ทิ้งข้อมูล)", danger: true }, { v: "cancel", t: "ยกเลิก (กลับไปแก้ต่อ)" });
+  const c = await askChoice(saved ? 'งาน "' + name + '" มีการแก้ไขที่ยังไม่ได้บันทึก' : 'งาน "' + name + '" ยังไม่ได้บันทึก', "ต้องการทำอย่างไรก่อนไปต่อ?", btns);
+  if (c === "save") return await saveJob();
+  return c === "discard";
 }
-async function delJob(row) {
-  const d = row.data || {};
-  if (!canEdit(getSession())) { $("pjMsg").textContent = "บัญชีนี้ลบไม่ได้ (ดูได้อย่างเดียว)"; return; }
-  if (!window.confirm("ลบงาน " + (d.code || "") + " " + ((d.project && d.project.pj) || "") + " ถาวรใช่ไหม?\n\nลบแล้วกู้คืนไม่ได้ (รหัสนี้จะไม่ถูกนำมาใช้ซ้ำในวันเดียวกันถ้ามีรหัสที่ใหญ่กว่า)")) return;
+async function saveJob() {
+  if (!editable()) { jmsg("บัญชีนี้ดูได้อย่างเดียว บันทึกไม่ได้"); return false; }
+  const project = projectNow();
+  if (!project.pj) { jmsg("ใส่ชื่อโครงการก่อนบันทึก"); $("ppj").focus(); return false; }
+  const piles = jobPiles();
+  if (!piles.length) { jmsg("ยังไม่มีเสาที่ข้อมูลครบให้บันทึก (ใส่ความยาวเสาก่อน)"); return false; }
+  const wasNew = !curJobId, b = $("bPjSave"); b.disabled = true;
   try {
-    await deleteProject(row.id);
-    if (curJobId === row.id) { curJobId = null; curCode = null; }
-    $("pjMsg").textContent = "ลบงาน " + (d.code || "") + " แล้ว"; refreshJobs();
-  } catch (e) { $("pjMsg").textContent = "ลบไม่สำเร็จ: " + (e.message || e); }
+    if (!curCode) curCode = await nextPileCode();
+    curJobId = await savePileJob({ id: curJobId, job: { code: curCode, project, piles }, user: getSession() });
+    try { history.replaceState(null, "", "#" + curJobId); } catch (e) {}
+    lastSaved = jobSnap(); saveDraftJob();
+    jmsg(wasNew ? "บันทึกแล้ว รหัส " + curCode + " (" + piles.length + ' ต้น) • กด "คัดลอกลิงก์งาน" เพื่อส่งให้ทีมเปิดดู (ต้องล็อกอินก่อน)' : "บันทึกการแก้ไขแล้ว (รหัส " + curCode + ")");
+    refreshJobs(); b.disabled = false; return true;
+  } catch (e) { jmsg("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); b.disabled = false; return false; }
+}
+function saveDraftJob() { try { const d = JSON.parse(localStorage.getItem(DKEY) || "{}"); d._job = curJobId; localStorage.setItem(DKEY, JSON.stringify(d)); } catch (e) {} }
+async function openJob(id) {
+  try {
+    const row = await getProject(id);
+    if (!row || !row.data || row.data.kind !== "pile") { jmsg("ไม่พบงานนี้"); return false; }
+    const d = row.data;
+    setMode("pile");
+    showQueue({ project: d.project || { pj: "", ow: "", lo: "" }, piles: (d.piles || []).map((p) => ({ ...p, kind: p.section[0], sizeCm: +p.section.slice(1), errs: [] })) });
+    $("preqPdf").hidden = false; $("preqMsg").textContent = "";
+    curJobId = row.id; curCode = d.code || null; lastSaved = jobSnap(); saveDraftJob();
+    try { history.replaceState(null, "", "#" + curJobId); } catch (e) {}
+    jmsg("เปิดงานแล้ว"); return true;
+  } catch (e) { jmsg("เปิดงานไม่ได้ ลองใหม่อีกครั้ง"); return false; }
+}
+async function deleteJob() {
+  if (!curJobId || !editable()) return;
+  const name = $("ppj").value.trim() || "(ไม่มีชื่อ)";
+  if (!window.confirm('ลบงาน "' + name + '" ออกจากระบบถาวรใช่ไหม?\n\nลบแล้วกู้คืนไม่ได้ และคนที่เปิดลิงก์งานนี้จะเปิดไม่ได้อีก')) return;
+  try {
+    await deleteProject(curJobId);
+    resetJob(); jmsg('ลบงาน "' + name + '" แล้ว'); refreshJobs();
+  } catch (e) { jmsg("ลบไม่สำเร็จ ลองใหม่อีกครั้ง"); }
+}
+// เริ่มงานใหม่: ล้างรายการเสา โครงการ และรหัสที่เปิดอยู่ (ฟอร์มเสาคงไว้)
+function resetJob() {
+  queue = []; active = null; curJobId = null; curCode = null;
+  $("preq").value = ""; $("preqList").innerHTML = ""; $("preqPdf").hidden = true; $("preqMsg").textContent = "";
+  ["ppj", "pow", "plo"].forEach((id) => { $(id).value = ""; });
+  try { history.replaceState(null, "", "#view3d"); } catch (e) {}
+  render(); lastSaved = jobSnap(); saveDraftJob();
+}
+async function newJob() { if (!(await guardUnsaved())) return; resetJob(); jmsg("เริ่มงานใหม่แล้ว (บันทึกครั้งหน้าจะได้รหัสใหม่)"); }
+async function linkJob() {
+  if (!curJobId) return;
+  const url = location.origin + location.pathname + "#" + curJobId;
+  try { await navigator.clipboard.writeText(url); jmsg("คัดลอกลิงก์งานแล้ว • ส่งให้ทีมเปิดดูได้ (ต้องล็อกอินก่อน)"); }
+  catch (e) { window.prompt("คัดลอกลิงก์นี้", url); }
 }
 
 async function pdfAll() {
@@ -259,7 +316,7 @@ async function pdfAll() {
       msg.textContent = "กำลังสร้าง PDF… " + (i + 1) + "/" + ok.length;
       const inp = pileInputOf(ok[i], ok[i].project), plan = planPile(inp);
       await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), first); first = false;
-      await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len), curCode), false, true);
+      await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     }
     const pj = (ok[0].project.pj || "คำขอ").slice(0, 30);
     download(("แบบเสาเข็ม+blow " + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));
@@ -276,7 +333,7 @@ async function pdf() {
     await document.fonts.ready;
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
     await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), true);
-    if (inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len), curCode), false, true);
+    if (inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     const name = `แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
     download(name + ".pdf", doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว";
@@ -308,8 +365,15 @@ export function initPile() {
   $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };
   $("bPilePdf").onclick = pdf;
   $("preqTpl").onclick = () => { $("preq").value = TEMPLATE; $("preqMsg").textContent = "แก้ข้อความตัวอย่างนี้ แล้วกด อ่านข้อความ (หรือส่งตัวอย่างนี้ให้หน้างานกรอก)"; try { navigator.clipboard.writeText(TEMPLATE); } catch (e) {} };
-  $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("preqPdf").onclick = pdfAll; $("bPjSave").onclick = saveJob; $("bPjNew").onclick = newJob; refreshJobs();
+  $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("preqPdf").onclick = pdfAll; $("bPjSave").onclick = saveJob; $("bPjNew").onclick = newJob; $("bPjLink").onclick = linkJob; jmsg("");
   $("m-wall").onclick = () => setMode("wall"); $("m-pile").onclick = () => setMode("pile");
   let m = "wall"; try { m = sessionStorage.getItem(MKEY) || "wall"; } catch (e) {}
   setMode(m === "pile" ? "pile" : "wall");
+  lastSaved = jobSnap(); // ค่าที่เปิดมา (จากร่างในเครื่อง) ไม่ถือเป็นงานค้าง
+  refreshJobs();
+  const hid = (location.hash || "").slice(1);
+  let draftJob = null; try { draftJob = (JSON.parse(localStorage.getItem(DKEY) || "null") || {})._job || null; } catch (e) {}
+  const first = /^pile-[a-z0-9]+$/.test(hid) ? hid : draftJob;
+  if (first) openJob(first).then((ok) => { if (!ok) { curJobId = null; curCode = null; jmsg(""); } });
+  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (/^pile-[a-z0-9]+$/.test(h) && h !== curJobId) openJob(h); });
 }

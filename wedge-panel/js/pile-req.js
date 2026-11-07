@@ -1,6 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107073333";
-import { esc } from "./draw2d.js?v=20261107073333";
+import { autoSplit } from "./pile-calc.js?v=20261107073757";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107073757";
+import { esc } from "./draw2d.js?v=20261107073757";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -95,19 +96,18 @@ export function blowSheet(p, secLabel, project, pieceLens, code) {
   const S = r ? r.S : NaN;
   const css = `<style>
 .bs{width:794px;height:1123px;background:#fff;color:#000;box-sizing:border-box;padding:46px 56px;font-family:'Times New Roman',Times,serif;font-size:15px;position:relative}
-.bs .r{display:grid;grid-template-columns:276px 152px 22px 90px 1fr;height:31px;align-items:center}
+.bs .r{display:grid;grid-template-columns:276px 152px 22px 90px 1fr;height:26px;align-items:center}
 .bs .r>span{white-space:nowrap}
 .bs .r>span:nth-child(5){padding-left:8px}
 .bs .v{text-align:right}.bs .r3 .v{text-align:right}.bs .e{text-align:center}
-.bs .g{height:30px}
-.bs .box{border:1.5px solid #13508A;border-radius:8px;padding:10px 16px;margin:14px 0 20px;font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:14px;line-height:1.55;background:#f5f8fc}
+.bs .g{height:16px}
+.bs .box{border:1.5px solid #13508A;border-radius:8px;padding:10px 16px;margin:12px 0 14px;font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:14px;line-height:1.55;background:#f5f8fc}
 .bs .box .k{color:#13508A;font-weight:700;display:inline-block;width:78px}
-.bs .box .code{float:right;font-weight:700;color:#13508A;font-size:15px}
 </style>`;
   return `${css}<div class="bs">
 <div style="display:flex;align-items:center;gap:14px;border-bottom:2px solid #000;padding-bottom:12px"><img src="assets/logo.png" style="width:128px;height:auto" alt=""><div style="font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif"><div style="font-size:19px;font-weight:700">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:13px;margin-top:4px">299หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div></div>
-<div style="text-align:center;font-weight:700;font-size:13px;margin-top:22px">STATIC LOAD BEARING CAPACITY OF PILE DRIVEN BY GRAVITY DROP HAMMER</div>
-<div class="box">${code ? `<span class="code">รหัสงาน ${esc(code)}</span>` : ""}<div><span class="k">โครงการ</span>${esc(project.pj || "-")}</div><div><span class="k">เจ้าของ</span>${esc(project.ow || "-")}</div><div><span class="k">สถานที่</span>${esc(project.lo || "-")}</div><div><span class="k">เสาเข็ม</span>${pile} &nbsp; ${esc(pcs)} &nbsp; TIS.396-2549</div></div>
+<div style="text-align:center;font-weight:700;font-size:19px;margin-top:22px">Pile Bearing Capacity Calculation by Gravity drop hammer</div>
+<div class="box"><div><span class="k">โครงการ</span>${esc(project.pj || "-")}</div><div><span class="k">เจ้าของ</span>${esc(project.ow || "-")}</div><div><span class="k">สถานที่</span>${esc(project.lo || "-")}</div><div><span class="k">เสาเข็ม</span>${pile} &nbsp; ${esc(pcs)} &nbsp; TIS.396-2549</div></div>
 ${row("PILE LENGTH :", "L =", f(p.L * 100), "CM.")}
 ${row("AREA", "A =", r ? f(r.A) : "-", "CM.<sup style='font-size:9px'>2</sup>")}
 ${row("PERIMETER", "P =", r ? f(r.P) : "-", "CM.")}
@@ -122,17 +122,23 @@ ${row("ALLOWABLE BEARING CAPACITY", "Qa =", f(p.Qa), "T.")}
 ${row("FACTOR OF SAFETY", "F.S. =", f(FS), "")}
 ${row("ULTIMATE BEARING CAPACITY", "Qu =", r ? f(r.Qu) : "-", "T.")}
 <div class="g"></div>
-<div style="height:31px;display:flex;align-items:center">FROM DANISH PILE DRIVING FORMULAR</div>
-<div style="display:flex;align-items:center;gap:10px;margin:4px 0 4px 70px;height:62px"><span>Qu =</span><span style="display:inline-block;text-align:center"><div style="border-bottom:1.3px solid #000;padding:0 14px 1px;font-style:italic">a</div><div style="padding:1px 10px">S + 1/2 * SQR. 2ab</div></span></div>
-<div style="height:31px;display:flex;align-items:center">WHERE ;</div>
+<div style="height:26px;display:flex;align-items:center">FROM DANISH PILE DRIVING FORMULAR</div>
+<div style="display:flex;align-items:center;gap:10px;margin:2px 0 2px 70px;height:54px"><span>Qu =</span><span style="display:inline-block;text-align:center"><div style="border-bottom:1.3px solid #000;padding:0 14px 1px;font-style:italic">a</div><div style="padding:1px 10px">S + 1/2 * SQR. 2ab</div></span></div>
+<div style="height:26px;display:flex;align-items:center">WHERE ;</div>
 ${row3("ENERGY FOR DRIVING", "a = EWH", r ? f(r.a) : "-", "T-CM.")}
 ${row3("ENERGY LOSS", "b = L/Aec", r ? f(r.b, 5) : "-", "CM./T.")}
 ${row3("EXPECTED PENETRATION", "S = a/Qu - 1/2 SQR.2ab", r ? f(S, 3) : "-", "CM./BLOW")}
 <div class="g"></div>
-<div style="height:31px;display:flex;align-items:center">THUS ;</div>
+<div style="height:26px;display:flex;align-items:center">THUS ;</div>
 ${row3("FOR 10 BLOWS REQUIRED PENETRATION", "", r && S > 0 ? f(10 * S) : "-", "CM.")}
 ${row3("FOR 1 FOOT REQUIRES", "", r && S > 0 ? f(30 / S) : "-", "BLOWS.")}
 ${r && S <= 0 ? `<p style="color:#c00000;font-weight:700;margin-top:14px">หมายเหตุ: ค่า S ≤ 0 ตุ้ม/ระยะยกเบาเกินไปสำหรับ Qa นี้</p>` : ""}
+<div style="position:absolute;right:56px;bottom:40px;width:270px;text-align:center;font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:14px;line-height:1.6">
+<div style="height:46px;border-bottom:1.2px solid #000"></div>
+<div style="margin-top:4px;font-family:'Times New Roman',Times,serif;font-size:15px">( ${esc(TITLE_BLOCK.approveBy)} )</div>
+<div>วิศวกรผู้ควบคุม &nbsp; ${esc(TITLE_BLOCK.licence)}</div>
+<div>วันที่ ........./........./.........</div>
+</div>
 </div>`;
 }
 
