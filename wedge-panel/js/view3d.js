@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261107041438";
-import { f2, f3, fmt } from "./calc.js?v=20261107041438";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261107041438";
+import { SHOULDER } from "./standards.js?v=20261107041905";
+import { f2, f3, fmt } from "./calc.js?v=20261107041905";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261107041905";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -64,14 +64,15 @@ function side(G,ty,fz,cd,x0,L,bot,Tt){const zl=x=>cd>0?x-x0:x0+L-x,b=railT(G,fz,
 ex(b,angU(50),0,L,AGL);ex(b,rect(64,114,Tt-10,Tt),0,L,SLT);const sp=[];for(let p=75;p<L;p+=150){ex(b,bot?rect(50,114,50,Tt-10):rect(50,114,66,Tt-10),p-3,6,SLT);sp.push(cd>0?x0+p:x0+L-p)}
 return{zl,sp,g:b}}
 function wedge(G,ty,TD,fx,cd,z0,H,bot){const g=new THREE.Group();g.position.set(fx*KK,0,z0*KK);if(cd>0)g.scale.x=-1;G.add(g);ex(g,RAIL[ty],0,H,0x888780);boxU(TD).forEach(p=>ex(g,p,0,H,RHSC));if(ty==="A")ex(g,rect(TD,TD+50,100,110),0,H,FBC);ex(g,rect(TD,TD+50,0,100),0,6,CAP);ex(g,rect(TD,TD+50,0,100),H-6,6,CAP);if(bot)ex(g,angU(TD+50),0,H,AGL);return g}
-function post(g,cx,zf,dir,Tt){const za=dir>0?zf+9:zf-59,zw=dir>0?zf+9:zf-14;bx(g,cx-70,zw,140,5,0,Tt,PSTC);bx(g,cx-70,za,5,50,0,Tt,PSTC);bx(g,cx+65,za,5,50,0,Tt,PSTC)}
+// ตัวปิดปลายตัวกั้น = เหล็กรางน้ำ C 50x25x5 ตั้งสูงเท่าความหนาแผ่น แนบฝาปลายหัวลิ่ม (หนา 6 มม.) ไม่มีช่องว่าง
+function post(g,cx,zf,dir,Tt){const zw=dir>0?zf+6:zf-11,za=dir>0?zf+6:zf-31;bx(g,cx-25,zw,50,5,0,Tt,PSTC);bx(g,cx-25,za,5,25,0,Tt,PSTC);bx(g,cx+20,za,5,25,0,Tt,PSTC)}
 let DIVCH=false; // เหล็กรางน้ำ 2 นิ้ว (ตั้งใน build)
 function divider(G,ty,TC,xL,z0,H,Tt){const HD=TC/2,cx=xL+HD;const a=new THREE.Group();a.position.set(xL*KK,0,z0*KK);G.add(a);ex(a,RAIL[ty],0,H,0x888780);const b=new THREE.Group();b.position.set((xL+TC)*KK,0,z0*KK);b.scale.x=-1;G.add(b);ex(b,RAIL[ty],0,H,0x888780);
 if(DIVCH){ // ตัวกั้นเหล็กรางน้ำ 2" (C 50x25x5) วางนอนเป็นคานค้ำถี่ ทุกระยะ SP มม. (ถี่กว่าแผ่นตัดพลาสม่าเดิมที่ 500) เอวกว้าง 50 ตามแนวโต๊ะ ยาวเท่าความหนาแผ่น
 const SP=250,w=25,d=25,t=5,nc=Math.max(2,Math.ceil((H-d)/SP)+1);for(let i=0;i<nc;i++){const zc=z0+i*(H-d)/(nc-1);ex(G,rect(cx-w,cx+w,0,Tt),zc,t,0xB4B2A9);ex(G,rect(cx-w,cx-w+t,0,Tt),zc,d,0xB4B2A9);ex(G,rect(cx+w-t,cx+w,0,Tt),zc,d,0xB4B2A9)}post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return nc}
 const nr=Math.max(2,Math.ceil((H-9)/500)+1),rib=RIB[ty](HD).map(p=>[p[0]+cx,p[1]]);for(let i=0;i<nr;i++)ex(G,rib,z0+i*(H-9)/(nr-1),9,0xEF9F27);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return nr}
 function bolt(g,x,zf,dir,top,Tt){const z=zf-dir*SU;cyl(g,10,8,x,top+4,z,BRC,6);cyl(g,6,top-Tt+20,x,(top+Tt-20)/2,z,0xB4B2A9);bx(g,x-20,dir>0?zf-80:zf+50,40,30,Tt-16,Tt-10,BRC);cyl(g,10,8,x,Tt-20,z,BRC,6)}
-function joint(G,cx,wA,zf,dir,sp,Tt){const PY=Tt+22,zA0=dir>0?zf+15:zf-105;bx(G,cx-wA/2,zA0,wA,90,Tt,Tt+10,PAC);[28,64].forEach(o=>{const zc=zf+dir*o;bx(G,cx-22,zc-10,44,20,Tt+10,PY,PAC);cylZ(G,18,20,cx,PY,zc,PAC)});
+function joint(G,cx,wA,zf,dir,sp,Tt){const PY=Tt+22,zA0=dir>0?zf+6:zf-96;bx(G,cx-wA/2,zA0,wA,90,Tt,Tt+10,PAC);[28,64].forEach(o=>{const zc=zf+dir*(o-9);bx(G,cx-22,zc-10,44,20,Tt+10,PY,PAC);cylZ(G,18,20,cx,PY,zc,PAC)});
 const zB0=dir>0?zf-120:zf,zb=zf-dir*12;bx(G,cx-105,zB0,210,120,Tt,Tt+10,PBC); // เพลทม่วงสุดที่ขอบด้านในแฟลตบาร์ (zf) ไม่เกิน • บูชขยับเข้ามาอยู่บนเพลทเต็มตัว
 bx(G,cx-22,zb-12,44,24,Tt+10,PY,PBC);cylZ(G,18,24,cx,PY,zb,PBC);
 const ok=HOLES.map(o=>cx+o).filter(h=>!sp.some(s=>Math.abs(h-s)<BLK)),use=ok.length>=2?[ok[0],ok[ok.length-1]]:ok;use.forEach(x=>bolt(G,x,zf,dir,Tt+10,Tt));
