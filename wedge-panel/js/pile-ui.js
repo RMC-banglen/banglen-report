@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074127";
-import { pileSheet } from "./pile-draw.js?v=20261107074127";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107074127";
-import { download } from "./pdf.js?v=20261107074127";
-import { esc } from "./draw2d.js?v=20261107074127";
-import { getSession, canEdit } from "./auth.js?v=20261107074127";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074127";
-import { db } from "./db.js?v=20261107074127";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107074127";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074158";
+import { pileSheet } from "./pile-draw.js?v=20261107074158";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107074158";
+import { download } from "./pdf.js?v=20261107074158";
+import { esc } from "./draw2d.js?v=20261107074158";
+import { getSession, canEdit } from "./auth.js?v=20261107074158";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074158";
+import { db } from "./db.js?v=20261107074158";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107074158";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -213,7 +213,7 @@ function renderJobList() {
   const box = $("pjList"); if (!box) return;
   box.innerHTML = listRows.map((r) => {
     const d = r.data || {}, cur = r.id === curJobId;
-    return '<div class="prow' + (cur ? " cur" : "") + '"><button type="button" class="pbtn" data-id="' + esc(r.id) + '">' + esc((d.code || "") + " " + ((d.project && d.project.pj) || r.name || "ไม่มีชื่อโครงการ")) + ' <span style="color:var(--faint)">• ' + (d.piles || []).length + " ต้น</span></button>" +
+    return '<div class="prow' + (cur ? " cur" : "") + '"><button type="button" class="pbtn" data-id="' + esc(r.id) + '">' + esc((d.code || "") + " " + ((d.project && (d.project.ow || d.project.pj)) || r.name || "ไม่มีชื่อเจ้าของ")) + ' <span style="color:var(--faint)">• ' + (d.piles || []).length + " ต้น</span></button>" +
       (cur && editable() ? '<button type="button" class="ptrash" title="ลบงานนี้" aria-label="ลบงานนี้">' + TRASH_SVG + "</button>" : "") + "</div>";
   }).join("") || '<p class="hint">ยังไม่มีงานที่บันทึก</p>';
   box.querySelectorAll(".pbtn").forEach((b) => (b.onclick = async () => { if (!(await guardUnsaved())) return; openJob(b.dataset.id); }));
@@ -241,7 +241,7 @@ function askChoice(title, text, buttons) {
 }
 async function guardUnsaved() {
   if (!isDirty()) return true;
-  const name = $("ppj").value.trim() || "(ยังไม่มีชื่อ)", saved = !!curJobId, btns = [];
+  const name = $("pow").value.trim() || $("ppj").value.trim() || "(ยังไม่มีชื่อ)", saved = !!curJobId, btns = [];
   if (editable()) btns.push({ v: "save", t: saved ? "บันทึกการแก้ไข" : "บันทึกงาน", pri: true });
   btns.push({ v: "discard", t: saved ? "ไม่บันทึก (ทิ้งการแก้ไข)" : "ไม่บันทึก (ทิ้งข้อมูล)", danger: true }, { v: "cancel", t: "ยกเลิก (กลับไปแก้ต่อ)" });
   const c = await askChoice(saved ? 'งาน "' + name + '" มีการแก้ไขที่ยังไม่ได้บันทึก' : 'งาน "' + name + '" ยังไม่ได้บันทึก', "ต้องการทำอย่างไรก่อนไปต่อ?", btns);
@@ -251,7 +251,7 @@ async function guardUnsaved() {
 async function saveJob() {
   if (!editable()) { jmsg("บัญชีนี้ดูได้อย่างเดียว บันทึกไม่ได้"); return false; }
   const project = projectNow();
-  if (!project.pj) { jmsg("ใส่ชื่อโครงการก่อนบันทึก"); $("ppj").focus(); return false; }
+  if (!project.ow && !project.pj) { jmsg("ใส่ชื่อเจ้าของก่อนบันทึก (ใช้ค้นหางาน)"); $("pow").focus(); return false; }
   const piles = jobPiles();
   if (!piles.length) { jmsg("ยังไม่มีเสาที่ข้อมูลครบให้บันทึก (ใส่ความยาวเสาก่อน)"); return false; }
   const wasNew = !curJobId, b = $("bPjSave"); b.disabled = true;
@@ -280,7 +280,7 @@ async function openJob(id) {
 }
 async function deleteJob() {
   if (!curJobId || !editable()) return;
-  const name = $("ppj").value.trim() || "(ไม่มีชื่อ)";
+  const name = $("pow").value.trim() || $("ppj").value.trim() || "(ไม่มีชื่อ)";
   if (!window.confirm('ลบงาน "' + name + '" ออกจากระบบถาวรใช่ไหม?\n\nลบแล้วกู้คืนไม่ได้ และคนที่เปิดลิงก์งานนี้จะเปิดไม่ได้อีก')) return;
   try {
     await deleteProject(curJobId);
@@ -318,7 +318,7 @@ async function pdfAll() {
       await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), first); first = false;
       await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     }
-    const pj = (ok[0].project.pj || "คำขอ").slice(0, 30);
+    const pj = (ok[0].project.ow || ok[0].project.pj || "คำขอ").slice(0, 30);
     download(((curCode ? curCode + " " : "") + "แบบเสาเข็ม+blow " + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว " + ok.length + " ต้น";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
@@ -334,7 +334,7 @@ async function pdf() {
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
     await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), true);
     if (inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
-    const name = `${curCode ? curCode + " " : ""}แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
+    const name = `${curCode ? curCode + " " : ""}${inp.project.ow ? inp.project.ow + " " : ""}แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
     download(name + ".pdf", doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
