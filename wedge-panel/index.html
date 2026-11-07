@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261107064454">
+<meta name="app-version" content="20261107065905">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -36,7 +36,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261107064454">
+<link rel="stylesheet" href="css/app.css?v=20261107065905">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -153,6 +153,7 @@
 </div>
 <div class="wrap" id="pileWrap" hidden>
 <aside>
+<fieldset><legend>วางข้อความคำขอ (จากกลุ่มเทเลแกรม)</legend><textarea id="preq" rows="7" placeholder="วางข้อความที่ขอมาตรงนี้" style="width:100%;box-sizing:border-box"></textarea><div class="btns"><button type="button" id="preqTpl">ตัวอย่างฟอร์ม</button><button type="button" class="pri" id="preqGo">อ่านข้อความ</button></div><div id="preqList"></div><div class="btns"><button type="button" class="pri" id="preqPdf" hidden>PDF ทั้งชุด (แบบ + blow count)</button></div><p class="hint" id="preqMsg">ท่อนต่อ (ต/ช) = 2 ท่อน แบ่งอัตโนมัติ เช่น 21 ม. = 10+11 ถ้าอยากกำหนดเองให้เขียน 10+11 ในบรรทัดเสา</p></fieldset>
 <fieldset><legend>ข้อมูลในตารางชื่อแบบ</legend>
 <label for="ppj">ชื่อโครงการ</label><input id="ppj" type="text" autocomplete="off">
 <label for="pow">เจ้าของโครงการ</label><input id="pow" type="text" autocomplete="off">
@@ -166,6 +167,7 @@
 <div id="plSplit" hidden><div id="plRows"></div><p class="hint">ไม่ใส่ = แบ่งความยาวให้อัตโนมัติ (เมตรเต็มเท่ากัน เศษไปท้ายท่อน) ใส่เองได้ เช่น 7 + 10 โดยต้องใส่ครบทุกท่อน และรวมเท่าความยาวเสา</p></div>
 <p class="hint" id="pjHint"></p>
 </fieldset>
+<fieldset><legend>ข้อมูลตอก (ใบ blow count)</legend><label for="pW">น้ำหนักตุ้ม (ตัน)</label><input id="pW" type="number" step="0.01" min="0"><label for="pQa">Qa (ตัน)</label><input id="pQa" type="number" step="0.1" min="0"><label for="pH">ระยะยกตุ้ม (ซม.)</label><input id="pH" type="number" step="1" min="0"></fieldset>
 <fieldset id="pxBox"><legend>เหล็กเสริมพิเศษ</legend><div id="pxs"></div><button type="button" id="pxAdd">เพิ่มเหล็กเสริม</button><p class="hint">ระบุขนาด ความยาว และจำนวนเส้น ไม่ใส่ความยาว = ยาวเท่าท่อน</p></fieldset>
 <fieldset id="pshBox"><legend>บ่า</legend><label class="chk"><input type="checkbox" id="psh"> มีบ่า (ขนาด 0.20 + 0.10 ม. เหล็ก 3 เส้น)</label><div id="pshAtBox" hidden><label for="pshAt">ระยะบ่าจากหัวเสา (ม.)</label><input id="pshAt" type="number" step="0.01" min="0"></div></fieldset>
 <fieldset><legend>ส่งออก</legend><div class="btns"><button type="button" class="pri" id="bPilePdf">ส่งออก PDF (A4)</button></div><p class="hint" id="pileMsg"></p><p class="hint">แบบนี้ไม่ได้บันทึกลงฐานข้อมูล ระบบจำค่าที่กรอกล่าสุดไว้ในเครื่องนี้เท่านั้น</p></fieldset>
@@ -177,6 +179,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261107064454"></script>
+<script type="module" src="js/ui.js?v=20261107065905"></script>
 </body>
 </html>
