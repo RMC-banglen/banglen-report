@@ -1,6 +1,6 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107070541";
-import { esc } from "./draw2d.js?v=20261107070541";
+import { autoSplit } from "./pile-calc.js?v=20261107070825";
+import { esc } from "./draw2d.js?v=20261107070825";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -43,9 +43,9 @@ export function parseRequest(text, secs) {
     const ex = body.match(/(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)(?:\s*\+\s*(\d+(?:\.\d+)?))?/);
     let pieces = 1, split = null;
     if (ex) { split = ex.slice(1).filter(Boolean).map(n); pieces = split.length; if (Math.abs(split.reduce((a, b) => a + b, 0) - L) > 0.01) errs.push("ความยาวแต่ละท่อนรวมไม่เท่าความยาวเสา"); }
-    else if (/ต\s*\/?\s*ช|ต่อ/.test(body)) pieces = 2;
+    else if (/ต\s*[\/.]?\s*ช|ต่อ/.test(body)) pieces = 2;
     const get = (re) => { const x = body.match(re); return x ? n(x[1]) : 0; };
-    const W = get(/ตุ้ม\s*[:.]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.]?\s*(\d+(?:\.\d+)?)/);
+    const W = get(/ตุ้ม\s*[:.]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:=]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.]?\s*(\d+(?:\.\d+)?)/);
     if (!W) errs.push("ไม่พบน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่พบ Qa"); if (!H) errs.push("ไม่พบระยะยก");
     piles.push({ section: key, sizeCm, kind, L, pieces, split, W, Qa, H, errs });
   });
