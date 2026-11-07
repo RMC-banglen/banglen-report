@@ -183,6 +183,8 @@ nav.modes button[aria-selected="true"]{color:var(--accent);border-bottom-color:v
 .pxrow select{padding-left:10px;padding-right:26px}
 .pxrow.nosel{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px}
 .pxrow label{margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.pxrow .pxall{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:13px;margin:2px 0 0;white-space:normal}
+.pxrow .pxall input{width:auto;min-width:0}
 .pxrow .iconbtn{width:44px;min-width:0;padding:0}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 
