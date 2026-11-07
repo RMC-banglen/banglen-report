@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107062715";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107063057";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -55,7 +55,7 @@ export function wireLayout(w4, w5, B = 220, sq = false, wl, pat, p4) {
   if (w4 === 2 && w5 === 2) return { w4: [[-yw, -yw], [yw, yw]], w5: [[yw, -yw], [-yw, yw]], n4: 2, n5: 2, std: false, per: 2 }; // I-18: ลวด 4 มม. กับ 5 มม. อย่างละ 1 เส้นต่อแถว (สลับแนวทแยง — ยังไม่ยืนยันจากแบบ)
   // แถวล่าง: ซ้าย bl เส้น (นับจากขอบซ้ายทีละ 35 มม.) ขวา br เส้น (นับจากขอบขวา) • แถวบนหมุน 180° (ซ้ายบน = br, ขวาบน = bl)
   // bl ตามแบบ DXF (เส้นบอกระยะ 3.5 ซม. ในภาพ DETAIL OF PC.WIRES: I-18=1, I-26=3, I-30=3, I-35=2) ถ้าไม่ระบุใช้ครึ่งปัดขึ้น (I-22 ตามแบบ AutoCAD)
-  const k = Math.max(1, Math.round((w4 + w5) / 2)), p = k === 4 && p4 ? p4 : 35, bl = k === 4 && p4 ? 2 : k > 1 ? Math.min(k - 1, Math.max(1, wl ?? Math.ceil(k / 2))) : k, br = k - bl; // ต้องมีลวดทุกมุม (ซ้ายและขวาของแต่ละแถวอย่างน้อยด้านละ 1 เส้น) — ผู้ใช้สั่ง
+  const k = Math.max(1, Math.round((w4 + w5) / 2)), p = k === 4 && p4 ? p4 : 35, bl = k === 4 && p4 ? 2 : k === 3 ? 1 : k > 1 ? Math.min(k - 1, Math.max(1, wl ?? Math.ceil(k / 2))) : k, br = k - bl; // ต้องมีลวดทุกมุม (ซ้ายและขวาของแต่ละแถวอย่างน้อยด้านละ 1 เส้น) — ผู้ใช้สั่ง
   const bot = [...Array(bl)].map((_, i) => -hb + 35 + p * i).concat([...Array(br)].map((_, j) => hb - 35 - p * j)).sort((p, q) => p - q);
   const top = bot.map((x) => -x).sort((p, q) => p - q);
   const all = top.map((x) => [x, -yw]).concat(bot.map((x) => [x, yw]));

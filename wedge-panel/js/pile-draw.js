@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107062715";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107062715";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107062715";
+import { pilePoly, esc } from "./draw2d.js?v=20261107063057";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107063057";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107063057";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -119,7 +119,7 @@ function wiresDetail(cx, cy, s, lay = wireLayout(4, 2)) {
   const dimS = (xa, xb, yd, yRef, lift = 0, below = false, txt = "0.035") => L(xa, yRef, xa, yd + (below ? 5 : -5), 0.6) + L(xb, yRef, xb, yd + (below ? 5 : -5), 0.6) + dimH(xa, xb, yd, "", {}) + (lift > 0 ? L((xa + xb) / 2, yd, (xa + xb) / 2, below ? yd + 11 + lift - ft : yd - 5 - lift + 2, 0.5) : "") + T((xa + xb) / 2, below ? yd + 11 + lift : yd - 5 - lift, txt, { size: ft - 1 }); // ตัวเลขที่ยกสูง ลากเส้นชี้จากเส้นบอกระยะ (แบบ AutoCAD) ไม่จำเป็นต้องอยู่กลางช่วง
   // ใส่ระยะ 0.035 ทุกช่วงตามตำแหน่งลวดจริง (สลับความสูงตัวเลขไม่ให้ชนกัน)
   const pp = lay.pitch || 35, off = (i) => (i === 0 ? 0 : 35 + pp * (i - 1)); // ตำแหน่งลวดที่ i = 35 + pp×i จากขอบ
-  const chain = (x0c, dir, n, yd, yRef, below) => { let o2 = ""; for (let i = 0; i < n; i++) o2 += dimS(X(x0c + dir * off(i)), X(x0c + dir * (35 + pp * i)), yd, yRef, (i % 2) * 9, below, i === 0 ? "0.035" : (pp / 1000).toFixed(3)); return o2; };
+  const chain = (x0c, dir, n, yd, yRef, below) => { let o2 = ""; if (n < 2) return o2; /* ลวดเส้นเดียวในฝั่ง ไม่ลงระยะแนวนอน (เหมือนแบบ I-22) */ for (let i = 0; i < n; i++) o2 += dimS(X(x0c + dir * off(i)), X(x0c + dir * (35 + pp * i)), yd, yRef, (i % 2) * 9, below, i === 0 ? "0.035" : (pp / 1000).toFixed(3)); return o2; };
   o += chain(-HBv, 1, nl, y0 - 26, Y(-W35), false) + chain(HBv, -1, nr, y0 - 26, Y(-W35), false);
   o += chain(-HBv, 1, nr, y1 + 26, Y(W35), true) + chain(HBv, -1, nl, y1 + 26, Y(W35), true);
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });
