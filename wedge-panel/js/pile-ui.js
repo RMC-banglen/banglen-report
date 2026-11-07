@@ -1,10 +1,11 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107065905";
-import { pileSheet } from "./pile-draw.js?v=20261107065905";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107065905";
-import { download } from "./pdf.js?v=20261107065905";
-import { esc } from "./draw2d.js?v=20261107065905";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107065905";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107070541";
+import { pileSheet } from "./pile-draw.js?v=20261107070541";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107070541";
+import { download } from "./pdf.js?v=20261107070541";
+import { esc } from "./draw2d.js?v=20261107070541";
+import { db } from "./db.js?v=20261107070541";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107070541";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -134,8 +135,37 @@ function loadPile(p, project) {
   $("ppj").value = project.pj; $("pow").value = project.ow; $("plo").value = project.lo;
   $("plRows").dataset.n = ""; renderExtras(); render();
 }
-function readReq() {
-  const r = parseRequest($("preq").value, PILE_SECTIONS), msg = $("preqMsg");
+function readReq() { showQueue(parseRequest($("preq").value, PILE_SECTIONS)); }
+
+// รายการคำขอจากหน้า "ติดตามรายการคำนวณเสาเข็ม" (อ่านอย่างเดียว ไม่แก้สถานะในระบบนั้น)
+async function loadTracker() {
+  const msg = $("preqMsg"), box = $("preqList"); msg.textContent = "กำลังดึงรายการขอ…"; box.innerHTML = "";
+  try {
+    const { data, error } = await db().from("pile_calc_requests").select("id,data,updated_at").order("updated_at", { ascending: false }).limit(60);
+    if (error) throw error;
+    const rows = (data || []).map((x) => x.data).filter((r) => r && r.status === "received" && Array.isArray(r.items));
+    msg.textContent = rows.length ? "คำขอที่ยังไม่ได้เขียนแบบ " + rows.length + " งาน กดเลือกงาน" : "ไม่มีคำขอที่รอเขียนแบบ";
+    rows.forEach((r) => {
+      const b = document.createElement("button"); b.type = "button"; b.style.cssText = "display:block;width:100%;text-align:left;margin:3px 0";
+      b.textContent = (r.code ? r.code + " " : "") + (r.project || "(ไม่มีชื่อโครงการ)") + " — " + r.items.length + " รายการ";
+      b.onclick = () => showQueue(fromTracker(r)); box.appendChild(b);
+    });
+  } catch (e) { msg.textContent = "ดึงรายการขอไม่สำเร็จ: " + (e.message || e); }
+}
+function fromTracker(r) {
+  const piles = r.items.map((i) => {
+    const sz = parseFloat(i.size), size = Math.round(sz < 1 ? sz * 100 : sz), kind = i.section === "S" ? "S" : "T", errs = [];
+    const L = parseFloat(i.length) || 0, W = parseFloat(i.hammer) || 0, Qa = parseFloat(i.qa) || 0, H = parseFloat(i.drop) || 0;
+    if (i.std === "factory") errs.push("มาตรฐานโรงงาน ยังไม่รองรับ");
+    if (i.micro || i.joint === "micro") errs.push("ไมโครไพล์ ไม่รองรับ");
+    if (!PILE_SECTIONS[kind + size]) errs.push("ไม่มีหน้าตัดนี้ในระบบ");
+    if (!L) errs.push("ไม่มีความยาว"); if (!W) errs.push("ไม่มีน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่มี Qa"); if (!H) errs.push("ไม่มีระยะยก");
+    return { section: kind + size, sizeCm: size, kind, L, pieces: i.joint === "joined" ? 2 : 1, split: null, W, Qa, H, errs, qty: i.qty };
+  });
+  return { project: { pj: r.project || "", ow: r.owner || "", lo: r.location || "" }, piles };
+}
+function showQueue(r) {
+  const msg = $("preqMsg");
   const proj = { pj: r.project.pj || $("ppj").value.trim(), ow: r.project.ow || $("pow").value.trim(), lo: r.project.lo || $("plo").value.trim() };
   queue = r.piles.map((p) => ({ ...p, project: proj }));
   const box = $("preqList"); box.innerHTML = "";
@@ -211,7 +241,7 @@ export function initPile() {
   $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };
   $("bPilePdf").onclick = pdf;
   $("preqTpl").onclick = () => { $("preq").value = TEMPLATE; $("preqMsg").textContent = "แก้ข้อความตัวอย่างนี้ แล้วกด อ่านข้อความ (หรือส่งตัวอย่างนี้ให้หน้างานกรอก)"; try { navigator.clipboard.writeText(TEMPLATE); } catch (e) {} };
-  $("preqGo").onclick = readReq; $("preqPdf").onclick = pdfAll;
+  $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("preqPdf").onclick = pdfAll;
   $("m-wall").onclick = () => setMode("wall"); $("m-pile").onclick = () => setMode("pile");
   let m = "wall"; try { m = sessionStorage.getItem(MKEY) || "wall"; } catch (e) {}
   setMode(m === "pile" ? "pile" : "wall");
