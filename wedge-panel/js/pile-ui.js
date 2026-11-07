@@ -1,16 +1,18 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107072450";
-import { pileSheet } from "./pile-draw.js?v=20261107072450";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107072450";
-import { download } from "./pdf.js?v=20261107072450";
-import { esc } from "./draw2d.js?v=20261107072450";
-import { db } from "./db.js?v=20261107072450";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107072450";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107072910";
+import { pileSheet } from "./pile-draw.js?v=20261107072910";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107072910";
+import { download } from "./pdf.js?v=20261107072910";
+import { esc } from "./draw2d.js?v=20261107072910";
+import { getSession, canEdit } from "./auth.js?v=20261107072910";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject } from "./db.js?v=20261107072910";
+import { db } from "./db.js?v=20261107072910";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107072910";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
 const DB_SIZES = [10, 12, 16, 20, 25];
-let extras = [], splits = [], started = false, queue = [];
+let extras = [], splits = [], started = false, queue = [], active = null, curJobId = null, curCode = null;
 
 const num = (id) => { const v = parseFloat($(id).value); return v > 0 ? v : 0; };
 const pnVal = () => Math.min(6, Math.max(1, +$("pnS").value || 1));
@@ -125,17 +127,18 @@ const blowItem = (inp) => ({ section: inp.section, L: inp.L, W: inp.blow.W, Qa: 
 
 // ---- วางข้อความคำขอ → รายการเสา → PDF ทั้งชุด ----
 function pileInputOf(p, project) {
-  return { section: p.section, full: false, L: p.L, pieces: p.pieces, joint: p.pieces >= 2, split: p.split, extras: [], shoulder: 0, project, blow: { W: p.W, Qa: p.Qa, H: p.H } };
+  return { section: p.section, full: false, L: p.L, pieces: p.pieces, joint: p.pieces >= 2, split: p.split, extras: (p.extras || []).map((e) => ({ ...e })), shoulder: p.shoulder || 0, project, blow: { W: p.W, Qa: p.Qa, H: p.H } };
 }
 function loadPile(p, project) {
   $("psec").value = p.section; $("pL").value = p.L; $("pnS").value = String(p.pieces);
   const pt = document.querySelector('input[name="pt"][value="len"]'); if (pt) pt.checked = true;
-  splits = p.split ? p.split.map(String) : []; extras = []; $("psh").checked = false; $("pshAt").value = "";
+  splits = p.split ? p.split.map(String) : []; extras = (p.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces || 0 })); active = p;
+  $("psh").checked = (p.shoulder || 0) > 0; $("pshAt").value = p.shoulder > 0 ? p.shoulder : "";
   $("pW").value = p.W || ""; $("pQa").value = p.Qa || ""; $("pH").value = p.H || "";
   $("ppj").value = project.pj; $("pow").value = project.ow; $("plo").value = project.lo;
   $("plRows").dataset.n = ""; renderExtras(); render();
 }
-function readReq() { showQueue(parseRequest($("preq").value, PILE_SECTIONS)); }
+function readReq() { curJobId = null; curCode = null; showQueue(parseRequest($("preq").value, PILE_SECTIONS)); }
 
 // รายการคำขอจากหน้า "ติดตามรายการคำนวณเสาเข็ม" (อ่านอย่างเดียว ไม่แก้สถานะในระบบนั้น)
 async function loadTracker() {
@@ -148,7 +151,7 @@ async function loadTracker() {
     rows.forEach((r) => {
       const b = document.createElement("button"); b.type = "button"; b.style.cssText = "display:block;width:100%;text-align:left;margin:3px 0";
       b.textContent = (r.code ? r.code + " " : "") + (r.project || "(ไม่มีชื่อโครงการ)") + " — " + r.items.length + " รายการ";
-      b.onclick = () => showQueue(fromTracker(r)); box.appendChild(b);
+      b.onclick = () => { curJobId = null; curCode = null; showQueue(fromTracker(r)); }; box.appendChild(b);
     });
   } catch (e) { msg.textContent = "ดึงรายการขอไม่สำเร็จ: " + (e.message || e); }
 }
@@ -174,13 +177,77 @@ function showQueue(r) {
     const b = document.createElement("button"); b.type = "button"; b.className = "preqrow";
     b.style.cssText = "display:block;width:100%;text-align:left;margin:3px 0";
     b.textContent = (p.errs.length ? "⚠ " : "") + (i + 1) + ". " + (p.kind === "T" ? "I" : "S") + "-" + p.sizeCm + " ยาว " + p.L + " ม. (" + pl + ") ตุ้ม " + p.W + " Qa " + p.Qa + " ยก " + p.H + (p.errs.length ? " — " + p.errs.join(", ") : "");
-    b.onclick = () => { if (!PILE_SECTIONS[p.section]) return; loadPile(p, proj); }; box.appendChild(b);
+    b.onclick = () => { if (!PILE_SECTIONS[p.section]) return; syncActive(); loadPile(p, proj); }; box.appendChild(b);
   });
   $("preqPdf").hidden = !queue.some((p) => !p.errs.length);
   msg.textContent = queue.length ? "พบ " + queue.length + " ต้น กดแถวเพื่อดูแบบ" : "ไม่พบรายการเสา (ต้องมีบรรทัดแบบ I 0.22×19.00 ม.)";
   if (queue[0] && PILE_SECTIONS[queue[0].section]) loadPile(queue[0], proj);
 }
+// เสาที่เปิดอยู่ในฟอร์ม → เก็บค่าที่แก้ล่าสุดกลับเข้ารายการ
+function syncActive() {
+  if (!active || !queue.includes(active)) return;
+  const i = read();
+  Object.assign(active, { section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, kind: i.section[0], sizeCm: +i.section.slice(1) });
+}
+const slim = (p) => ({ section: p.section, L: p.L, pieces: p.pieces, split: p.split || null, W: p.W, Qa: p.Qa, H: p.H, extras: p.extras || [], shoulder: p.shoulder || 0 });
+async function saveJob() {
+  const msg = $("pjMsg"), b = $("bPjSave");
+  if (!canEdit(getSession())) { msg.textContent = "บัญชีนี้บันทึกไม่ได้ (ดูได้อย่างเดียว)"; return; }
+  syncActive();
+  let piles = queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]).map(slim);
+  if (!queue.length) { const i = read(); if (i.full || !i.L) { msg.textContent = "ใส่ความยาวเสาก่อนบันทึก"; return; } piles = [slim({ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder })]; }
+  if (!piles.length) { msg.textContent = "ไม่มีเสาที่ข้อมูลครบให้บันทึก"; return; }
+  b.disabled = true; msg.textContent = "กำลังบันทึก…";
+  try {
+    if (!curCode) curCode = await nextPileCode();
+    const project = { pj: $("ppj").value.trim(), ow: $("pow").value.trim(), lo: $("plo").value.trim() };
+    curJobId = await savePileJob({ id: curJobId, job: { code: curCode, project, piles }, user: getSession() });
+    msg.textContent = "บันทึกแล้ว รหัส " + curCode + " (" + piles.length + " ต้น)";
+    refreshJobs();
+  } catch (e) { msg.textContent = "บันทึกไม่สำเร็จ: " + (e.message || e); }
+  b.disabled = false;
+}
+function newJob() { // เริ่มงานใหม่: ล้างรายการเสาและรหัสที่เปิดอยู่ (ฟอร์มเสาคงไว้)
+  queue = []; active = null; curJobId = null; curCode = null; $("preq").value = ""; $("preqList").innerHTML = ""; $("preqPdf").hidden = true; $("preqMsg").textContent = "";
+  ["ppj", "pow", "plo"].forEach((id) => { $(id).value = ""; }); render();
+  $("pjMsg").textContent = "เริ่มงานใหม่ (บันทึกครั้งหน้าจะได้รหัสใหม่)";
+}
+async function refreshJobs() {
+  const box = $("pjList"); if (!box) return;
+  try {
+    const rows = await listPileJobs(20); box.innerHTML = "";
+    rows.forEach((row) => {
+      const d = row.data || {}, wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:4px;margin:3px 0";
+      const b = document.createElement("button"); b.type = "button"; b.style.cssText = "flex:1;text-align:left";
+      b.textContent = (d.code || row.name) + " " + ((d.project && d.project.pj) || "") + " — " + ((d.piles || []).length) + " ต้น";
+      b.onclick = () => openJob(row);
+      const x = document.createElement("button"); x.type = "button"; x.className = "iconbtn"; x.textContent = "ลบ"; x.setAttribute("aria-label", "ลบงาน " + (d.code || ""));
+      x.onclick = () => delJob(row);
+      wrap.append(b, x); box.appendChild(wrap);
+    });
+    if (!rows.length) box.textContent = "ยังไม่มีงานที่บันทึก";
+  } catch (e) { box.textContent = "โหลดรายการไม่สำเร็จ"; }
+}
+function openJob(row) {
+  const d = row.data || {};
+  const piles = (d.piles || []).map((p) => ({ ...p, kind: p.section[0], sizeCm: +p.section.slice(1), errs: [] }));
+  showQueue({ project: d.project || { pj: "", ow: "", lo: "" }, piles });
+  curJobId = row.id; curCode = d.code || null;
+  $("pjMsg").textContent = "เปิดงาน " + curCode + " แก้ไขแล้วกดบันทึกเพื่อเก็บทับรหัสเดิม";
+}
+async function delJob(row) {
+  const d = row.data || {};
+  if (!canEdit(getSession())) { $("pjMsg").textContent = "บัญชีนี้ลบไม่ได้ (ดูได้อย่างเดียว)"; return; }
+  if (!window.confirm("ลบงาน " + (d.code || "") + " " + ((d.project && d.project.pj) || "") + " ถาวรใช่ไหม?\n\nลบแล้วกู้คืนไม่ได้ (รหัสนี้จะไม่ถูกนำมาใช้ซ้ำในวันเดียวกันถ้ามีรหัสที่ใหญ่กว่า)")) return;
+  try {
+    await deleteProject(row.id);
+    if (curJobId === row.id) { curJobId = null; curCode = null; }
+    $("pjMsg").textContent = "ลบงาน " + (d.code || "") + " แล้ว"; refreshJobs();
+  } catch (e) { $("pjMsg").textContent = "ลบไม่สำเร็จ: " + (e.message || e); }
+}
+
 async function pdfAll() {
+  syncActive();
   const ok = queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]), b = $("preqPdf"), msg = $("preqMsg");
   if (!ok.length) return; b.disabled = true;
   try {
@@ -241,7 +308,7 @@ export function initPile() {
   $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };
   $("bPilePdf").onclick = pdf;
   $("preqTpl").onclick = () => { $("preq").value = TEMPLATE; $("preqMsg").textContent = "แก้ข้อความตัวอย่างนี้ แล้วกด อ่านข้อความ (หรือส่งตัวอย่างนี้ให้หน้างานกรอก)"; try { navigator.clipboard.writeText(TEMPLATE); } catch (e) {} };
-  $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("preqPdf").onclick = pdfAll;
+  $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("preqPdf").onclick = pdfAll; $("bPjSave").onclick = saveJob; $("bPjNew").onclick = newJob; refreshJobs();
   $("m-wall").onclick = () => setMode("wall"); $("m-pile").onclick = () => setMode("pile");
   let m = "wall"; try { m = sessionStorage.getItem(MKEY) || "wall"; } catch (e) {}
   setMode(m === "pile" ? "pile" : "wall");
