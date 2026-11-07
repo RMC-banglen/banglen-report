@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107061350";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107061350";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107061350";
+import { pilePoly, esc } from "./draw2d.js?v=20261107062451";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107062451";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107062451";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -70,7 +70,7 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   o += dimV(dx - 56, y0, y1, "") + T(dx - 62, cy + 4.5, c2(G.B), { size: 14, anchor: "end" });
   // ขนาดแนวนอนด้านล่าง
   const yd = y1 + 26;
-  (G.sq ? [[0, 35, "0.035"], [35, 70, "0.035"], [G.B - 35, G.B, "0.035"]] : [[0, G.dg, cm3(G.dg)], [G.dg, G.dg + G.tw, G.tw % 10 === 0 ? c2(G.tw) : cm3(G.tw)], [G.dg + G.tw, G.B, cm3(G.dg)]]).forEach(([a, b, t], i) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, G.sq && i === 1 ? yd - 6 : yd + 16, t, { size: 13 }); }); // เสาสี่เหลี่ยม: ตัวเลขช่วงที่ 2 อยู่เหนือเส้น ไม่ชนช่วงแรกและเส้นขนาดรวม
+  (G.sq ? [[0, 35, "0.035"], [35, 70, "0.035"], [G.B - 35, G.B, "0.035"]] : [[0, G.dg, cm3(G.dg)], [G.dg, G.dg + G.tw, G.B === 220 ? c2(G.tw) : cm3(G.tw)], [G.dg + G.tw, G.B, cm3(G.dg)]]).forEach(([a, b, t], i) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, G.sq && i === 1 ? yd - 6 : yd + 16, t, { size: 13 }); }); // เสาสี่เหลี่ยม: ตัวเลขช่วงที่ 2 อยู่เหนือเส้น ไม่ชนช่วงแรกและเส้นขนาดรวม
   o += dimH(x0, x1, yd + 24, "") + T(cx, yd + 40, c2(G.B), { size: 14 });
   o += T(cx - 34, yd + 62, "SECTION", { size: 16 }) + T(cx + 50, yd + 62, `${letter}-${letter}`, { size: 16 }) + L(cx - 76, yd + 67, cx + 84, yd + 67, 0.9);
   // ป้ายชี้: เส้นใต้ตัวหนังสือยาวไปทางขวา เส้นชี้เฉียงลงที่ลวด หัวลูกศรทึบ
