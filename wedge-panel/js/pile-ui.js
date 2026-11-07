@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107073757";
-import { pileSheet } from "./pile-draw.js?v=20261107073757";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107073757";
-import { download } from "./pdf.js?v=20261107073757";
-import { esc } from "./draw2d.js?v=20261107073757";
-import { getSession, canEdit } from "./auth.js?v=20261107073757";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107073757";
-import { db } from "./db.js?v=20261107073757";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107073757";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074127";
+import { pileSheet } from "./pile-draw.js?v=20261107074127";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107074127";
+import { download } from "./pdf.js?v=20261107074127";
+import { esc } from "./draw2d.js?v=20261107074127";
+import { getSession, canEdit } from "./auth.js?v=20261107074127";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074127";
+import { db } from "./db.js?v=20261107074127";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107074127";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -319,7 +319,7 @@ async function pdfAll() {
       await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     }
     const pj = (ok[0].project.pj || "คำขอ").slice(0, 30);
-    download(("แบบเสาเข็ม+blow " + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));
+    download(((curCode ? curCode + " " : "") + "แบบเสาเข็ม+blow " + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว " + ok.length + " ต้น";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
   b.disabled = false;
@@ -334,7 +334,7 @@ async function pdf() {
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
     await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), true);
     if (inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
-    const name = `แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
+    const name = `${curCode ? curCode + " " : ""}แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
     download(name + ".pdf", doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
