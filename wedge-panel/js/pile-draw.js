@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107012843";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107012843";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107012843";
+import { pilePoly, esc } from "./draw2d.js?v=20261107013550";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107013550";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107013550";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -73,7 +73,11 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   if (simple) legend.push([null, "PC.WIRE ดูตาราง"]);
   else if (pcSame) legend.push([null, "PC.WIRE เหมือน A-A"]);
   else { if (lay.n4) legend.push([symW4, `${lay.n4}-PC.WIRE 4mm.`]); if (lay.n5) legend.push([symW5, `${lay.n5}-PC.WIRE 5mm.`]); }
-  ex.forEach((e) => { const len = e.len || (plan.pieces[0] && plan.pieces[0].len); legend.push([symDB, `${e.n}-DB${e.d}x${len ? m2(len) : "L"}m.`]); });
+  ex.forEach((e) => {
+    // ความยาวเหล็ก: ระบุเอง = ตามนั้น • เต็มท่อน = ความยาวของท่อนที่ใช้เหล็กนี้ ถ้าหลายท่อนยาวไม่เท่ากัน = "เต็มท่อน" (ดูความยาวในภาพด้านข้าง)
+    const ls = [...new Set(plan.pieces.filter((p) => p.extras && p.extras.includes(e) && p.len && (!p.cfg || p.cfg === letter)).map((p) => p.len))];
+    legend.push([symDB, e.len ? `${e.n}-DB${e.d}x${m2(e.len)}m.` : `${e.n}-DB${e.d}x${ls.map(m2).join("/")}m.`]);
+  });
   legend.forEach(([sym, t], i) => { const yy = sy1(i); if (sym) o += sym(yy); o += T(lx + (sym ? 28 : 0), yy, t, { size: 15, anchor: "start" }); });
   // ปลอก: เส้นนอนชี้เข้าที่เส้นปลอกด้านข้างเอว
   const xCD = x1 + 36;

@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107012843";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107013550";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -97,7 +97,8 @@ export function planPile(input) {
   const lenTxt = full ? "1.00-20.00" : m2(L);
   let jt = joint ? (input.pieces > 1 && !full ? `${pieces.length} ท่อนต่อเชื่อม ${pieces.map((p) => r2(p.len)).join("+")}` : "มีหัวต่อ") : "ไม่มีหัวต่อเชื่อม";
   if (full) jt = "มีหัวต่อ";
-  const xt = extras.map((e) => `${e.n}-DB${e.d}x${e.len ? m2(e.len) : (full ? "L" : m2(pieces[0].len))}m.`).join(" ");
+  const xl = (e) => { if (e.len) return `x${m2(e.len)}m.`; if (full) return "xLm."; const ls = [...new Set(pieces.filter((p) => p.extras.includes(e)).map((p) => p.len))]; return `x${ls.map(m2).join("/")}m.`; };
+  const xt = extras.map((e) => `${e.n}-DB${e.d}${xl(e)}`).join(" ");
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
   const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5) : null;
   return { sec, full, joint, pieces, extras, kinds, configs, layout, shoulder, rows, warn, title, L, project: input.project || {} };
