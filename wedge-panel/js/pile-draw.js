@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107024129";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107024129";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107024129";
+import { pilePoly, esc } from "./draw2d.js?v=20261107024609";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107024609";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107024609";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -101,16 +101,12 @@ function wiresDetail(cx, cy, s, lay = wireLayout(4, 2)) {
   lay.w4.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(3.5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
   lay.w5.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(2.2 * s)}" fill="${INK}"/>`; });
   const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-HBv), x1 = X(HBv), y0 = Y(-HBv), y1 = Y(HBv), ft = 8;
-  const per = lay.per, cnt = Math.ceil(per / 2);
-  const dimS = (xa, xb, yd, yRef, txt = "0.035") => L(xa, yRef, xa, yd + (yd < yRef ? -5 : 5), 0.6) + L(xb, yRef, xb, yd + (yd < yRef ? -5 : 5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, yd - 5, txt, { size: ft });
-  // ระยะ 0.035 ต่อเนื่อง: แถวบนวัดจากขอบขวา แถวล่างวัดจากขอบซ้าย (จุดละ 3.5 ซม. ตามแบบ)
-  if (cnt > 1) { // ลวดหลายเส้น: รวมระยะ 0.035 ต่อเนื่องเป็นเส้นเดียว (n@0.035)
-    o += dimS(X(HBv), X(HBv - 35 * cnt), y0 - 26, Y(-W35), `${cnt}@0.035`);
-    o += dimS(X(-HBv), X(-HBv + 35 * cnt), y1 + 32, Y(W35), `${cnt}@0.035`);
-  } else for (let i = 0; i < cnt; i++) {
-    o += dimS(X(HBv - 35 * i), X(HBv - 35 * (i + 1)), y0 - 26, Y(-W35));
-    o += dimS(X(-HBv + 35 * i), X(-HBv + 35 * (i + 1)), y1 + 32, Y(W35));
-  }
+  const per = lay.per, nl = Math.floor(per / 2), nr = Math.ceil(per / 2); // แถวบน: ซ้าย nl เส้น (วัดจากขอบซ้าย) ขวา nr เส้น (วัดจากขอบขวา) • แถวล่างสลับข้าง
+  const dimS = (xa, xb, yd, yRef, lift = 0, below = false) => L(xa, yRef, xa, yd + (below ? 5 : -5), 0.6) + L(xb, yRef, xb, yd + (below ? 5 : -5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, below ? yd + 11 + lift : yd - 5 - lift, "0.035", { size: ft - 1 });
+  // ใส่ระยะ 0.035 ทุกช่วงตามตำแหน่งลวดจริง (สลับความสูงตัวเลขไม่ให้ชนกัน)
+  const chain = (x0c, dir, n, yd, yRef, below) => { let o2 = ""; for (let i = 0; i < n; i++) o2 += dimS(X(x0c + dir * 35 * i), X(x0c + dir * 35 * (i + 1)), yd, yRef, (i % 2) * 9, below); return o2; };
+  o += chain(-HBv, 1, nl, y0 - 26, Y(-W35), false) + chain(HBv, -1, nr, y0 - 26, Y(-W35), false);
+  o += chain(-HBv, 1, nr, y1 + 26, Y(W35), true) + chain(HBv, -1, nl, y1 + 26, Y(W35), true);
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });
   o += vd(x1 + 28, y0, Y(-W35), x1);
   o += `<g>${dimV(x0 - 28, Y(W35), y1, "")}${L(x0, Y(W35), x0 - 33, Y(W35), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(W35) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
@@ -503,7 +499,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
     g += cfgs.map((cf, i) => sectionA(plan, i ? 610 : 190, cyA, sa, simple || cf.simple || !cf.layout, cf.extras, cf.letter, i > 0 && cf.wires === cfgs[0].wires, cf.layout || wireLayout(4, 2))).join("");
   } else {
     const c0 = cfgs[0], lay = c0.layout || wireLayout(4, 2);
-    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + (PILE22.sq ? "" : wiresDetail(colBx, cyA, sa, lay)); // เสา I: DETAIL OF PC.WIRES • เสาสี่เหลี่ยม: ไม่มีแบบขยาย (ผู้ใช้สั่ง)
+    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + (PILE22.sq ? "" : wiresDetail(colBx, lay.std ? cyA : cyA + 22, lay.std ? sa : sa * 1.3, lay)); // ลวดหลายเส้น: ขยายแบบขยายลวดให้ตัวเลขระยะไม่ชนกัน // เสา I: DETAIL OF PC.WIRES • เสาสี่เหลี่ยม: ไม่มีแบบขยาย (ผู้ใช้สั่ง)
   }
   g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - HB() * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;
