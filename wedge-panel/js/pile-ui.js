@@ -1,9 +1,9 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107020448";
-import { pileSheet } from "./pile-draw.js?v=20261107020448";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107020448";
-import { download } from "./pdf.js?v=20261107020448";
-import { esc } from "./draw2d.js?v=20261107020448";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107020702";
+import { pileSheet } from "./pile-draw.js?v=20261107020702";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107020702";
+import { download } from "./pdf.js?v=20261107020702";
+import { esc } from "./draw2d.js?v=20261107020702";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -95,7 +95,7 @@ function restore() {
   try {
     const d = JSON.parse(localStorage.getItem(DKEY) || "null");
     if (!d) return;
-    $("psec").value = d.section in PILE_SECTIONS ? d.section : "T22";
+    $("psec").value = [...$("psec").options].some((o) => o.value === d.section) ? d.section : "T22";
     $("pL").value = d.L || "";
     $("ppj").value = (d.project && d.project.pj) || ""; $("pow").value = (d.project && d.project.ow) || ""; $("plo").value = (d.project && d.project.lo) || "";
     const r = d._raw || {};
@@ -143,7 +143,7 @@ document.addEventListener("wheel", (e) => { const t = e.target; if (t && t.tagNa
 
 export function initPile() {
   if (started) return; started = true;
-  $("psec").innerHTML = Object.values(PILE_SECTIONS).map((s) => `<option value="${s.key}">${s.menu || s.label} มอก. (${s.size} ม.)</option>`).join("");
+  $("psec").innerHTML = Object.values(PILE_SECTIONS).filter((s) => !s.draft || /[?&]draft/.test(location.search)).map((s) => `<option value="${s.key}">${s.menu || s.label} มอก. (${s.size} ม.)</option>`).join("");
   restore(); renderExtras();
   ["pL", "pshAt", "ppj", "pow", "plo"].forEach((id) => $(id).addEventListener("input", sched));
   $("pL").addEventListener("input", renderExtras); // ความยาวท่อนเปลี่ยน → ตัวเลือกท่อนของเหล็กเสริมอัปเดต

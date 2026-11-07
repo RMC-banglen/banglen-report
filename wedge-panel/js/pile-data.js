@@ -25,6 +25,7 @@ export const PILE_SECTIONS = {
   },
   T18: {
     key: "T18",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "I-18",
     size: "0.18x0.18",
     std: "TIS 396-2549",
@@ -41,6 +42,7 @@ export const PILE_SECTIONS = {
   },
   T26: {
     key: "T26",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "I-26",
     size: "0.26x0.26",
     std: "TIS 396-2549",
@@ -59,6 +61,7 @@ export const PILE_SECTIONS = {
   },
   T30: {
     key: "T30",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "I-30",
     size: "0.30x0.30",
     std: "TIS 396-2549",
@@ -77,6 +80,7 @@ export const PILE_SECTIONS = {
   },
   T35: {
     key: "T35",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "I-35",
     size: "0.35x0.35",
     std: "TIS 396-2549",
@@ -94,6 +98,7 @@ export const PILE_SECTIONS = {
   },
   S18: {
     key: "S18",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "[ ]",
     menu: "สี่เหลี่ยม 0.18",
     size: "0.18x0.18",
@@ -112,6 +117,7 @@ export const PILE_SECTIONS = {
   },
   S22: {
     key: "S22",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "[ ]",
     menu: "สี่เหลี่ยม 0.22",
     size: "0.22x0.22",
@@ -133,6 +139,7 @@ export const PILE_SECTIONS = {
   },
   S26: {
     key: "S26",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "[ ]",
     menu: "สี่เหลี่ยม 0.26",
     size: "0.26x0.26",
@@ -153,6 +160,7 @@ export const PILE_SECTIONS = {
   },
   S30: {
     key: "S30",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "[ ]",
     menu: "สี่เหลี่ยม 0.30",
     size: "0.30x0.30",
@@ -173,6 +181,7 @@ export const PILE_SECTIONS = {
   },
   S35: {
     key: "S35",
+    draft: true, // ทำตัวอย่างให้ผู้ใช้ดูก่อน ยังไม่เปิดในเมนูเว็บ (เปิดดูได้ด้วย ?draft=1)
     label: "[ ]",
     menu: "สี่เหลี่ยม 0.35",
     size: "0.35x0.35",
