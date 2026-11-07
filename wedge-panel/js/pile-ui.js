@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107084550";
-import { pileSheet } from "./pile-draw.js?v=20261107084550";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107084550";
-import { download } from "./pdf.js?v=20261107084550";
-import { esc } from "./draw2d.js?v=20261107084550";
-import { getSession, canEdit } from "./auth.js?v=20261107084550";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107084550";
-import { db } from "./db.js?v=20261107084550";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107084550";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107084645";
+import { pileSheet } from "./pile-draw.js?v=20261107084645";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107084645";
+import { download } from "./pdf.js?v=20261107084645";
+import { esc } from "./draw2d.js?v=20261107084645";
+import { getSession, canEdit } from "./auth.js?v=20261107084645";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107084645";
+import { db } from "./db.js?v=20261107084645";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107084645";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -300,7 +300,10 @@ async function deleteJob() {
 function resetJob() {
   queue = []; active = null; curJobId = null; curCode = null;
   $("preq").value = ""; $("preqList").innerHTML = ""; $("preqMsg").textContent = "";
-  ["ppj", "pow", "plo"].forEach((id) => { $(id).value = ""; });
+  ["ppj", "pow", "plo", "pL", "pW", "pQa", "pH", "pshAt"].forEach((id) => { $(id).value = ""; });
+  $("psh").checked = false; $("pnS").value = "1"; splits = []; extras = [];
+  const pt = document.querySelector('input[name="pt"][value="len"]'); if (pt) pt.checked = true;
+  $("plRows").dataset.n = ""; renderExtras(); // ล้างทุกช่อง เริ่มงานใหม่ต้องว่างทั้งหมด
   try { history.replaceState(null, "", "#view3d"); } catch (e) {}
   render(); lastSaved = jobSnap(); saveDraftJob();
 }
