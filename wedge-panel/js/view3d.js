@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261107024609";
-import { f2, f3, fmt } from "./calc.js?v=20261107024609";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261107024609";
+import { SHOULDER } from "./standards.js?v=20261107034650";
+import { f2, f3, fmt } from "./calc.js?v=20261107034650";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261107034650";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -65,7 +65,9 @@ ex(b,angU(50),0,L,AGL);ex(b,rect(64,114,Tt-10,Tt),0,L,SLT);const sp=[];for(let p
 return{zl,sp,g:b}}
 function wedge(G,ty,TD,fx,cd,z0,H,bot){const g=new THREE.Group();g.position.set(fx*KK,0,z0*KK);if(cd>0)g.scale.x=-1;G.add(g);ex(g,RAIL[ty],0,H,0x888780);boxU(TD).forEach(p=>ex(g,p,0,H,RHSC));if(ty==="A")ex(g,rect(TD,TD+50,100,110),0,H,FBC);ex(g,rect(TD,TD+50,0,100),0,6,CAP);ex(g,rect(TD,TD+50,0,100),H-6,6,CAP);if(bot)ex(g,angU(TD+50),0,H,AGL);return g}
 function post(g,cx,zf,dir,Tt){const za=dir>0?zf+9:zf-59,zw=dir>0?zf+9:zf-14;bx(g,cx-70,zw,140,5,0,Tt,PSTC);bx(g,cx-70,za,5,50,0,Tt,PSTC);bx(g,cx+65,za,5,50,0,Tt,PSTC)}
+let DIVCH=false; // เหล็กรางน้ำ 2 นิ้ว (ตั้งใน build)
 function divider(G,ty,TC,xL,z0,H,Tt){const HD=TC/2,cx=xL+HD;const a=new THREE.Group();a.position.set(xL*KK,0,z0*KK);G.add(a);ex(a,RAIL[ty],0,H,0x888780);const b=new THREE.Group();b.position.set((xL+TC)*KK,0,z0*KK);b.scale.x=-1;G.add(b);ex(b,RAIL[ty],0,H,0x888780);
+if(DIVCH){const w=25,t=3,ch=[[cx-w,0],[cx+w,0],[cx+w,Tt],[cx+w-t,Tt],[cx+w-t,t],[cx-w+t,t],[cx-w+t,Tt],[cx-w,Tt]];ex(G,ch,z0,H,0xB4B2A9);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return 0}
 const nr=Math.max(2,Math.ceil((H-9)/500)+1),rib=RIB[ty](HD).map(p=>[p[0]+cx,p[1]]);for(let i=0;i<nr;i++)ex(G,rib,z0+i*(H-9)/(nr-1),9,0xEF9F27);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return nr}
 function bolt(g,x,zf,dir,top,Tt){const z=zf-dir*SU;cyl(g,10,8,x,top+4,z,BRC,6);cyl(g,6,top-Tt+20,x,(top+Tt-20)/2,z,0xB4B2A9);bx(g,x-20,dir>0?zf-80:zf+50,40,30,Tt-16,Tt-10,BRC);cyl(g,10,8,x,Tt-20,z,BRC,6)}
 function joint(G,cx,wA,zf,dir,sp,Tt){const PY=Tt+22,zA0=dir>0?zf+15:zf-105;bx(G,cx-wA/2,zA0,wA,90,Tt,Tt+10,PAC);[28,64].forEach(o=>{const zc=zf+dir*o;bx(G,cx-22,zc-10,44,20,Tt+10,PY,PAC);cylZ(G,18,20,cx,PY,zc,PAC)});
@@ -89,7 +91,7 @@ $("tC").onclick=()=>{showC=!showC;concs.forEach(m=>m.visible=showC);$("tC").text
 $("selT").onchange=build;$("tR").onchange=build}
 function build(){init();const st=getState(),it=st.list.find(i=>i.code===$("selT").value)||st.list[0];sc.remove(g3);g3.traverse(o=>{if(o.geometry)o.geometry.dispose()});g3=new THREE.Group();sc.add(g3);concs=[];
 if(!it){$("tInfo").textContent="ยังไม่มีรายการแผ่น";upd();return}
-const G=st.G,ty=st.p.ty,Tt=G.T,TD=G.TD,TC=G.TC,WB=TD+50,CE=WB+5,TL=6096,TW=1524,LF=6000,TDV=60,H=it.H,W=it.WT-2*G.TP,multi=$("tR").checked;
+DIVCH=st.G.div==="ch";const G=st.G,ty=st.p.ty,Tt=G.T,TD=G.TD,TC=G.TC,WB=TD+50,CE=WB+5,TL=6096,TW=1524,LF=6000,TDV=60,H=it.H,W=it.WT-2*G.TP,multi=$("tR").checked;
 const x0L=CE-WB,xeMax=x0L+LF-WB;let R=1;if(multi){while(CS+(R+1)*H+R*TDV+MG<=TW)R++}const sideW=CS+R*H+(R-1)*TDV;const n=Math.floor((xeMax-CE+TC)/(W+TC));
 bx(g3,0,0,TL,TW,-9,0,0x5F5E5A);hX(g3,0,TL,0,1);hX(g3,0,TL,TW,-1);hZ(g3,0,TW,0,1);hZ(g3,0,TW,TL,-1);
 if(sideW+MG>TW||n<1){$("tInfo").textContent="แผ่นนี้วางบนโต๊ะ 5×20 ฟุตไม่ได้";frame();return}

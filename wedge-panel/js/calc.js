@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261107024609";
+} from "./standards.js?v=20261107034650";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -162,6 +162,9 @@ export function panelCalc(G, WT, H, S) {
   return { W, WT, H, T, TP, vx, hy, am, ah, lv, lh, nv: nm, nh, kv, kh, kg: kv + kh, vol, wt: vol * CONCRETE_DENSITY, pipe, ties: nm * nh, x0, x1 };
 }
 
+// ตัวกั้นหัวคู่: std = แบบมาตรฐาน (TC) • ch = เหล็กรางน้ำ 2 นิ้ว (TCc ระยะสั้นลง ไม่มีแผ่นตัดพลาสม่า)
+export const divG = (G, div) => (div === "ch" ? { ...G, TC: G.TCc, div: "ch" } : G);
+
 // ---------- โต๊ะหล่อ ----------
 export function tableFit(G, W, H) {
   const WB = G.TD + 50, CE = WB + 5, x0 = CE - WB, xeMax = x0 + TABLE.LF - WB, span = xeMax - CE;
@@ -193,7 +196,7 @@ export function mkName(WT, H, T, S, P) {
 // in = { pile, allowance, spans:[{cc,n}], stack:[ความสูงแผ่น...], spec, truckKg }
 // คืน { p, G, g, S, groups, list, totQ, totW, totV, totS, trips, nSpan, nPile, wLen, al }
 export function calcProject(input) {
-  const p = PILES[input.pile], G = WG[p.ty];
+  const p = PILES[input.pile], G = divG(WG[p.ty], input.div);
   const g = input.allowance ?? DEFAULT_ALLOWANCE;
   const S = input.spec || standardSpec();
   const stk = input.stack || [];
@@ -279,7 +282,7 @@ function totals(items, truckKg, S) {
 // in = { pile, rows:[{WT (มม. กว้างรวมปลายลิ่มถึงปลายลิ่ม), H (มม. ต้องเป็นความสูงมาตรฐาน), qty}], spec, truckKg }
 // ไม่มีข้อมูลระยะเสา จึงตรวจการเสียบร่องด้วยค่าเผื่อมาตรฐาน 20 มม./ข้าง (กลาง/กลางเสา = กว้างรวม + เอว + 2×ค่าเผื่อ)
 export function calcDirect(input) {
-  const p = PILES[input.pile], G = WG[p.ty];
+  const p = PILES[input.pile], G = divG(WG[p.ty], input.div);
   const S = input.spec || standardSpec();
   const g = input.allowance ?? DEFAULT_ALLOWANCE;
   const al = [], items = new Map(), groups = new Map(), rowInfo = [];
