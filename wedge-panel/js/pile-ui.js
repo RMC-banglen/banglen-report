@@ -1,9 +1,9 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107015403";
-import { pileSheet } from "./pile-draw.js?v=20261107015403";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107015403";
-import { download } from "./pdf.js?v=20261107015403";
-import { esc } from "./draw2d.js?v=20261107015403";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107020448";
+import { pileSheet } from "./pile-draw.js?v=20261107020448";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107020448";
+import { download } from "./pdf.js?v=20261107020448";
+import { esc } from "./draw2d.js?v=20261107020448";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -60,7 +60,7 @@ function renderExtras() {
 function syncUi() {
   const full = radio("pt") === "full", two = pnVal() === 2;
   $("pLbox").hidden = full; $("pnBox").hidden = full; $("plSplit").hidden = full || pnVal() < 2; renderSplitRows(); $("pjHint").textContent = full ? "" : (pnVal() >= 2 ? "เสา 2 ท่อนขึ้นไป มีหัวต่อเชื่อม (แผ่นเหล็กและเหล็กเดือย) ทุกรอยต่อ" : "ท่อนเดี่ยว ไม่มีหัวต่อเชื่อม");
-  const sc = PILE_SECTIONS[$("psec").value], noSh = !(sc && sc.shoulder); if (noSh) $("psh").checked = false; $("pshBox").hidden = full || noSh; // บ่ามีเฉพาะหน้าตัดที่มีแบบบ่า $("pxBox").hidden = full; $("pshAtBox").hidden = !$("psh").checked || full || noSh;
+  const sc = PILE_SECTIONS[$("psec").value], noSh = !(sc && sc.shoulder); if (noSh) $("psh").checked = false; $("pshBox").hidden = full || noSh; // บ่ามีเฉพาะหน้าตัดที่มีแบบบ่า $("pxBox").hidden = full || (sc && sc.extras === false); $("pshAtBox").hidden = !$("psh").checked || full || noSh;
   const L = num("pL");
   
 }
@@ -121,7 +121,7 @@ async function pdf() {
     host.remove();
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
     doc.addImage(cv.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 841.89, 595.28);
-    const name = `แบบเสาเข็ม ${PILE_SECTIONS[inp.section].label} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
+    const name = `แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
     download(name + ".pdf", doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
@@ -143,7 +143,7 @@ document.addEventListener("wheel", (e) => { const t = e.target; if (t && t.tagNa
 
 export function initPile() {
   if (started) return; started = true;
-  $("psec").innerHTML = Object.values(PILE_SECTIONS).map((s) => `<option value="${s.key}">${s.label} มอก. (${s.size} ม.)</option>`).join("");
+  $("psec").innerHTML = Object.values(PILE_SECTIONS).map((s) => `<option value="${s.key}">${s.menu || s.label} มอก. (${s.size} ม.)</option>`).join("");
   restore(); renderExtras();
   ["pL", "pshAt", "ppj", "pow", "plo"].forEach((id) => $(id).addEventListener("input", sched));
   $("pL").addEventListener("input", renderExtras); // ความยาวท่อนเปลี่ยน → ตัวเลือกท่อนของเหล็กเสริมอัปเดต

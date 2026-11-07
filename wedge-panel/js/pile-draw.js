@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107015403";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107015403";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107015403";
+import { pilePoly, esc } from "./draw2d.js?v=20261107020448";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107020448";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107020448";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -19,7 +19,10 @@ const dimV = (x, y1, y2, txt, o = {}) => L(x, y1, x, y2, 0.9) + L(x - 5, y1, x +
 const leader = (x1, y1, x2, y2, txt, o = {}) => L(x1, y1, x2, y2, 0.9) + tri(x1, y1, (Math.atan2(y1 - y2, x1 - x2) * 180) / Math.PI + 180, 5) + (txt ? L(x2, y2, x2 + (o.dir === "l" ? -(o.len || 110) : o.len || 110), y2, 0.9) + T(x2 + (o.dir === "l" ? -(o.len || 110) / 2 : (o.len || 110) / 2), y2 - 3, txt, { size: o.size || 10.5 }) : "");
 
 // หน้าตัดไอ: จุดจาก pilePoly (มม. ศูนย์กลางที่ 0,0) → พิกัดหน้าจอ
-const secPts = (p, cx, cy, s) => pilePoly(p).map(([x, y]) => `${f1(cx + x * s)},${f1(cy + y * s)}`).join(" ");
+// หน้าตัดสี่เหลี่ยมมุมตัด (sq): แปดเหลี่ยม ตัดมุม ch มม.
+const sqPoly = (p) => { const h = p.B / 2, c = p.ch || 30; return [[-h + c, -h], [h - c, -h], [h, -h + c], [h, h - c], [h - c, h], [-h + c, h], [-h, h - c], [-h, -h + c]]; };
+const polyOf = (p) => (p.sq ? sqPoly(p) : pilePoly(p));
+const secPts = (p, cx, cy, s) => polyOf(p).map(([x, y]) => `${f1(cx + x * s)},${f1(cy + y * s)}`).join(" ");
 let PILE22 = { B: 220, f: 65, c: 50, dg: 70, tw: 80 }; // หน้าตัดปัจจุบัน (ตั้งค่าใน pileSheet จาก plan.sec.geo)
 const HB = () => PILE22.B / 2;
 const cm3 = (v) => (v / 1000).toFixed(3), c2 = (v) => (v / 1000).toFixed(2); // 0.065 / 0.08
@@ -36,7 +39,7 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   let o = `<polygon points="${secPts(PILE22, cx, cy, s)}" fill="none" stroke="${INK}" stroke-width="1.3"/>`;
   // ปลอกเกลียวอยู่ล้อมนอกลวด PC และเหล็ก DB (ห่างผิวคอนกรีต ~25 มม. ที่ปีก ~20 มม. ที่เอว)
   const G = PILE22, hb = G.B / 2, rO = hb - 25, rM = hb - G.f + 13, rW = Math.max(8, G.tw / 2 - 20), rC = G.c / 2 + 15;
-  const ring = [[-rO, -rO], [rO, -rO], [rO, -rM], [rW, -rC], [rW, rC], [rO, rM], [rO, rO], [-rO, rO], [-rO, rM], [-rW, rC], [-rW, -rC], [-rO, -rM]];
+  const sqr = hb - 30, ring = G.sq ? [[-sqr, -sqr], [sqr, -sqr], [sqr, sqr], [-sqr, sqr]] : [[-rO, -rO], [rO, -rO], [rO, -rM], [rW, -rC], [rW, rC], [rO, rM], [rO, rO], [-rO, rO], [-rO, rM], [-rW, rC], [-rW, -rC], [-rO, -rM]];
   o += `<polygon points="${ring.map(([x, y]) => P(x, y)).join(" ")}" fill="none" stroke="${INK}" stroke-width="0.8"/>`;
   const star = (x, y, r) => [0, 60, 120].map((a) => { const t = (a * Math.PI) / 180; return L(X(x) - Math.cos(t) * r, Y(y) - Math.sin(t) * r, X(x) + Math.cos(t) * r, Y(y) + Math.sin(t) * r, 1); }).join("");
   const circ = (x, y, r, fill) => `<circle cx="${f1(X(x))}" cy="${f1(Y(y))}" r="${f1(r * s)}" fill="${fill || "#fff"}" stroke="${INK}" stroke-width="0.9"/>`;
@@ -48,12 +51,12 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   });
   const x0 = X(-hb), x1 = X(hb), y0 = Y(-hb), y1 = Y(hb);
   // ขนาดแนวตั้งด้านซ้าย: 0.065 0.020 0.050 0.020 0.065 และ 0.22
-  const sl = (G.B - 2 * G.f - G.c) / 2, dv = [[0, G.f], [G.f, G.f + sl], [G.f + sl, G.f + sl + G.c], [G.f + sl + G.c, G.B - G.f], [G.B - G.f, G.B]], dx = x0 - 26, lab = [cm3(G.f), cm3(sl), cm3(G.c), cm3(sl), cm3(G.f)];
+  const sl = G.sq ? 0 : (G.B - 2 * G.f - G.c) / 2, dv = G.sq ? [[0, 35], [G.B - 35, G.B]] : [[0, G.f], [G.f, G.f + sl], [G.f + sl, G.f + sl + G.c], [G.f + sl + G.c, G.B - G.f], [G.B - G.f, G.B]], dx = x0 - 26, lab = G.sq ? ["0.035", "0.035"] : [cm3(G.f), cm3(sl), cm3(G.c), cm3(sl), cm3(G.f)];
   dv.forEach(([a, b], i) => { o += dimV(dx, y0 + a * s, y0 + b * s, ""); o += T(dx - 6, y0 + ((a + b) / 2) * s + 4.5, lab[i], { size: 13, anchor: "end" }); });
   o += dimV(dx - 56, y0, y1, "") + T(dx - 62, cy + 4.5, c2(G.B), { size: 14, anchor: "end" });
   // ขนาดแนวนอนด้านล่าง
   const yd = y1 + 26;
-  [[0, G.dg, cm3(G.dg)], [G.dg, G.dg + G.tw, G.tw % 10 === 0 ? c2(G.tw) : cm3(G.tw)], [G.dg + G.tw, G.B, cm3(G.dg)]].forEach(([a, b, t]) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, yd + 16, t, { size: 13 }); });
+  (G.sq ? [[0, 35, "0.035"], [G.B - 35, G.B, "0.035"]] : [[0, G.dg, cm3(G.dg)], [G.dg, G.dg + G.tw, G.tw % 10 === 0 ? c2(G.tw) : cm3(G.tw)], [G.dg + G.tw, G.B, cm3(G.dg)]]).forEach(([a, b, t]) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, yd + 16, t, { size: 13 }); });
   o += dimH(x0, x1, yd + 24, "") + T(cx, yd + 40, c2(G.B), { size: 14 });
   o += T(cx - 34, yd + 62, "SECTION", { size: 16 }) + T(cx + 50, yd + 62, `${letter}-${letter}`, { size: 16 }) + L(cx - 76, yd + 67, cx + 84, yd + 67, 0.9);
   // ป้ายชี้: เส้นใต้ตัวหนังสือยาวไปทางขวา เส้นชี้เฉียงลงที่ลวด หัวลูกศรทึบ
@@ -85,7 +88,8 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   // ปลอก: เส้นนอนชี้เข้าที่เส้นปลอกด้านข้างเอว
   const xCD = x1 + 36;
   const spr = plan.sec.spiral, wTxt = spr.wire.toFixed(1), stpf = (v) => String(Math.round(v * 10000) / 10000);
-  o += L(X(G.tw / 2 - 22) + 4, cy, xCD + 150, cy, 0.9) + tri(X(G.tw / 2 - 22), cy, 180, 5) + T(xCD, cy + 17, `CDØ${wTxt}mm.@${stpf(spr.midStep).padEnd(4, "0")}m.`, { size: 15, anchor: "start" }); // ปลายลูกศรชี้กลางเอว (กึ่งกลางความสูงเสา) เส้นอยู่ต่ำกว่าตัวหนังสือเล็กน้อย
+  const xTip = G.sq ? hb - 30 : G.tw / 2 - 22;
+  o += L(X(xTip) + 4, cy, xCD + 150, cy, 0.9) + tri(X(xTip), cy, 180, 5) + T(xCD, cy + 17, `CDØ${wTxt}mm.@${stpf(spr.midStep).padEnd(4, "0")}m.`, { size: 15, anchor: "start" }); // ปลายลูกศรชี้กลางเอว (กึ่งกลางความสูงเสา) เส้นอยู่ต่ำกว่าตัวหนังสือเล็กน้อย
   return o;
 }
 
@@ -135,7 +139,7 @@ function wiresDetailStd(cx, cy, s) {
 
 function stirrupDetail(cx, cy, s) {
   const sd = PILE22.B - 70, k = sd / PILE22.B; // ปลอก = หน้าตัดเล็กลง 70 มม. (I-22 = 0.150)
-  let o = `<polygon points="${pilePoly(PILE22).map(([x, y]) => `${f1(cx + x * k * s)},${f1(cy + y * k * s)}`).join(" ")}" fill="none" stroke="${INK}" stroke-width="1.3"/>`;
+  let o = `<polygon points="${(PILE22.sq ? [[-PILE22.B / 2 + 35, -PILE22.B / 2 + 35], [PILE22.B / 2 - 35, -PILE22.B / 2 + 35], [PILE22.B / 2 - 35, PILE22.B / 2 - 35], [-PILE22.B / 2 + 35, PILE22.B / 2 - 35]].map(([x, y]) => [x / k, y / k]) : pilePoly(PILE22)).map(([x, y]) => `${f1(cx + x * k * s)},${f1(cy + y * k * s)}`).join(" ")}" fill="none" stroke="${INK}" stroke-width="1.3"/>`;
   const x1 = cx + (sd / 2) * s, y0 = cy - (sd / 2) * s, y1 = cy + (sd / 2) * s;
   o += dimV(x1 + 22, y0, y1, "", {}) + T(x1 + 26, cy + 4, cm3(sd), { size: 10, anchor: "start" });
   o += dimH(cx - 7.5 * s, cx + 7.5 * s, y1 + 14, "", {}) + T(cx, y1 + 28, "0.015", { size: 9.5 });
@@ -157,6 +161,16 @@ function liftingPoints(x0, y0, w) {
 const TAN60 = Math.tan((60 * Math.PI) / 180);
 const tw = (txt, size = 14) => txt.length * size * 0.47 + 18; // ความยาวเส้นใต้ตัวหนังสือให้พอดีข้อความ
 function dowelPts(dowel) {
+  if (PILE22.sq) { // เสาสี่เหลี่ยม: เหล็กเดือยวางตามมุม/กึ่งกลางด้าน/กลางแผ่น ตามจำนวน (4 มุม • 5 +กลาง • 6 +กลางบนล่าง • 7 +กลาง • 8 รอบ • 9 +กลาง)
+    const n = dowel ? dowel.n : 4, a = PILE22.B / 2 - (PILE22.dIn || 55), pts = [[-a, -a], [a, -a], [-a, a], [a, a]];
+    if (n === 5) pts.push([0, 0]);
+    if (n >= 6) pts.push([0, -a], [0, a]);
+    if (n === 7) pts.push([0, 0]);
+    if (n >= 8) pts.push([-a, 0], [a, 0]);
+    if (n >= 9) pts.push([0, 0]);
+    const top = pts.filter((p) => p[1] < 0), bot = pts.filter((p) => p[1] >= 0);
+    return { top, bot, nTop: top.length, nBot: bot.length };
+  }
   const top = dowel ? Math.ceil(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), xs = (k) => Array.from({ length: k }, (_, i) => (i - (k - 1) / 2) * pitch), ry = hb - 45;
   return { top: xs(top).map((x) => [x, -ry]), bot: xs(bot).map((x) => [x, ry]), nTop: top, nBot: bot };
 }
@@ -489,7 +503,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
     g += cfgs.map((cf, i) => sectionA(plan, i ? 610 : 190, cyA, sa, simple || cf.simple || !cf.layout, cf.extras, cf.letter, i > 0 && cf.wires === cfgs[0].wires, cf.layout || wireLayout(4, 2))).join("");
   } else {
     const c0 = cfgs[0], lay = c0.layout || wireLayout(4, 2);
-    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + wiresDetail(colBx, cyA, sa, lay); // ไม่มีดีเทลปลอก (DETAIL OF STIRRUP)
+    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + (PILE22.sq ? stirrupDetail(colBx, cyA, sa) : wiresDetail(colBx, cyA, sa, lay)); // เสา I: DETAIL OF PC.WIRES • เสาสี่เหลี่ยม: DETAIL OF STIRRUP
   }
   g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - HB() * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;

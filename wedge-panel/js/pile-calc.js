@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107015403";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107020448";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -12,7 +12,18 @@ export function ruleFor(sec, len) {
 // ตำแหน่งลวด PC ในหน้าตัดไอ (มม. จากศูนย์กลาง): แถวบน y=−75 แถวล่าง y=+75 (ห่างขอบ 35 มม.) ระยะลวดห่างกัน 35 มม. (ตามแบบ AutoCAD: 3.5 ซม. ต่อเนื่อง)
 // แถวบนนับจากขอบขวา แถวล่างนับจากขอบซ้าย: ลวดที่ 1, 2, 3 ห่างขอบ 3.5, 7.0, 10.5 ซม. และอีกฝั่งที่เหลือนับจากขอบตรงข้าม (10 เส้น = แถวละ 5: บน −75,−40,+5,+40,+75 ล่าง −75,−40,−5,+40,+75)
 // 4mm×4 + 5mm×2 = แบบมาตรฐาน (ลวด 4 มม. ที่มุม ลวด 5 มม. สลับบน/ล่าง) ซึ่งตรงกับกฎเดียวกัน
-export function wireLayout(w4, w5, B = 220) {
+// เสาสี่เหลี่ยม: ลวดรอบวงปลอก ห่างผิว 35 มม. — 4 มุมก่อน ที่เหลือแบ่งเท่าๆ กันตามด้านบน/ล่าง/ซ้าย/ขวา (ลวด 4 มม. ใช้ที่มุมก่อน) ตำแหน่งจริงในแบบไม่มีระบุ จึงเป็นการจัดเอง
+function sqLayout(w4, w5, B) {
+  const N = w4 + w5, yw = B / 2 - 35, e = Math.max(0, N - 4), cnt = [0, 0, 0, 0]; // บน ล่าง ซ้าย ขวา
+  for (let i = 0; i < e; i++) cnt[i % 4]++;
+  const along = (m) => Array.from({ length: m }, (_, i) => -yw + ((i + 1) * 2 * yw) / (m + 1));
+  const pts = [[-yw, -yw], [yw, yw], [yw, -yw], [-yw, yw]]; // มุม: ซ้ายบน ขวาล่าง ขวาบน ซ้ายล่าง (กระจายแนวทแยง)
+  along(cnt[0]).forEach((x) => pts.push([x, -yw])); along(cnt[1]).forEach((x) => pts.push([x, yw]));
+  along(cnt[2]).forEach((y) => pts.push([-yw, y])); along(cnt[3]).forEach((y) => pts.push([yw, y]));
+  return { w4: pts.slice(0, w4), w5: pts.slice(w4, w4 + w5), n4: w4, n5: w5, std: false, per: 0 };
+}
+export function wireLayout(w4, w5, B = 220, sq = false) {
+  if (sq) return sqLayout(w4, w5, B);
   const hb = B / 2, yw = hb - 35; // แถวลวดห่างผิว 35 มม. (3.5 ซม.)
   if (w4 === 4 && w5 === 2) return { w4: [[-yw, -yw], [yw, -yw], [-yw, yw], [yw, yw]], w5: [[-hb + 70, -yw], [hb - 70, yw]], n4: 4, n5: 2, std: true };
   if (w4 === 2 && w5 === 2) return { w4: [[-yw, -yw], [yw, yw]], w5: [[yw, -yw], [-yw, yw]], n4: 2, n5: 2, std: false, per: 2 }; // I-18: ลวด 4 มม. กับ 5 มม. อย่างละ 1 เส้นต่อแถว (สลับแนวทแยง — ยังไม่ยืนยันจากแบบ)
@@ -63,7 +74,7 @@ export function planPile(input) {
   }
   const shortIdx = pieces.reduce((bi, p, i) => (p.len < pieces[bi].len ? i : bi), 0) + 1; // ไม่ได้เลือกท่อน = ท่อนสั้นที่สุดก่อน (เท่ากัน = ท่อนบน)
   // เหล็กเสริมพิเศษ: ความยาวว่าง = ยาวเท่าท่อน
-  const extras = (full ? [] : input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), pieces: +e.pieces < 0 ? "all" : +e.pieces > 0 ? Math.floor(+e.pieces) : (input.pieces > 1 ? shortIdx : "all"), len: +e.len > 0 ? r2(+e.len) : null }));
+  const extras = (full || sec.extras === false ? [] : input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), pieces: +e.pieces < 0 ? "all" : +e.pieces > 0 ? Math.floor(+e.pieces) : (input.pieces > 1 ? shortIdx : "all"), len: +e.len > 0 ? r2(+e.len) : null }));
   extras.forEach((e) => { if (e.n % 2) warn.push(`เหล็กเสริม DB${e.d} ${e.n} เส้น เป็นเลขคี่ จัดวางบน/ล่างไม่เท่ากัน`); });
   // เหล็กเสริมแต่ละรายการใช้กับ "ทุกท่อน" หรือท่อนที่ระบุ (นับจากท่อนบน = 1)
   extras.forEach((e) => { if (e.pieces !== "all" && e.pieces > pieces.length) warn.push(`เหล็กเสริม DB${e.d} ระบุท่อนที่ ${e.pieces} แต่มีแค่ ${pieces.length} ท่อน`); });
@@ -76,7 +87,7 @@ export function planPile(input) {
   const grp = (keyFn) => { const m = new Map(); pieces.forEach((p, i) => { const k = keyFn(p); if (!m.has(k)) m.set(k, { key: k, idx: [], first: p }); m.get(k).idx.push(i); }); return [...m.values()].sort((a, b) => (a.first.extras.length > 0) - (b.first.extras.length > 0)); };
   let cfgs = full ? [] : grp((p) => wk(p) + "#" + ek(p)), manyCfg = false;
   if (cfgs.length > 2) { cfgs = grp((p) => (p.extras.length ? ek(p) : "")); manyCfg = true; if (cfgs.length > 2) cfgs = [cfgs[0], { key: "rest", idx: cfgs.slice(1).flatMap((g) => g.idx), first: cfgs[1].first }]; }
-  const configs = cfgs.map((g, i) => ({ letter: "AB"[i], idx: g.idx, wires: wk(g.first), extras: g.first.extras, rule: g.first.rule || null, layout: g.first.rule ? wireLayout(g.first.rule.w4, g.first.rule.w5, sec.geo ? sec.geo.B : 220) : null, simple: manyCfg }));
+  const configs = cfgs.map((g, i) => ({ letter: "AB"[i], idx: g.idx, wires: wk(g.first), extras: g.first.extras, rule: g.first.rule || null, layout: g.first.rule ? wireLayout(g.first.rule.w4, g.first.rule.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq)) : null, simple: manyCfg }));
   configs.forEach((cf) => cf.idx.forEach((i) => { pieces[i].cfg = cf.letter; }));
   const kinds = { A: true, B: configs.length > 1 };
   // บ่า: อ้างระยะจากหัวเสา (ท่อนบน)
@@ -102,6 +113,6 @@ export function planPile(input) {
   const xl = (e) => { if (e.len) return `x${m2(e.len)}m.`; if (full) return "xLm."; const ls = [...new Set(pieces.filter((p) => p.extras.includes(e)).map((p) => p.len))]; return `x${ls.map(m2).join("/")}m.`; };
   const xt = extras.map((e) => `${e.n}-DB${e.d}${xl(e)}`).join(" ");
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
-  const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5, sec.geo ? sec.geo.B : 220) : null;
+  const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq)) : null;
   return { sec, full, joint, pieces, extras, kinds, configs, layout, shoulder, rows, warn, title, L, project: input.project || {} };
 }
