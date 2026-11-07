@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107083652";
-import { pileSheet } from "./pile-draw.js?v=20261107083652";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107083652";
-import { download } from "./pdf.js?v=20261107083652";
-import { esc } from "./draw2d.js?v=20261107083652";
-import { getSession, canEdit } from "./auth.js?v=20261107083652";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107083652";
-import { db } from "./db.js?v=20261107083652";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107083652";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107084550";
+import { pileSheet } from "./pile-draw.js?v=20261107084550";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107084550";
+import { download } from "./pdf.js?v=20261107084550";
+import { esc } from "./draw2d.js?v=20261107084550";
+import { getSession, canEdit } from "./auth.js?v=20261107084550";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107084550";
+import { db } from "./db.js?v=20261107084550";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107084550";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -355,7 +355,7 @@ function setMode(m) {
   $("wallWrap").hidden = pile; $("pileWrap").hidden = !pile;
   $("m-wall").setAttribute("aria-selected", pile ? "false" : "true");
   $("m-pile").setAttribute("aria-selected", pile ? "true" : "false");
-  $("appTitle").textContent = pile ? "เขียนแบบเสาเข็มไอ" : "ออกแบบแผ่นกันดินหัวลิ่ม";
+  $("appTitle").textContent = pile ? "เขียนแบบเสาเข็ม" : "ออกแบบแผ่นกันดินหัวลิ่ม";
   try { sessionStorage.setItem(MKEY, m); } catch (e) {}
   if (pile) render();
 }
