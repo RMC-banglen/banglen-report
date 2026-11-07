@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107055857";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107055857";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107055857";
+import { pilePoly, esc } from "./draw2d.js?v=20261107060006";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107060006";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107060006";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -223,7 +223,7 @@ export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
     pts.forEach(([sx, px, py]) => { r += L(sx, yL, px, py, 0.8) + tri(px, py, (Math.atan2(py - yL, px - sx) * 180) / Math.PI, 7); });
     return r;
   };
-  const lab = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง"); // แบบเต็ม: เหล็กเดือยขึ้นกับความยาว ให้ดูตาราง
+  const lab = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตาราง"); // แบบเต็ม: เหล็กเดือยขึ้นกับความยาว ให้ดูตาราง
   if (compact) { (noLab ? [] : [[yT, P.nTop], [yB, P.nBot]]).forEach(([yy2, k]) => { o += T(x0 + len + 8, yy2 + 5, lab(k), { size: 14, anchor: "start" }); }); return o + T(x - 20, y + h + 28, "WELDING PLATE SID VIEW", { size: 14, anchor: "start" }) + L(x - 28, y + h + 32, x + 190, y + h + 32, 0.9); }
   o += row(yT - 26, lab(P.nTop), [[x0 + len * 0.3, yT]]);
   o += L(x + pw / 2, y + h / 2, x0 + 14, y + h / 2, 0.9) + tri(x + pw / 2, y + h / 2, 180, 7) + T(x0 + 20, y + h / 2 - 4, "PLATE 9mm.", { size: 14, anchor: "start" }) + L(x0 + 14, y + h / 2, x0 + 20 + tw("PLATE 9mm."), y + h / 2, 0.9);
