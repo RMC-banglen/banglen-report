@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107055224";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107055224";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107055224";
+import { pilePoly, esc } from "./draw2d.js?v=20261107055501";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107055501";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107055501";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -493,13 +493,17 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
     const e = elevation(plan, pc, y, { first: i === 0, idx: i });
     g += e.svg; y += e.h - 4;
   });
+  // โหมด "ดูตาราง" (แบบเต็ม/หลายชุดลวด): ไม่วาดจุดลวดในหน้าตัด (ตามแบบ DXF: SEE TABLE) แสดงเฉพาะเส้นบอกระยะตำแหน่งลวดของแถวที่มีลวดมากที่สุดที่ไม่ใช่แบบ 4/2
+  const gG = plan.sec.geo || {}, rk = [...plan.sec.rules].filter((r) => !(r.w4 === 4 && r.w5 === 2)).sort((p, q) => q.w4 + q.w5 - (p.w4 + p.w5))[0] || plan.sec.rules[0];
+  const layDim = { ...wireLayout(rk.w4, rk.w5, gG.B || 220, !!gG.sq, gG.wl, gG.two ? "two" : gG.pat), w4: [], w5: [], std: false };
   // ---- แถว 2: หน้าตัด A / B (+ จุดยกสำหรับแบบเดี่ยว) ----
   const sa = (two ? 0.5 : 0.62) * (220 / PILE22.B), topE = HB() * sa + (two ? 20 : 48), botE = HB() * sa + 98, cyA = y + topE;
   if (two) {
-    g += cfgs.map((cf, i) => sectionA(plan, i ? 610 : 190, cyA, sa, simple || cf.simple || !cf.layout, cf.extras, cf.letter, i > 0 && cf.wires === cfgs[0].wires, cf.layout || wireLayout(4, 2))).join("");
+    g += cfgs.map((cf, i) => sectionA(plan, i ? 610 : 190, cyA, sa, simple || cf.simple || !cf.layout, cf.extras, cf.letter, i > 0 && cf.wires === cfgs[0].wires, (simple || cf.simple || !cf.layout) ? layDim : cf.layout)).join("");
   } else {
     const c0 = cfgs[0], lay = c0.layout || wireLayout(4, 2);
-    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + (PILE22.sq ? "" : wiresDetail(colBx, lay.std ? cyA : cyA + 22, lay.std ? sa : sa * 1.3, lay)); // ลวดหลายเส้น: ขยายแบบขยายลวดให้ตัวเลขระยะไม่ชนกัน // เสา I: DETAIL OF PC.WIRES • เสาสี่เหลี่ยม: ไม่มีแบบขยาย (ผู้ใช้สั่ง)
+    const lay2 = simple || c0.simple ? layDim : lay;
+    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay2) + (PILE22.sq ? "" : wiresDetail(colBx, lay2.std ? cyA : cyA + 22, lay2.std ? sa : sa * 1.3, lay2)); // ลวดหลายเส้น: ขยายแบบขยายลวดให้ตัวเลขระยะไม่ชนกัน // เสา I: DETAIL OF PC.WIRES • เสาสี่เหลี่ยม: ไม่มีแบบขยาย (ผู้ใช้สั่ง)
   }
   g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - HB() * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;
