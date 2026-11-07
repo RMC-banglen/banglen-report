@@ -1,6 +1,6 @@
 // Supabase: ใช้ตาราง worktrack_users ของเว็บเดิม (ล็อกอิน) และ wedge_panel_projects (โครงการ)
 // โครงการเก็บเป็นข้อมูลฟอร์ม JSON เท่านั้น ไม่เก็บผลคำนวณ ไม่เก็บ PDF
-import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=20261107074331";
+import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=20261107074440";
 
 let client = null;
 export function db() {
@@ -74,7 +74,7 @@ export async function nextPileCode(d = new Date()) {
 export async function savePileJob({ id, job, user }) {
   const row = {
     id: id || "pile-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-    name: job.code + " " + (job.project.ow || job.project.pj || ""), // ใช้ชื่อเจ้าของค้นหางาน
+    name: job.code + " " + (job.label || job.project.ow || job.project.pj || ""), // ใช้ชื่อเจ้าของค้นหางาน
     customer: String(job.project.ow || "").trim() || null,
     data: { kind: "pile", ...job },
     updated_at: new Date().toISOString(),

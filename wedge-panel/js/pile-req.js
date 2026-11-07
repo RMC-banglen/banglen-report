@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107074331";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107074331";
-import { esc } from "./draw2d.js?v=20261107074331";
+import { autoSplit } from "./pile-calc.js?v=20261107074440";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107074440";
+import { esc } from "./draw2d.js?v=20261107074440";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -143,3 +143,12 @@ ${r && S <= 0 ? `<p style="color:#c00000;font-weight:700;margin-top:14px">หม
 }
 
 export { autoSplit };
+
+// ชื่อสั้นสำหรับค้นหา/ตั้งชื่อไฟล์: "ชนิดงาน + เจ้าของ" เช่น "บ้านพักอาศัย คุณ สุปราณี จีนประดับ"
+export function shortProject(pj) {
+  let t = String(pj || "").replace(/\s+/g, " ").trim();
+  t = t.replace(/^(งาน)?(ก่อสร้าง|โครงการ|ต่อเติม)\s*/, "");
+  t = t.split(/\s+(?=ค\.ส\.ล|คสล|พร้อม|จำนวน|\d)/)[0].replace(/\s*\d.*$/, "").trim();
+  return t.length > 36 ? t.slice(0, 36).trim() : t;
+}
+export const jobLabel = (p) => [shortProject(p && p.pj), p && p.ow].filter(Boolean).join(" ").trim();
