@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261106095217";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261106095217";
-import { m2, wireLayout } from "./pile-calc.js?v=20261106095217";
+import { pilePoly, esc } from "./draw2d.js?v=20261107011435";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107011435";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107011435";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -458,7 +458,7 @@ function titleBlock(plan, logoHref) {
 
 export function pileSheet(plan, logoHref = "assets/logo.png") {
   if (!plan.sec) return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"></svg>`;
-  const np = plan.pieces.length, simple = plan.full || plan.pieces.length === 0 || !plan.layout, lay = plan.layout || wireLayout(4, 2); // ลวดตามตาราง: ตามความยาวท่อนแรก
+  const np = plan.pieces.length, wireDiff = plan.pieces.some((p) => !p.rule || !plan.pieces[0].rule || p.rule.w4 !== plan.pieces[0].rule.w4 || p.rule.w5 !== plan.pieces[0].rule.w5), simple = plan.full || plan.pieces.length === 0 || !plan.layout || wireDiff, lay = plan.layout || wireLayout(4, 2); // ท่อนที่ลวดต่างกัน (เช่น 12+13 ม.) → หน้าตัดไม่ระบุลวด ให้ดูตาราง
   const kinds = plan.kinds || { A: true, B: false }, two = kinds.A && kinds.B, hasX = plan.extras.length > 0;
   const colBx = 640;
   let g = "", y = 0; // y = ตำแหน่งแนวตั้งของเนื้อหา (หน่วยก่อนย่อ)
