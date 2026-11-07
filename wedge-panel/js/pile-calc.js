@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107021027";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107022201";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -27,11 +27,15 @@ export function wireLayout(w4, w5, B = 220, sq = false) {
   const hb = B / 2, yw = hb - 35; // แถวลวดห่างผิว 35 มม. (3.5 ซม.)
   if (w4 === 4 && w5 === 2) return { w4: [[-yw, -yw], [yw, -yw], [-yw, yw], [yw, yw]], w5: [[-hb + 70, -yw], [hb - 70, yw]], n4: 4, n5: 2, std: true };
   if (w4 === 2 && w5 === 2) return { w4: [[-yw, -yw], [yw, yw]], w5: [[yw, -yw], [-yw, yw]], n4: 2, n5: 2, std: false, per: 2 }; // I-18: ลวด 4 มม. กับ 5 มม. อย่างละ 1 เส้นต่อแถว (สลับแนวทแยง — ยังไม่ยืนยันจากแบบ)
-  const k = Math.max(1, Math.round(Math.max(w4, w5) / 2)), nl = Math.floor(k / 2), nr = Math.ceil(k / 2);
+  const k = Math.max(1, Math.round((w4 + w5) / 2)), nl = Math.floor(k / 2), nr = Math.ceil(k / 2); // ตำแหน่งต่อแถว (บน/ล่าง)
   const top = [...Array(nl)].map((_, i) => -hb + 35 * (i + 1)).concat([...Array(nr)].map((_, j) => hb - 35 * (j + 1))).sort((p, q) => p - q);
   const bot = top.map((x) => -x).sort((p, q) => p - q);
-  const mk = (n) => (n > 0 ? top.map((x) => [x, -yw]).concat(bot.map((x) => [x, yw])) : []);
-  return { w4: mk(w4), w5: mk(w5), n4: w4, n5: w5, std: false, per: k };
+  const all = top.map((x) => [x, -yw]).concat(bot.map((x) => [x, yw]));
+  if (w4 > 0 && w5 > 0) { // ลวดสองขนาด: 4 มม. อยู่ที่มุม/ริมนอกสุดก่อน ที่เหลือเป็น 5 มม. (ตำแหน่งจริงในแบบไม่ระบุ — จัดเอง)
+    const ord = all.map((p, i) => [p, i]).sort((p, q) => Math.abs(q[0][0]) - Math.abs(p[0][0]) || p[0][1] - q[0][1] || p[1] - q[1]).map((t) => t[0]);
+    return { w4: ord.slice(0, w4), w5: ord.slice(w4), n4: w4, n5: w5, std: false, per: k };
+  }
+  return { w4: w4 ? all : [], w5: w5 ? all : [], n4: w4, n5: w5, std: false, per: k };
 }
 
 // แบ่งเป็น n ท่อนอัตโนมัติ: เมตรเต็มเท่ากัน เศษไปเพิ่มท่อนท้าย (17 ม. 2 ท่อน → 8+9, 19 → 9+10, 28 ม. 3 ท่อน → 9+9+10)
