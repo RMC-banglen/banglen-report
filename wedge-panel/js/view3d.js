@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261107035820";
-import { f2, f3, fmt } from "./calc.js?v=20261107035820";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261107035820";
+import { SHOULDER } from "./standards.js?v=20261107040551";
+import { f2, f3, fmt } from "./calc.js?v=20261107040551";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261107040551";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -72,7 +72,8 @@ const SP=250,w=25,d=25,t=5,nc=Math.max(2,Math.ceil((H-d)/SP)+1);for(let i=0;i<nc
 const nr=Math.max(2,Math.ceil((H-9)/500)+1),rib=RIB[ty](HD).map(p=>[p[0]+cx,p[1]]);for(let i=0;i<nr;i++)ex(G,rib,z0+i*(H-9)/(nr-1),9,0xEF9F27);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return nr}
 function bolt(g,x,zf,dir,top,Tt){const z=zf-dir*SU;cyl(g,10,8,x,top+4,z,BRC,6);cyl(g,6,top-Tt+20,x,(top+Tt-20)/2,z,0xB4B2A9);bx(g,x-20,dir>0?zf-80:zf+50,40,30,Tt-16,Tt-10,BRC);cyl(g,10,8,x,Tt-20,z,BRC,6)}
 function joint(G,cx,wA,zf,dir,sp,Tt){const PY=Tt+22,zA0=dir>0?zf+15:zf-105;bx(G,cx-wA/2,zA0,wA,90,Tt,Tt+10,PAC);[28,64].forEach(o=>{const zc=zf+dir*o;bx(G,cx-22,zc-10,44,20,Tt+10,PY,PAC);cylZ(G,18,20,cx,PY,zc,PAC)});
-const zB0=dir>0?zf-120:zf+10;bx(G,cx-105,zB0,210,110,Tt,Tt+10,PBC);bx(G,cx-22,zf-12,44,24,Tt+10,PY,PBC);cylZ(G,18,24,cx,PY,zf,PBC);
+const zB0=dir>0?zf-120:zf-12;bx(G,cx-105,zB0,210,132,Tt,Tt+10,PBC); // เพลทม่วงยาวคลุมถึงใต้บูช (บูชวางบนเพลท ไม่ลอยเลยขอบ)
+bx(G,cx-22,zf-12,44,24,Tt+10,PY,PBC);cylZ(G,18,24,cx,PY,zf,PBC);
 const ok=HOLES.map(o=>cx+o).filter(h=>!sp.some(s=>Math.abs(h-s)<BLK)),use=ok.length>=2?[ok[0],ok[ok.length-1]]:ok;use.forEach(x=>bolt(G,x,zf,dir,Tt+10,Tt));
 cylZ(G,10,100,cx,PY,zf+dir*25,RED);cylX(G,10,45,cx-22,PY,zf-dir*25,RED)}
 function magnet(G,zf,xc,Tt){const mc=zf+MU;bx(G,xc-160,mc-60,320,120,0,60,0x444441);cyl(G,31.5,35,xc,77,mc,0xD3D1C7);cyl(G,10,4,xc,96,mc,RED);
