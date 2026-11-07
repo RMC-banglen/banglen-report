@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107042535";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107042535";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107042535";
+import { pilePoly, esc } from "./draw2d.js?v=20261107054818";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107054818";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107054818";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -101,7 +101,7 @@ function wiresDetail(cx, cy, s, lay = wireLayout(4, 2)) {
   lay.w4.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(3.5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
   lay.w5.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(2.2 * s)}" fill="${INK}"/>`; });
   const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-HBv), x1 = X(HBv), y0 = Y(-HBv), y1 = Y(HBv), ft = 8;
-  const per = lay.per, nl = Math.floor(per / 2), nr = Math.ceil(per / 2); // แถวบน: ซ้าย nl เส้น (วัดจากขอบซ้าย) ขวา nr เส้น (วัดจากขอบขวา) • แถวล่างสลับข้าง
+  const per = lay.per, nl = lay.br ?? Math.floor(per / 2), nr = lay.bl ?? Math.ceil(per / 2); // แถวบน: ซ้าย nl เส้น (วัดจากขอบซ้าย) ขวา nr เส้น (วัดจากขอบขวา) • แถวล่างสลับข้าง
   const dimS = (xa, xb, yd, yRef, lift = 0, below = false) => L(xa, yRef, xa, yd + (below ? 5 : -5), 0.6) + L(xb, yRef, xb, yd + (below ? 5 : -5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, below ? yd + 11 + lift : yd - 5 - lift, "0.035", { size: ft - 1 });
   // ใส่ระยะ 0.035 ทุกช่วงตามตำแหน่งลวดจริง (สลับความสูงตัวเลขไม่ให้ชนกัน)
   const chain = (x0c, dir, n, yd, yRef, below) => { let o2 = ""; for (let i = 0; i < n; i++) o2 += dimS(X(x0c + dir * 35 * i), X(x0c + dir * 35 * (i + 1)), yd, yRef, (i % 2) * 9, below); return o2; };
