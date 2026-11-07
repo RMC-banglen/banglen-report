@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107012315";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107012315";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107012315";
+import { pilePoly, esc } from "./draw2d.js?v=20261107012344";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107012344";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107012344";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -41,7 +41,7 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   lay.w5.forEach(([x, y]) => { o += star(x, y, 4.5 * s); });
   ex.forEach((e) => {
     const top = Math.ceil(e.n / 2), bot = e.n - top;
-    dbRow(top, -69).concat(dbRow(bot, 69)).forEach(([x, y]) => { o += circ(x, y, e.d / 2, "#fff"); });
+    dbRow(top, -69).concat(dbRow(bot, 69)).forEach(([x, y]) => { o += circ(x, y, e.d / 2, INK); }); // เหล็กเสริม DB ทึบดำ ตรงกับสัญลักษณ์ ● ในคำอธิบาย
   });
   const x0 = X(-110), x1 = X(110), y0 = Y(-110), y1 = Y(110);
   // ขนาดแนวตั้งด้านซ้าย: 0.065 0.020 0.050 0.020 0.065 และ 0.22
