@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107063450";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107063450";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107063450";
+import { pilePoly, esc } from "./draw2d.js?v=20261107063806";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107063806";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107063806";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -170,6 +170,7 @@ function liftingPoints(x0, y0, w) {
 
 // แผ่นเหล็กหัวต่อ (มองหน้าแผ่น): โครงหน้าตัดไอ + เหล็กเดือย DB ครึ่งบน/ครึ่งล่าง (ห่างขอบ ~45 มม. ห่างกัน 70 มม.) ป้ายชี้เอียง 60° ขนานกัน
 const TAN60 = Math.tan((60 * Math.PI) / 180);
+const capLine = (x, y, txt, size = 14) => T(x, y, txt, { size, anchor: "start" }) + L(x - 8, y + 4, x + txt.length * size * 0.6 + 6, y + 4, 0.9); // ชื่อภาพ + เส้นใต้ยาวเต็มตัวหนังสือเสมอ
 const tw = (txt, size = 14) => txt.length * size * 0.47 + 18; // ความยาวเส้นใต้ตัวหนังสือให้พอดีข้อความ
 function dowelPts(dowel) {
   if (PILE22.sq) { // เสาสี่เหลี่ยม: เหล็กเดือยวางตามมุม/กึ่งกลางด้าน/กลางแผ่น ตามจำนวน (4 มุม • 5 +กลาง • 6 +กลางบนล่าง • 7 +กลาง • 8 รอบ • 9 +กลาง)
@@ -200,7 +201,7 @@ export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
       [`<rect x="${lx}" y="${y0l + 36 - 8}" width="16" height="7" fill="#fff" stroke="${INK}" stroke-width="1.2"/>`, "PLATE 9mm."],
     ];
     rows.forEach(([sym, t], i) => { o += sym + T(lx + 26, y0l + i * 20, t, { size: 14, anchor: "start" }); });
-    o += T(cx - 40 * s, cy + HB() * s + 28, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""), { size: 14, anchor: "start" }) + L(cx - HB() * s, cy + HB() * s + 32, cx + 90 * s, cy + HB() * s + 32, 0.9);
+    o += capLine(cx - 40 * s, cy + HB() * s + 28, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""));
     return o;
   }
   // ป้ายเส้นใต้ตัวหนัง: เรียงบนลงล่าง RING PLATE → 2DB (บน) → PLATE → 2DB (ล่าง)
@@ -215,7 +216,7 @@ export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
   o += row(yTopEdge - 22, lbl(P.nTop), P.top.map(([x, y]) => [cx + x * s, cy + y * s - 2]));
   o += L(cx + 20 * s, cy, tx - 4, cy, 0.9) + tri(cx + 20 * s, cy, 180, 7) + T(tx, cy - 4, "PLATE 9mm.", { size: 14, anchor: "start" }) + L(tx - 4, cy, tx + tw("PLATE 9mm."), cy, 0.9);
   o += row(yBotEdge + 24, lbl(P.nBot), P.bot.map(([x, y]) => [cx + x * s, cy + y * s + 2]));
-  o += T(cx - 60 * s, yBotEdge + 58, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""), { size: 14, anchor: "start" }) + L(cx - HB() * s, yBotEdge + 62, cx + 90 * s, yBotEdge + 62, 0.9);
+  o += capLine(cx - 60 * s, yBotEdge + 58, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""));
   return o;
 }
 
@@ -239,12 +240,12 @@ export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
     return r;
   };
   const lab = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตาราง"); // แบบเต็ม: เหล็กเดือยขึ้นกับความยาว ให้ดูตาราง
-  if (compact) { (noLab ? [] : [[yT, P.nTop], [yB, P.nBot]]).forEach(([yy2, k]) => { o += T(x0 + len + 8, yy2 + 5, lab(k), { size: 14, anchor: "start" }); }); return o + T(x - 20, y + h + 28, "WELDING PLATE SID VIEW", { size: 14, anchor: "start" }) + L(x - 28, y + h + 32, x + 190, y + h + 32, 0.9); }
+  if (compact) { (noLab ? [] : [[yT, P.nTop], [yB, P.nBot]]).forEach(([yy2, k]) => { o += T(x0 + len + 8, yy2 + 5, lab(k), { size: 14, anchor: "start" }); }); return o + capLine(x - 20, y + h + 28, "WELDING PLATE SID VIEW"); }
   o += row(yT - 26, lab(P.nTop), [[x0 + len * 0.3, yT]]);
   o += L(x + pw / 2, y + h / 2, x0 + 14, y + h / 2, 0.9) + tri(x + pw / 2, y + h / 2, 180, 7) + T(x0 + 20, y + h / 2 - 4, "PLATE 9mm.", { size: 14, anchor: "start" }) + L(x0 + 14, y + h / 2, x0 + 20 + tw("PLATE 9mm."), y + h / 2, 0.9);
   o += row(yB + 28, lab(P.nBot), [[x0 + len * 0.3, yB]]);
   o += row(y + h + 46, "COLLAR 3x50mm.", [[x + pw + cd * 0.6, y + h - 1]]);
-  o += T(x - 20, y + h + 80, "WELDING PLATE SID VIEW", { size: 14, anchor: "start" }) + L(x - 28, y + h + 84, x + 190, y + h + 84, 0.9);
+  o += capLine(x - 20, y + h + 80, "WELDING PLATE SID VIEW");
   return o;
 }
 
