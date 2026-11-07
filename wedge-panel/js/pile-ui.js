@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074158";
-import { pileSheet } from "./pile-draw.js?v=20261107074158";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107074158";
-import { download } from "./pdf.js?v=20261107074158";
-import { esc } from "./draw2d.js?v=20261107074158";
-import { getSession, canEdit } from "./auth.js?v=20261107074158";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074158";
-import { db } from "./db.js?v=20261107074158";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107074158";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074319";
+import { pileSheet } from "./pile-draw.js?v=20261107074319";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107074319";
+import { download } from "./pdf.js?v=20261107074319";
+import { esc } from "./draw2d.js?v=20261107074319";
+import { getSession, canEdit } from "./auth.js?v=20261107074319";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074319";
+import { db } from "./db.js?v=20261107074319";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107074319";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -319,7 +319,7 @@ async function pdfAll() {
       await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     }
     const pj = (ok[0].project.ow || ok[0].project.pj || "คำขอ").slice(0, 30);
-    download(((curCode ? curCode + " " : "") + "แบบเสาเข็ม+blow " + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));
+    download(((curCode ? curCode + " " : "") + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว " + ok.length + " ต้น";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
   b.disabled = false;
