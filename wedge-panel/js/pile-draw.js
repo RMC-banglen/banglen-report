@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107013550";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107013550";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107013550";
+import { pilePoly, esc } from "./draw2d.js?v=20261107015403";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107015403";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107015403";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -20,12 +20,14 @@ const leader = (x1, y1, x2, y2, txt, o = {}) => L(x1, y1, x2, y2, 0.9) + tri(x1,
 
 // หน้าตัดไอ: จุดจาก pilePoly (มม. ศูนย์กลางที่ 0,0) → พิกัดหน้าจอ
 const secPts = (p, cx, cy, s) => pilePoly(p).map(([x, y]) => `${f1(cx + x * s)},${f1(cy + y * s)}`).join(" ");
-const PILE22 = { B: 220, f: 65, c: 50, dg: 70, tw: 80 };
+let PILE22 = { B: 220, f: 65, c: 50, dg: 70, tw: 80 }; // หน้าตัดปัจจุบัน (ตั้งค่าใน pileSheet จาก plan.sec.geo)
+const HB = () => PILE22.B / 2;
+const cm3 = (v) => (v / 1000).toFixed(3), c2 = (v) => (v / 1000).toFixed(2); // 0.065 / 0.08
 
 // ตำแหน่งลวด PC (มม. จากศูนย์กลาง): ลวด 4 มม. มุม ๆ และลวด 5 มม. ตรงข้ามกัน (ตามแบบ I-22)
 const WIRE4 = [[-75, -75], [75, -75], [-75, 75], [75, 75]];
 const WIRE5 = [[-40, -75], [40, 75]];
-const dbRow = (k, y) => (k === 1 ? [[0, y]] : k === 2 ? [[-63, y], [63, y]] : k === 3 ? [[-63, y], [0, y], [63, y]] : [[-63, y], [-22, y], [22, y], [63, y]].slice(0, Math.min(4, k)));
+const dbRow = (k, y) => { const q = PILE22.B / 220; return (k === 1 ? [[0, y]] : k === 2 ? [[-63 * q, y], [63 * q, y]] : k === 3 ? [[-63 * q, y], [0, y], [63 * q, y]] : [[-63 * q, y], [-22 * q, y], [22 * q, y], [63 * q, y]].slice(0, Math.min(4, k))); };
 const barRow = (k, y) => (k === 1 ? [[0, y]] : k === 2 ? [[-75, y], [75, y]] : k === 3 ? [[-75, y], [0, y], [75, y]] : [[-75, y], [-25, y], [25, y], [75, y]].slice(0, Math.min(4, k)));
 
 // หน้าตัด A-A ตามแบบ AutoCAD: ปลอกเกลียวด้านใน, ลวด 4 มม. (วงกลม) และ 5 มม. (ดอกจัน), ป้ายชี้แบบเส้นใต้ตัวหนังสือ + ลูกศรทึบ
@@ -33,7 +35,8 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   const X = (x) => cx + x * s, Y = (y) => cy + y * s, P = (x, y) => `${f1(X(x))},${f1(Y(y))}`;
   let o = `<polygon points="${secPts(PILE22, cx, cy, s)}" fill="none" stroke="${INK}" stroke-width="1.3"/>`;
   // ปลอกเกลียวอยู่ล้อมนอกลวด PC และเหล็ก DB (ห่างผิวคอนกรีต ~25 มม. ที่ปีก ~20 มม. ที่เอว)
-  const ring = [[-85, -85], [85, -85], [85, -58], [20, -40], [20, 40], [85, 58], [85, 85], [-85, 85], [-85, 58], [-20, 40], [-20, -40], [-85, -58]];
+  const G = PILE22, hb = G.B / 2, rO = hb - 25, rM = hb - G.f + 13, rW = Math.max(8, G.tw / 2 - 20), rC = G.c / 2 + 15;
+  const ring = [[-rO, -rO], [rO, -rO], [rO, -rM], [rW, -rC], [rW, rC], [rO, rM], [rO, rO], [-rO, rO], [-rO, rM], [-rW, rC], [-rW, -rC], [-rO, -rM]];
   o += `<polygon points="${ring.map(([x, y]) => P(x, y)).join(" ")}" fill="none" stroke="${INK}" stroke-width="0.8"/>`;
   const star = (x, y, r) => [0, 60, 120].map((a) => { const t = (a * Math.PI) / 180; return L(X(x) - Math.cos(t) * r, Y(y) - Math.sin(t) * r, X(x) + Math.cos(t) * r, Y(y) + Math.sin(t) * r, 1); }).join("");
   const circ = (x, y, r, fill) => `<circle cx="${f1(X(x))}" cy="${f1(Y(y))}" r="${f1(r * s)}" fill="${fill || "#fff"}" stroke="${INK}" stroke-width="0.9"/>`;
@@ -41,17 +44,17 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   lay.w5.forEach(([x, y]) => { o += star(x, y, 4.5 * s); });
   ex.forEach((e) => {
     const top = Math.ceil(e.n / 2), bot = e.n - top;
-    dbRow(top, -69).concat(dbRow(bot, 69)).forEach(([x, y]) => { o += circ(x, y, e.d / 2, INK); }); // เหล็กเสริม DB ทึบดำ ตรงกับสัญลักษณ์ ● ในคำอธิบาย
+    dbRow(top, -(hb - 41)).concat(dbRow(bot, hb - 41)).forEach(([x, y]) => { o += circ(x, y, e.d / 2, INK); }); // เหล็กเสริม DB ทึบดำ ตรงกับสัญลักษณ์ ● ในคำอธิบาย
   });
-  const x0 = X(-110), x1 = X(110), y0 = Y(-110), y1 = Y(110);
+  const x0 = X(-hb), x1 = X(hb), y0 = Y(-hb), y1 = Y(hb);
   // ขนาดแนวตั้งด้านซ้าย: 0.065 0.020 0.050 0.020 0.065 และ 0.22
-  const dv = [[0, 65], [65, 85], [85, 135], [135, 155], [155, 220]], dx = x0 - 26, lab = ["0.065", "0.020", "0.050", "0.020", "0.065"];
+  const sl = (G.B - 2 * G.f - G.c) / 2, dv = [[0, G.f], [G.f, G.f + sl], [G.f + sl, G.f + sl + G.c], [G.f + sl + G.c, G.B - G.f], [G.B - G.f, G.B]], dx = x0 - 26, lab = [cm3(G.f), cm3(sl), cm3(G.c), cm3(sl), cm3(G.f)];
   dv.forEach(([a, b], i) => { o += dimV(dx, y0 + a * s, y0 + b * s, ""); o += T(dx - 6, y0 + ((a + b) / 2) * s + 4.5, lab[i], { size: 13, anchor: "end" }); });
-  o += dimV(dx - 56, y0, y1, "") + T(dx - 62, cy + 4.5, "0.22", { size: 14, anchor: "end" });
+  o += dimV(dx - 56, y0, y1, "") + T(dx - 62, cy + 4.5, c2(G.B), { size: 14, anchor: "end" });
   // ขนาดแนวนอนด้านล่าง
   const yd = y1 + 26;
-  [[0, 70, "0.070"], [70, 150, "0.08"], [150, 220, "0.070"]].forEach(([a, b, t]) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, yd + 16, t, { size: 13 }); });
-  o += dimH(x0, x1, yd + 24, "") + T(cx, yd + 40, "0.22", { size: 14 });
+  [[0, G.dg, cm3(G.dg)], [G.dg, G.dg + G.tw, G.tw % 10 === 0 ? c2(G.tw) : cm3(G.tw)], [G.dg + G.tw, G.B, cm3(G.dg)]].forEach(([a, b, t]) => { o += dimH(x0 + a * s, x0 + b * s, yd, "") + T(x0 + ((a + b) / 2) * s, yd + 16, t, { size: 13 }); });
+  o += dimH(x0, x1, yd + 24, "") + T(cx, yd + 40, c2(G.B), { size: 14 });
   o += T(cx - 34, yd + 62, "SECTION", { size: 16 }) + T(cx + 50, yd + 62, `${letter}-${letter}`, { size: 16 }) + L(cx - 76, yd + 67, cx + 84, yd + 67, 0.9);
   // ป้ายชี้: เส้นใต้ตัวหนังสือยาวไปทางขวา เส้นชี้เฉียงลงที่ลวด หัวลูกศรทึบ
   const xT = x1 + 36, TL = 138;
@@ -81,54 +84,60 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   legend.forEach(([sym, t], i) => { const yy = sy1(i); if (sym) o += sym(yy); o += T(lx + (sym ? 28 : 0), yy, t, { size: 15, anchor: "start" }); });
   // ปลอก: เส้นนอนชี้เข้าที่เส้นปลอกด้านข้างเอว
   const xCD = x1 + 36;
-  o += L(X(18) + 4, cy, xCD + 150, cy, 0.9) + tri(X(18), cy, 180, 5) + T(xCD, cy + 17, "CDØ2.8mm.@0.17m.", { size: 15, anchor: "start" }); // ปลายลูกศรชี้กลางเอว (กึ่งกลางความสูงเสา) เส้นอยู่ต่ำกว่าตัวหนังสือเล็กน้อย
+  const spr = plan.sec.spiral, wTxt = spr.wire.toFixed(1), stpf = (v) => String(Math.round(v * 10000) / 10000);
+  o += L(X(G.tw / 2 - 22) + 4, cy, xCD + 150, cy, 0.9) + tri(X(G.tw / 2 - 22), cy, 180, 5) + T(xCD, cy + 17, `CDØ${wTxt}mm.@${stpf(spr.midStep).padEnd(4, "0")}m.`, { size: 15, anchor: "start" }); // ปลายลูกศรชี้กลางเอว (กึ่งกลางความสูงเสา) เส้นอยู่ต่ำกว่าตัวหนังสือเล็กน้อย
   return o;
 }
 
 // DETAIL OF PC.WIRES: ตำแหน่งลวดเทียบขอบเสา — แถวบน/ล่างวัดจากขอบด้านเดียวกันกับที่ลวดอยู่ ทุกช่วง 0.035 ม. (เส้นบอกระยะแยกอยู่นอกตัวเสา มีเส้นต่อจากลวดชัดเจน)
 function wiresDetail(cx, cy, s, lay = wireLayout(4, 2)) {
   if (lay.std) return wiresDetailStd(cx, cy, s);
+  const HBv = HB(), W35 = HBv - 35;
   let o = `<polygon points="${secPts(PILE22, cx, cy, s)}" fill="none" stroke="${INK}" stroke-width="1.3"/>`;
   lay.w4.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(3.5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
   lay.w5.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(2.2 * s)}" fill="${INK}"/>`; });
-  const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-110), x1 = X(110), y0 = Y(-110), y1 = Y(110), ft = 8;
+  const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-HBv), x1 = X(HBv), y0 = Y(-HBv), y1 = Y(HBv), ft = 8;
   const per = lay.per, cnt = Math.ceil(per / 2);
-  const dimS = (xa, xb, yd, yRef) => L(xa, yRef, xa, yd + (yd < yRef ? -5 : 5), 0.6) + L(xb, yRef, xb, yd + (yd < yRef ? -5 : 5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, yd - 5, "0.035", { size: ft });
+  const dimS = (xa, xb, yd, yRef, txt = "0.035") => L(xa, yRef, xa, yd + (yd < yRef ? -5 : 5), 0.6) + L(xb, yRef, xb, yd + (yd < yRef ? -5 : 5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, yd - 5, txt, { size: ft });
   // ระยะ 0.035 ต่อเนื่อง: แถวบนวัดจากขอบขวา แถวล่างวัดจากขอบซ้าย (จุดละ 3.5 ซม. ตามแบบ)
-  for (let i = 0; i < cnt; i++) {
-    o += dimS(X(110 - 35 * i), X(110 - 35 * (i + 1)), y0 - 26, Y(-75));
-    o += dimS(X(-110 + 35 * i), X(-110 + 35 * (i + 1)), y1 + 32, Y(75));
+  if (cnt > 1) { // ลวดหลายเส้น: รวมระยะ 0.035 ต่อเนื่องเป็นเส้นเดียว (n@0.035)
+    o += dimS(X(HBv), X(HBv - 35 * cnt), y0 - 26, Y(-W35), `${cnt}@0.035`);
+    o += dimS(X(-HBv), X(-HBv + 35 * cnt), y1 + 32, Y(W35), `${cnt}@0.035`);
+  } else for (let i = 0; i < cnt; i++) {
+    o += dimS(X(HBv - 35 * i), X(HBv - 35 * (i + 1)), y0 - 26, Y(-W35));
+    o += dimS(X(-HBv + 35 * i), X(-HBv + 35 * (i + 1)), y1 + 32, Y(W35));
   }
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });
-  o += vd(x1 + 28, y0, Y(-75), x1);
-  o += `<g>${dimV(x0 - 28, Y(75), y1, "")}${L(x0, Y(75), x0 - 33, Y(75), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(75) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
+  o += vd(x1 + 28, y0, Y(-W35), x1);
+  o += `<g>${dimV(x0 - 28, Y(W35), y1, "")}${L(x0, Y(W35), x0 - 33, Y(W35), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(W35) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
   o += T(cx, y1 + 62, "DETAIL OF PC.WIRES", { size: 12 }) + L(cx - 70, y1 + 66, cx + 70, y1 + 66, 0.9);
   return o;
 }
 
 function wiresDetailStd(cx, cy, s) {
+  const HBv = HB(), W35 = HBv - 35;
   let o = `<polygon points="${secPts(PILE22, cx, cy, s)}" fill="none" stroke="${INK}" stroke-width="1.3"/>`;
-  WIRE4.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(3.5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
-  WIRE5.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(2.2 * s)}" fill="${INK}"/>`; });
-  const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-110), x1 = X(110), y0 = Y(-110), y1 = Y(110), ft = 7.5; // ตัวเลขเล็กพอดีช่วง 0.035 ไม่ชนกัน
+  wireLayout(4, 2, PILE22.B).w4.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(3.5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
+  wireLayout(4, 2, PILE22.B).w5.forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(2.2 * s)}" fill="${INK}"/>`; });
+  const X = (mm) => cx + mm * s, Y = (mm) => cy + mm * s, x0 = X(-HBv), x1 = X(HBv), y0 = Y(-HBv), y1 = Y(HBv), ft = 7.5; // ตัวเลขเล็กพอดีช่วง 0.035 ไม่ชนกัน
   const seg = (xa, xb, yd, yWire, edgeY, lift = 0) => L(xa, edgeY, xa, yd + (yd < edgeY ? -5 : 5), 0.6) + L(xb, yWire, xb, yd + (yd < edgeY ? -5 : 5), 0.6) + dimH(xa, xb, yd, "", {}) + T((xa + xb) / 2, yd - 5 - lift, "0.035", { size: ft });
   // บน: ขอบซ้าย → ลวด 4 มม. → ลวด 5 มม. (35 + 35)
-  o += seg(x0, X(-75), y0 - 26, Y(-75), y0) + seg(X(-75), X(-40), y0 - 26, Y(-75), y0);
+  o += seg(x0, X(-W35), y0 - 26, Y(-W35), y0) + seg(X(-W35), X(-HBv + 70), y0 - 26, Y(-W35), y0);
   // ล่าง: ขอบขวา → ลวด 4 มม. → ลวด 5 มม.
-  o += seg(x1, X(75), y1 + 30, Y(75), y1).replace(/y="(S+)"/, (m) => m) + seg(X(75), X(40), y1 + 30, Y(75), y1);
+  o += seg(x1, X(W35), y1 + 30, Y(W35), y1).replace(/y="(S+)"/, (m) => m) + seg(X(W35), X(HBv - 70), y1 + 30, Y(W35), y1);
   // แนวตั้ง: ขอบบน → ลวดบน (ขวา) • ขอบล่าง → ลวดล่าง (ซ้าย)
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });
-  o += vd(x1 + 28, y0, Y(-75), x1);
-  o += `<g>${dimV(x0 - 28, Y(75), y1, "")}${L(x0, Y(75), x0 - 33, Y(75), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(75) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
+  o += vd(x1 + 28, y0, Y(-W35), x1);
+  o += `<g>${dimV(x0 - 28, Y(W35), y1, "")}${L(x0, Y(W35), x0 - 33, Y(W35), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(W35) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
   o += T(cx, y1 + 62, "DETAIL OF PC.WIRES", { size: 12 }) + L(cx - 70, y1 + 66, cx + 70, y1 + 66, 0.9);
   return o;
 }
 
 function stirrupDetail(cx, cy, s) {
-  const k = 150 / 220;
+  const sd = PILE22.B - 70, k = sd / PILE22.B; // ปลอก = หน้าตัดเล็กลง 70 มม. (I-22 = 0.150)
   let o = `<polygon points="${pilePoly(PILE22).map(([x, y]) => `${f1(cx + x * k * s)},${f1(cy + y * k * s)}`).join(" ")}" fill="none" stroke="${INK}" stroke-width="1.3"/>`;
-  const x1 = cx + 75 * s, y0 = cy - 75 * s, y1 = cy + 75 * s;
-  o += dimV(x1 + 22, y0, y1, "", {}) + T(x1 + 26, cy + 4, "0.150", { size: 10, anchor: "start" });
+  const x1 = cx + (sd / 2) * s, y0 = cy - (sd / 2) * s, y1 = cy + (sd / 2) * s;
+  o += dimV(x1 + 22, y0, y1, "", {}) + T(x1 + 26, cy + 4, cm3(sd), { size: 10, anchor: "start" });
   o += dimH(cx - 7.5 * s, cx + 7.5 * s, y1 + 14, "", {}) + T(cx, y1 + 28, "0.015", { size: 9.5 });
   o += T(cx, y1 + 46, "DETAIL OF STIRRUP", { size: 10.5 }) + L(cx - 55, y1 + 49, cx + 55, y1 + 49, 0.9);
   return o;
@@ -148,8 +157,8 @@ function liftingPoints(x0, y0, w) {
 const TAN60 = Math.tan((60 * Math.PI) / 180);
 const tw = (txt, size = 14) => txt.length * size * 0.47 + 18; // ความยาวเส้นใต้ตัวหนังสือให้พอดีข้อความ
 function dowelPts(dowel) {
-  const top = dowel ? Math.ceil(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, xs = (k) => Array.from({ length: k }, (_, i) => (i - (k - 1) / 2) * 70);
-  return { top: xs(top).map((x) => [x, -65]), bot: xs(bot).map((x) => [x, 65]), nTop: top, nBot: bot };
+  const top = dowel ? Math.ceil(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), xs = (k) => Array.from({ length: k }, (_, i) => (i - (k - 1) / 2) * pitch), ry = hb - 45;
+  return { top: xs(top).map((x) => [x, -ry]), bot: xs(bot).map((x) => [x, ry]), nTop: top, nBot: bot };
 }
 export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
   const P = dowelPts(dowel), lbl = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง");
@@ -157,16 +166,16 @@ export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
   const cid = "cl" + Math.round(cx * 7 + cy * 13), pg = secPts(PILE22, cx, cy, s);
   let o = `<defs><clipPath id="${cid}"><polygon points="${pg}"/></clipPath></defs><polygon points="${pg}" fill="#fff"/><polygon points="${pg}" fill="none" stroke="#555" stroke-width="11" clip-path="url(#${cid})"/><polygon points="${pg}" fill="none" stroke="${INK}" stroke-width="1.4"/>`;
   [...P.top, ...P.bot].forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
-  const xr = cx + 110 * s, tx = xr + 40;
+  const xr = cx + HB() * s, tx = xr + 40;
   if (compact) {
     // สัญลักษณ์ + legend แทนป้ายชี้ (เหมือนหน้าตัด) ชื่อภาพอยู่ใต้รูป
-    const lx = xr + 24, y0l = cy - 110 * s + 12, rows = [
+    const lx = xr + 24, y0l = cy - HB() * s + 12, rows = [
       [`<circle cx="${lx + 8}" cy="${y0l - 4}" r="4" fill="#fff" stroke="${INK}" stroke-width="1"/>`, dowel ? `${dowel.n}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง"],
       [`<rect x="${lx}" y="${y0l + 16 - 8}" width="16" height="7" fill="#555" stroke="${INK}" stroke-width="0.8"/>`, "COLLAR 3x50mm."],
       [`<rect x="${lx}" y="${y0l + 36 - 8}" width="16" height="7" fill="#fff" stroke="${INK}" stroke-width="1.2"/>`, "PLATE 9mm."],
     ];
     rows.forEach(([sym, t], i) => { o += sym + T(lx + 26, y0l + i * 20, t, { size: 14, anchor: "start" }); });
-    o += T(cx - 40 * s, cy + 110 * s + 28, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""), { size: 14, anchor: "start" }) + L(cx - 110 * s, cy + 110 * s + 32, cx + 90 * s, cy + 110 * s + 32, 0.9);
+    o += T(cx - 40 * s, cy + HB() * s + 28, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""), { size: 14, anchor: "start" }) + L(cx - HB() * s, cy + HB() * s + 32, cx + 90 * s, cy + HB() * s + 32, 0.9);
     return o;
   }
   // ป้ายเส้นใต้ตัวหนัง: เรียงบนลงล่าง RING PLATE → 2DB (บน) → PLATE → 2DB (ล่าง)
@@ -176,23 +185,23 @@ export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
     pts.forEach(([sx, px, py]) => { r += L(sx, yL, px, py, 0.8) + tri(px, py, (Math.atan2(py - yL, px - sx) * 180) / Math.PI, 7); });
     return r;
   };
-  const yTopEdge = cy - 110 * s, yBotEdge = cy + 110 * s;
+  const yTopEdge = cy - HB() * s, yBotEdge = cy + HB() * s;
   o += row(yTopEdge - 50, "COLLAR 3x50mm.", [[cx - 80 * s, yTopEdge + 2.5]]);
   o += row(yTopEdge - 22, lbl(P.nTop), P.top.map(([x, y]) => [cx + x * s, cy + y * s - 2]));
   o += L(cx + 20 * s, cy, tx - 4, cy, 0.9) + tri(cx + 20 * s, cy, 180, 7) + T(tx, cy - 4, "PLATE 9mm.", { size: 14, anchor: "start" }) + L(tx - 4, cy, tx + tw("PLATE 9mm."), cy, 0.9);
   o += row(yBotEdge + 24, lbl(P.nBot), P.bot.map(([x, y]) => [cx + x * s, cy + y * s + 2]));
-  o += T(cx - 60 * s, yBotEdge + 58, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""), { size: 14, anchor: "start" }) + L(cx - 110 * s, yBotEdge + 62, cx + 90 * s, yBotEdge + 62, 0.9);
+  o += T(cx - 60 * s, yBotEdge + 58, "WELDING PLATE" + (subtitle ? ` (${subtitle})` : ""), { size: 14, anchor: "start" }) + L(cx - HB() * s, yBotEdge + 62, cx + 90 * s, yBotEdge + 62, 0.9);
   return o;
 }
 
 // แผ่นเหล็กหัวต่อ (ด้านข้าง): แผ่นเหล็ก 9 มม. + ปลอกริง (COLLAR) 3 มม. ต่อจากแผ่นเข้าไปด้านในเสา (ลึก COLLAR_D) เหล็กเดือยเชื่อมกับแผ่นและยื่นเลยปลอกริง
 const COLLAR_D = 50; // มม. collar มาตรฐาน หนา 3 กว้าง 50 (ความลึกจากหน้าแผ่นเข้าไปในเสา)
 export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
-  const h = 220 * s, P = dowelPts(dowel), pw = Math.max(7, 9 * s), cd = COLLAR_D * s, wall = Math.max(2.4, 3 * s), len = dowel ? dowel.len * 1000 * s : 300 * s, x0 = x + pw + cd, tx = x0 + len + 24;
+  const h = PILE22.B * s, P = dowelPts(dowel), pw = Math.max(7, 9 * s), cd = COLLAR_D * s, wall = Math.max(2.4, 3 * s), len = dowel ? dowel.len * 1000 * s : 300 * s, x0 = x + pw + cd, tx = x0 + len + 24;
   // แผ่นเหล็ก 9 มม. (ซ้าย) + ปลอกริงยื่นเข้าด้านใน (ขวา) มีผนังหนา 3 มม. ด้านบน/ล่าง
   let o = `<rect x="${x}" y="${y}" width="${pw}" height="${h}" fill="#fff" stroke="${INK}" stroke-width="1.5"/><rect x="${x + pw}" y="${y}" width="${cd}" height="${h}" fill="#fff" stroke="${INK}" stroke-width="1.5"/>`;
   o += L(x + pw, y + wall, x + pw + cd, y + wall, 0.9) + L(x + pw, y + h - wall, x + pw + cd, y + h - wall, 0.9);
-  const yT = y + (110 - 65) * s, yB = y + (110 + 65) * s;
+  const yT = y + 45 * s, yB = y + (PILE22.B - 45) * s;
   // เหล็กข้ออ้อย DB: แท่งขนาดตามจริงเกินเล็กน้อย พื้นขาว ขอบดำ รอยข้อเฉียงเรียงเท่ากัน
   const bt = Math.max(7, (dowel ? dowel.d : 12) * s * 0.9);
   const deformed = (xa, xb, yc) => { let r = `<rect x="${f1(xa)}" y="${f1(yc - bt / 2)}" width="${f1(xb - xa)}" height="${f1(bt)}" fill="#fff" stroke="${INK}" stroke-width="1.2"/>`; for (let px = xa + 5; px < xb - 3; px += 7) r += L(px, yc - bt / 2, px + bt * 0.55, yc + bt / 2, 0.8); return r + L(xa, yc, xb, yc, 0.6); };
@@ -320,7 +329,8 @@ export function elevation(plan, piece, y0, opts) {
   const F = (m) => (piece.full || !piece.len ? X0 + TW : m <= mL ? X0 + m * k1 : piece.len <= mL ? X0 + TW : cxF + 30 + ((m - mL) / (piece.len - mL)) * (X0 + TW - (cxF + 30)));
   o += dimH(X0, X0 + TW, y0 + 4, "", {}) + T(X0 + TW / 2, y0 - 2, ls, { size: 15 }); // ความยาวรวมของท่อน อยู่เหนือเส้น 0.33/0.66
   const xs = [X0, X0 + a, X0 + a + b, X0 + a + b + mid, X0 + a + b + mid + b, X0 + TW];
-  const labs = [m2(sp.endLen), m2(sp.nearLen), piece.full ? "L-1.98" : m2(piece.mid), m2(sp.nearLen), m2(sp.endLen)];
+  const mz = (v) => { const s = (Math.round(v * 1000) / 1000).toFixed(3); return s.endsWith("0") ? s.slice(0, -1) : s; }; // 0.525 / 0.33
+  const labs = [mz(sp.endLen), mz(sp.nearLen), piece.full ? `L-${mz(2 * (sp.endLen + sp.nearLen))}` : mz(piece.mid), mz(sp.nearLen), mz(sp.endLen)];
   labs.forEach((t, i) => { o += dimH(xs[i], xs[i + 1], y0 + 26, t, { size: 13 }); });
   o += `<rect x="${X0}" y="${yTop}" width="${TW}" height="${sh}" fill="#fff" stroke="${INK}" stroke-width="1.4"/>`;
   // ปลอกเกลียว: เส้นตั้ง (ห่วง) + เส้นเฉียง จำนวนรอบต่อโซนตามระยะ @ ในมาตรฐาน (ปลาย @0.05, ใกล้ @0.07, กลาง @0.17)
@@ -360,7 +370,7 @@ export function elevation(plan, piece, y0, opts) {
   // จุดตัดหน้าตัด: มีเหล็กเสริม = อยู่กลางช่วงเหล็กเสริม (ตรงเหล็กเส้น) ไม่มี = หลังรอยหักกลาง ตัวอักษร B เฉพาะเสาหลายท่อนที่ท่อนนี้มีเหล็กเสริมแต่ท่อนอื่นไม่มี
   let xm = cx + 60;
   if (ex.length) { // ขีดตัดต้องอยู่บนเส้นเหล็ก และอยู่ในช่วงปลอก @0.17 (หลัง 0.99 ม. จากปลาย) เพราะแบบขยายระบุ CD@0.17
-    const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)), zs = F(Math.min(0.99 + 0.05, piece.len)), ze = barEnd(bl);
+    const bl = Math.max(...ex.map((e) => (e.len || piece.len) || 0)), zs = F(Math.min(sp.endLen + sp.nearLen + 0.05, piece.len)), ze = barEnd(bl);
     xm = ze - zs > 40 ? (zs + ze) / 2 : Math.max(X0 + 10, ze - 8);
     if (plan.shoulder && opts.first && !piece.full) { const xsh = F(Math.min(plan.shoulder.at, piece.len)); if (Math.abs(xm - xsh) < 38) xm = xsh + 40 <= ze ? xsh + 40 : xsh - 38; }
     if (Math.abs(xm - cx) < 30) xm = cx + 34 <= ze ? cx + 34 : cx - 34; // ไม่ทับรอยหักกลางและตัวเลขระยะกลาง
@@ -368,18 +378,19 @@ export function elevation(plan, piece, y0, opts) {
   }
   const letter = piece.cfg || "A";
   o += `<circle cx="${f1(xm)}" cy="${yTop - 12}" r="8" fill="#fff" stroke="${INK}" stroke-width="1"/>` + T(xm, yTop - 8, letter, { size: 13 }) + L(xm, yTop - 4, xm, yTop + sh, 0.9);
-  o += dimV(X0 - 18, yTop, yTop + sh, "0.22", { size: 13 });
+  o += dimV(X0 - 18, yTop, yTop + sh, c2(PILE22.B), { size: 13 });
   // ป้ายปลอกเกลียว
   const sy = yTop + sh + 18;
   let lbl = ""; // ป้ายปลอกวาดทีหลัง (ทับเส้นชี้บ่า) พร้อมขอบขาว ให้อ่านออกเสมอ
-  lbl += T(X0 + 48, sy, "2-CD.Ø2.8mm.", { size: 13, halo: true }) + T(X0 + 48, sy + 15, "@0.05m.", { size: 13, halo: true });
+  const sf = (v) => String(Math.round(v * 10000) / 10000).padEnd(4, "0"), cdW = `CD.Ø${sp.wire.toFixed(1)}mm.`;
+  lbl += T(X0 + 48, sy, "2-" + cdW, { size: 13, halo: true }) + T(X0 + 48, sy + 15, `@${sf(sp.endStep)}m.`, { size: 13, halo: true });
   // ป้ายโซน 0.66 ซ้าย: ถ้าวงบ่าอยู่ทับป้าย ให้เลื่อนป้ายไปทางขวาของวง (วงและเส้นชี้บ่าไม่บังตัวหนังสือ)
   let l2 = X0 + a + b / 2 + 14;
   if (plan.shoulder && opts.first && !piece.full) { const xsh = F(Math.min(plan.shoulder.at, piece.len)); if (Math.abs(xsh - l2) < 62) l2 = xsh + 100; }
-  lbl += T(l2, sy, "CD.Ø2.8mm.", { size: 13, halo: true }) + T(l2, sy + 15, "@0.07m.", { size: 13, halo: true });
-  lbl += T(cx, sy, "CD.Ø2.8mm.", { size: 13, halo: true }) + T(cx, sy + 15, "@0.17m.", { size: 13, halo: true });
-  lbl += T(xs[3] + b / 2 - 14, sy, "CD.Ø2.8mm.", { size: 13, halo: true }) + T(xs[3] + b / 2 - 14, sy + 15, "@0.07m.", { size: 13, halo: true });
-  lbl += T(X0 + TW - 48, sy, "2-CD.Ø2.8mm.", { size: 13, halo: true }) + T(X0 + TW - 48, sy + 15, "@0.05m.", { size: 13, halo: true });
+  lbl += T(l2, sy, cdW, { size: 13, halo: true }) + T(l2, sy + 15, `@${sf(sp.nearStep)}m.`, { size: 13, halo: true });
+  lbl += T(cx, sy, cdW, { size: 13, halo: true }) + T(cx, sy + 15, `@${sf(sp.midStep)}m.`, { size: 13, halo: true });
+  lbl += T(xs[3] + b / 2 - 14, sy, cdW, { size: 13, halo: true }) + T(xs[3] + b / 2 - 14, sy + 15, `@${sf(sp.nearStep)}m.`, { size: 13, halo: true });
+  lbl += T(X0 + TW - 48, sy, "2-" + cdW, { size: 13, halo: true }) + T(X0 + TW - 48, sy + 15, `@${sf(sp.endStep)}m.`, { size: 13, halo: true });
   const hasSh = !!(plan.shoulder && opts.first && !piece.full);
   let yy = sy + 30 + (hasSh ? 38 + (ex.length ? 22 : 0) : 0); // ระยะบ่าอยู่ใต้ป้ายปลอกทันที
   // ไม่มีป้ายชี้หัวต่อในรูปด้านท่อนเสา (ประหยัดพื้นที่) รายละเอียดอยู่ในแบบขยายแผ่นเหล็กหัวต่อด้านล่าง
@@ -462,6 +473,7 @@ function titleBlock(plan, logoHref) {
 
 export function pileSheet(plan, logoHref = "assets/logo.png") {
   if (!plan.sec) return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"></svg>`;
+  PILE22 = plan.sec.geo || { B: 220, f: 65, c: 50, dg: 70, tw: 80 };
   const np = plan.pieces.length, cfgs = plan.configs && plan.configs.length ? plan.configs : [{ letter: "A", extras: plan.extras, layout: plan.layout, wires: "x", simple: false }];
   const simple = plan.full || plan.pieces.length === 0 || !plan.layout, kinds = plan.kinds || { A: true, B: false }, two = cfgs.length === 2, hasX = plan.extras.length > 0;
   const colBx = 640;
@@ -472,24 +484,24 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
     g += e.svg; y += e.h - 4;
   });
   // ---- แถว 2: หน้าตัด A / B (+ จุดยกสำหรับแบบเดี่ยว) ----
-  const sa = two ? 0.5 : 0.62, topE = 110 * sa + (two ? 20 : 48), botE = 110 * sa + 98, cyA = y + topE;
+  const sa = (two ? 0.5 : 0.62) * (220 / PILE22.B), topE = HB() * sa + (two ? 20 : 48), botE = HB() * sa + 98, cyA = y + topE;
   if (two) {
     g += cfgs.map((cf, i) => sectionA(plan, i ? 610 : 190, cyA, sa, simple || cf.simple || !cf.layout, cf.extras, cf.letter, i > 0 && cf.wires === cfgs[0].wires, cf.layout || wireLayout(4, 2))).join("");
   } else {
     const c0 = cfgs[0], lay = c0.layout || wireLayout(4, 2);
     g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + wiresDetail(colBx, cyA, sa, lay); // ไม่มีดีเทลปลอก (DETAIL OF STIRRUP)
   }
-  g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - 110 * sa - 20), two ? 240 : 290);
+  g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - HB() * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;
   // ---- แถว 3: หัวต่อ (ซ้าย) • คอลัมน์ขวา: แบบขยายบ่า (บน) + ตารางลวด (มุมขวาล่างเสมอ) ----
   const sw = sa, hasJ = plan.joint, TW3 = 360, rx = 1160 - TW3, colA = two ? 190 : 230, colB = two ? 610 : 640;
   const dowels = plan.full ? [plan.rows[0] && plan.rows[0].dowel] : [...new Map(plan.pieces.map((p) => [p.rule ? p.rule.dowel.n + "-" + p.rule.dowel.d : "x", p])).values()].map((p) => p.rule && p.rule.dowel);
   let hLeft = 0;
   if (hasJ) {
-    const list = plan.full ? [null] : dowels.slice(0, 2), cyB = y + 110 * sw + 16;
+    const list = plan.full ? [null] : dowels.slice(0, 2), cyB = y + HB() * sw + 16;
     list.forEach((d, i) => { g += weldingPlate(d, colA + i * 300, cyB, sw, !plan.full && list.length > 1 ? `${m2(plan.pieces.filter((p) => p.rule && p.rule.dowel === d)[0]?.len || plan.pieces[i].len)} m.` : "", true); });
-    g += weldSide(list[0], (list.length > 1 ? colA + 600 : colB) - 110 * sw, cyB - 110 * sw, sw, true, list.length > 1); // 2 แผ่น: ขนาดเหล็กเดือยบอกในคำอธิบายของแต่ละแผ่นแล้ว ภาพด้านข้างไม่ซ้ำป้าย (กันชนตาราง)
-    hLeft = 110 * sw * 2 + 16 + 44;
+    g += weldSide(list[0], (list.length > 1 ? colA + 600 : colB) - HB() * sw, cyB - HB() * sw, sw, true, list.length > 1); // 2 แผ่น: ขนาดเหล็กเดือยบอกในคำอธิบายของแต่ละแผ่นแล้ว ภาพด้านข้างไม่ซ้ำป้าย (กันชนตาราง)
+    hLeft = HB() * sw * 2 + 16 + 44;
   }
   const TSC = 0.72, tb0 = table(plan, 1168 - TW3, 742 - table(plan, 0, 0, TW3).h, TW3), tb = { h: tb0.h * TSC, svg: `<g transform="translate(1168,742) scale(${TSC}) translate(-1168,-742)">${tb0.svg}</g>` }; // ตารางลวดติดมุมขวาล่าง ชิดตารางชื่อแบบ
   const yRow3 = y;

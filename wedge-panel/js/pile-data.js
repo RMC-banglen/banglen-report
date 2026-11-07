@@ -9,6 +9,8 @@ export const PILE_SECTIONS = {
     std: "TIS 396-2549",
     minL: 1,
     maxL: 20,
+    geo: { B: 220, f: 65, c: 50, dg: 70, tw: 80 }, // รูปหน้าตัดไอ (มม.): กว้าง, ปีก, ก้นร่อง, ลึกร่อง, เอว
+    shoulder: true, // มีแบบบ่าในต้นแบบ (ขนาดบ่ายังมีเฉพาะ I-22)
     // ตารางลวดอัดแรงและเหล็กเดือยหัวต่อ ตามช่วงความยาวท่อน (ม.): to = ความยาวสูงสุดของช่วง
     rules: [
       // ตารางปริมาณลวด PC (ไฟล์ Excel 10 ม.ค. 2566): 1–12 ม. 4mm×4 + 5mm×2 • 13–16 ม. 4mm×8 • 17–18 ม. 4mm×10 • 19–20 ม. 5mm×8
@@ -20,6 +22,75 @@ export const PILE_SECTIONS = {
     // ปลอกเกลียว CD Ø2.8 มม.: ปลายทั้งสองข้าง 0.33 ม. @0.05 แล้ว 0.66 ม. @0.07 ส่วนกลาง @0.17 (กลาง = L − 1.98)
     spiral: { wire: 2.8, endLen: 0.33, endStep: 0.05, nearLen: 0.66, nearStep: 0.07, midStep: 0.17 },
     lift: 0.207, // จุดยก 0.207L จากปลายทั้งสองข้าง
+  },
+  T18: {
+    key: "T18",
+    label: "I-18",
+    size: "0.18x0.18",
+    std: "TIS 396-2549",
+    minL: 1,
+    maxL: 12,
+    geo: { B: 180, f: 60, c: 30, dg: 55, tw: 70 },
+    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    rules: [
+      { to: 12, w4: 2, w5: 2, dowel: { n: 4, d: 12, len: 0.3 } },
+    ],
+    // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
+    spiral: { wire: 2.8, endLen: 0.27, endStep: 0.03, nearLen: 0.54, nearStep: 0.075, midStep: 0.13 },
+    lift: 0.207,
+  },
+  T26: {
+    key: "T26",
+    label: "I-26",
+    size: "0.26x0.26",
+    std: "TIS 396-2549",
+    minL: 1,
+    maxL: 20,
+    geo: { B: 260, f: 65, c: 90, dg: 85, tw: 90 },
+    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    rules: [
+      { to: 16, w4: 0, w5: 6, dowel: { n: 3, d: 12, len: 0.3 } },
+      { to: 18, w4: 0, w5: 8, dowel: { n: 3, d: 16, len: 0.4 } },
+      { to: 20, w4: 0, w5: 10, dowel: { n: 3, d: 16, len: 0.4 } },
+    ],
+    // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
+    spiral: { wire: 2.8, endLen: 0.39, endStep: 0.05, nearLen: 0.78, nearStep: 0.065, midStep: 0.16 },
+    lift: 0.207,
+  },
+  T30: {
+    key: "T30",
+    label: "I-30",
+    size: "0.30x0.30",
+    std: "TIS 396-2549",
+    minL: 1,
+    maxL: 20,
+    geo: { B: 300, f: 75, c: 90, dg: 100, tw: 100 },
+    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    rules: [
+      { to: 16, w4: 0, w5: 8, dowel: { n: 5, d: 16, len: 0.4 } },
+      { to: 18, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 20, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.4 } },
+    ],
+    // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
+    spiral: { wire: 3.0, endLen: 0.45, endStep: 0.055, nearLen: 0.9, nearStep: 0.0675, midStep: 0.17 },
+    lift: 0.207,
+  },
+  T35: {
+    key: "T35",
+    label: "I-35",
+    size: "0.35x0.35",
+    std: "TIS 396-2549",
+    minL: 1,
+    maxL: 20,
+    geo: { B: 350, f: 85, c: 120, dg: 115, tw: 120 },
+    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    rules: [
+      { to: 18, w4: 0, w5: 10, dowel: { n: 6, d: 16, len: 0.4 } },
+      { to: 20, w4: 0, w5: 12, dowel: { n: 7, d: 16, len: 0.4 } },
+    ],
+    // ปลอกเกลียว: ปลาย 1.5B @endStep, ถัดไป 3B @nearStep, ส่วนกลาง @midStep (ตามแบบ DXF)
+    spiral: { wire: 3.0, endLen: 0.525, endStep: 0.045, nearLen: 1.05, nearStep: 0.06, midStep: 0.15 },
+    lift: 0.207,
   },
 };
 

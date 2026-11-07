@@ -1,9 +1,9 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107013550";
-import { pileSheet } from "./pile-draw.js?v=20261107013550";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107013550";
-import { download } from "./pdf.js?v=20261107013550";
-import { esc } from "./draw2d.js?v=20261107013550";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107015403";
+import { pileSheet } from "./pile-draw.js?v=20261107015403";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107015403";
+import { download } from "./pdf.js?v=20261107015403";
+import { esc } from "./draw2d.js?v=20261107015403";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -60,7 +60,7 @@ function renderExtras() {
 function syncUi() {
   const full = radio("pt") === "full", two = pnVal() === 2;
   $("pLbox").hidden = full; $("pnBox").hidden = full; $("plSplit").hidden = full || pnVal() < 2; renderSplitRows(); $("pjHint").textContent = full ? "" : (pnVal() >= 2 ? "เสา 2 ท่อนขึ้นไป มีหัวต่อเชื่อม (แผ่นเหล็กและเหล็กเดือย) ทุกรอยต่อ" : "ท่อนเดี่ยว ไม่มีหัวต่อเชื่อม");
-  $("pshBox").hidden = full; $("pxBox").hidden = full; $("pshAtBox").hidden = !$("psh").checked || full;
+  const sc = PILE_SECTIONS[$("psec").value], noSh = !(sc && sc.shoulder); if (noSh) $("psh").checked = false; $("pshBox").hidden = full || noSh; // บ่ามีเฉพาะหน้าตัดที่มีแบบบ่า $("pxBox").hidden = full; $("pshAtBox").hidden = !$("psh").checked || full || noSh;
   const L = num("pL");
   
 }
