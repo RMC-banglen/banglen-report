@@ -1,15 +1,15 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261107035433";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261107035820";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261107035433";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261107035433";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261107035433";
-import { createViews } from "./view3d.js?v=20261107035433";
-import { initPile } from "./pile-ui.js?v=20261107035433";
-import { makePdf } from "./pdf.js?v=20261107035433";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261107035433";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261107035433";
+} from "./calc.js?v=20261107035820";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261107035820";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261107035820";
+import { createViews } from "./view3d.js?v=20261107035820";
+import { initPile } from "./pile-ui.js?v=20261107035820";
+import { makePdf } from "./pdf.js?v=20261107035820";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261107035820";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261107035820";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -135,7 +135,7 @@ function run() {
   let r;
   if (direct) {
     if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1 && HS.includes(x.H))) return showEmpty();
-    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, H: r.H, qty: r.qty, st: r.st || 1 })), spec: S, truckKg: truck, div: $("dvt").value });
+    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, H: r.H, qty: r.qty, st: r.st || 1 })), spec: S, truckKg: truck, div: "ch" });
     r.ref = $("rf").value.trim();
   } else {
     const op = renderStack();
@@ -145,7 +145,7 @@ function run() {
     const sp = currentSpans(spanAl);
     const stk = op[stackSel] ? [...op[stackSel]] : [];
     if (!$("pt").value || !stk.length || !sp.some((x) => x.cc >= 600 && x.n >= 1)) return showEmpty();
-    r = calcProject({ pile: $("pt").value, allowance: Math.round(+$("gp").value * 1000), spans: sp, stack: stk, spec: S, truckKg: truck, div: $("dvt").value });
+    r = calcProject({ pile: $("pt").value, allowance: Math.round(+$("gp").value * 1000), spans: sp, stack: stk, spec: S, truckKg: truck, div: "ch" });
     r.al = [...r.al.filter((a) => a[1].startsWith("งานสั่งพิเศษ")), ...spanAl, ...r.al.filter((a) => !a[1].startsWith("งานสั่งพิเศษ"))];
   }
   STATE = r;
@@ -261,7 +261,7 @@ document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => {
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (PANES.includes(h)) show(h); else if (/^p-[a-z0-9]+$/.test(h)) loadProject(h); });
 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
-const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dvt", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "tk", "lm", "cmx", "lmt"];
+const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "tk", "lm", "cmx", "lmt"];
 function collect() {
   const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });

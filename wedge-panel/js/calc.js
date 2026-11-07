@@ -2,7 +2,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261107035433";
+} from "./standards.js?v=20261107035820";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -162,8 +162,8 @@ export function panelCalc(G, WT, H, S) {
   return { W, WT, H, T, TP, vx, hy, am, ah, lv, lh, nv: nm, nh, kv, kh, kg: kv + kh, vol, wt: vol * CONCRETE_DENSITY, pipe, ties: nm * nh, x0, x1 };
 }
 
-// ตัวกั้นหัวคู่: std = แบบมาตรฐาน (TC) • ch = เหล็กรางน้ำ 2 นิ้ว (TCc ระยะสั้นลง ไม่มีแผ่นตัดพลาสม่า)
-export const divG = (G, div) => (div === "ch" ? { ...G, TC: G.TCc, div: "ch" } : G);
+// ตัวกั้นหัวคู่: ใช้เหล็กรางน้ำ 2 นิ้วทั้งหมด (TCc ระยะสั้นลง ไม่มีแผ่นตัดพลาสม่า — ผู้ใช้สั่ง 7 พ.ย. 2569) • div = "std" ใช้แบบมาตรฐานเดิม (TC) เฉพาะในเทสต์/เทียบ
+export const divG = (G, div) => (div !== "std" ? { ...G, TC: G.TCc, div: "ch" } : G);
 
 // ---------- โต๊ะหล่อ ----------
 export function tableFit(G, W, H) {
