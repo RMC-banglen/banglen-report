@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107075211";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107075211";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107075211";
+import { pilePoly, esc } from "./draw2d.js?v=20261107075343";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107075343";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107075343";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -508,7 +508,7 @@ function tbLayout(p) {
   const wP = TB_COLS[2] - TB_COLS[1] - 12, wL = TB_COLS[3] - TB_COLS[2] - 12;
   const pj = tbWrap(p.pj, wP), lo = tbWrap(p.lo, wL), ow = tbWrap(p.ow, wP);
   const rh = (n) => Math.max(39, 18 + n * TB_LH + 3);
-  const h1 = rh(Math.max(pj.length, lo.length)), h2 = rh(ow.length);
+  const h1 = rh(Math.max(pj.length, lo.length)), h2 = rh(Math.max(ow.length, 2)); // แถวล่าง: ช่องผู้อนุมัติมี 2 บรรทัด (ชื่อ / สย.)
   return { pj, lo, ow, h1, h2, H: h1 + h2 };
 }
 
@@ -521,9 +521,9 @@ function titleBlock(plan, logoHref, lay) {
   o += T(140, mid - 13, tb.company, { size: 18, anchor: "start", weight: 700 }) + T(140, mid + 5, tb.companyEn, { size: 10, anchor: "start" });
   const lab = (x1, yy, t) => T(x1 + 6, yy + 13, t, { size: 8.5, anchor: "start", fill: "#444" });
   const lines = (x1, x2, yy, arr) => arr.map((t, i) => T((x1 + x2) / 2, yy + 15 + TB_LH * (i + 1), t, { size: TB_SZ })).join("");
-  const one = (x1, x2, yy, t) => T((x1 + x2) / 2, yy + 31, t, { size: TB_SZ });
-  o += lab(cols[1], y, "PROJECT") + lines(cols[1], cols[2], y, lay.pj) + lab(cols[2], y, "LOCATION") + lines(cols[2], cols[3], y, lay.lo) + lab(cols[3], y, "DESIGN BY :") + one(cols[3], cols[4], y, tb.designBy);
-  o += lab(cols[1], yb, "OWNER") + lines(cols[1], cols[2], yb, lay.ow) + lab(cols[2], yb, "DRAWING BY :") + one(cols[2], cols[3], yb, tb.drawBy) + lab(cols[3], yb, "APPROVED BY :") + one(cols[3], cols[4], yb, `${tb.approveBy} ${tb.licence}`);
+  const one = (x1, x2, yy, t, h) => T((x1 + x2) / 2, yy + 13 + (h - 13) / 2 + 5, t, { size: TB_SZ });
+  o += lab(cols[1], y, "PROJECT") + lines(cols[1], cols[2], y, lay.pj) + lab(cols[2], y, "LOCATION") + lines(cols[2], cols[3], y, lay.lo) + lab(cols[3], y, "DESIGN BY :") + one(cols[3], cols[4], y, tb.designBy, lay.h1);
+  o += lab(cols[1], yb, "OWNER") + lines(cols[1], cols[2], yb, lay.ow) + lab(cols[2], yb, "DRAWING BY :") + one(cols[2], cols[3], yb, tb.drawBy, lay.h2) + lab(cols[3], yb, "APPROVED BY :") + lines(cols[3], cols[4], yb, [tb.approveBy, tb.licence]);
   return o;
 }
 

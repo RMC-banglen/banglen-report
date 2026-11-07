@@ -248,9 +248,9 @@ export const SHOULDER_STD = { a: 0.2, b: 0.1, bars: 3, d: 12, cover: 0.05 }; // 
 export const TITLE_BLOCK = {
   company: "บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด",
   companyEn: "RUAMMITR CONCRETE (BANGLAN) COMPANY LIMITED",
-  designBy: "CHAIYAPORN S.",
-  drawBy: "CHAIYAPORN S.",
-  approveBy: "CHAIYAPORN S.",
+  designBy: "ชัยพร สุรังสิมันต์กุล",
+  drawBy: "ชัยพร สุรังสิมันต์กุล",
+  approveBy: "ชัยพร สุรังสิมันต์กุล",
   approveByTh: "ชัยพร สุรังสิมันต์กุล", // ใช้ในช่องเซ็นของใบ blow count
   licence: "สย.8954",
 };
