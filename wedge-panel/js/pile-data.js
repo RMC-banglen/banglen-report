@@ -205,6 +205,46 @@ export const PILE_SECTIONS = {
     spiral: { wire: 4.0, endLen: 0.525, endStep: 0.045, nearLen: 1.05, nearStep: 0.06, midStep: 0.15 },
     lift: 0.207,
   },
+  T40: {
+    key: "T40",
+    label: "I-40",
+    size: "0.40x0.40",
+    std: "TIS 396-2549",
+    minL: 1,
+    maxL: 20,
+    geo: { B: 400, f: 110, c: 120, dg: 120, tw: 160, two: true },
+    shoulder: false,
+    // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางผู้ใช้ 7 พ.ย. 2569 ตัดสั้นลง 1 ซม. • ปลอก/ขนาดจาก 40.dxf
+    rules: [
+      { to: 14, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.45 } },
+      { to: 16, w4: 0, w5: 16, dowel: { n: 6, d: 20, len: 0.45 } },
+      { to: 18, w4: 0, w5: 18, dowel: { n: 5, d: 25, len: 0.5 } },
+      { to: 20, w4: 0, w5: 20, dowel: { n: 6, d: 25, len: 0.5 } },
+    ],
+    spiral: { wire: 4.0, endLen: 0.6, endStep: 0.035, nearLen: 1.2, nearStep: 0.08, midStep: 0.2 },
+    lift: 0.207,
+  },
+  S40: {
+    key: "S40",
+    label: "[ ]",
+    menu: "S-40",
+    size: "0.40x0.40",
+    std: "TIS 396-2549",
+    minL: 1,
+    maxL: 20,
+    geo: { sq: true, B: 400, ch: 20, dIn: 55, two: true },
+    shoulder: false,
+    extras: false,
+    // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางผู้ใช้ 7 พ.ย. 2569 ตัดสั้นลง 1 ซม. • ปลอก/ขนาดจาก 40.dxf
+    rules: [
+      { to: 14, w4: 0, w5: 18, dowel: { n: 5, d: 25, len: 0.5 } },
+      { to: 16, w4: 0, w5: 20, dowel: { n: 5, d: 25, len: 0.5 } },
+      { to: 18, w4: 0, w5: 24, dowel: { n: 6, d: 25, len: 0.5 } },
+      { to: 20, w4: 0, w5: 28, dowel: { n: 7, d: 25, len: 0.5 } },
+    ],
+    spiral: { wire: 4.0, endLen: 0.6, endStep: 0.04, nearLen: 1.2, nearStep: 0.05, midStep: 0.125 },
+    lift: 0.207,
+  },
 };
 
 // บ่า (ที่รองรับ): ขนาดตามแบบ 0.20 + 0.10 ม. เหล็กในบ่า 3 เส้น DB12
