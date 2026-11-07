@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074319";
-import { pileSheet } from "./pile-draw.js?v=20261107074319";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107074319";
-import { download } from "./pdf.js?v=20261107074319";
-import { esc } from "./draw2d.js?v=20261107074319";
-import { getSession, canEdit } from "./auth.js?v=20261107074319";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074319";
-import { db } from "./db.js?v=20261107074319";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107074319";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074331";
+import { pileSheet } from "./pile-draw.js?v=20261107074331";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107074331";
+import { download } from "./pdf.js?v=20261107074331";
+import { esc } from "./draw2d.js?v=20261107074331";
+import { getSession, canEdit } from "./auth.js?v=20261107074331";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074331";
+import { db } from "./db.js?v=20261107074331";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107074331";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -213,7 +213,7 @@ function renderJobList() {
   const box = $("pjList"); if (!box) return;
   box.innerHTML = listRows.map((r) => {
     const d = r.data || {}, cur = r.id === curJobId;
-    return '<div class="prow' + (cur ? " cur" : "") + '"><button type="button" class="pbtn" data-id="' + esc(r.id) + '">' + esc((d.code || "") + " " + ((d.project && (d.project.ow || d.project.pj)) || r.name || "ไม่มีชื่อเจ้าของ")) + ' <span style="color:var(--faint)">• ' + (d.piles || []).length + " ต้น</span></button>" +
+    return '<div class="prow' + (cur ? " cur" : "") + '"><button type="button" class="pbtn" data-id="' + esc(r.id) + '">' + esc((d.code || "") + " " + ((d.project && (d.project.ow || d.project.pj)) || r.name || "ไม่มีชื่อเจ้าของ")) + "</button>" +
       (cur && editable() ? '<button type="button" class="ptrash" title="ลบงานนี้" aria-label="ลบงานนี้">' + TRASH_SVG + "</button>" : "") + "</div>";
   }).join("") || '<p class="hint">ยังไม่มีงานที่บันทึก</p>';
   box.querySelectorAll(".pbtn").forEach((b) => (b.onclick = async () => { if (!(await guardUnsaved())) return; openJob(b.dataset.id); }));
