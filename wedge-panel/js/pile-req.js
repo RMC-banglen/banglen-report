@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107075551";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107075551";
-import { esc } from "./draw2d.js?v=20261107075551";
+import { autoSplit } from "./pile-calc.js?v=20261107083652";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107083652";
+import { esc } from "./draw2d.js?v=20261107083652";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -89,7 +89,7 @@ export function blowSheet(p, secLabel, project, pieceLens, code) {
   const wp = r ? (r.A * p.L * 100 * DENSITY) / 1e6 : 0;
   const sz = (+size / 100).toFixed(2), len = f(p.L);
   const pile = kind === "T" ? `I &nbsp; ${sz} × ${len} ม.` : `เสาตัน ${sz} × ${sz} × ${len} ม.`;
-  const pcs = pieceLens && pieceLens.length > 1 ? `ต่อเชื่อม ${pieceLens.length} ท่อน (${pieceLens.map((v) => f(v)).join(" + ")} ม.)` : "ท่อนเดี่ยว";
+  const pcs = pieceLens && pieceLens.length > 1 ? `${pieceLens.length} ท่อนต่อเชื่อม (${pieceLens.map((v) => f(v)).join(" + ")} ม.)` : "ท่อนเดี่ยว";
   const red = (t) => `<b style="color:#c00000">${t}</b>`;
   const row = (l, s, v, u) => `<div class="r"><span>${l}</span><span>${s || ""}</span><span class="e"></span><span class="v">${v == null ? "" : v}</span><span>${u || ""}</span></div>`;
   const row3 = (l, s, v, u) => `<div class="r"><span>${l}</span><span>${s}</span><span class="e">=</span><span class="v">${v}</span><span>${u}</span></div>`;

@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107075551";
-import { pileSheet } from "./pile-draw.js?v=20261107075551";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107075551";
-import { download } from "./pdf.js?v=20261107075551";
-import { esc } from "./draw2d.js?v=20261107075551";
-import { getSession, canEdit } from "./auth.js?v=20261107075551";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107075551";
-import { db } from "./db.js?v=20261107075551";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107075551";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107083652";
+import { pileSheet } from "./pile-draw.js?v=20261107083652";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107083652";
+import { download } from "./pdf.js?v=20261107083652";
+import { esc } from "./draw2d.js?v=20261107083652";
+import { getSession, canEdit } from "./auth.js?v=20261107083652";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107083652";
+import { db } from "./db.js?v=20261107083652";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107083652";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -113,6 +113,16 @@ function restore() {
   } catch (e) {}
 }
 
+// ตรา: html2canvas วาดรูปที่อ้างไฟล์ใน SVG ไม่ได้ ต้องฝังเป็น data URL ตอนส่งออก PDF
+let logoCache = null;
+async function logoData() {
+  if (logoCache) return logoCache;
+  try {
+    const blob = await (await fetch("assets/logo.png")).blob();
+    logoCache = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+  } catch (e) { logoCache = "assets/logo.png"; }
+  return logoCache;
+}
 async function addPage(doc, html, first, portrait) {
   const host = document.createElement("div");
   host.style.cssText = "position:absolute;left:-12000px;top:0;background:#fff;" + (portrait ? "width:794px;height:1123px" : "width:1188px;height:840px");
@@ -314,7 +324,7 @@ async function pdfAll(withBlow = true) {
     for (let i = 0; i < ok.length; i++) {
       msg.textContent = "กำลังสร้าง PDF… " + (i + 1) + "/" + ok.length;
       const inp = pileInputOf(ok[i], ok[i].project), plan = planPile(inp);
-      await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), first); first = false;
+      await addPage(doc, pileSheet(plan, await logoData()).replace('width="100%"', 'width="1188" height="840"'), first); first = false;
       if (withBlow) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     }
     const pj = jobLabel(ok[0].project).slice(0, 60) || "คำขอ";
@@ -331,7 +341,7 @@ async function pdf(withBlow = true) {
     if (!window.html2canvas || !window.jspdf) throw new Error("โหลดตัวสร้าง PDF ไม่สำเร็จ ลองรีเฟรชหน้า");
     await document.fonts.ready;
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
-    await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), true);
+    await addPage(doc, pileSheet(plan, await logoData()).replace('width="100%"', 'width="1188" height="840"'), true);
     if (withBlow && inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     const name = `${curCode ? curCode + " " : ""}${jobLabel(inp.project) ? jobLabel(inp.project) + " " : ""}แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
     download(name + ".pdf", doc.output("blob"));
