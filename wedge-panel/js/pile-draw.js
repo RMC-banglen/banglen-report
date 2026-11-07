@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107011924";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107011924";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107011924";
+import { pilePoly, esc } from "./draw2d.js?v=20261107012041";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107012041";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107012041";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -135,7 +135,7 @@ function liftingPoints(x0, y0, w) {
   let o = `<rect x="${x0}" y="${y0 + 22}" width="${w}" height="16" fill="none" stroke="${INK}" stroke-width="1.1"/>`;
   [x0 + a, x0 + w - a].forEach((x) => { o += L(x, y0 + 16, x, y0 + 44, 1.1); });
   o += dimH(x0, x0 + a, y0 + 8, "0.207L", { size: 9.5 }) + dimH(x0 + w - a, x0 + w, y0 + 8, "0.207L", { size: 9.5 });
-  o += L(x0, y0 + 60, x0 + w, y0 + 60, 0.9) + tick(x0, y0 + 60) + tick(x0 + w, y0 + 60) + T(x0 + w / 2, y0 + 56, "LENGTH OF PILE", { size: 10.5 });
+  o += dimH(x0, x0 + w, y0 + 60, "", {}) + T(x0 + w / 2, y0 + 56, "LENGTH OF PILE", { size: 10.5 });
   o += `<rect x="${x0 - 10}" y="${y0 + 74}" width="${w + 20}" height="22" fill="none" stroke="${INK}" stroke-width="0.9"/>` + T(x0 + w / 2, y0 + 89, "LIFTING POINT FOR PRE-STRESS CONCRETE PILE", { size: 10 });
   return o;
 }
@@ -183,7 +183,7 @@ export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
 
 // แผ่นเหล็กหัวต่อ (ด้านข้าง): แผ่นเหล็ก 9 มม. + ปลอกริง (COLLAR) 3 มม. ต่อจากแผ่นเข้าไปด้านในเสา (ลึก COLLAR_D) เหล็กเดือยเชื่อมกับแผ่นและยื่นเลยปลอกริง
 const COLLAR_D = 50; // มม. collar มาตรฐาน หนา 3 กว้าง 50 (ความลึกจากหน้าแผ่นเข้าไปในเสา)
-export function weldSide(dowel, x, y, s, compact = false) {
+export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
   const h = 220 * s, P = dowelPts(dowel), pw = Math.max(7, 9 * s), cd = COLLAR_D * s, wall = Math.max(2.4, 3 * s), len = dowel ? dowel.len * 1000 * s : 300 * s, x0 = x + pw + cd, tx = x0 + len + 24;
   // แผ่นเหล็ก 9 มม. (ซ้าย) + ปลอกริงยื่นเข้าด้านใน (ขวา) มีผนังหนา 3 มม. ด้านบน/ล่าง
   let o = `<rect x="${x}" y="${y}" width="${pw}" height="${h}" fill="#fff" stroke="${INK}" stroke-width="1.5"/><rect x="${x + pw}" y="${y}" width="${cd}" height="${h}" fill="#fff" stroke="${INK}" stroke-width="1.5"/>`;
@@ -201,7 +201,7 @@ export function weldSide(dowel, x, y, s, compact = false) {
     return r;
   };
   const lab = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง"); // แบบเต็ม: เหล็กเดือยขึ้นกับความยาว ให้ดูตาราง
-  if (compact) { [[yT, P.nTop], [yB, P.nBot]].forEach(([yy2, k]) => { o += T(x0 + len + 8, yy2 + 5, lab(k), { size: 14, anchor: "start" }); }); return o + T(x - 20, y + h + 28, "WELDING PLATE SID VIEW", { size: 14, anchor: "start" }) + L(x - 28, y + h + 32, x + 190, y + h + 32, 0.9); }
+  if (compact) { (noLab ? [] : [[yT, P.nTop], [yB, P.nBot]]).forEach(([yy2, k]) => { o += T(x0 + len + 8, yy2 + 5, lab(k), { size: 14, anchor: "start" }); }); return o + T(x - 20, y + h + 28, "WELDING PLATE SID VIEW", { size: 14, anchor: "start" }) + L(x - 28, y + h + 32, x + 190, y + h + 32, 0.9); }
   o += row(yT - 26, lab(P.nTop), [[x0 + len * 0.3, yT]]);
   o += L(x + pw / 2, y + h / 2, x0 + 14, y + h / 2, 0.9) + tri(x + pw / 2, y + h / 2, 180, 7) + T(x0 + 20, y + h / 2 - 4, "PLATE 9mm.", { size: 14, anchor: "start" }) + L(x0 + 14, y + h / 2, x0 + 20 + tw("PLATE 9mm."), y + h / 2, 0.9);
   o += row(yB + 28, lab(P.nBot), [[x0 + len * 0.3, yB]]);
@@ -484,7 +484,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   if (hasJ) {
     const list = plan.full ? [null] : dowels.slice(0, 2), cyB = y + 110 * sw + 16;
     list.forEach((d, i) => { g += weldingPlate(d, colA + i * 300, cyB, sw, !plan.full && list.length > 1 ? `${m2(plan.pieces.filter((p) => p.rule && p.rule.dowel === d)[0]?.len || plan.pieces[i].len)} m.` : "", true); });
-    g += weldSide(list[0], (list.length > 1 ? colA + 600 : colB) - 110 * sw, cyB - 110 * sw, sw, true);
+    g += weldSide(list[0], (list.length > 1 ? colA + 600 : colB) - 110 * sw, cyB - 110 * sw, sw, true, list.length > 1); // 2 แผ่น: ขนาดเหล็กเดือยบอกในคำอธิบายของแต่ละแผ่นแล้ว ภาพด้านข้างไม่ซ้ำป้าย (กันชนตาราง)
     hLeft = 110 * sw * 2 + 16 + 44;
   }
   const TSC = 0.72, tb0 = table(plan, 1168 - TW3, 742 - table(plan, 0, 0, TW3).h, TW3), tb = { h: tb0.h * TSC, svg: `<g transform="translate(1168,742) scale(${TSC}) translate(-1168,-742)">${tb0.svg}</g>` }; // ตารางลวดติดมุมขวาล่าง ชิดตารางชื่อแบบ
