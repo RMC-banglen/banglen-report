@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107071841";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107071841";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107071841";
+import { pilePoly, esc } from "./draw2d.js?v=20261107071947";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107071947";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107071947";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -486,20 +486,21 @@ export function table(plan, x, y, w) {
   return { svg: o, h: H };
 }
 
-// ข้อความในช่องตารางชื่อแบบ ต้องไม่ล้นกรอบ: ลดขนาดตัวอักษร → ขึ้น 2 บรรทัด → บีบความกว้างอัตโนมัติ
+// ข้อความในช่องตารางชื่อแบบ: ขนาดตัวอักษรเท่ากันทุกช่อง ยาวเกินกรอบให้ตัดเป็น 2 แถว (ตัดที่เว้นวรรคใกล้กลาง ไม่มีเว้นวรรคก็ตัดตามความกว้าง)
 function fitVal(cx, yy, w, v) {
-  const est = (t, sz) => [...t].reduce((a, ch) => a + (/[ัิ-ฺ็-๎]/.test(ch) ? 0 : /[A-Z0-9]/.test(ch) ? 0.62 : 0.5) * sz, 0);
-  for (const sz of [13, 12, 11, 10]) if (est(v, sz) <= w) return T(cx, yy + 31, v, { size: sz });
-  const sp = [...v.matchAll(/s/g)].map((m) => m.index).sort((p, q) => Math.abs(p - v.length / 2) - Math.abs(q - v.length / 2))[0];
-  if (sp > 0) { const l1 = v.slice(0, sp).trim(), l2 = v.slice(sp).trim(); if (est(l1, 9.5) <= w && est(l2, 9.5) <= w) return T(cx, yy + 24, l1, { size: 9.5 }) + T(cx, yy + 35, l2, { size: 9.5 }); }
-  const sz = 9.5, one = est(v, sz) > w;
-  const txt = (t, y) => `<text x="${f1(cx)}" y="${y}" font-size="${sz}" text-anchor="middle" fill="${INK}" ${FONT}${est(t, sz) > w ? ` textLength="${f1(w)}" lengthAdjust="spacingAndGlyphs"` : ""}>${esc(t)}</text>`;
-  if (!one) return txt(v, yy + 31);
-  const h = Math.ceil(v.length / 2); return txt(v.slice(0, h), yy + 24) + txt(v.slice(h), yy + 35);
+  const SZ = 11, wid = (ch) => (/[ัิ-ฺ็-๎]/.test(ch) ? 0 : /[A-Z0-9]/.test(ch) ? 0.66 : 0.58) * SZ, est = (t) => [...t].reduce((q, ch) => q + wid(ch), 0);
+  v = String(v || "").trim();
+  if (est(v) <= w) return T(cx, yy + 29, v, { size: SZ });
+  const sp = [...v.matchAll(/s/g)].map((m) => m.index).sort((p, q) => Math.abs(p - v.length / 2) - Math.abs(q - v.length / 2));
+  let l1, l2;
+  for (const i of sp) { const x = v.slice(0, i).trim(), y = v.slice(i).trim(); if (est(x) <= w && est(y) <= w) { l1 = x; l2 = y; break; } }
+  if (l1 == null) { let acc = 0, k = 0; for (const ch of v) { if (acc + wid(ch) > w) break; acc += wid(ch); k += ch.length; } l1 = v.slice(0, k); l2 = v.slice(k).trim(); }
+  if (est(l2) > w) { let acc = 0, k = 0; for (const ch of l2) { if (acc + wid(ch) > w - 6) break; acc += wid(ch); k += ch.length; } l2 = l2.slice(0, k) + "…"; }
+  return T(cx, yy + 22, l1, { size: SZ }) + T(cx, yy + 35, l2, { size: SZ });
 }
 
 function titleBlock(plan, logoHref) {
-  const y = 742, p = plan.project || {}, tb = TITLE_BLOCK, cols = [20, 470, 760, 970, 1168];
+  const y = 742, p = plan.project || {}, tb = TITLE_BLOCK, cols = [20, 470, 740, 990, 1168];
   let o = `<rect x="20" y="${y}" width="1148" height="78" fill="#fff" stroke="${INK}" stroke-width="1.4"/>`;
   o += L(cols[1], y + 39, 1168, y + 39, 1) + cols.slice(1, 4).map((x) => L(x, y, x, y + 78, 1)).join("");
   o += `<image href="${logoHref}" x="30" y="${y + 8}" width="96" height="62" preserveAspectRatio="xMidYMid meet"/>`;
