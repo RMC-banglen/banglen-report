@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107063057";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107063057";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107063057";
+import { pilePoly, esc } from "./draw2d.js?v=20261107063450";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107063450";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107063450";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -125,7 +125,7 @@ function wiresDetail(cx, cy, s, lay = wireLayout(4, 2)) {
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });
   o += vd(x1 + 28, y0, Y(-W35), x1);
   o += `<g>${dimV(x0 - 28, Y(W35), y1, "")}${L(x0, Y(W35), x0 - 33, Y(W35), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(W35) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
-  o += T(cx, y1 + 62, "DETAIL OF PC.WIRES", { size: 12 }) + L(cx - 70, y1 + 66, cx + 70, y1 + 66, 0.9);
+  o += T(cx, y1 + 88, "DETAIL OF PC.WIRES", { size: 16 }) + L(cx - 98, y1 + 93, cx + 98, y1 + 93, 0.9); // ชื่อภาพอยู่แนวเดียวกับ SECTION A-A ขนาดตัวอักษรเท่ากัน
   return o;
 }
 
@@ -144,7 +144,7 @@ function wiresDetailStd(cx, cy, s) {
   const vd = (xd, ya, yb, ref) => L(ref, ya, xd + 5, ya, 0.6) + L(ref, yb, xd + 5, yb, 0.6) + dimV(xd, ya, yb, "") + T(xd + 7, (ya + yb) / 2 + 3.5, "0.035", { size: ft, anchor: "start" });
   o += vd(x1 + 28, y0, Y(-W35), x1);
   o += `<g>${dimV(x0 - 28, Y(W35), y1, "")}${L(x0, Y(W35), x0 - 33, Y(W35), 0.6)}${L(x0, y1, x0 - 33, y1, 0.6)}${T(x0 - 35, (Y(W35) + y1) / 2 + 3.5, "0.035", { size: ft, anchor: "end" })}</g>`;
-  o += T(cx, y1 + 62, "DETAIL OF PC.WIRES", { size: 12 }) + L(cx - 70, y1 + 66, cx + 70, y1 + 66, 0.9);
+  o += T(cx, y1 + 88, "DETAIL OF PC.WIRES", { size: 16 }) + L(cx - 98, y1 + 93, cx + 98, y1 + 93, 0.9); // ชื่อภาพอยู่แนวเดียวกับ SECTION A-A ขนาดตัวอักษรเท่ากัน
   return o;
 }
 
@@ -523,13 +523,13 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - HB() * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;
   // ---- แถว 3: หัวต่อ (ซ้าย) • คอลัมน์ขวา: แบบขยายบ่า (บน) + ตารางลวด (มุมขวาล่างเสมอ) ----
-  const sw = sa, hasJ = plan.joint, TW3 = 360, rx = 1160 - TW3, colA = two ? 190 : 230, colB = two ? 610 : 640;
+  const sw = bigSec ? sa / 1.3 : sa, hasJ = plan.joint, TW3 = 360, rx = 1160 - TW3, colA = two ? 190 : 230, colB = two ? 610 : bigSec ? colBx : 640; // หัวเพลท (ด้านข้าง) อยู่คอลัมน์เดียวกับภาพขยายลวด
   const dowels = plan.full ? [plan.rows[0] && plan.rows[0].dowel] : [...new Map(plan.pieces.map((p) => [p.rule ? p.rule.dowel.n + "-" + p.rule.dowel.d : "x", p])).values()].map((p) => p.rule && p.rule.dowel);
   let hLeft = 0;
   if (hasJ) {
     const list = plan.full ? [null] : dowels.slice(0, 2), cyB = y + HB() * sw + 16;
     list.forEach((d, i) => { g += weldingPlate(d, colA + i * 300, cyB, sw, !plan.full && list.length > 1 ? `${m2(plan.pieces.filter((p) => p.rule && p.rule.dowel === d)[0]?.len || plan.pieces[i].len)} m.` : "", true); });
-    g += weldSide(list[0], (list.length > 1 ? colA + 600 : colB) - HB() * sw, cyB - HB() * sw, sw, true, list.length > 1); // 2 แผ่น: ขนาดเหล็กเดือยบอกในคำอธิบายของแต่ละแผ่นแล้ว ภาพด้านข้างไม่ซ้ำป้าย (กันชนตาราง)
+    g += weldSide(list[0], (list.length > 1 ? colA + 600 : colB) - HB() * (bigSec && list.length === 1 ? sa : sw), cyB - HB() * sw, sw, true, list.length > 1); // 2 แผ่น: ขนาดเหล็กเดือยบอกในคำอธิบายของแต่ละแผ่นแล้ว ภาพด้านข้างไม่ซ้ำป้าย (กันชนตาราง)
     hLeft = HB() * sw * 2 + 16 + 44;
   }
   const TSC = 0.72, tb0 = table(plan, 1168 - TW3, 742 - table(plan, 0, 0, TW3).h, TW3), tb = { h: tb0.h * TSC, svg: `<g transform="translate(1168,742) scale(${TSC}) translate(-1168,-742)">${tb0.svg}</g>` }; // ตารางลวดติดมุมขวาล่าง ชิดตารางชื่อแบบ
