@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107064005";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107064005";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107064005";
+import { pilePoly, esc } from "./draw2d.js?v=20261107064229";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107064229";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107064229";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -184,7 +184,7 @@ function dowelPts(dowel) {
     const top = pts.filter((p) => p[1] < 0), bot = pts.filter((p) => p[1] >= 0);
     return { top, bot, nTop: top.length, nBot: bot.length };
   }
-  const top = dowel ? Math.ceil(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), xs = (k) => Array.from({ length: k }, (_, i) => (i - (k - 1) / 2) * pitch), ry = hb - 45;
+  const top = dowel ? Math.ceil(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), W = (Math.max(top, bot) - 1) * pitch / 2, xs = (k) => Array.from({ length: k }, (_, i) => (k > 1 ? -W + (i * 2 * W) / (k - 1) : 0)), ry = hb - 45; // ทั้งสองแถวกางเท่ากัน: เหล็กมุมบน/ล่างตรงกัน (เช่น 5 เส้น = 3 บน, ล่าง 2 เส้นที่มุม)
   const sh = pitch * 0.3, tx = xs(top).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? -sh : x)), bx = xs(bot).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? sh : x)); // เหล็กตรงกลางแถวบน/ล่างเยื้องสลับกัน ไม่ให้ไวร์จี้ปูนติด
   return { top: tx.map((x) => [x, -ry]), bot: bx.map((x) => [x, ry]), nTop: top, nBot: bot };
 }
