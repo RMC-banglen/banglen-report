@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107060006";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107060006";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107060006";
+import { pilePoly, esc } from "./draw2d.js?v=20261107060432";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107060432";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107060432";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -45,9 +45,20 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   const circ = (x, y, r, fill) => `<circle cx="${f1(X(x))}" cy="${f1(Y(y))}" r="${f1(r * s)}" fill="${fill || "#fff"}" stroke="${INK}" stroke-width="0.9"/>`;
   lay.w4.forEach(([x, y]) => { o += circ(x, y, 3, "#fff"); });
   lay.w5.forEach(([x, y]) => { o += star(x, y, 4.5 * s); });
+  // เหล็กเสริม DB: อยู่แนวเดียวกับแถวลวด PC (ห่างผิว 35 มม.) ห้ามทับลวด PC และต้องไม่ล้นกรอบปลอกแหวน — หาตำแหน่งว่างระหว่างลวดให้เอง (ผู้ใช้สั่งให้จำไว้เสมอ)
+  const obs = [...lay.w4.map((p) => ({ x: p[0], y: p[1], r: 3 })), ...lay.w5.map((p) => ({ x: p[0], y: p[1], r: 4.5 }))], limX = G.sq ? hb - 30 : hb - 25;
   ex.forEach((e) => {
-    const top = Math.ceil(e.n / 2), bot = e.n - top;
-    dbRow(top, -(hb - 41)).concat(dbRow(bot, hb - 41)).forEach(([x, y]) => { o += circ(x, y, e.d / 2, INK); }); // เหล็กเสริม DB ทึบดำ ตรงกับสัญลักษณ์ ● ในคำอธิบาย
+    const r = e.d / 2, top = Math.ceil(e.n / 2), bot = e.n - top, yRow = Math.min(hb - 35, limX - r - 1), xmax = limX - r - 2;
+    [[-1, top], [1, bot]].forEach(([sg, cnt]) => {
+      const y = sg * yRow;
+      for (let i = 0; i < cnt; i++) {
+        const ideal = -xmax + ((i + 0.5) * 2 * xmax) / cnt, sc = (x) => Math.min(...obs.filter((q) => Math.abs(q.y - y) < 30).map((q) => Math.hypot(x - q.x, y - q.y) - (r + q.r)), 99);
+        const cand = []; for (let x = -xmax; x <= xmax; x += 1) cand.push([x, sc(x)]);
+        const cap = Math.min(6, Math.max(...cand.map((c) => c[1])));
+        const x = cand.filter((c) => c[1] >= cap).sort((p, q) => Math.abs(p[0] - ideal) - Math.abs(q[0] - ideal))[0][0];
+        obs.push({ x, y, r }); o += circ(x, y, r, INK);
+      }
+    });
   });
   const x0 = X(-hb), x1 = X(hb), y0 = Y(-hb), y1 = Y(hb);
   // ขนาดแนวตั้งด้านซ้าย: 0.065 0.020 0.050 0.020 0.065 และ 0.22
