@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107055501";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107055501";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107055501";
+import { pilePoly, esc } from "./draw2d.js?v=20261107055714";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107055714";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107055714";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -493,9 +493,9 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
     const e = elevation(plan, pc, y, { first: i === 0, idx: i });
     g += e.svg; y += e.h - 4;
   });
-  // โหมด "ดูตาราง" (แบบเต็ม/หลายชุดลวด): ไม่วาดจุดลวดในหน้าตัด (ตามแบบ DXF: SEE TABLE) แสดงเฉพาะเส้นบอกระยะตำแหน่งลวดของแถวที่มีลวดมากที่สุดที่ไม่ใช่แบบ 4/2
-  const gG = plan.sec.geo || {}, rk = [...plan.sec.rules].filter((r) => !(r.w4 === 4 && r.w5 === 2)).sort((p, q) => q.w4 + q.w5 - (p.w4 + p.w5))[0] || plan.sec.rules[0];
-  const layDim = { ...wireLayout(rk.w4, rk.w5, gG.B || 220, !!gG.sq, gG.wl, gG.two ? "two" : gG.pat), w4: [], w5: [], std: false };
+  // โหมด "ดูตาราง" (แบบเต็ม/หลายชุดลวด): วาดตำแหน่งลวดของช่วงความยาวแรกในตาราง (เหมือนแบบ I-22 เดิม) ข้อความ "PC.WIRE ดูตาราง" บอกว่าจำนวนจริงดูที่ตาราง
+  const gG = plan.sec.geo || {}, r0 = plan.sec.rules[0];
+  const layDim = plan.layout || wireLayout(r0.w4, r0.w5, gG.B || 220, !!gG.sq, gG.wl, gG.two ? "two" : gG.pat);
   // ---- แถว 2: หน้าตัด A / B (+ จุดยกสำหรับแบบเดี่ยว) ----
   const sa = (two ? 0.5 : 0.62) * (220 / PILE22.B), topE = HB() * sa + (two ? 20 : 48), botE = HB() * sa + 98, cyA = y + topE;
   if (two) {
