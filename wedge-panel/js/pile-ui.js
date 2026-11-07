@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107072923";
-import { pileSheet } from "./pile-draw.js?v=20261107072923";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107072923";
-import { download } from "./pdf.js?v=20261107072923";
-import { esc } from "./draw2d.js?v=20261107072923";
-import { getSession, canEdit } from "./auth.js?v=20261107072923";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject } from "./db.js?v=20261107072923";
-import { db } from "./db.js?v=20261107072923";
-import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107072923";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107073333";
+import { pileSheet } from "./pile-draw.js?v=20261107073333";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107073333";
+import { download } from "./pdf.js?v=20261107073333";
+import { esc } from "./draw2d.js?v=20261107073333";
+import { getSession, canEdit } from "./auth.js?v=20261107073333";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject } from "./db.js?v=20261107073333";
+import { db } from "./db.js?v=20261107073333";
+import { parseRequest, TEMPLATE, blowSheet } from "./pile-req.js?v=20261107073333";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -113,14 +113,14 @@ function restore() {
   } catch (e) {}
 }
 
-async function addPage(doc, html, first) {
+async function addPage(doc, html, first, portrait) {
   const host = document.createElement("div");
-  host.style.cssText = "position:absolute;left:-12000px;top:0;width:1188px;height:840px;background:#fff";
+  host.style.cssText = "position:absolute;left:-12000px;top:0;background:#fff;" + (portrait ? "width:794px;height:1123px" : "width:1188px;height:840px");
   host.innerHTML = html; document.body.appendChild(host);
   const cv = await window.html2canvas(host, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
   host.remove();
-  if (!first) doc.addPage("a4", "landscape");
-  doc.addImage(cv.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 841.89, 595.28);
+  if (!first) doc.addPage("a4", portrait ? "portrait" : "landscape");
+  doc.addImage(cv.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, portrait ? 595.28 : 841.89, portrait ? 841.89 : 595.28);
 }
 const secName = (k) => { const s = PILE_SECTIONS[k]; return (s.menu || s.label) + " มอก."; };
 const blowItem = (inp) => ({ section: inp.section, L: inp.L, W: inp.blow.W, Qa: inp.blow.Qa, H: inp.blow.H });
@@ -259,7 +259,7 @@ async function pdfAll() {
       msg.textContent = "กำลังสร้าง PDF… " + (i + 1) + "/" + ok.length;
       const inp = pileInputOf(ok[i], ok[i].project), plan = planPile(inp);
       await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), first); first = false;
-      await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false);
+      await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len), curCode), false, true);
     }
     const pj = (ok[0].project.pj || "คำขอ").slice(0, 30);
     download(("แบบเสาเข็ม+blow " + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));
@@ -276,7 +276,7 @@ async function pdf() {
     await document.fonts.ready;
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
     await addPage(doc, pileSheet(plan).replace('width="100%"', 'width="1188" height="840"'), true);
-    if (inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false);
+    if (inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len), curCode), false, true);
     const name = `แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
     download(name + ".pdf", doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว";

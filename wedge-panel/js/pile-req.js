@@ -1,6 +1,6 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107072923";
-import { esc } from "./draw2d.js?v=20261107072923";
+import { autoSplit } from "./pile-calc.js?v=20261107073333";
+import { esc } from "./draw2d.js?v=20261107073333";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -78,25 +78,61 @@ export function blow(sectionKey, L, W, H, Qa) {
   return { A, P, a, b, Qu, S, per10: S > 0 ? 10 / S : 0, per30: S > 0 ? 30 / S : 0, pen10: 10 * S };
 }
 
-const f = (v, d = 2) => (isFinite(v) ? v.toFixed(d) : "-");
-// หน้าใบ blow count (ขนาดเดียวกับแผ่นแบบ 1188×840)
-export function blowSheet(p, secLabel, project, pieceLens) {
-  const r = blow(p.section, p.L, p.W, p.H, p.Qa);
-  const rows = Array.from({ length: 14 }, (_, i) => `<tr><td>${i + 1}</td><td></td><td></td><td></td><td></td></tr>`).join("");
-  const res = r ? (r.S > 0 ? "" : `<p style="color:#c00;font-weight:700">ค่า S ≤ 0 : ตุ้ม/ระยะยกเบาเกินไปสำหรับ Qa นี้</p>`) : `<p style="color:#c00">ข้อมูลไม่ครบ</p>`;
+const f = (v, d = 2) => (isFinite(v) ? v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "-");
+const DENSITY = 2.4; // ตัน/ลบ.ม. คอนกรีตอัดแรง (ใช้หาน้ำหนักเสา Wp)
+
+// ใบคำนวณ blow count แบบฟอร์ม Excel ของบริษัท (A4 แนวตั้ง 794×1123) หัวกระดาษ/สูตร/ลำดับบรรทัดตามต้นแบบ
+// p = {section,L,W,Qa,H}  project = {pj,ow,lo}  pieceLens = ความยาวแต่ละท่อน  code = รหัสงาน (ไม่มีก็ได้)
+export function blowSheet(p, secLabel, project, pieceLens, code) {
+  const r = blow(p.section, p.L, p.W, p.H, p.Qa), kind = p.section[0], size = p.section.slice(1);
+  const wp = r ? (r.A * p.L * 100 * DENSITY) / 1e6 : 0;
+  const sz = (+size / 100).toFixed(2), len = f(p.L);
+  const pile = kind === "T" ? `I &nbsp; ${sz} × ${len} ม.` : `เสาตัน ${sz} × ${sz} × ${len} ม.`;
   const pcs = pieceLens && pieceLens.length > 1 ? `ต่อเชื่อม ${pieceLens.length} ท่อน (${pieceLens.map((v) => f(v)).join(" + ")} ม.)` : "ท่อนเดี่ยว";
-  return `<div style="width:1188px;height:840px;background:#fff;color:#000;font-family:Sarabun,Tahoma,sans-serif;font-size:17px;padding:30px 44px;box-sizing:border-box;border:2px solid #000">
-<div style="display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:8px"><b style="font-size:26px">ใบคำนวณ Blow Count (สูตร Danish)</b><span>เสาเข็ม ${esc(secLabel)} ยาว ${f(p.L)} ม. ${esc(pcs)}</span></div>
-<div style="margin:8px 0 12px;line-height:1.5">โครงการ: ${esc(project.pj)} &nbsp; เจ้าของ: ${esc(project.ow)} &nbsp; สถานที่: ${esc(project.lo)}</div>
-<div style="display:flex;gap:32px">
-<table style="border-collapse:collapse;width:520px"><tbody>
-${[["น้ำหนักตุ้ม W", f(p.W), "ตัน"], ["ระยะยกตุ้ม H", f(p.H, 0), "ซม."], ["แรงที่ยอมให้ Qa", f(p.Qa), "ตัน"], ["ตัวคูณปลอดภัย F.S.", f(FS, 1), ""], ["กำลังประลัย Qu = F.S.×Qa", r ? f(r.Qu) : "-", "ตัน"],
-["พื้นที่หน้าตัด A", r ? f(r.A, 0) : "-", "ซม.²"], ["ความยาวเสา L", f(p.L * 100, 0), "ซม."], ["ประสิทธิภาพตุ้ม E", f(E), ""], ["Ec", f(EC, 0), "ตัน/ซม.²"],
-["a = E·W·H", r ? f(r.a) : "-", "ตัน·ซม."], ["b = L/(A·Ec)", r ? f(r.b, 5) : "-", "ซม./ตัน"]].map((x) => `<tr><td style="border:1px solid #000;padding:3px 8px">${x[0]}</td><td style="border:1px solid #000;padding:3px 8px;text-align:right;width:90px">${x[1]}</td><td style="border:1px solid #000;padding:3px 8px;width:70px">${x[2]}</td></tr>`).join("")}
-</tbody></table>
-<div style="flex:1"><div style="border:2px solid #000;padding:12px 16px;line-height:1.7"><b>S = a/Qu − ½√(2ab)</b><br>ระยะจมต่อครั้ง S = <b>${r ? f(r.S, 3) : "-"}</b> ซม./ครั้ง<br>10 ครั้งสุดท้ายจมไม่เกิน <b>${r ? f(r.pen10, 1) : "-"}</b> ซม.<br>ประมาณ <b>${r ? f(r.per10, 1) : "-"}</b> ครั้ง / 10 ซม. &nbsp; = <b>${r ? f(r.per30, 1) : "-"}</b> ครั้ง / 30 ซม. (ฟุต)</div>${res}
-<div style="margin-top:10px;font-size:15px;color:#333">หมายเหตุ: ค่าที่ได้เป็นเกณฑ์ตอกเสาเข็มตามสูตร Danish ใช้ควบคุมหน้างาน ไม่แทนรายการคำนวณของวิศวกร</div></div></div>
-<table style="border-collapse:collapse;width:100%;margin-top:14px;font-size:15px"><thead><tr>${["ครั้งที่/ช่วงตอก", "ระดับ/ความลึก (ม.)", "จำนวนครั้ง/10 ซม.", "จำนวนครั้ง/30 ซม.", "หมายเหตุ"].map((h) => `<th style="border:1px solid #000;padding:2px 6px">${h}</th>`).join("")}</tr></thead><tbody>${rows.replace(/<td>/g, '<td style="border:1px solid #000;height:15px">')}</tbody></table>
+  const red = (t) => `<b style="color:#c00000">${t}</b>`;
+  const row = (l, s, v, u) => `<div class="r"><span>${l}</span><span>${s || ""}</span><span class="e"></span><span class="v">${v == null ? "" : v}</span><span>${u || ""}</span></div>`;
+  const row3 = (l, s, v, u) => `<div class="r"><span>${l}</span><span>${s}</span><span class="e">=</span><span class="v">${v}</span><span>${u}</span></div>`;
+  const S = r ? r.S : NaN;
+  const css = `<style>
+.bs{width:794px;height:1123px;background:#fff;color:#000;box-sizing:border-box;padding:46px 56px;font-family:'Times New Roman',Times,serif;font-size:15px;position:relative}
+.bs .r{display:grid;grid-template-columns:276px 152px 22px 90px 1fr;height:31px;align-items:center}
+.bs .r>span{white-space:nowrap}
+.bs .r>span:nth-child(5){padding-left:8px}
+.bs .v{text-align:right}.bs .r3 .v{text-align:right}.bs .e{text-align:center}
+.bs .g{height:30px}
+.bs .box{border:1.5px solid #13508A;border-radius:8px;padding:10px 16px;margin:14px 0 20px;font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:14px;line-height:1.55;background:#f5f8fc}
+.bs .box .k{color:#13508A;font-weight:700;display:inline-block;width:78px}
+.bs .box .code{float:right;font-weight:700;color:#13508A;font-size:15px}
+</style>`;
+  return `${css}<div class="bs">
+<div style="display:flex;align-items:center;gap:14px;border-bottom:2px solid #000;padding-bottom:12px"><img src="assets/logo.png" style="width:128px;height:auto" alt=""><div style="font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif"><div style="font-size:19px;font-weight:700">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:13px;margin-top:4px">299หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div></div>
+<div style="text-align:center;font-weight:700;font-size:13px;margin-top:22px">STATIC LOAD BEARING CAPACITY OF PILE DRIVEN BY GRAVITY DROP HAMMER</div>
+<div class="box">${code ? `<span class="code">รหัสงาน ${esc(code)}</span>` : ""}<div><span class="k">โครงการ</span>${esc(project.pj || "-")}</div><div><span class="k">เจ้าของ</span>${esc(project.ow || "-")}</div><div><span class="k">สถานที่</span>${esc(project.lo || "-")}</div><div><span class="k">เสาเข็ม</span>${pile} &nbsp; ${esc(pcs)} &nbsp; TIS.396-2549</div></div>
+${row("PILE LENGTH :", "L =", f(p.L * 100), "CM.")}
+${row("AREA", "A =", r ? f(r.A) : "-", "CM.<sup style='font-size:9px'>2</sup>")}
+${row("PERIMETER", "P =", r ? f(r.P) : "-", "CM.")}
+${row("WEIGHT OF PILE", "Wp =", r ? f(wp) : "-", "T.")}
+${row("MODULUS OF ELASTICITY P.C. PILE", "Ec =", f(EC), "T. / CM.")}
+<div class="g"></div>
+${row("RIG. NO.", "", "", "")}
+${row("WEIGHT OF DROP HAMMER", "W =", red(f(p.W)), "T.")}
+${row("EFFICIENCY FACTOR FOR RIG.", "E =", f(E), "")}
+${row("HEIGHT OF FALL DROP HAMMER", "H =", red(f(p.H)), "CM.")}
+${row("ALLOWABLE BEARING CAPACITY", "Qa =", f(p.Qa), "T.")}
+${row("FACTOR OF SAFETY", "F.S. =", f(FS), "")}
+${row("ULTIMATE BEARING CAPACITY", "Qu =", r ? f(r.Qu) : "-", "T.")}
+<div class="g"></div>
+<div style="height:31px;display:flex;align-items:center">FROM DANISH PILE DRIVING FORMULAR</div>
+<div style="display:flex;align-items:center;gap:10px;margin:4px 0 4px 70px;height:62px"><span>Qu =</span><span style="display:inline-block;text-align:center"><div style="border-bottom:1.3px solid #000;padding:0 14px 1px;font-style:italic">a</div><div style="padding:1px 10px">S + 1/2 * SQR. 2ab</div></span></div>
+<div style="height:31px;display:flex;align-items:center">WHERE ;</div>
+${row3("ENERGY FOR DRIVING", "a = EWH", r ? f(r.a) : "-", "T-CM.")}
+${row3("ENERGY LOSS", "b = L/Aec", r ? f(r.b, 5) : "-", "CM./T.")}
+${row3("EXPECTED PENETRATION", "S = a/Qu - 1/2 SQR.2ab", r ? f(S, 3) : "-", "CM./BLOW")}
+<div class="g"></div>
+<div style="height:31px;display:flex;align-items:center">THUS ;</div>
+${row3("FOR 10 BLOWS REQUIRED PENETRATION", "", r && S > 0 ? f(10 * S) : "-", "CM.")}
+${row3("FOR 1 FOOT REQUIRES", "", r && S > 0 ? f(30 / S) : "-", "BLOWS.")}
+${r && S <= 0 ? `<p style="color:#c00000;font-weight:700;margin-top:14px">หมายเหตุ: ค่า S ≤ 0 ตุ้ม/ระยะยกเบาเกินไปสำหรับ Qa นี้</p>` : ""}
 </div>`;
 }
 
