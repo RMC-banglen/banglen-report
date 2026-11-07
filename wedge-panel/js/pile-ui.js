@@ -1,9 +1,9 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107012041";
-import { pileSheet } from "./pile-draw.js?v=20261107012041";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107012041";
-import { download } from "./pdf.js?v=20261107012041";
-import { esc } from "./draw2d.js?v=20261107012041";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107012315";
+import { pileSheet } from "./pile-draw.js?v=20261107012315";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107012315";
+import { download } from "./pdf.js?v=20261107012315";
+import { esc } from "./draw2d.js?v=20261107012315";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -28,13 +28,21 @@ function read() {
   };
 }
 
+// ความยาวแต่ละท่อนตามที่ใส่เอง หรือแบ่งอัตโนมัติ (ใช้แสดงในตัวเลือกท่อน และหาท่อนสั้นที่สุด)
+function pieceLens() {
+  const n = pnVal(); if (n < 2) return [num("pL")];
+  const sp = splits.slice(0, n).map((v) => parseFloat(v)), L = num("pL");
+  return sp.length === n && sp.every((v) => v > 0) ? sp : L ? autoSplit(L, n) : Array(n).fill(0);
+}
+const shortestIdx = (lens) => lens.reduce((bi, v, i) => (v > 0 && (lens[bi] <= 0 || v < lens[bi]) ? i : bi), 0) + 1;
+
 function renderExtras() {
   const box = $("pxs"); box.innerHTML = "";
   extras.forEach((e, i) => {
-    const multi = pnVal() > 1, showSel = multi && !(e.len > 0); // ท่อนเดี่ยว: ไม่ต้องเลือก • ระบุความยาวสั้นกว่าเสา: ท่อนบนเสมอ • ไม่ระบุ(เต็มท่อน): เลือกท่อนบน/ทุกท่อน
-    if (!multi) e.pieces = 0; else if (e.len > 0 || !e.pieces) e.pieces = 1;
+    const multi = pnVal() > 1, showSel = multi, lens = pieceLens(), sIdx = shortestIdx(lens); // ท่อนเดี่ยว: ไม่ต้องเลือก • ระบุความยาวสั้นกว่าเสา: ท่อนบนเสมอ • ไม่ระบุ(เต็มท่อน): เลือกท่อนบน/ทุกท่อน
+    if (!multi) e.pieces = 0;
     const d = document.createElement("div"); d.className = "pxrow" + (showSel ? "" : " nosel");
-    d.innerHTML = `<div><label>ขนาด</label><select>${DB_SIZES.map((s) => `<option value="${s}" ${s === e.d ? "selected" : ""}>DB${s}</option>`).join("")}</select></div><div><label>ยาว (ม.)</label><input type="number" step="0.01" min="0" value="${e.len || ""}" placeholder="เต็มท่อน"></div><div><label>จำนวน (เส้น)</label><input type="number" step="1" min="1" max="8" value="${e.n || ""}"></div>${showSel ? `<div><label>ใช้กับท่อน</label><select class="xp"><option value="1" ${e.pieces !== -1 ? "selected" : ""}>ท่อนบน</option><option value="-1" ${e.pieces === -1 ? "selected" : ""}>ทั้ง ${pnVal()} ท่อน</option></select></div>` : ""}<button type="button" class="iconbtn" aria-label="ลบเหล็กเสริมนี้">✕</button>`;
+    d.innerHTML = `<div><label>ขนาด</label><select>${DB_SIZES.map((s) => `<option value="${s}" ${s === e.d ? "selected" : ""}>DB${s}</option>`).join("")}</select></div><div><label>ยาว (ม.)</label><input type="number" step="0.01" min="0" value="${e.len || ""}" placeholder="เต็มท่อน"></div><div><label>จำนวน (เส้น)</label><input type="number" step="1" min="1" max="8" value="${e.n || ""}"></div>${showSel ? `<div><label>ใช้กับท่อน</label><select class="xp">${lens.map((l, q) => `<option value="${q + 1}" ${e.pieces !== -1 && (e.pieces || sIdx) === q + 1 ? "selected" : ""}>ท่อนที่ ${q + 1}${l ? ` (${m2(l)} ม.)` : ""}</option>`).join("")}<option value="-1" ${e.pieces === -1 ? "selected" : ""}>ทั้ง ${pnVal()} ท่อน</option></select></div>` : ""}<button type="button" class="iconbtn" aria-label="ลบเหล็กเสริมนี้">✕</button>`;
     const [sel, xp] = d.querySelectorAll("select"), [len, n] = d.querySelectorAll("input");
     if (xp) xp.onchange = () => { e.pieces = +xp.value; render(); };
     sel.onchange = () => { e.d = +sel.value; render(); };
@@ -61,7 +69,7 @@ function renderSplitRows() {
     for (let i = 0; i < n; i++) {
       const d = document.createElement("div"); d.className = "splr";
       d.innerHTML = `<label>ท่อนที่ ${i + 1}${i === 0 ? " (บน)" : i === n - 1 ? " (ล่าง)" : ""} (ม.)</label><input type="number" step="0.01" min="0" value="${splits[i] || ""}">`;
-      const inp = d.querySelector("input"); inp.oninput = () => { splits[i] = inp.value; sched(); };
+      const inp = d.querySelector("input"); inp.oninput = () => { splits[i] = inp.value; renderExtras(); sched(); };
       box.appendChild(d);
     }
   }
@@ -134,6 +142,7 @@ export function initPile() {
   $("psec").innerHTML = Object.values(PILE_SECTIONS).map((s) => `<option value="${s.key}">${s.label} มอก. (${s.size} ม.)</option>`).join("");
   restore(); renderExtras();
   ["pL", "pshAt", "ppj", "pow", "plo"].forEach((id) => $(id).addEventListener("input", sched));
+  $("pL").addEventListener("input", renderExtras); // ความยาวท่อนเปลี่ยน → ตัวเลือกท่อนของเหล็กเสริมอัปเดต
   ["psh", "psec"].forEach((id) => $(id).addEventListener("change", render));
   document.querySelectorAll('input[name="pt"],#pnS').forEach((x) => x.addEventListener("change", () => { renderExtras(); render(); }));
   $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };

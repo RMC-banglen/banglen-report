@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107012041";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107012315";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -59,15 +59,18 @@ export function planPile(input) {
       return { full: false, len, mid: r2(len - ends), rule };
     });
   }
+  const shortIdx = pieces.reduce((bi, p, i) => (p.len < pieces[bi].len ? i : bi), 0) + 1; // ไม่ได้เลือกท่อน = ท่อนสั้นที่สุดก่อน (เท่ากัน = ท่อนบน)
   // เหล็กเสริมพิเศษ: ความยาวว่าง = ยาวเท่าท่อน
-  const extras = (full ? [] : input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), pieces: +e.pieces < 0 ? "all" : +e.pieces > 0 ? Math.floor(+e.pieces) : (input.pieces > 1 ? 1 : "all"), len: +e.len > 0 ? r2(+e.len) : null }));
+  const extras = (full ? [] : input.extras || []).filter((e) => +e.d > 0 && +e.n > 0).map((e) => ({ d: +e.d, n: Math.floor(+e.n), pieces: +e.pieces < 0 ? "all" : +e.pieces > 0 ? Math.floor(+e.pieces) : (input.pieces > 1 ? shortIdx : "all"), len: +e.len > 0 ? r2(+e.len) : null }));
   extras.forEach((e) => { if (e.n % 2) warn.push(`เหล็กเสริม DB${e.d} ${e.n} เส้น เป็นเลขคี่ จัดวางบน/ล่างไม่เท่ากัน`); });
   // เหล็กเสริมแต่ละรายการใช้กับ "ทุกท่อน" หรือท่อนที่ระบุ (นับจากท่อนบน = 1)
   extras.forEach((e) => { if (e.pieces !== "all" && e.pieces > pieces.length) warn.push(`เหล็กเสริม DB${e.d} ระบุท่อนที่ ${e.pieces} แต่มีแค่ ${pieces.length} ท่อน`); });
   pieces.forEach((p, i) => { p.extras = extras.filter((e) => e.pieces === "all" || e.pieces === i + 1); });
+  // ท่อนที่ใส่เหล็กเสริมแสดงอยู่ด้านบนเสมอ (ท่อนอื่นเรียงตามเดิมต่อท้าย)
+  if (pieces.length > 1 && pieces.some((p) => p.extras.length) && !pieces.every((p) => p.extras.length)) pieces = [...pieces.filter((p) => p.extras.length), ...pieces.filter((p) => !p.extras.length)];
   // ชุดหน้าตัด (config): ท่อนที่ลวด PC และเหล็กเสริมเหมือนกันรวมเป็นหน้าตัดเดียว ต่างกันแยกเป็น A, B (A = ชุดที่ไม่มีเหล็กเสริมก่อน แล้วเรียงตามท่อนจากบน)
   // เกิน 2 ชุด (หน้าตัดวางไม่พอ) → แบ่งตามเหล็กเสริมอย่างเดียว (A ไม่มี / B มี) และให้ลวดดูตาราง
-  const wk = (p) => (p.rule ? p.rule.w4 + "/" + p.rule.w5 : "x"), ek = (p) => p.extras.map((e) => e.d + "x" + e.n + "x" + (e.len || p.len)).join("|");
+  const wk = (p) => (p.rule ? p.rule.w4 + "/" + p.rule.w5 : "x"), ek = (p) => p.extras.map((e) => e.d + "x" + e.n + "x" + (e.len || "L")).join("|");
   const grp = (keyFn) => { const m = new Map(); pieces.forEach((p, i) => { const k = keyFn(p); if (!m.has(k)) m.set(k, { key: k, idx: [], first: p }); m.get(k).idx.push(i); }); return [...m.values()].sort((a, b) => (a.first.extras.length > 0) - (b.first.extras.length > 0)); };
   let cfgs = full ? [] : grp((p) => wk(p) + "#" + ek(p)), manyCfg = false;
   if (cfgs.length > 2) { cfgs = grp((p) => (p.extras.length ? ek(p) : "")); manyCfg = true; if (cfgs.length > 2) cfgs = [cfgs[0], { key: "rest", idx: cfgs.slice(1).flatMap((g) => g.idx), first: cfgs[1].first }]; }
