@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107071947";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107071947";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107071947";
+import { pilePoly, esc } from "./draw2d.js?v=20261107072450";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107072450";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107072450";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -486,29 +486,44 @@ export function table(plan, x, y, w) {
   return { svg: o, h: H };
 }
 
-// ข้อความในช่องตารางชื่อแบบ: ขนาดตัวอักษรเท่ากันทุกช่อง ยาวเกินกรอบให้ตัดเป็น 2 แถว (ตัดที่เว้นวรรคใกล้กลาง ไม่มีเว้นวรรคก็ตัดตามความกว้าง)
-function fitVal(cx, yy, w, v) {
-  const SZ = 11, wid = (ch) => (/[ัิ-ฺ็-๎]/.test(ch) ? 0 : /[A-Z0-9]/.test(ch) ? 0.66 : 0.58) * SZ, est = (t) => [...t].reduce((q, ch) => q + wid(ch), 0);
-  v = String(v || "").trim();
-  if (est(v) <= w) return T(cx, yy + 29, v, { size: SZ });
-  const sp = [...v.matchAll(/s/g)].map((m) => m.index).sort((p, q) => Math.abs(p - v.length / 2) - Math.abs(q - v.length / 2));
-  let l1, l2;
-  for (const i of sp) { const x = v.slice(0, i).trim(), y = v.slice(i).trim(); if (est(x) <= w && est(y) <= w) { l1 = x; l2 = y; break; } }
-  if (l1 == null) { let acc = 0, k = 0; for (const ch of v) { if (acc + wid(ch) > w) break; acc += wid(ch); k += ch.length; } l1 = v.slice(0, k); l2 = v.slice(k).trim(); }
-  if (est(l2) > w) { let acc = 0, k = 0; for (const ch of l2) { if (acc + wid(ch) > w - 6) break; acc += wid(ch); k += ch.length; } l2 = l2.slice(0, k) + "…"; }
-  return T(cx, yy + 22, l1, { size: SZ }) + T(cx, yy + 35, l2, { size: SZ });
+// ตารางชื่อแบบ: ตัวอักษรขนาดเดียวกันอ่านง่าย (13) ข้อความยาวให้ตัดหลายแถว แล้วขยายความสูงกรอบตามจำนวนแถว (ขยายขึ้นด้านบน ก้นกรอบอยู่ที่เดิม)
+const TB_SZ = 13, TB_COLS = [20, 470, 740, 990, 1168], TB_LH = 16;
+const tbWid = (ch) => (/[ัิ-ฺ็-๎]/.test(ch) ? 0 : /[A-Z0-9]/.test(ch) ? 0.66 : 0.58) * TB_SZ;
+const tbEst = (t) => [...t].reduce((q, ch) => q + tbWid(ch), 0);
+function tbWrap(v, w) { // ตัดแถวที่ช่องว่าง/ขอบคำ: คำนำหน้า (ต. อ. จ. แขวง เขต ...) ติดกับคำถัดไปเสมอ ไม่ตัดกลางคำ
+  v = String(v || "").trim(); if (!v) return [""];
+  const PRE = /^(ต|อ|จ|ถ|ซ|ม)\.$|^(แขวง|เขต|ตำบล|อำเภอ|จังหวัด|ถนน|ซอย|หมู่|หมู่ที่|คุณ|นาย|นาง|นางสาว)$/;
+  const words = []; for (const t of v.split(/\s+/)) { if (words.length && PRE.test(words[words.length - 1])) words[words.length - 1] += " " + t; else words.push(t); }
+  const seg = (t) => { try { return [...new Intl.Segmenter("th", { granularity: "word" }).segment(t)].map((x) => x.segment); } catch (e) { return [...t]; } };
+  const out = []; let cur = "";
+  for (const wd of words) {
+    if (tbEst((cur ? cur + " " : "") + wd) <= w) { cur = cur ? cur + " " + wd : wd; continue; }
+    if (cur) { out.push(cur); cur = ""; }
+    if (tbEst(wd) <= w) { cur = wd; continue; }
+    for (const piece of seg(wd)) { if (tbEst(cur + piece) > w && cur) { out.push(cur); cur = ""; } cur += piece; }
+  }
+  if (cur) out.push(cur); return out.slice(0, 4);
+}
+function tbLayout(p) {
+  const wP = TB_COLS[2] - TB_COLS[1] - 12, wL = TB_COLS[3] - TB_COLS[2] - 12;
+  const pj = tbWrap(p.pj, wP), lo = tbWrap(p.lo, wL), ow = tbWrap(p.ow, wP);
+  const rh = (n) => Math.max(39, 18 + n * TB_LH + 3);
+  const h1 = rh(Math.max(pj.length, lo.length)), h2 = rh(ow.length);
+  return { pj, lo, ow, h1, h2, H: h1 + h2 };
 }
 
-function titleBlock(plan, logoHref) {
-  const y = 742, p = plan.project || {}, tb = TITLE_BLOCK, cols = [20, 470, 740, 990, 1168];
-  let o = `<rect x="20" y="${y}" width="1148" height="78" fill="#fff" stroke="${INK}" stroke-width="1.4"/>`;
-  o += L(cols[1], y + 39, 1168, y + 39, 1) + cols.slice(1, 4).map((x) => L(x, y, x, y + 78, 1)).join("");
-  o += `<image href="${logoHref}" x="30" y="${y + 8}" width="96" height="62" preserveAspectRatio="xMidYMid meet"/>`;
-  o += T(140, y + 26, tb.company, { size: 18, anchor: "start", weight: 700 }) + T(140, y + 44, tb.companyEn, { size: 10, anchor: "start" });
-  const cell = (x1, x2, yy, label, val) => T(x1 + 6, yy + 13, label, { size: 8.5, anchor: "start", fill: "#444" }) + fitVal((x1 + x2) / 2, yy, x2 - x1 - 12, val || "");
-  o += cell(cols[1], cols[2], y, "PROJECT", p.pj) + cell(cols[2], cols[3], y, "LOCATION", p.lo) + cell(cols[3], cols[4], y, "DESIGN BY :", tb.designBy);
-  o += cell(cols[1], cols[2], y + 39, "OWNER", p.ow) + cell(cols[2], cols[3], y + 39, "DRAWING BY :", tb.drawBy) + cell(cols[3], cols[4], y + 39, "APPROVED BY :", `${tb.approveBy} ${tb.licence}`);
-  o += L(470, y + 39, 470, y + 78, 1);
+function titleBlock(plan, logoHref, lay) {
+  const tb = TITLE_BLOCK, cols = TB_COLS, y = 820 - lay.H, H = lay.H, yb = y + lay.h1;
+  let o = `<rect x="20" y="${y}" width="1148" height="${H}" fill="#fff" stroke="${INK}" stroke-width="1.4"/>`;
+  o += L(cols[1], yb, 1168, yb, 1) + cols.slice(1, 4).map((x) => L(x, y, x, y + H, 1)).join("");
+  const mid = y + H / 2;
+  o += `<image href="${logoHref}" x="30" y="${f1(mid - 31)}" width="96" height="62" preserveAspectRatio="xMidYMid meet"/>`;
+  o += T(140, mid - 13, tb.company, { size: 18, anchor: "start", weight: 700 }) + T(140, mid + 5, tb.companyEn, { size: 10, anchor: "start" });
+  const lab = (x1, yy, t) => T(x1 + 6, yy + 13, t, { size: 8.5, anchor: "start", fill: "#444" });
+  const lines = (x1, x2, yy, arr) => arr.map((t, i) => T((x1 + x2) / 2, yy + 15 + TB_LH * (i + 1), t, { size: TB_SZ })).join("");
+  const one = (x1, x2, yy, t) => T((x1 + x2) / 2, yy + 31, t, { size: TB_SZ });
+  o += lab(cols[1], y, "PROJECT") + lines(cols[1], cols[2], y, lay.pj) + lab(cols[2], y, "LOCATION") + lines(cols[2], cols[3], y, lay.lo) + lab(cols[3], y, "DESIGN BY :") + one(cols[3], cols[4], y, tb.designBy);
+  o += lab(cols[1], yb, "OWNER") + lines(cols[1], cols[2], yb, lay.ow) + lab(cols[2], yb, "DRAWING BY :") + one(cols[2], cols[3], yb, tb.drawBy) + lab(cols[3], yb, "APPROVED BY :") + one(cols[3], cols[4], yb, `${tb.approveBy} ${tb.licence}`);
   return o;
 }
 
@@ -548,7 +563,8 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
     g += weldSide(list[0], (list.length > 1 ? colA + 600 : colB) - HB() * (bigSec && list.length === 1 ? sa : sw), cyB - HB() * sw, sw, true, list.length > 1); // 2 แผ่น: ขนาดเหล็กเดือยบอกในคำอธิบายของแต่ละแผ่นแล้ว ภาพด้านข้างไม่ซ้ำป้าย (กันชนตาราง)
     hLeft = HB() * sw * 2 + 16 + 44;
   }
-  const TSC = 0.72, tb0 = table(plan, 1168 - TW3, 742 - table(plan, 0, 0, TW3).h, TW3), tb = { h: tb0.h * TSC, svg: `<g transform="translate(1168,742) scale(${TSC}) translate(-1168,-742)">${tb0.svg}</g>` }; // ตารางลวดติดมุมขวาล่าง ชิดตารางชื่อแบบ
+  const lay = tbLayout(plan.project || {}), TY = 820 - lay.H;
+  const TSC = 0.72, tb0 = table(plan, 1168 - TW3, TY - table(plan, 0, 0, TW3).h, TW3), tb = { h: tb0.h * TSC, svg: `<g transform="translate(1168,${TY}) scale(${TSC}) translate(-1168,-${TY})">${tb0.svg}</g>` }; // ตารางลวดติดมุมขวาล่าง ชิดตารางชื่อแบบ
   const yRow3 = y;
   let hRight = 0;
   const bigSh = !!plan.shoulder && !hasJ; // ท่อนเดี่ยว (ไม่มีหัวต่อ): แถวล่างว่าง → วางภาพ 3 มิติบ่าและแบบขยายบ่าใหญ่ๆ
@@ -565,14 +581,14 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   const rowH = Math.max(hLeft, hRight);
   y += rowH + 6;
   // ---- ย่อให้พอดี: พื้นที่ใช้ได้ = เหนือตารางชื่อแบบ ----
-  const top = 90, avail = 742 - top - 10;
+  const top = 90, avail = TY - top - 10;
   let k = Math.min(1, avail / y);
-  if (plan.shoulder && !bigSh) k = Math.min(k, (742 - tb.h - 8 - top) / (yRow3 + 200)); // แบบขยายบ่าอยู่เหนือตารางพอดี
+  if (plan.shoulder && !bigSh) k = Math.min(k, (TY - tb.h - 8 - top) / (yRow3 + 200)); // แบบขยายบ่าอยู่เหนือตารางพอดี
   const tx = (W / 2) * (1 - k);
   let o = `<defs><pattern id="stipple" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="0.8" fill="#222"/><circle cx="4.5" cy="4.5" r="0.8" fill="#222"/></pattern></defs>`;
   o += `<rect width="${W}" height="${H}" fill="#fff"/><rect x="20" y="20" width="1148" height="800" fill="none" stroke="${INK}" stroke-width="1.8"/>`;
   o += L(20, 62, 1168, 62, 1.4) + T(W / 2, 48, plan.title, { size: 22, weight: 400 }); // ชื่อแบบอยู่ในกรอบหัวแบบเต็มความกว้าง
   o += `<g transform="translate(${f1(tx)},${top}) scale(${k.toFixed(4)})">${g}</g>`;
-  o += tb.svg + titleBlock(plan, logoHref);
+  o += tb.svg + titleBlock(plan, logoHref, lay);
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" style="background:#fff;display:block">${o}</svg>`;
 }

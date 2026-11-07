@@ -1,6 +1,6 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107071947";
-import { esc } from "./draw2d.js?v=20261107071947";
+import { autoSplit } from "./pile-calc.js?v=20261107072450";
+import { esc } from "./draw2d.js?v=20261107072450";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -31,8 +31,7 @@ function parseHeadLine(l, p) {
   if (clean(parts[0])) p.lo = (p.lo ? p.lo + " " : "") + clean(parts[0]);
   for (let i = 1; i < parts.length; i += 2) {
     const lab = parts[i], t = clean(parts[i + 1] || "");
-    if (lab === "โครงการ") p.pj = t ? "โครงการ" + t : "";
-    else if (lab === "หน่วยงาน" || lab === "ชื่องาน") p.pj = t;
+    if (lab === "โครงการ" || lab === "หน่วยงาน" || lab === "ชื่องาน") p.pj = t; // หน่วยงาน = โครงการ ไม่เอาคำว่า หน่วยงาน/โครงการ มาใส่ในชื่อ
     else if (/^เจ้าของ/.test(lab)) p.ow = t;
     else p.lo = (p.lo ? p.lo + " " : "") + t;
   }
