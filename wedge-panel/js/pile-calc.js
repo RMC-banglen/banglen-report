@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107061300";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107061350";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -12,13 +12,22 @@ export function ruleFor(sec, len) {
 // ตำแหน่งลวด PC ในหน้าตัดไอ (มม. จากศูนย์กลาง): แถวบน y=−75 แถวล่าง y=+75 (ห่างขอบ 35 มม.) ระยะลวดห่างกัน 35 มม. (ตามแบบ AutoCAD: 3.5 ซม. ต่อเนื่อง)
 // แถวบนนับจากขอบขวา แถวล่างนับจากขอบซ้าย: ลวดที่ 1, 2, 3 ห่างขอบ 3.5, 7.0, 10.5 ซม. และอีกฝั่งที่เหลือนับจากขอบตรงข้าม (10 เส้น = แถวละ 5: บน −75,−40,+5,+40,+75 ล่าง −75,−40,−5,+40,+75)
 // 4mm×4 + 5mm×2 = แบบมาตรฐาน (ลวด 4 มม. ที่มุม ลวด 5 มม. สลับบน/ล่าง) ซึ่งตรงกับกฎเดียวกัน
+// ลวดต้องบาลานซ์: ลวด 4 มม. กับ 5 มม. พื้นที่ไม่เท่ากัน จึงจัดขนาดเป็นคู่ที่หมุน 180° ซึ่งกันและกัน (คู่ริมนอกสุดเป็น 4 มม. ก่อน) ให้จุดศูนย์ถ่วงของกลุ่มลวดอยู่กลางหน้าตัดเสมอ (ผู้ใช้สั่ง)
+function balanceSplit(pts, w4) {
+  const used = new Set(), key = (p) => p[0].toFixed(3) + "," + p[1].toFixed(3), pairs = [];
+  pts.forEach((p) => { if (used.has(key(p))) return; used.add(key(p)); const q = pts.find((r) => r !== p && !used.has(key(r)) && Math.abs(r[0] + p[0]) < 1e-6 && Math.abs(r[1] + p[1]) < 1e-6); if (q) { used.add(key(q)); pairs.push([p, q]); } else pairs.push([p]); });
+  pairs.sort((a, b) => Math.abs(b[0][0]) + Math.abs(b[0][1]) - Math.abs(a[0][0]) - Math.abs(a[0][1]));
+  const f4 = [], f5 = []; let n = w4;
+  pairs.forEach((pr) => { if (n >= pr.length) { f4.push(...pr); n -= pr.length; } else f5.push(...pr); });
+  return { w4: f4, w5: f5 };
+}
 // เสา 40 (I-40 / S-40): ลวดแถวนอก (ห่างผิว 35) ได้สูงสุด 8 เส้นต่อปีก (ซ้าย 4 ขวา 4 นับทีละ 35 มม. ตามเส้นบอกระยะในแบบ) ส่วนที่เกินเป็นแถวที่สอง (เข้ามาอีก 35) แถวล่างนับจากมุมซ้าย แถวบนหมุน 180° — ตำแหน่งแถวสองและการกระจายเป็นการสมมติ
 function twoRow(w4, w5, B) {
   const hb = B / 2, yw = hb - 35, N = w4 + w5, k = Math.max(1, Math.round(N / 2)), m1 = Math.min(k, 8), m2 = k - m1;
   const row = (m, y) => { const bl = Math.ceil(m / 2), br = m - bl; return [...Array(bl)].map((_, i) => [-yw + 35 * i, y]).concat([...Array(br)].map((_, j) => [yw - 35 * j, y])); };
   const bot = row(m1, yw).concat(m2 ? row(m2, yw - 35) : []), all = bot.concat(bot.map(([x, y]) => [-x, -y])).sort((p, q) => Math.abs(q[0]) + Math.abs(q[1]) - Math.abs(p[0]) - Math.abs(p[1]));
   const bl1 = Math.ceil(m1 / 2);
-  return { w4: all.slice(0, w4), w5: all.slice(w4), n4: w4, n5: w5, std: false, per: k, bl: bl1, br: m1 - bl1, two: true };
+  return { ...balanceSplit(all, w4), n4: w4, n5: w5, std: false, per: k, bl: bl1, br: m1 - bl1, two: true };
 }
 // เสาสี่เหลี่ยม: ลวดรอบวงปลอก ห่างผิว 35 มม. — 4 มุมก่อน ที่เหลือแบ่งเท่าๆ กันตามด้านบน/ล่าง/ซ้าย/ขวา (ลวด 4 มม. ใช้ที่มุมก่อน) ตำแหน่งจริงในแบบไม่มีระบุ จึงเป็นการจัดเอง
 function sqLayout(w4, w5, B, pat) {
@@ -28,7 +37,7 @@ function sqLayout(w4, w5, B, pat) {
   if (pp) { // ตำแหน่งตามแบบ AutoCAD (ผู้ใช้ส่ง 7 พ.ย. 2569): แถวล่างตามรายการ L n = นับจากมุมซ้าย n×35 มม., R n = จากมุมขวา; แถวบนหมุน 180°; extra = แถวที่สอง (เข้ามา 35 มม.)
     const X = (t) => (t[0] === "L" ? -yw + 35 * +t.slice(1) : yw - 35 * +t.slice(1)), bot = pp.row.map((t) => [X(t), yw]).concat((pp.extra || []).map(([t, r]) => [X(t), yw - 35 * r]));
     const all = bot.concat(bot.map(([x, y]) => [-x, -y])).sort((p, q) => Math.abs(q[0]) + Math.abs(q[1]) - Math.abs(p[0]) - Math.abs(p[1]));
-    return { w4: all.slice(0, w4), w5: all.slice(w4), n4: w4, n5: w5, std: false, per: 0 };
+    return { ...balanceSplit(all, w4), n4: w4, n5: w5, std: false, per: 0 };
   }
   const e = Math.max(0, N - 4), cnt = [0, 0, 0, 0]; // บน ล่าง ซ้าย ขวา
   for (let i = 0; i < e; i++) cnt[i % 4]++;
@@ -36,7 +45,7 @@ function sqLayout(w4, w5, B, pat) {
   const pts = [[-yw, -yw], [yw, yw], [yw, -yw], [-yw, yw]]; // มุม: ซ้ายบน ขวาล่าง ขวาบน ซ้ายล่าง (กระจายแนวทแยง)
   along(cnt[0]).forEach((x) => pts.push([x, -yw])); along(cnt[1]).forEach((x) => pts.push([x, yw]));
   along(cnt[2]).forEach((y) => pts.push([-yw, y])); along(cnt[3]).forEach((y) => pts.push([yw, y]));
-  return { w4: pts.slice(0, w4), w5: pts.slice(w4, w4 + w5), n4: w4, n5: w5, std: false, per: 0 };
+  return { ...balanceSplit(pts, w4), n4: w4, n5: w5, std: false, per: 0 };
 }
 export function wireLayout(w4, w5, B = 220, sq = false, wl, pat, p4) {
   if (sq) return sqLayout(w4, w5, B, pat);
@@ -52,7 +61,7 @@ export function wireLayout(w4, w5, B = 220, sq = false, wl, pat, p4) {
   const all = top.map((x) => [x, -yw]).concat(bot.map((x) => [x, yw]));
   if (w4 > 0 && w5 > 0) { // ลวดสองขนาด: 4 มม. อยู่ที่มุม/ริมนอกสุดก่อน ที่เหลือเป็น 5 มม. (ตำแหน่งจริงในแบบไม่ระบุ — จัดเอง)
     const ord = all.map((p, i) => [p, i]).sort((p, q) => Math.abs(q[0][0]) - Math.abs(p[0][0]) || p[0][1] - q[0][1] || p[1] - q[1]).map((t) => t[0]);
-    return { w4: ord.slice(0, w4), w5: ord.slice(w4), n4: w4, n5: w5, std: false, per: k, bl, br, pitch: p };
+    return { ...balanceSplit(all, w4), n4: w4, n5: w5, std: false, per: k, bl, br, pitch: p };
   }
   return { w4: w4 ? all : [], w5: w5 ? all : [], n4: w4, n5: w5, std: false, per: k, bl, br, pitch: p };
 }

@@ -1,15 +1,15 @@
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261107061300";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261107061350";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261107061300";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261107061300";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261107061300";
-import { createViews } from "./view3d.js?v=20261107061300";
-import { initPile } from "./pile-ui.js?v=20261107061300";
-import { makePdf } from "./pdf.js?v=20261107061300";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261107061300";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261107061300";
+} from "./calc.js?v=20261107061350";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261107061350";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261107061350";
+import { createViews } from "./view3d.js?v=20261107061350";
+import { initPile } from "./pile-ui.js?v=20261107061350";
+import { makePdf } from "./pdf.js?v=20261107061350";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261107061350";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261107061350";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
