@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107063806";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107063806";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107063806";
+import { pilePoly, esc } from "./draw2d.js?v=20261107063920";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107063920";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107063920";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -176,7 +176,7 @@ function dowelPts(dowel) {
   if (PILE22.sq) { // เสาสี่เหลี่ยม: เหล็กเดือยวางตามมุม/กึ่งกลางด้าน/กลางแผ่น ตามจำนวน (4 มุม • 5 +กลาง • 6 +กลางบนล่าง • 7 +กลาง • 8 รอบ • 9 +กลาง)
     const n = dowel ? dowel.n : 4, a = PILE22.B / 2 - (PILE22.dIn || 55), pts = [[-a, -a], [a, -a], [-a, a], [a, a]];
     if (n === 5) pts.push([0, 0]);
-    if (n >= 6) pts.push([0, -a], [0, a]);
+    if (n >= 6) pts.push([-a * 0.3, -a], [a * 0.3, a]); // เหล็กกลางแถวบน/ล่างเยื้องสลับกัน (ไวร์จี้ปูนต้องลงได้)
     if (n === 7) pts.push([0, 0]);
     if (n >= 8) pts.push([-a, 0], [a, 0]);
     if (n >= 9) pts.push([0, 0]);
@@ -184,7 +184,8 @@ function dowelPts(dowel) {
     return { top, bot, nTop: top.length, nBot: bot.length };
   }
   const top = dowel ? Math.ceil(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), xs = (k) => Array.from({ length: k }, (_, i) => (i - (k - 1) / 2) * pitch), ry = hb - 45;
-  return { top: xs(top).map((x) => [x, -ry]), bot: xs(bot).map((x) => [x, ry]), nTop: top, nBot: bot };
+  const sh = pitch * 0.3, tx = xs(top).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? -sh : x)), bx = xs(bot).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? sh : x)); // เหล็กตรงกลางแถวบน/ล่างเยื้องสลับกัน ไม่ให้ไวร์จี้ปูนติด
+  return { top: tx.map((x) => [x, -ry]), bot: bx.map((x) => [x, ry]), nTop: top, nBot: bot };
 }
 export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
   const P = dowelPts(dowel), lbl = (k) => (dowel ? `${k}DB${dowel.d}mm.x${Math.round(dowel.len * 100)}cm.` : "ดูตามตาราง");
