@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261107042413";
-import { f2, f3, fmt } from "./calc.js?v=20261107042413";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261107042413";
+import { SHOULDER } from "./standards.js?v=20261107042535";
+import { f2, f3, fmt } from "./calc.js?v=20261107042535";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261107042535";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -73,10 +73,10 @@ const SP=250,w=25,d=25,t=5,nc=Math.max(2,Math.ceil((H-d)/SP)+1);for(let i=0;i<nc
 const nr=Math.max(2,Math.ceil((H-9)/500)+1),rib=RIB[ty](HD).map(p=>[p[0]+cx,p[1]]);for(let i=0;i<nr;i++)ex(G,rib,z0+i*(H-9)/(nr-1),9,0xEF9F27);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return nr}
 function bolt(g,x,zf,dir,top,Tt){const z=zf-dir*SU;cyl(g,10,8,x,top+4,z,BRC,6);cyl(g,6,top-Tt+20,x,(top+Tt-20)/2,z,0xB4B2A9);bx(g,x-20,dir>0?zf-80:zf+50,40,30,Tt-16,Tt-10,BRC);cyl(g,10,8,x,Tt-20,z,BRC,6)}
 function joint(G,cx,wA,zf,dir,sp,Tt){const PY=Tt+22,zA0=dir>0?zf+6:zf-96;bx(G,cx-wA/2,zA0,wA,90,Tt,Tt+10,PAC);[28,64].forEach(o=>{const zc=zf+dir*(o-9);bx(G,cx-22,zc-10,44,20,Tt+10,PY,PAC);cylZ(G,18,20,cx,PY,zc,PAC)});
-const zB0=dir>0?zf-120:zf,zb=zf-dir*12;bx(G,cx-105,zB0,210,120,Tt,Tt+10,PBC); // เพลทม่วงสุดที่ขอบด้านในแฟลตบาร์ (zf) ไม่เกิน • บูชขยับเข้ามาอยู่บนเพลทเต็มตัว
-[0,25].forEach(o=>{const zq=zb-dir*o;bx(G,cx-22,zq-12,44,24,Tt+10,PY,PBC);cylZ(G,18,24,cx,PY,zq,PBC)}); // บูชม่วง 2 ตัวเรียงต่อกันบนเพลทม่วง
+const zB0=dir>0?zf-120:zf,zb=zf-dir*16;bx(G,cx-105,zB0,210,120,Tt,Tt+10,PBC); // เพลทม่วงสุดที่ขอบด้านในแฟลตบาร์ (zf) ไม่เกิน • บูชขยับเข้ามาอยู่บนเพลทเต็มตัว
+[0,32].forEach(o=>{const zq=zb-dir*o;bx(G,cx-22,zq-12,44,24,Tt+10,PY,PBC);cylZ(G,18,24,cx,PY,zq,PBC)}); // บูชม่วง 2 ตัวเรียงต่อกันบนเพลทม่วง
 const ok=HOLES.map(o=>cx+o).filter(h=>!sp.some(s=>Math.abs(h-s)<BLK)),use=ok.length>=2?[ok[0],ok[ok.length-1]]:ok;use.forEach(x=>bolt(G,x,zf,dir,Tt+10,Tt));
-cylZ(G,10,125,cx,PY,zf+dir*12.5,RED);cylX(G,10,45,cx-22,PY,zf-dir*72,RED)}
+cylZ(G,10,138,cx,PY,zf+dir*6,RED);cylX(G,10,45,cx-22,PY,zf-dir*88,RED)}
 function magnet(G,zf,xc,Tt){const mc=zf+MU;bx(G,xc-160,mc-60,320,120,0,60,0x444441);cyl(G,31.5,35,xc,77,mc,0xD3D1C7);cyl(G,10,4,xc,96,mc,RED);
 [xc-135,xc+135].forEach(ax=>{bx(G,ax-25,zf+40,50,140,Tt+21,Tt+25,BRC);bx(G,ax-25,zf+40,5,140,Tt,Tt+21,BRC);bx(G,ax+20,zf+40,5,140,Tt,Tt+21,BRC);cyl(G,15,Tt-60,ax,(Tt+60)/2,mc,0x888780);cyl(G,13,8,ax,Tt+29,mc,RED,6);bolt(G,ax,zf,-1,Tt+25,Tt)})}
 function hX(G,x0,x1,ze,dir){const z=dir>0?ze:ze-75;bx(G,x0,z,x1-x0,75,-16,-9,HBC);bx(G,x0,z+35,x1-x0,5,-159,-16,HBC);bx(G,x0,z,x1-x0,75,-166,-159,HBC)}
