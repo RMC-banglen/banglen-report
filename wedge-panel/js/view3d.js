@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261107034650";
-import { f2, f3, fmt } from "./calc.js?v=20261107034650";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261107034650";
+import { SHOULDER } from "./standards.js?v=20261107035154";
+import { f2, f3, fmt } from "./calc.js?v=20261107035154";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261107035154";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -67,7 +67,8 @@ function wedge(G,ty,TD,fx,cd,z0,H,bot){const g=new THREE.Group();g.position.set(
 function post(g,cx,zf,dir,Tt){const za=dir>0?zf+9:zf-59,zw=dir>0?zf+9:zf-14;bx(g,cx-70,zw,140,5,0,Tt,PSTC);bx(g,cx-70,za,5,50,0,Tt,PSTC);bx(g,cx+65,za,5,50,0,Tt,PSTC)}
 let DIVCH=false; // เหล็กรางน้ำ 2 นิ้ว (ตั้งใน build)
 function divider(G,ty,TC,xL,z0,H,Tt){const HD=TC/2,cx=xL+HD;const a=new THREE.Group();a.position.set(xL*KK,0,z0*KK);G.add(a);ex(a,RAIL[ty],0,H,0x888780);const b=new THREE.Group();b.position.set((xL+TC)*KK,0,z0*KK);b.scale.x=-1;G.add(b);ex(b,RAIL[ty],0,H,0x888780);
-if(DIVCH){const w=25,t=3,ch=[[cx-w,0],[cx+w,0],[cx+w,Tt],[cx+w-t,Tt],[cx+w-t,t],[cx-w+t,t],[cx-w+t,Tt],[cx-w,Tt]];ex(G,ch,z0,H,0xB4B2A9);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return 0}
+if(DIVCH){const w=25,d=25,t=5,y0=(Tt-d)/2,ch=[[cx-w,y0],[cx+w,y0],[cx+w,y0+d],[cx+w-t,y0+d],[cx+w-t,y0+t],[cx-w+t,y0+t],[cx-w+t,y0+d],[cx-w,y0+d]]; // C 50x25x5 (เหล็กรางน้ำ 2" มาตรฐานตลาด) เอวกว้าง 50 ตามแนวโต๊ะ ปีกลึก 25 อยู่กลางความหนาแผ่น (ทิศ/จำนวนจริงรอยืนยัน)
+ex(G,ch,z0,H,0xB4B2A9);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return 0}
 const nr=Math.max(2,Math.ceil((H-9)/500)+1),rib=RIB[ty](HD).map(p=>[p[0]+cx,p[1]]);for(let i=0;i<nr;i++)ex(G,rib,z0+i*(H-9)/(nr-1),9,0xEF9F27);post(G,cx,z0,1,Tt);post(G,cx,z0+H,-1,Tt);return nr}
 function bolt(g,x,zf,dir,top,Tt){const z=zf-dir*SU;cyl(g,10,8,x,top+4,z,BRC,6);cyl(g,6,top-Tt+20,x,(top+Tt-20)/2,z,0xB4B2A9);bx(g,x-20,dir>0?zf-80:zf+50,40,30,Tt-16,Tt-10,BRC);cyl(g,10,8,x,Tt-20,z,BRC,6)}
 function joint(G,cx,wA,zf,dir,sp,Tt){const PY=Tt+22,zA0=dir>0?zf+15:zf-105;bx(G,cx-wA/2,zA0,wA,90,Tt,Tt+10,PAC);[28,64].forEach(o=>{const zc=zf+dir*o;bx(G,cx-22,zc-10,44,20,Tt+10,PY,PAC);cylZ(G,18,20,cx,PY,zc,PAC)});
