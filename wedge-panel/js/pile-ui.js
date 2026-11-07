@@ -1,13 +1,13 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074440";
-import { pileSheet } from "./pile-draw.js?v=20261107074440";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261107074440";
-import { download } from "./pdf.js?v=20261107074440";
-import { esc } from "./draw2d.js?v=20261107074440";
-import { getSession, canEdit } from "./auth.js?v=20261107074440";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074440";
-import { db } from "./db.js?v=20261107074440";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107074440";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261107074651";
+import { pileSheet } from "./pile-draw.js?v=20261107074651";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261107074651";
+import { download } from "./pdf.js?v=20261107074651";
+import { esc } from "./draw2d.js?v=20261107074651";
+import { getSession, canEdit } from "./auth.js?v=20261107074651";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261107074651";
+import { db } from "./db.js?v=20261107074651";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261107074651";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -179,7 +179,6 @@ function showQueue(r) {
     b.textContent = (p.errs.length ? "⚠ " : "") + (i + 1) + ". " + (p.kind === "T" ? "I" : "S") + "-" + p.sizeCm + " ยาว " + p.L + " ม. (" + pl + ") ตุ้ม " + p.W + " Qa " + p.Qa + " ยก " + p.H + (p.errs.length ? " — " + p.errs.join(", ") : "");
     b.onclick = () => { if (!PILE_SECTIONS[p.section]) return; syncActive(); loadPile(p, proj); }; box.appendChild(b);
   });
-  $("preqPdf").hidden = !queue.some((p) => !p.errs.length);
   msg.textContent = queue.length ? "พบ " + queue.length + " ต้น กดแถวเพื่อดูแบบ" : "ไม่พบรายการเสา (ต้องมีบรรทัดแบบ I 0.22×19.00 ม.)";
   if (queue[0] && PILE_SECTIONS[queue[0].section]) loadPile(queue[0], proj);
 }
@@ -272,7 +271,7 @@ async function openJob(id) {
     const d = row.data;
     setMode("pile");
     showQueue({ project: d.project || { pj: "", ow: "", lo: "" }, piles: (d.piles || []).map((p) => ({ ...p, kind: p.section[0], sizeCm: +p.section.slice(1), errs: [] })) });
-    $("preqPdf").hidden = false; $("preqMsg").textContent = "";
+    $("preqMsg").textContent = "";
     curJobId = row.id; curCode = d.code || null; lastSaved = jobSnap(); saveDraftJob();
     try { history.replaceState(null, "", "#" + curJobId); } catch (e) {}
     jmsg("เปิดงานแล้ว"); return true;
@@ -290,7 +289,7 @@ async function deleteJob() {
 // เริ่มงานใหม่: ล้างรายการเสา โครงการ และรหัสที่เปิดอยู่ (ฟอร์มเสาคงไว้)
 function resetJob() {
   queue = []; active = null; curJobId = null; curCode = null;
-  $("preq").value = ""; $("preqList").innerHTML = ""; $("preqPdf").hidden = true; $("preqMsg").textContent = "";
+  $("preq").value = ""; $("preqList").innerHTML = ""; $("preqMsg").textContent = "";
   ["ppj", "pow", "plo"].forEach((id) => { $(id).value = ""; });
   try { history.replaceState(null, "", "#view3d"); } catch (e) {}
   render(); lastSaved = jobSnap(); saveDraftJob();
@@ -305,7 +304,7 @@ async function linkJob() {
 
 async function pdfAll() {
   syncActive();
-  const ok = queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]), b = $("preqPdf"), msg = $("preqMsg");
+  const ok = queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]), b = $("bPilePdf"), msg = $("pileMsg");
   if (!ok.length) return; b.disabled = true;
   try {
     if (!window.html2canvas || !window.jspdf) throw new Error("โหลดตัวสร้าง PDF ไม่สำเร็จ ลองรีเฟรชหน้า");
@@ -363,9 +362,9 @@ export function initPile() {
   ["psh", "psec"].forEach((id) => $(id).addEventListener("change", render));
   document.querySelectorAll('input[name="pt"],#pnS').forEach((x) => x.addEventListener("change", () => { renderExtras(); render(); }));
   $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };
-  $("bPilePdf").onclick = pdf;
+  $("bPilePdf").onclick = () => { syncActive(); return queue.some((p) => !p.errs.length && PILE_SECTIONS[p.section]) ? pdfAll() : pdf(); }; // มีรายการเสา = ส่งออกทั้งชุด ไม่มี = ส่งออกเสาในฟอร์ม
   $("preqTpl").onclick = () => { $("preq").value = TEMPLATE; $("preqMsg").textContent = "แก้ข้อความตัวอย่างนี้ แล้วกด อ่านข้อความ (หรือส่งตัวอย่างนี้ให้หน้างานกรอก)"; try { navigator.clipboard.writeText(TEMPLATE); } catch (e) {} };
-  $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("preqPdf").onclick = pdfAll; $("bPjSave").onclick = saveJob; $("bPjNew").onclick = newJob; $("bPjLink").onclick = linkJob; jmsg("");
+  $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("bPjSave").onclick = saveJob; $("bPjNew").onclick = newJob; $("bPjLink").onclick = linkJob; jmsg("");
   $("m-wall").onclick = () => setMode("wall"); $("m-pile").onclick = () => setMode("pile");
   let m = "wall"; try { m = sessionStorage.getItem(MKEY) || "wall"; } catch (e) {}
   setMode(m === "pile" ? "pile" : "wall");
