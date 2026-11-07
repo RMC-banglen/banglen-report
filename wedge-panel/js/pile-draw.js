@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107023514";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107023514";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107023514";
+import { pilePoly, esc } from "./draw2d.js?v=20261107023941";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107023941";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107023941";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -20,7 +20,7 @@ const leader = (x1, y1, x2, y2, txt, o = {}) => L(x1, y1, x2, y2, 0.9) + tri(x1,
 
 // หน้าตัดไอ: จุดจาก pilePoly (มม. ศูนย์กลางที่ 0,0) → พิกัดหน้าจอ
 // หน้าตัดสี่เหลี่ยมมุมตัด (sq): แปดเหลี่ยม ตัดมุม ch มม.
-const sqPoly = (p) => { const h = p.B / 2, c = p.ch || 30; return [[-h + c, -h], [h - c, -h], [h, -h + c], [h, h - c], [h - c, h], [-h + c, h], [-h, h - c], [-h, -h + c]]; };
+const sqPoly = (p) => { const h = p.B / 2, c = p.ch || 20; return [[-h + c, -h], [h - c, -h], [h, -h + c], [h, h - c], [h - c, h], [-h + c, h], [-h, h - c], [-h, -h + c]]; };
 const polyOf = (p) => (p.sq ? sqPoly(p) : pilePoly(p));
 const secPts = (p, cx, cy, s) => polyOf(p).map(([x, y]) => `${f1(cx + x * s)},${f1(cy + y * s)}`).join(" ");
 let PILE22 = { B: 220, f: 65, c: 50, dg: 70, tw: 80 }; // หน้าตัดปัจจุบัน (ตั้งค่าใน pileSheet จาก plan.sec.geo)
@@ -503,7 +503,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
     g += cfgs.map((cf, i) => sectionA(plan, i ? 610 : 190, cyA, sa, simple || cf.simple || !cf.layout, cf.extras, cf.letter, i > 0 && cf.wires === cfgs[0].wires, cf.layout || wireLayout(4, 2))).join("");
   } else {
     const c0 = cfgs[0], lay = c0.layout || wireLayout(4, 2);
-    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + (PILE22.sq ? stirrupDetail(colBx, cyA, sa) : wiresDetail(colBx, cyA, sa, lay)); // เสา I: DETAIL OF PC.WIRES • เสาสี่เหลี่ยม: DETAIL OF STIRRUP
+    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + (PILE22.sq ? "" : wiresDetail(colBx, cyA, sa, lay)); // เสา I: DETAIL OF PC.WIRES • เสาสี่เหลี่ยม: ไม่มีแบบขยาย (ผู้ใช้สั่ง)
   }
   g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - HB() * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;
