@@ -104,7 +104,7 @@ export const PILE_SECTIONS = {
   S18: {
     key: "S18",
     label: "[ ]",
-    menu: "สี่เหลี่ยม 0.18",
+    menu: "S-18",
     size: "0.18x0.18",
     std: "TIS 396-2549",
     minL: 1,
@@ -124,7 +124,7 @@ export const PILE_SECTIONS = {
   S22: {
     key: "S22",
     label: "[ ]",
-    menu: "สี่เหลี่ยม 0.22",
+    menu: "S-22",
     size: "0.22x0.22",
     std: "TIS 396-2549",
     minL: 1,
@@ -146,7 +146,7 @@ export const PILE_SECTIONS = {
   S26: {
     key: "S26",
     label: "[ ]",
-    menu: "สี่เหลี่ยม 0.26",
+    menu: "S-26",
     size: "0.26x0.26",
     std: "TIS 396-2549",
     minL: 1,
@@ -167,7 +167,7 @@ export const PILE_SECTIONS = {
   S30: {
     key: "S30",
     label: "[ ]",
-    menu: "สี่เหลี่ยม 0.30",
+    menu: "S-30",
     size: "0.30x0.30",
     std: "TIS 396-2549",
     minL: 1,
@@ -188,7 +188,7 @@ export const PILE_SECTIONS = {
   S35: {
     key: "S35",
     label: "[ ]",
-    menu: "สี่เหลี่ยม 0.35",
+    menu: "S-35",
     size: "0.35x0.35",
     std: "TIS 396-2549",
     minL: 1,
