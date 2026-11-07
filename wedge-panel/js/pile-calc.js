@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107011435";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261107011924";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -65,8 +65,15 @@ export function planPile(input) {
   // เหล็กเสริมแต่ละรายการใช้กับ "ทุกท่อน" หรือท่อนที่ระบุ (นับจากท่อนบน = 1)
   extras.forEach((e) => { if (e.pieces !== "all" && e.pieces > pieces.length) warn.push(`เหล็กเสริม DB${e.d} ระบุท่อนที่ ${e.pieces} แต่มีแค่ ${pieces.length} ท่อน`); });
   pieces.forEach((p, i) => { p.extras = extras.filter((e) => e.pieces === "all" || e.pieces === i + 1); });
-  // แบบขยายหน้าตัด: มี A อย่างเดียวเสมอ (เสาท่อนเดี่ยวหรือทุกท่อนมีเหล็กเสริมเหมือนกัน แสดงเหล็กเสริมใน A) ยกเว้นเสาหลายท่อนที่ท่อนหนึ่งมีเหล็กเสริมและอีกท่อนไม่มี = A (ไม่มีเหล็กเสริม) และ B (มีเหล็กเสริม)
-  const kinds = { A: true, B: pieces.length > 1 && pieces.some((p) => p.extras.length > 0) && pieces.some((p) => !p.extras.length) };
+  // ชุดหน้าตัด (config): ท่อนที่ลวด PC และเหล็กเสริมเหมือนกันรวมเป็นหน้าตัดเดียว ต่างกันแยกเป็น A, B (A = ชุดที่ไม่มีเหล็กเสริมก่อน แล้วเรียงตามท่อนจากบน)
+  // เกิน 2 ชุด (หน้าตัดวางไม่พอ) → แบ่งตามเหล็กเสริมอย่างเดียว (A ไม่มี / B มี) และให้ลวดดูตาราง
+  const wk = (p) => (p.rule ? p.rule.w4 + "/" + p.rule.w5 : "x"), ek = (p) => p.extras.map((e) => e.d + "x" + e.n + "x" + (e.len || p.len)).join("|");
+  const grp = (keyFn) => { const m = new Map(); pieces.forEach((p, i) => { const k = keyFn(p); if (!m.has(k)) m.set(k, { key: k, idx: [], first: p }); m.get(k).idx.push(i); }); return [...m.values()].sort((a, b) => (a.first.extras.length > 0) - (b.first.extras.length > 0)); };
+  let cfgs = full ? [] : grp((p) => wk(p) + "#" + ek(p)), manyCfg = false;
+  if (cfgs.length > 2) { cfgs = grp((p) => (p.extras.length ? ek(p) : "")); manyCfg = true; if (cfgs.length > 2) cfgs = [cfgs[0], { key: "rest", idx: cfgs.slice(1).flatMap((g) => g.idx), first: cfgs[1].first }]; }
+  const configs = cfgs.map((g, i) => ({ letter: "AB"[i], idx: g.idx, wires: wk(g.first), extras: g.first.extras, rule: g.first.rule || null, layout: g.first.rule ? wireLayout(g.first.rule.w4, g.first.rule.w5) : null, simple: manyCfg }));
+  configs.forEach((cf) => cf.idx.forEach((i) => { pieces[i].cfg = cf.letter; }));
+  const kinds = { A: true, B: configs.length > 1 };
   // บ่า: อ้างระยะจากหัวเสา (ท่อนบน)
   let shoulder = null;
   if (+input.shoulder > 0) {
@@ -90,5 +97,5 @@ export function planPile(input) {
   const xt = extras.map((e) => `${e.n}-DB${e.d}x${e.len ? m2(e.len) : (full ? "L" : m2(pieces[0].len))}m.`).join(" ");
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
   const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5) : null;
-  return { sec, full, joint, pieces, extras, kinds, layout, shoulder, rows, warn, title, L, project: input.project || {} };
+  return { sec, full, joint, pieces, extras, kinds, configs, layout, shoulder, rows, warn, title, L, project: input.project || {} };
 }

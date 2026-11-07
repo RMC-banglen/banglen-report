@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107011435";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107011435";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107011435";
+import { pilePoly, esc } from "./draw2d.js?v=20261107011924";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107011924";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107011924";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -362,7 +362,7 @@ export function elevation(plan, piece, y0, opts) {
     if (Math.abs(xm - cx) < 30) xm = cx + 34 <= ze ? cx + 34 : cx - 34; // ไม่ทับรอยหักกลางและตัวเลขระยะกลาง
     for (let t = 0; t < 6 && xs.some((q) => Math.abs(q - xm) < 14); t++) xm += 20;
   }
-  const letter = plan.kinds && plan.kinds.B && ex.length ? "B" : "A";
+  const letter = piece.cfg || "A";
   o += `<circle cx="${f1(xm)}" cy="${yTop - 12}" r="8" fill="#fff" stroke="${INK}" stroke-width="1"/>` + T(xm, yTop - 8, letter, { size: 13 }) + L(xm, yTop - 4, xm, yTop + sh, 0.9);
   o += dimV(X0 - 18, yTop, yTop + sh, "0.22", { size: 13 });
   // ป้ายปลอกเกลียว
@@ -458,8 +458,8 @@ function titleBlock(plan, logoHref) {
 
 export function pileSheet(plan, logoHref = "assets/logo.png") {
   if (!plan.sec) return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"></svg>`;
-  const np = plan.pieces.length, wireDiff = plan.pieces.some((p) => !p.rule || !plan.pieces[0].rule || p.rule.w4 !== plan.pieces[0].rule.w4 || p.rule.w5 !== plan.pieces[0].rule.w5), simple = plan.full || plan.pieces.length === 0 || !plan.layout || wireDiff, lay = plan.layout || wireLayout(4, 2); // ท่อนที่ลวดต่างกัน (เช่น 12+13 ม.) → หน้าตัดไม่ระบุลวด ให้ดูตาราง
-  const kinds = plan.kinds || { A: true, B: false }, two = kinds.A && kinds.B, hasX = plan.extras.length > 0;
+  const np = plan.pieces.length, cfgs = plan.configs && plan.configs.length ? plan.configs : [{ letter: "A", extras: plan.extras, layout: plan.layout, wires: "x", simple: false }];
+  const simple = plan.full || plan.pieces.length === 0 || !plan.layout, kinds = plan.kinds || { A: true, B: false }, two = cfgs.length === 2, hasX = plan.extras.length > 0;
   const colBx = 640;
   let g = "", y = 0; // y = ตำแหน่งแนวตั้งของเนื้อหา (หน่วยก่อนย่อ)
   // ---- แถว 1: รูปด้านท่อนเสา ----
@@ -470,9 +470,10 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   // ---- แถว 2: หน้าตัด A / B (+ จุดยกสำหรับแบบเดี่ยว) ----
   const sa = two ? 0.5 : 0.62, topE = 110 * sa + (two ? 20 : 48), botE = 110 * sa + 98, cyA = y + topE;
   if (two) {
-    g += sectionA(plan, 190, cyA, sa, simple, [], "A", false, lay) + sectionA(plan, 610, cyA, sa, simple, plan.extras, "B", true, lay);
+    g += cfgs.map((cf, i) => sectionA(plan, i ? 610 : 190, cyA, sa, simple || cf.simple || !cf.layout, cf.extras, cf.letter, i > 0 && cf.wires === cfgs[0].wires, cf.layout || wireLayout(4, 2))).join("");
   } else {
-    g += sectionA(plan, 230, cyA, sa, simple, plan.extras, "A", false, lay) + wiresDetail(colBx, cyA, sa, lay); // ไม่มีดีเทลปลอก (DETAIL OF STIRRUP)
+    const c0 = cfgs[0], lay = c0.layout || wireLayout(4, 2);
+    g += sectionA(plan, 230, cyA, sa, simple || c0.simple, plan.full ? [] : c0.extras, "A", false, lay) + wiresDetail(colBx, cyA, sa, lay); // ไม่มีดีเทลปลอก (DETAIL OF STIRRUP)
   }
   g += liftingPoints(two ? 900 : 860, y + (two ? 30 : topE - 110 * sa - 20), two ? 240 : 290);
   y += topE + botE + 8;
