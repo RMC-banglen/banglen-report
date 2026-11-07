@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261107074857";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107074857";
-import { esc } from "./draw2d.js?v=20261107074857";
+import { autoSplit } from "./pile-calc.js?v=20261107075032";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107075032";
+import { esc } from "./draw2d.js?v=20261107075032";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -136,7 +136,7 @@ ${r && S <= 0 ? `<p style="color:#c00000;font-weight:700;margin-top:14px">หม
 <div style="position:absolute;right:56px;bottom:40px;width:270px;text-align:center;font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:14px;line-height:1.6">
 <div style="height:46px;border-bottom:1.2px solid #000"></div>
 <div style="margin-top:4px;font-size:15px">( ${esc(TITLE_BLOCK.approveByTh)} )</div>
-<div>วิศวกรผู้ควบคุม &nbsp; ${esc(TITLE_BLOCK.licence)}</div>
+<div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div>
 </div>
 </div>`;
 }
