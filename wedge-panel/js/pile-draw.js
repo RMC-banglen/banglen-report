@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261107060650";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261107060650";
-import { m2, wireLayout } from "./pile-calc.js?v=20261107060650";
+import { pilePoly, esc } from "./draw2d.js?v=20261107060758";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261107060758";
+import { m2, wireLayout } from "./pile-calc.js?v=20261107060758";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -47,17 +47,19 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   lay.w5.forEach(([x, y]) => { o += star(x, y, 4.5 * s); });
   // เหล็กเสริม DB: อยู่แนวแถวลวด PC แต่ต่ำกว่าแนวลวดเล็กน้อย 5 มม. (ขยับเข้าหาแกนหน้าตัด ตามผู้ใช้สั่ง) (ห่างผิว 35 มม.) ชิดลวด PC แต่ห้ามทับ (ต้องผูกเหล็กเข้ากับลวด) และต้องไม่ล้นกรอบปลอกแหวน (ผู้ใช้สั่งให้จำไว้เสมอ)
   const obs = [...lay.w4.map((p) => ({ x: p[0], y: p[1], r: 3 })), ...lay.w5.map((p) => ({ x: p[0], y: p[1], r: 4.5 }))], limX = G.sq ? hb - 30 : hb - 25;
+  const wiresAll = obs.slice();
   ex.forEach((e) => {
     const r = e.d / 2, top = Math.ceil(e.n / 2), bot = e.n - top, yRow = Math.min(hb - 35, limX - r - 1) - 5, xmax = limX - r - 2;
     [[-1, top], [1, bot]].forEach(([sg, cnt]) => {
-      const y = sg * yRow;
+      const y = sg * yRow, rowW = wiresAll.filter((q) => Math.abs(q.y - sg * (hb - 35)) < 5).sort((p, q) => Math.abs(q.x) - Math.abs(p.x) || p.x - q.x);
+      const free = (x) => x >= -xmax && x <= xmax && obs.every((q) => Math.hypot(x - q.x, y - q.y) >= r + q.r + 1);
       for (let i = 0; i < cnt; i++) {
-        const ideal = -xmax + ((i + 0.5) * 2 * xmax) / cnt, sc = (x) => Math.min(...obs.filter((q) => Math.abs(q.y - y) < 30).map((q) => Math.hypot(x - q.x, y - q.y) - (r + q.r)), 99);
-        const cand = []; for (let x = -xmax; x <= xmax; x += 1) cand.push([x, sc(x)]);
-        // ชิดลวด PC (ห่างขอบลวด 1–2.5 มม.) เพราะต้องผูกเหล็กเสริมเข้ากับลวด — เลือกที่ชิดลวด/เหล็กตัวก่อนที่ใกล้ตำแหน่งกระจายที่สุด ไม่มีที่ชิดจึงเลือกที่ใกล้ที่สุดเท่าที่ห่างไม่ทับ
-        const ok = cand.filter((c) => c[1] >= 1), adj = ok.filter((c) => c[1] <= 2.5), pool = adj.length ? adj : ok.sort((p, q) => p[1] - q[1]).slice(0, 12);
-        const x = (pool.length ? pool : cand).sort((p, q) => Math.abs(p[0] - ideal) - Math.abs(q[0] - ideal))[0][0];
-        obs.push({ x, y, r }); o += circ(x, y, r, INK);
+        // เกาะลวดริมนอกสุดก่อน (ซ้ายสุด/ขวาสุดสลับกัน) ถัดไปค่อยเกาะเส้นในๆ — ถึงเส้นในสุดเมื่อเหล็กมีมาก; วางด้านใน (หันเข้าแกน) ของลวด ห่างขอบลวด 1.5 มม.
+        const w = rowW[i % rowW.length] || { x: 0, y, r: 0 }, dx = Math.sqrt(Math.max(0, (r + w.r + 1.5) ** 2 - (y - w.y) ** 2)), dirs = w.x <= 0 ? [1, -1] : [-1, 1];
+        let x = null;
+        for (const dr of dirs) { for (let s = 0; s <= 40 && x === null; s++) { const c = w.x + dr * (dx + s); if (free(c)) x = c; } if (x !== null) break; }
+        if (x === null) { const ideal = -xmax + ((i + 0.5) * 2 * xmax) / cnt; for (let s = 0; s <= xmax * 2 && x === null; s++) for (const t of [ideal + s, ideal - s]) if (free(t)) { x = t; break; } }
+        x = x ?? 0; obs.push({ x, y, r }); o += circ(x, y, r, INK);
       }
     });
   });
