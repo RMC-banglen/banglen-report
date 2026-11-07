@@ -251,5 +251,6 @@ export const TITLE_BLOCK = {
   designBy: "CHAIYAPORN S.",
   drawBy: "CHAIYAPORN S.",
   approveBy: "CHAIYAPORN S.",
+  approveByTh: "ชัยพร สุรังสิมันต์กุล", // ใช้ในช่องเซ็นของใบ blow count
   licence: "สย.8954",
 };
