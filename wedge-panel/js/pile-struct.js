@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109021631";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109021631";
-import { esc } from "./draw2d.js?v=20261109021631";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109021741";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109021741";
+import { esc } from "./draw2d.js?v=20261109021741";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -121,6 +121,7 @@ const CSS = `<style>
 .sp table.tb.dot td{border-bottom:1px dotted #000}
 .sp table.hd8 td,.sp table.hd8 th{border:1px solid #000;font-weight:700;padding:5px 4px}
 .sp .red{color:#c00000;font-weight:700}
+.sp .blue td{color:#1f3fd0;font-weight:400}
 .sp table.hd8{table-layout:fixed;width:100%}
 .sp .sg{width:280px;text-align:center;font-size:12px;line-height:1.6}
 .sp .sg .ln{height:56px;border-bottom:1.2px solid #000}
@@ -153,7 +154,7 @@ export function calcPage1(p, project, c, logoSrc = "assets/logo.png") {
   return `${CSS}<div class="sp"><div class="fr">${head(project, t, logoSrc)}
 <div class="bar">PROPERTIES OF &nbsp;PILE</div>
 <table class="tb hd8"><tr><th>Ac (cm2.)</th><th>L (max) (m.)</th><th>p (cm.)</th><th>w (kg/m.)</th><th>Ix (cm4.)</th><th>Zx (cm3.)</th><th>fc' cy (ksc.)</th><th>fci' cy (ksc.)</th></tr>
-<tr class="red"><td>${f(c.pr.Ac)}</td><td>${f(c.Lmax)}</td><td>${f(c.pr.p)}</td><td>${f(c.w)}</td><td>${f(c.pr.Ix)}</td><td>${f(c.pr.Zx)}</td><td>${f(FC)}</td><td>${f(FCI)}</td></tr></table>
+<tr class="blue"><td>${f(c.pr.Ac)}</td><td>${f(c.Lmax)}</td><td>${f(c.pr.p)}</td><td>${f(c.w)}</td><td>${f(c.pr.Ix)}</td><td>${f(c.pr.Zx)}</td><td>${f(FC)}</td><td>${f(FCI)}</td></tr></table>
 <div class="sec" style="text-align:center;border-top:1px solid #000">TWO POINT PICKING CONDITION: ( PLUS &nbsp;30 % FOR IMPACTED LOAD )</div>
 ${row("l = 0.207( LENGTH OF PILE )", "(l)", f(pk.l), "m.")}
 ${row("Mmax &nbsp;= 0.0215 (w) (L) (L)", "(Mm)", f(pk.Mm), "kg-m.")}
