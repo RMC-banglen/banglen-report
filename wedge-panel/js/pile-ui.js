@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109073639";
-import { pileSheet } from "./pile-draw.js?v=20261109073639";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109073639";
-import { download } from "./pdf.js?v=20261109073639";
-import { esc } from "./draw2d.js?v=20261109073639";
-import { getSession, canEdit } from "./auth.js?v=20261109073639";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109073639";
-import { db } from "./db.js?v=20261109073639";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109073639";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109073639";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109074435";
+import { pileSheet } from "./pile-draw.js?v=20261109074435";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109074435";
+import { download } from "./pdf.js?v=20261109074435";
+import { esc } from "./draw2d.js?v=20261109074435";
+import { getSession, canEdit } from "./auth.js?v=20261109074435";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109074435";
+import { db } from "./db.js?v=20261109074435";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109074435";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109074435";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -437,8 +437,9 @@ export function initPile() {
   $("preqTpl").onclick = () => { $("preq").value = TEMPLATE; $("preqMsg").textContent = "แก้ข้อความตัวอย่างนี้ แล้วกด อ่านข้อความ (หรือส่งตัวอย่างนี้ให้หน้างานกรอก)"; try { navigator.clipboard.writeText(TEMPLATE); } catch (e) {} };
   $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("bPjSave").onclick = saveJob; $("bPjNew").onclick = newJob; $("bPjLink").onclick = linkJob; jmsg("");
   $("m-wall").onclick = () => setMode("wall"); $("m-pile").onclick = () => setMode("pile");
-  let m = "wall"; try { m = sessionStorage.getItem(MKEY) || "wall"; } catch (e) {}
-  setMode(m === "pile" ? "pile" : "wall");
+  let m = "pile"; try { m = sessionStorage.getItem(MKEY) || ""; } catch (e) {} // เปิดมาที่แบบเสาเข็มก่อน (ยกเว้นเปิดลิงก์โครงการแผ่นกันดิน)
+  if (!m) { const hh = location.hash.slice(1); m = hh && !/^pile-/.test(hh) ? "wall" : "pile"; }
+  setMode(m === "wall" ? "wall" : "pile");
   lastSaved = jobSnap(); // ค่าที่เปิดมา (จากร่างในเครื่อง) ไม่ถือเป็นงานค้าง
   refreshJobs();
   const hid = (location.hash || "").slice(1);
