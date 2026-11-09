@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261109023616";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109023616";
-import { m2, wireLayout } from "./pile-calc.js?v=20261109023616";
+import { pilePoly, esc } from "./draw2d.js?v=20261109023742";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109023742";
+import { m2, wireLayout } from "./pile-calc.js?v=20261109023742";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;

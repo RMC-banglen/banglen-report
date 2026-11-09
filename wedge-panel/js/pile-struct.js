@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109023616";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109023616";
-import { esc } from "./draw2d.js?v=20261109023616";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109023742";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109023742";
+import { esc } from "./draw2d.js?v=20261109023742";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -218,7 +218,8 @@ ${two(cell("Range c at midle span require volume of stirrups 0.08% of concrete v
 ${two(cell("Require number of stirrups", f(st.nC), "loops / m."), cell(`Used stirrups CD${f(st.d, 1)}mm.@${sf(st.midStep)}`, f(st.usedC), "loops/m."))}
 <div class="cqsec" style="border-top:1px solid #000;margin-top:6px">Design of Joint welding</div>
 ${row(`Choose DB${j.d}mm. SD40 for Dowel ;`, `${f(AREA_DB[j.d])} x ${f(FY, 0)}`, f(j.cap, 0), "kg. / No.")}
-${row("Effictive pre-stress after loss", "", f(c.fce), `ksc. , &nbsp;Total Force in pile = ${f(j.force, 0)} kg.`)}
+${row("Effictive pre-stress after loss", "", f(c.fce), "ksc.")}
+${row("Total Force in pile", "", f(j.force, 0), "kg.")}
 ${row(`Use ${j.n}-DB${j.d}mm. &nbsp;For dowel`, "", f(j.dowelCap, 0) + " kg. &gt;", `${f(j.force, 0)} kg. &nbsp; <b class="cqred">${j.ok ? "OK" : "No.K"}</b>`)}
 <div class="cqsec" style="border-top:1px solid #000;margin-top:6px">Design welding for dowel and plate and Plate to Plate.</div>
 ${row(`Choose welding class ${w.cls} ; Welding size ${w.size}mm.`, "", f(w.perCm, 0), "kg./cm.")}
