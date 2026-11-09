@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109050727";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109050727";
-import { esc } from "./draw2d.js?v=20261109050727";
+import { autoSplit } from "./pile-calc.js?v=20261109050806";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109050806";
+import { esc } from "./draw2d.js?v=20261109050806";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -76,7 +76,7 @@ export function parseRequest(text, secs) {
     .reduce((a, l) => { if (a.length && /(คุณ|นาย|นาง|นางสาว|น\.ส\.)$/.test(a[a.length - 1])) a[a.length - 1] += l; else a.push(l); return a; }, []) // ชื่อที่ขึ้นบรรทัดใหม่หลังคำนำหน้า ต่อกลับเป็นบรรทัดเดียว
     .forEach((l) => parseHeadLine(l, project));
   { // ชื่อโครงการที่มีสถานที่ต่อท้ายในบรรทัดเดียว (… แขวงรามอินทรา เขต… / … ต.แม่กลอง) → ตัดส่วนสถานที่ออก และตัดเลขที่โครงการนำหน้า ("6904 :")
-    const cut = project.pj.search(/(^|\s)(แขวง|ต\.|ตำบล)/);
+    const cut = project.pj.search(/(^|\s)(แขวง|ต\.|ตำบล|ถ\.|ซ\.)/);
     if (cut > 0) { project.lo = (project.pj.slice(cut).trim() + (project.lo ? " " + project.lo : "")).trim(); project.pj = project.pj.slice(0, cut).trim(); }
   }
   if (project.ow) { // ชื่อเจ้าของตัดเฉพาะชื่อ ส่วนที่ต่อจากนั้น (แขวง/เขต/ต./อ./จ. ...) เป็นสถานที่
