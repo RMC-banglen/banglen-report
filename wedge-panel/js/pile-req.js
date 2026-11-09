@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109045719";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109045719";
-import { esc } from "./draw2d.js?v=20261109045719";
+import { autoSplit } from "./pile-calc.js?v=20261109045923";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109045923";
+import { esc } from "./draw2d.js?v=20261109045923";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -50,6 +50,9 @@ const OWNER_LINE = /^(บริษัท|บจก|บมจ|หจก|ห้า
 export function normOwner(s0) {
   const s = String(s0 || "").normalize("NFC").replace(/\s+/g, " ").trim(); let m;
   if (!s) return "";
+  // เจ้าของหลายคน (คุณ ก คุณ ข) → "คุณ ก และ คุณ ข" ตัวต่อตัว
+  const many = s.split(/\s+(?=(?:คุณ|นางสาว|น\.ส\.|นาย|นาง)\s*\S)/).filter(Boolean);
+  if (many.length > 1 && !/และ|,/.test(s)) return many.map(normOwner).join(" และ ");
   if ((m = s.match(/^(?:บมจ\.?|บริษัท\.?\s*มหาชน)\s*(.+?)\s*(?:จำกัด)?\s*(?:\(?\s*มหาชน\s*\)?)?$/))) return "บริษัท " + m[1] + " จำกัด (มหาชน)";
   if ((m = s.match(/^(?:บจก\.?|บ\.|บริษัท)\.?\s*(.+?)\s*\(?\s*มหาชน\s*\)?$/))) return "บริษัท " + m[1].replace(/\s*จำกัด$/, "") + " จำกัด (มหาชน)";
   if ((m = s.match(/^(?:บจก\.?|บ\.|บริษัท)\.?\s*(.+?)\s*(?:จำกัด|จก\.?)?$/))) return "บริษัท " + m[1] + " จำกัด";
