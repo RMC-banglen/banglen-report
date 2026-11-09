@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109020316";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109020316";
-import { esc } from "./draw2d.js?v=20261109020316";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109021213";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109021213";
+import { esc } from "./draw2d.js?v=20261109021213";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -103,7 +103,7 @@ const CSS = `<style>
 .sp .hd .ti b{font-size:12px}
 .sp .pj{display:grid;grid-template-columns:88px 10px 1fr;margin-top:3px;border-top:1px solid #000;padding-top:3px}
 .sp .bar{text-align:center;font-weight:700;font-size:13px;padding:5px;border-bottom:1px solid #000}
-.sp .sec{font-weight:700;font-size:12px;padding:5px 8px 3px;border-bottom:1px solid #999}
+.sp .sec{font-weight:700;font-size:12px;padding:5px 8px 3px}
 .sp .r{display:grid;grid-template-columns:230px 150px 18px 82px 1fr;align-items:center;min-height:17px;padding:0 8px}
 .sp .r.t{grid-template-columns:1fr 1fr;}
 .sp .r .v{text-align:right;padding-right:6px}
@@ -111,10 +111,13 @@ const CSS = `<style>
 .sp .sub{padding:2px 8px;font-weight:600}
 .sp table.tb{width:100%;border-collapse:collapse;font-size:11px}
 .sp table.tb td,.sp table.tb th{border:1px solid #777;padding:2px 5px;text-align:center}
-.sp .blue{color:#1f3fd0}.sp .red{color:#c00000;font-weight:700}
+.sp .red{color:#c00000;font-weight:700}
+.sp table.hd8{table-layout:fixed;width:100%}
+.sp .sg{width:280px;text-align:center;font-size:12px;line-height:1.6}
+.sp .sg .ln{height:56px;border-bottom:1.2px solid #000}
 .sp .vt{position:relative;width:30px;flex:none;border-right:1px solid #000}
 .sp .vt span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-90deg);white-space:nowrap;font-weight:700;font-size:10px;line-height:1.2;text-align:center}
-.sp .grp{display:flex;border-bottom:1px solid #999}
+.sp .grp{display:flex}
 .sp .grp>.bd{flex:1}
 .sp .eng{border:1px solid #000;display:inline-block;padding:3px 8px;margin:8px;font-weight:700;font-size:11px}
 .sp .nm{text-align:center;margin:30px 0 8px}
@@ -122,7 +125,7 @@ const CSS = `<style>
 
 const logo = (src) => `<img src="${src}" alt="">`;
 const head = (project, title, logoSrc) => `<div class="hd"><div class="lg">${logo(logoSrc)}<div style="font-weight:700;font-size:11px;margin-top:3px">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:9.5px">299 หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div>
-<div class="ti"><b>รายการคำนวณเสาเข็มคอนกรีตอัดแรง ${title.kindTh} ขนาด ${esc(title.line1)}</b><br>${esc(title.line2)} มาตรฐาน มอก.396-2549
+<div class="ti"><b>รายการคำนวณเสาเข็มคอนกรีตอัดแรง ขนาด ${esc(title.line1)}</b><br>${esc(title.line2)} มาตรฐาน มอก.396-2549
 <div class="pj"><span>โครงการ</span><span>:</span><span>${esc(project.pj || "")}</span><span>เจ้าของโครงการ</span><span>:</span><span>${esc(project.ow || "")}</span><span>สถานที่</span><span>:</span><span>${esc(project.lo || "")}</span></div></div></div>`;
 
 const row = (l, s, v, u, o = {}) => `<div class="r"><span>${l}</span><span>${s || ""}</span><span class="e">${o.eq === false ? "" : "="}</span><span class="v ${o.cls || ""}">${v}</span><span>${u || ""}</span></div>`;
@@ -136,12 +139,12 @@ function titleParts(p, lens) {
 // หน้า 1: คุณสมบัติหน้าตัด • ตรวจแรงยกเสา • การสูญเสียแรงอัด • วัสดุ • ตรวจหน่วยแรง • กำลังรับน้ำหนัก
 export function calcPage1(p, project, c, logoSrc = "assets/logo.png") {
   const lens = pieceLensOf(p), t = titleParts(p, lens), pk = c.pick, ls = c.loss, g = c.chk;
-  const ok = (b) => (b ? "OK" : "NO.K");
+  const ok = (b) => `<b class="red">${b ? "OK" : "NO.K"}</b>`;
   const mat = c.rows.map((r) => `<tr><td style="text-align:left">${r.name}</td><td>${f(r.Pu)}</td><td>${f(r.Pi)}</td><td>${f(r.Pe)}</td><td>${f(r.n)}</td><td>${f(r.totPi)}</td><td>${f(r.totPe)}</td></tr>`).join("");
   return `${CSS}<div class="sp"><div class="fr">${head(project, t, logoSrc)}
 <div class="bar">PROPERTIES OF &nbsp;PILE</div>
-<table class="tb"><tr><th>Ac (cm2.)</th><th>L (max) (m.)</th><th>p (cm.)</th><th>w (kg/m.)</th><th>Ix (cm4.)</th><th>Zx (cm3.)</th><th>fc' cy (ksc.)</th><th>fci' cy (ksc.)</th></tr>
-<tr class="blue"><td>${f(c.pr.Ac)}</td><td>${f(c.Lmax)}</td><td>${f(c.pr.p)}</td><td>${f(c.w)}</td><td>${f(c.pr.Ix)}</td><td>${f(c.pr.Zx)}</td><td>${f(FC)}</td><td>${f(FCI)}</td></tr></table>
+<table class="tb hd8"><tr><th>Ac (cm2.)</th><th>L (max) (m.)</th><th>p (cm.)</th><th>w (kg/m.)</th><th>Ix (cm4.)</th><th>Zx (cm3.)</th><th>fc' cy (ksc.)</th><th>fci' cy (ksc.)</th></tr>
+<tr class="red"><td>${f(c.pr.Ac)}</td><td>${f(c.Lmax)}</td><td>${f(c.pr.p)}</td><td>${f(c.w)}</td><td>${f(c.pr.Ix)}</td><td>${f(c.pr.Zx)}</td><td>${f(FC)}</td><td>${f(FCI)}</td></tr></table>
 <div class="sec" style="text-align:center;border-top:1px solid #000">TWO POINT PICKING CONDITION: ( PLUS &nbsp;30 % FOR IMPACTED LOAD )</div>
 ${row("l = 0.207( LENGTH OF PILE )", "(l)", f(pk.l), "m.")}
 ${row("Mmax &nbsp;= 0.0215 (w) (L) (L)", "(Mm)", f(pk.Mm), "kg-m.")}
@@ -176,7 +179,7 @@ ${row("TOTAL(TIS420-2525)", "=ES+SH+CR+RE", f(ls.T420), "ksc.")}
 ${row("Ultimate load for pile", "(0.85*fc' - 0.6*fce)*Ac/1000", f(c.ult), "ton.")}
 ${row("Safe load for pile", "(0.33*fc' - 0.27*fce)*Ac/1000", f(c.safe), "ton.")}
 ${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false })}
-<div style="border-top:1px solid #000;padding:6px 8px 40px"><span class="eng">ENGINEER IN CHARGE</span><div class="nm">(&nbsp; ${esc(TITLE_BLOCK.approveByTh)} &nbsp; ${esc(TITLE_BLOCK.licence)} &nbsp;)</div></div>
+<div style="border-top:1px solid #000;padding:8px 14px 18px;display:flex;justify-content:space-between;align-items:flex-end"><span class="eng" style="margin:0">ENGINEER IN CHARGE</span><div class="sg"><div class="ln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }
 
@@ -184,7 +187,7 @@ ${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false }
 export function calcPage2(p, project, c, logoSrc = "assets/logo.png") {
   const lens = pieceLensOf(p), t = titleParts(p, lens), st = c.st, j = c.joint, w = j.weld;
   const sf = (v) => String(Math.round(v * 10000) / 10000);
-  const two = (a, b, c1, d) => `<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ddd"><div class="r" style="grid-template-columns:1fr 90px 40px">${a}</div><div class="r" style="grid-template-columns:1fr 90px 50px">${b}</div></div>`;
+  const two = (a, b, c1, d) => `<div style="display:grid;grid-template-columns:1fr 1fr;"><div class="r" style="grid-template-columns:1fr 90px 40px">${a}</div><div class="r" style="grid-template-columns:1fr 90px 50px">${b}</div></div>`;
   const cell = (l, v, u) => `<span>${l}</span><span class="v">${v}</span><span>${u}</span>`;
   return `${CSS}<div class="sp"><div class="fr">${head(project, t, logoSrc)}
 <div class="bar">DESIGN OF PRESTRESSED CONCRETE PILE</div>
@@ -200,16 +203,16 @@ ${two(cell("Require number of stirrups", f(st.nC), "loops / m."), cell(`Used sti
 <div class="sec" style="border-top:1px solid #000;margin-top:6px">Design of Joint welding</div>
 ${row(`Choose DB${j.d}mm. SD40 for Dowel ;`, `${f(AREA_DB[j.d])} x ${f(FY, 0)}`, f(j.cap, 0), "kg. / No.")}
 ${row("Effictive pre-stress after loss", "", f(c.fce), `ksc. , &nbsp;Total Force in pile = ${f(j.force, 0)} kg.`)}
-${row(`Use ${j.n}-DB${j.d}mm. &nbsp;For dowel`, "", f(j.dowelCap, 0) + " kg. &gt;", `${f(j.force, 0)} kg. &nbsp; <b style="color:${j.ok ? "#c00000" : "#000"}">${j.ok ? "OK" : "No.K"}</b>`)}
+${row(`Use ${j.n}-DB${j.d}mm. &nbsp;For dowel`, "", f(j.dowelCap, 0) + " kg. &gt;", `${f(j.force, 0)} kg. &nbsp; <b class="red">${j.ok ? "OK" : "No.K"}</b>`)}
 <div class="sec" style="border-top:1px solid #000;margin-top:6px">Design welding for dowel and plate and Plate to Plate.</div>
 ${row(`Choose welding class ${w.cls} ; Welding size ${w.size}mm.`, "", f(w.perCm, 0), "kg./cm.")}
 ${row("; Need welding length", "", f(w.need), "cm.")}
-${row(`; For ${j.n} Dowel bar welding length`, "", f(w.dowelWeld), "cm. &nbsp; " + (w.ok ? "More than need ==&gt; OK" : "No.K"))}
+${row(`; For ${j.n} Dowel bar welding length`, "", f(w.dowelWeld), "cm. &nbsp; " + (w.ok ? `More than need ==&gt; <b class="red">OK</b>` : `<b class="red">No.K</b>`))}
 <div class="sec" style="border-top:1px solid #000;margin-top:6px">Design develop length of dowel bar</div>
 ${row("; Develop length ; &nbsp;ldc = 0.075*db*fy / Sqrt(f'c)", "", f(j.ldc), "cm.")}
 ${row("; Minimum Develop length", "", f(j.minLd, 0), "cm.")}
 ${row("Use Develop Length", "", f(j.useLd, 0), "cm.")}
-<div style="border-top:1px solid #000;padding:6px 8px 40px;margin-top:6px"><span class="eng">ENGINEER IN CHARGE</span><div class="nm">(&nbsp; ${esc(TITLE_BLOCK.approveByTh)} &nbsp; ${esc(TITLE_BLOCK.licence)} &nbsp;)</div></div>
+<div style="border-top:1px solid #000;padding:8px 14px 18px;margin-top:6px;display:flex;justify-content:space-between;align-items:flex-end"><span class="eng" style="margin:0">ENGINEER IN CHARGE</span><div class="sg"><div class="ln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }
 
@@ -228,5 +231,5 @@ export function coverPage(piles, project, logoSrc = "assets/logo.png") {
 <div style="font-weight:700;margin-top:26px;font-size:16px">รายการคำนวณเสาเข็มคอนกรีตอัดแรง</div><div style="margin-top:8px;font-weight:600">มาตรฐาน มอก. 396-2549</div>
 <div style="margin-top:14px;font-weight:600">${list}</div>
 <div style="margin-top:80px;line-height:1.9"><div>โครงการ : &nbsp;${esc(project.pj || "")}</div><div>เจ้าของโครงการ : &nbsp;${esc(project.ow || "")}</div><div>สถานที่ : &nbsp;${esc(project.lo || "")}</div></div>
-<div style="margin-top:150px;margin-left:300px;line-height:1.7"><div style="height:60px"></div><div>${esc(TITLE_BLOCK.approveByTh)}</div><div>${esc(TITLE_BLOCK.licence)}</div></div></div></div>`;
+<div style="margin:150px 0 0 auto;width:280px;font-size:13px;line-height:1.7"><div style="height:60px;border-bottom:1.2px solid #000"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div></div>`;
 }

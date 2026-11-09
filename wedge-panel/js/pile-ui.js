@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109020316";
-import { pileSheet } from "./pile-draw.js?v=20261109020316";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109020316";
-import { download } from "./pdf.js?v=20261109020316";
-import { esc } from "./draw2d.js?v=20261109020316";
-import { getSession, canEdit } from "./auth.js?v=20261109020316";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109020316";
-import { db } from "./db.js?v=20261109020316";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109020316";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109020316";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109021213";
+import { pileSheet } from "./pile-draw.js?v=20261109021213";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109021213";
+import { download } from "./pdf.js?v=20261109021213";
+import { esc } from "./draw2d.js?v=20261109021213";
+import { getSession, canEdit } from "./auth.js?v=20261109021213";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109021213";
+import { db } from "./db.js?v=20261109021213";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109021213";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109021213";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -345,7 +345,7 @@ async function pdfBook() {
       step(); await addPage(doc, dividerPage(p), false, true);
       step(); await addPage(doc, calcPage1(p, project, c, logo), false, true);
       step(); await addPage(doc, calcPage2(p, project, c, logo), false, true);
-      step(); await addPage(doc, pileSheet(plan, logo).replace('width="100%"', 'width="1188" height="840"'), false, false, true);
+      step(); await addPage(doc, pileSheet(plan, logo).replace('width="100%"', 'width="1188" height="840"'), false, false); // แบบเป็นหน้า A4 แนวนอน เปิดดูตรงๆ ไม่ต้องหมุนหน้า
       step(); if (p.W > 0 && p.H > 0) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), project, plan.pieces.map((q) => q.len)), false, true);
     }
     download(((curCode ? curCode + " " : "") + (jobLabel(project) || "รูปเล่ม") + ".pdf").replace(/[\\/:*?"<>|]/g, ""), doc.output("blob"));
