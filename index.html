@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-09a';
+var APP_VERSION='2026-11-09b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13534,7 +13534,6 @@ window.__dataReady.then(data => {
     const [fMan,setFMan]=useState('');
     const [fMonth,setFMonth]=useState(0);      // 0 = ทุกเดือน
     const [fview,setFview]=useState('fail');   // fail = รายงานเสาเฟล · blow = นับ Blow count 30 ฟุต
-    const [blows,setBlows]=useState([]);       // ประวัติ Blow count (blow_counts) ใช้บอกชนิดดินของหน้างาน
     const [fSoil,setFSoil]=useState('');         // '' ทั้งหมด · hard · mid · soft · none (ยังไม่มีค่านับ)
     const [fPend,setFPend]=useState(false);    // true = แสดงเฉพาะงานที่ยัง "รอสรุป"
     const tblRef=useRef(null);
@@ -13552,7 +13551,6 @@ window.__dataReady.then(data => {
     const load=()=>{db.from('foreman_reports').select('*').order('drive_date',{ascending:false}).order('id',{ascending:false}).limit(5000)
       .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
     useEffect(load,[]);
-    useEffect(()=>{db.from('blow_counts').select('site,blows,count_date').order('count_date',{ascending:false}).limit(5000).then(({data,error})=>{if(!error)setBlows(data||[]);}).catch(()=>{});},[]);
     if(rows===null)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
     if(noTable)return <div className="grid"><ChartCard span="full" title="🏗️ รายงานโฟร์แมน (เสาเข็มเฟลหน้างาน)">
       <div style={{padding:'12px 14px',fontSize:14,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-foreman-reports.sql</b> หนึ่งครั้ง จากนั้นรีเฟรชหน้านี้</div>
@@ -13566,30 +13564,15 @@ window.__dataReady.then(data => {
     const sizes=[...new Set(inYear.map(r=>r.size).filter(Boolean))].sort();
     const mans=[...new Set(inYear.map(r=>r.foreman).filter(Boolean))].sort();
     const qq=q.trim().toLowerCase();
-    // ---- จับคู่หน้างานของรายงานเสาเฟล กับค่า Blow count (ชื่อหน้างานคล้ายกัน + วันที่ห่างกันไม่เกิน 150 วัน) → ชนิดดินของหน้างาน (ดูจากค่านับสูงสุด) ----
+    // ---- ชนิดดินของหน้างาน: ดูจากค่านับ Blow count ที่กรอกเองในแต่ละรายการ (ไม่จับคู่อัตโนมัติ) ----
     const SOIL_SOFT=300,SOIL_HARD=600,soilStep=(SOIL_HARD-SOIL_SOFT)/3;
     const SOIL_LV=[{e:'🟢',t:'ดินอ่อน',col:'#15803d',bg:'#dcfce7',k:'soft'},{e:'🟡',t:'เฝ้าระวัง 1',col:'#a16207',bg:'#fef9c3',k:'mid'},{e:'🟠',t:'เฝ้าระวัง 2',col:'#c2410c',bg:'#ffedd5',k:'mid'},{e:'🔶',t:'เฝ้าระวัง 3',col:'#b91c1c',bg:'#fee2e2',k:'mid'},{e:'🔴',t:'ดินแข็ง',col:'#991b1b',bg:'#fecaca',k:'hard'}];
     const soilIdx=n=>n<=SOIL_SOFT?0:n>=SOIL_HARD?4:n<=Math.round(SOIL_SOFT+soilStep)?1:n<=Math.round(SOIL_SOFT+2*soilStep)?2:3;
-    const SITE_STOP=['บ้าน','และ','ที่ดิน','ทาวน์โฮม','ค.ส.ล','ชั้น','อาคาร','โกดัง','โรงงาน','คลังสินค้า','เมือง','ซอย','หมู่บ้าน','โครงการ','ก่อสร้าง','หจก','บจก','บมจ','บริษัท','จำกัด','แขวง','เขต','อำเภอ','จังหวัด','ตำบล','ถนน','กรุงเทพฯ','กรุงเทพมหานคร','กรุงเทพ','หน่วยงาน','หน้างาน','เสาเข็ม','เข็มเจาะ'];
-    const siteTokens=t=>[...new Set(String(t||'').toLowerCase().split(/[^0-9a-z\u0E00-\u0E7F]+/).map(x=>x.replace(/^(ต|อ|จ)\./,'')).filter(x=>x.length>=3&&!SITE_STOP.includes(x)&&SITE_STOP.reduce((q,w)=>q.split(w).join(''),x).length>=3))];   // ตัดคำทั่วไป/คำผสมคำทั่วไป เช่น "บ้านและที่ดิน" ออก ไม่ให้จับคู่ผิด
-    const sameSite=(a,b)=>a.some(t=>b.some(u=>t===u||(t.length>=4&&u.length>=4&&(t.includes(u)||u.includes(t)))));
-    const blowTok=blows.map(b=>({...b,tok:siteTokens(b.site),t:new Date(String(b.count_date).slice(0,10)).getTime()}));
-    const soilCalc=r=>{   // ระบบจับคู่เอง
-      const tk=siteTokens((r.site||'')+' '+(r.customer||'')),t0=new Date(String(r.drive_date).slice(0,10)).getTime();
-      const hit=tk.length?blowTok.filter(b=>b.tok.length&&Math.abs(b.t-t0)<=150*864e5&&sameSite(tk,b.tok)):[];
-      return hit.length?{max:Math.max(...hit.map(h=>h.blows)),n:hit.length,list:hit.slice(0,5).map(h=>h.site+' '+h.blows)}:null;
+    const soilOf=r=>{   // ชนิดดินมาจากค่านับ Blow count ที่กรอกเอง (soil_override = ตัวเลข) · ยังไม่กรอก = ไม่แสดง
+      const ov=r.soil_override==null?'':String(r.soil_override).trim();
+      return /^\d+$/.test(ov)?{max:Number(ov)}:null;
     };
-    const soilCache={};
-    const soilOf=r=>{   // ถ้าคนแก้ไว้เอง (soil_override: 0-4 = ระดับ · x = ไม่ระบุ) ใช้ค่าที่แก้ ไม่งั้นใช้ที่ระบบจับคู่
-      if(soilCache[r.id]!==undefined)return soilCache[r.id];
-      const ov=r.soil_override==null?'':String(r.soil_override);
-      let res;
-      if(ov==='x')res=null;
-      else if(/^[0-4]$/.test(ov))res={manual:true,idx:Number(ov),n:0,list:[]};
-      else res=soilCalc(r);
-      return soilCache[r.id]=res;
-    };
-    const soilLv=o=>o.manual?o.idx:soilIdx(o.max);
+    const soilLv=o=>soilIdx(o.max);
     const soilKey=r=>{const o=soilOf(r);return o?SOIL_LV[soilLv(o)].k:'none';};
     const base=inYear.filter(r=>(!fFac||r.factory===fFac)&&(!fSoil||soilKey(r)===fSoil)&&(!fSize||r.size===fSize)&&(!fMan||r.foreman===fMan)
       &&(!qq||[r.customer,r.site,r.remark,r.cause,r.fix,r.foreman,r.kind,r.size].some(x=>String(x||'').toLowerCase().includes(qq))));
@@ -13691,7 +13674,7 @@ window.__dataReady.then(data => {
     const probOpts=[...new Set(['Fail','เสาแตกปีกขณะตอก','เสาแตกผ่ากลาง','เสาหักกลางต้น','เสาหัก 1 ท่อน','หัวเสาแตก','ตอกแตกใต้เพลท','หักท่อนแรก',...countBy(rows,r=>r.remark).filter(([k,n])=>k!=='ไม่ระบุ'&&n>=2).map(([k])=>k)])];
     const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
     const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
-    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['ดิน (Blow count)',r=>{const o=soilOf(r);if(!o)return<span style={{color:'#cbd5e1'}} title={String(r.soil_override||'')==='x'?'กำหนดเองว่าไม่ระบุชนิดดิน':'ยังไม่มีค่า Blow count ของหน้างานนี้ในระบบ'}>–</span>;const L=SOIL_LV[soilLv(o)];return<span title={o.manual?'กำหนดเอง (คลิกแถวเพื่อแก้ไข)':'ค่านับที่จับคู่ได้ '+o.n+' ค่า (ใช้ค่าสูงสุด): '+o.list.join(' · ')+' — ผิดหน้างาน? คลิกแถวเพื่อแก้ไข'} style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t}{o.manual?' ✏️':' · '+o.max}</span>;},{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['ลูกค้า',r=>r.customer,{w:190}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['ท่อนต่อ (ม.)',r=>r.segs,{nw:1}],['ปั้นจั่น',r=>r.crane,{nw:1}],['สาเหตุที่คิด',r=>r.cause,{w:170}],['หน้างาน',r=>r.site,{w:200}]];
+    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['ดิน (Blow count)',r=>{const o=soilOf(r);if(!o)return<span style={{color:'#cbd5e1'}} title="ยังไม่ได้ใส่ค่านับ Blow count (คลิกแถวเพื่อใส่)">–</span>;const L=SOIL_LV[soilLv(o)];return<span title="ค่านับ Blow count ที่ใส่ไว้ (คลิกแถวเพื่อแก้ไข)" style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t} · {o.max}</span>;},{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['ลูกค้า',r=>r.customer,{w:190}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['ท่อนต่อ (ม.)',r=>r.segs,{nw:1}],['ปั้นจั่น',r=>r.crane,{nw:1}],['สาเหตุที่คิด',r=>r.cause,{w:170}],['หน้างาน',r=>r.site,{w:200}]];
     const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
     const P=(k,label,opts,ph)=>{const v=form[k]||'';const custom=!!oth[k]||(v!==''&&!opts.includes(v));
       return <div style={{minWidth:0}}><label style={lbl}>{label}</label>
@@ -13721,7 +13704,7 @@ window.__dataReady.then(data => {
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / ปัญหา / โฟร์แมน" style={{...inp,width:'auto',flex:'1 1 220px'}}/>
           <select value={fMonth} onChange={e=>setFMonth(Number(e.target.value))} style={sel}><option value={0}>ทุกเดือน</option>{MF.map((m,i)=><option key={m} value={i+1}>{m}</option>)}</select>
-          <select value={fSoil} onChange={e=>setFSoil(e.target.value)} style={sel}><option value="">ทุกชนิดดิน</option><option value="hard">🔴 ดินแข็ง</option><option value="mid">🟡 เฝ้าระวัง (ปานกลาง)</option><option value="soft">🟢 ดินอ่อน</option><option value="none">– ยังไม่มีค่านับ</option></select>
+          <select value={fSoil} onChange={e=>setFSoil(e.target.value)} style={sel}><option value="">ทุกชนิดดิน</option><option value="hard">🔴 ดินแข็ง</option><option value="mid">🟡 เฝ้าระวัง (ปานกลาง)</option><option value="soft">🟢 ดินอ่อน</option><option value="none">– ยังไม่ได้ใส่ค่านับ</option></select>
           <select value={fFac} onChange={e=>setFFac(e.target.value)} style={sel}><option value="">ทุกโรงงาน</option>{facs.map(x=><option key={x}>{x}</option>)}</select>
           <select value={fSize} onChange={e=>setFSize(e.target.value)} style={sel}><option value="">ทุกขนาด</option>{sizes.map(x=><option key={x}>{x}</option>)}</select>
           <select value={fMan} onChange={e=>setFMan(e.target.value)} style={sel}><option value="">ทุกโฟร์แมน</option>{mans.map(x=><option key={x}>{x}</option>)}</select>
@@ -13755,13 +13738,13 @@ window.__dataReady.then(data => {
             {P('kind','ประเภท',['ช/มอก','ช/รง','ด/มอก','ด/รง'])}
             {P('remark','ปัญหา',probOpts,'พิมพ์ปัญหาเอง')}
             {F('cause','สาเหตุที่คิด',{placeholder:'โฟร์แมนคิดว่าเกิดจากอะไร'})}
-            {(()=>{const au=soilCalc({site:form.site,customer:form.customer,drive_date:form.drive_date});
-              return <div style={{minWidth:0,gridColumn:'1 / -1'}}><label style={lbl}>ชนิดดินของหน้างาน (Blow count)</label>
-                <select style={inp} value={form.soil_override||''} onChange={e=>setForm({...form,soil_override:e.target.value})}>
-                  <option value="">อัตโนมัติ — ตามที่ระบบจับคู่ {au?'('+SOIL_LV[soilIdx(au.max)].t+' · '+au.max+' ครั้ง)':'(ยังไม่พบค่านับของหน้างานนี้)'}</option>
-                  {SOIL_LV.map((L,i)=><option key={i} value={String(i)}>{L.e} {L.t}</option>)}
-                  <option value="x">– ไม่ระบุ (ค่าที่ระบบจับคู่ไม่ใช่หน้างานนี้)</option></select>
-                {au&&<div style={{fontSize:12,color:'#64748b',marginTop:3}}>ระบบจับคู่กับ: {au.list.join(' · ')} — ถ้าผิดหน้างานหรือค่าไม่ตรง เลือกระดับที่ถูกต้องเองได้</div>}</div>;})()}
+            {(()=>{const ov=String(form.soil_override||''),num=/^\d+$/.test(ov)?Number(ov):null,L=num!=null?SOIL_LV[soilIdx(num)]:null;
+              return <div style={{minWidth:0,gridColumn:'1 / -1'}}><label style={lbl}>ค่านับ Blow count ของหน้างาน (ครั้ง / 30 ฟุต) — ใส่ตัวเลข ระบบบอกชนิดดินให้</label>
+                <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                  <input style={{...inp,width:150}} type="number" min="0" inputMode="numeric" placeholder="เช่น 358" value={num!=null?String(num):''} onChange={e=>setForm({...form,soil_override:e.target.value===''?'':String(Math.max(0,Math.round(Number(e.target.value))))})}/>
+                  {L?<span style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t}</span>:<span style={{fontSize:12.5,color:'#94a3b8'}}>ยังไม่ได้ใส่ค่านับ</span>}
+                  <span style={{fontSize:12,color:'#64748b'}}>≤300 ดินอ่อน · 301–599 เฝ้าระวัง 1–3 · ≥600 ดินแข็ง</span></div>
+              </div>;})()}
             {F('fail_of','เฟลจากกี่ต้น',{placeholder:'1/60'})}
             {F('customer','ชื่อลูกค้า')}
             {F('site','หน้างาน')}
