@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109043133";
-import { pileSheet } from "./pile-draw.js?v=20261109043133";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109043133";
-import { download } from "./pdf.js?v=20261109043133";
-import { esc } from "./draw2d.js?v=20261109043133";
-import { getSession, canEdit } from "./auth.js?v=20261109043133";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109043133";
-import { db } from "./db.js?v=20261109043133";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109043133";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109043133";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109043215";
+import { pileSheet } from "./pile-draw.js?v=20261109043215";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109043215";
+import { download } from "./pdf.js?v=20261109043215";
+import { esc } from "./draw2d.js?v=20261109043215";
+import { getSession, canEdit } from "./auth.js?v=20261109043215";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109043215";
+import { db } from "./db.js?v=20261109043215";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109043215";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109043215";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -158,7 +158,8 @@ function loadPile(p, project) {
   $("ppj").value = project.pj; $("pow").value = project.ow; $("plo").value = project.lo;
   $("plRows").dataset.n = ""; renderExtras(); render();
 }
-async function readReq() { const r = parseRequest($("preq").value, PILE_SECTIONS); if (!(await guardUnsaved())) return; curJobId = null; curCode = null; lastSaved = ""; showQueue(r); jmsg(""); }
+// อ่านข้อความใหม่ได้เสมอ ไม่ต้องบันทึกก่อน และไม่ถาม: งานที่เปิดอยู่ (ถ้ามี) ยังเป็นงานเดิม แก้แล้วกด บันทึกการแก้ไข ได้ (ถ้าเป็นคำขอใหม่ให้กด เริ่มงานใหม่ ก่อน)
+function readReq() { showQueue(parseRequest($("preq").value, PILE_SECTIONS)); jmsg(curJobId ? "อ่านข้อความใหม่แล้ว กดบันทึกการแก้ไขเพื่อเก็บทับงานเดิม" : ""); }
 
 // รายการคำขอจากหน้า "ติดตามรายการคำนวณเสาเข็ม" (อ่านอย่างเดียว ไม่แก้สถานะในระบบนั้น)
 async function loadTracker() {
