@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109045652";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109045652";
-import { esc } from "./draw2d.js?v=20261109045652";
+import { autoSplit } from "./pile-calc.js?v=20261109045719";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109045719";
+import { esc } from "./draw2d.js?v=20261109045719";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -76,7 +76,7 @@ export function parseRequest(text, secs) {
     const mk = LOC_KEY.exec(project.ow), k = mk ? mk.index + (/^[฀-๿](ต|อ|จ)./.test(mk[0]) ? 1 : 0) : -1; // ต./อ./จ. ติดท้ายชื่อ: จุดตัดอยู่หลังตัวอักษรหน้ามัน
     if (k > 0) { project.lo = (project.ow.slice(k) + (project.lo ? " " + project.lo : "")).trim(); project.ow = project.ow.slice(0, k).trim(); }
   }
-  project.lo = project.lo.replace(/(แขวง|เขต)\.\s*/g, "$1").replace(/กทม\.?|กรุงเทพฯ?(?!มหานคร)/g, "กรุงเทพมหานคร").replace(/\s+/g, " ").trim(); // กทม. → กรุงเทพมหานคร ชื่อเต็มเสมอ
+  project.lo = project.lo.replace(/(แขวง|เขต)\.\s*/g, "$1").replace(/กทม\.?|กรุงเทพฯ?(?!มหานคร)/g, "กรุงเทพมหานคร").replace(/(^|\s)(ต|อ|จ)\.\s+(?=[ก-๙])/g, "$1$2.").replace(/\s+/g, " ").trim(); // กทม. → กรุงเทพมหานคร ชื่อเต็มเสมอ • "ต. สนามจันทร์" → "ต.สนามจันทร์"
   if (/^(คุณ|นาย|นาง|นางสาว)?$/.test(project.ow)) project.ow = "";
   if (/^[ต./อจ\s]*$/.test(project.lo)) project.lo = ""; // เหลือแต่ "ต./อ./จ." จากฟอร์มเปล่า
   project.ow = normOwner(project.ow); delete project._last;
