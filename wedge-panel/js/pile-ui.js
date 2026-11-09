@@ -1,13 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109014554";
-import { pileSheet } from "./pile-draw.js?v=20261109014554";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109014554";
-import { download } from "./pdf.js?v=20261109014554";
-import { esc } from "./draw2d.js?v=20261109014554";
-import { getSession, canEdit } from "./auth.js?v=20261109014554";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109014554";
-import { db } from "./db.js?v=20261109014554";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109014554";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109020316";
+import { pileSheet } from "./pile-draw.js?v=20261109020316";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109020316";
+import { download } from "./pdf.js?v=20261109020316";
+import { esc } from "./draw2d.js?v=20261109020316";
+import { getSession, canEdit } from "./auth.js?v=20261109020316";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109020316";
+import { db } from "./db.js?v=20261109020316";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109020316";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109020316";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -91,7 +92,7 @@ function render() {
   const inp = read();
   if (!inp.section) { // ยังไม่เลือกหน้าตัดเสา (เช่นเริ่มงานใหม่) ไม่แสดงแบบ
     $("pileSheet").innerHTML = ""; $("pileWarn").innerHTML = '<div class="al w">เลือกหน้าตัดเสาและใส่ความยาว เพื่อเขียนแบบ</div>';
-    $("bPilePdf").disabled = true; $("bPileDraw").disabled = true;
+    $("bPilePdf").disabled = true; $("bPileDraw").disabled = true; $("bPileBook").disabled = true;
     try { localStorage.setItem(DKEY, JSON.stringify({ ...inp, _job: curJobId })); } catch (e) {}
     return;
   }
@@ -99,7 +100,7 @@ function render() {
   $("pileSheet").innerHTML = pileSheet(plan);
   const empty = !inp.full && !inp.L;
   $("pileWarn").innerHTML = empty ? '<div class="al w">ใส่ความยาวเสา (ม.) เพื่อเขียนแบบ</div>' : plan.warn.map((w) => `<div class="al w">${esc(w)}</div>`).join("");
-  $("bPilePdf").disabled = empty; $("bPileDraw").disabled = empty;
+  $("bPilePdf").disabled = empty; $("bPileDraw").disabled = empty; $("bPileBook").disabled = empty;
   try { localStorage.setItem(DKEY, JSON.stringify({ ...inp, _job: curJobId })); } catch (e) {}
 }
 
@@ -130,14 +131,16 @@ async function logoData() {
   } catch (e) { logoCache = "assets/logo.png"; }
   return logoCache;
 }
-async function addPage(doc, html, first, portrait) {
+async function addPage(doc, html, first, portrait, rotate) {
   const host = document.createElement("div");
   host.style.cssText = "position:absolute;left:-12000px;top:0;background:#fff;" + (portrait ? "width:794px;height:1123px" : "width:1188px;height:840px");
   host.innerHTML = html; document.body.appendChild(host);
-  const cv = await window.html2canvas(host, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+  let cv = await window.html2canvas(host, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
   host.remove();
-  if (!first) doc.addPage("a4", portrait ? "portrait" : "landscape");
-  doc.addImage(cv.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, portrait ? 595.28 : 841.89, portrait ? 841.89 : 595.28);
+  if (rotate) { const rc = document.createElement("canvas"); rc.width = cv.height; rc.height = cv.width; const cx = rc.getContext("2d"); cx.translate(0, rc.height); cx.rotate(-Math.PI / 2); cx.drawImage(cv, 0, 0); cv = rc; } // แบบแนวนอนหมุนทวนเข็ม 90° ให้เต็มหน้า A4 แนวตั้ง
+  const por = portrait || rotate;
+  if (!first) doc.addPage("a4", por ? "portrait" : "landscape");
+  doc.addImage(cv.toDataURL("image/jpeg", 0.93), "JPEG", 0, 0, por ? 595.28 : 841.89, por ? 841.89 : 595.28);
 }
 const secName = (k) => { const s = PILE_SECTIONS[k]; return (s.menu || s.label) + " มอก."; };
 const blowItem = (inp) => ({ section: inp.section, L: inp.L, W: inp.blow.W, Qa: inp.blow.Qa, H: inp.blow.H });
@@ -322,6 +325,35 @@ async function linkJob() {
   catch (e) { window.prompt("คัดลอกลิงก์นี้", url); }
 }
 
+// ---- PDF รูปเล่ม: ปก • (หน้าคั่น • รายการคำนวณ 2 หน้า • แบบ • ใบ blow) ต่อเสาแต่ละต้น เรียงตามขนาดแล้วตามความยาว ไม่รวมใบ กว. (สย. แนบเอง) ----
+async function pdfBook() {
+  syncActive();
+  const b = $("bPileBook"), msg = $("pileMsg"), project = projectNow();
+  let piles = queue.length ? queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]) : [];
+  if (!queue.length) { const i = read(); if (!i.full && i.L && i.section) piles = [{ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, errs: [] }]; }
+  const noQa = piles.filter((p) => !(p.Qa > 0)); piles = piles.filter((p) => p.Qa > 0);
+  if (!piles.length) { msg.textContent = "ใส่ Qa ของเสาก่อน (ใช้ในรายการคำนวณ)"; return; }
+  piles = sortPiles(piles); b.disabled = true;
+  try {
+    if (!window.html2canvas || !window.jspdf) throw new Error("โหลดตัวสร้าง PDF ไม่สำเร็จ ลองรีเฟรชหน้า");
+    await document.fonts.ready;
+    const logo = await logoData(), doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "portrait" }), total = 1 + piles.length * 5;
+    let n = 0; const step = () => { msg.textContent = "กำลังสร้างรูปเล่ม… " + (++n) + "/" + total; };
+    step(); await addPage(doc, coverPage(piles, project, logo), true, true);
+    for (const p of piles) {
+      const inp = pileInputOf(p, project), plan = planPile(inp), lens = pieceLensOf(p), c = structCalc({ secKey: p.section, pieceLens: lens, Qa: p.Qa });
+      step(); await addPage(doc, dividerPage(p), false, true);
+      step(); await addPage(doc, calcPage1(p, project, c, logo), false, true);
+      step(); await addPage(doc, calcPage2(p, project, c, logo), false, true);
+      step(); await addPage(doc, pileSheet(plan, logo).replace('width="100%"', 'width="1188" height="840"'), false, false, true);
+      step(); if (p.W > 0 && p.H > 0) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), project, plan.pieces.map((q) => q.len)), false, true);
+    }
+    download(((curCode ? curCode + " " : "") + (jobLabel(project) || "รูปเล่ม") + ".pdf").replace(/[\\/:*?"<>|]/g, ""), doc.output("blob"));
+    msg.textContent = "ดาวน์โหลดแล้ว " + piles.length + " ต้น" + (noQa.length ? " (ข้าม " + noQa.length + " ต้นที่ไม่มี Qa)" : "");
+  } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
+  b.disabled = false;
+}
+
 async function pdfAll(withBlow = true) {
   syncActive();
   const ok = queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]), b = $("bPilePdf"), msg = $("pileMsg");
@@ -383,7 +415,7 @@ export function initPile() {
   document.querySelectorAll('input[name="pt"],#pnS').forEach((x) => x.addEventListener("change", () => { renderExtras(); render(); }));
   $("pxAdd").onclick = () => { extras.push({ d: 16, n: 4, len: 0, pieces: pnVal() > 1 ? 1 : 0 }); renderExtras(); render(); };
   const exp = (withBlow) => { syncActive(); return queue.some((p) => !p.errs.length && PILE_SECTIONS[p.section]) ? pdfAll(withBlow) : pdf(withBlow); };
-  $("bPilePdf").onclick = () => exp(true); $("bPileDraw").onclick = () => exp(false); // มีรายการเสา = ส่งออกทั้งชุด ไม่มี = ส่งออกเสาในฟอร์ม
+  $("bPilePdf").onclick = () => exp(true); $("bPileDraw").onclick = () => exp(false); $("bPileBook").onclick = pdfBook; // มีรายการเสา = ส่งออกทั้งชุด ไม่มี = ส่งออกเสาในฟอร์ม
   $("preqTpl").onclick = () => { $("preq").value = TEMPLATE; $("preqMsg").textContent = "แก้ข้อความตัวอย่างนี้ แล้วกด อ่านข้อความ (หรือส่งตัวอย่างนี้ให้หน้างานกรอก)"; try { navigator.clipboard.writeText(TEMPLATE); } catch (e) {} };
   $("preqGo").onclick = readReq; $("preqDb").onclick = loadTracker; $("bPjSave").onclick = saveJob; $("bPjNew").onclick = newJob; $("bPjLink").onclick = linkJob; jmsg("");
   $("m-wall").onclick = () => setMode("wall"); $("m-pile").onclick = () => setMode("pile");
