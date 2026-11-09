@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109043120";
-import { pileSheet } from "./pile-draw.js?v=20261109043120";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109043120";
-import { download } from "./pdf.js?v=20261109043120";
-import { esc } from "./draw2d.js?v=20261109043120";
-import { getSession, canEdit } from "./auth.js?v=20261109043120";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109043120";
-import { db } from "./db.js?v=20261109043120";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109043120";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109043120";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109043133";
+import { pileSheet } from "./pile-draw.js?v=20261109043133";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109043133";
+import { download } from "./pdf.js?v=20261109043133";
+import { esc } from "./draw2d.js?v=20261109043133";
+import { getSession, canEdit } from "./auth.js?v=20261109043133";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109043133";
+import { db } from "./db.js?v=20261109043133";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109043133";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109043133";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -259,6 +259,7 @@ function askChoice(title, text, buttons) {
   });
 }
 async function guardUnsaved() {
+  if (!curJobId) return true; // งานที่ยังไม่เคยบันทึก แก้ไข/อ่านข้อความใหม่ได้เลย ไม่ถาม
   if (!isDirty()) return true;
   const name = $("pow").value.trim() || $("ppj").value.trim() || "(ยังไม่มีชื่อ)", saved = !!curJobId, btns = [];
   if (editable()) btns.push({ v: "save", t: saved ? "บันทึกการแก้ไข" : "บันทึกงาน", pri: true });
