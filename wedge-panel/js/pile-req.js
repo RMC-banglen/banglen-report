@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109021741";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109021741";
-import { esc } from "./draw2d.js?v=20261109021741";
+import { autoSplit } from "./pile-calc.js?v=20261109022705";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109022705";
+import { esc } from "./draw2d.js?v=20261109022705";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -133,7 +133,7 @@ ${row3("EXPECTED PENETRATION", "S = a/Qu - 1/2 SQR.2ab", r ? f(S, 3) : "-", "CM.
 ${row3("FOR 10 BLOWS REQUIRED PENETRATION", "", r && S > 0 ? f(10 * S) : "-", "CM.")}
 ${row3("FOR 1 FOOT REQUIRES", "", r && S > 0 ? f(30 / S) : "-", "BLOWS.")}
 ${r && S <= 0 ? `<p style="color:#c00000;font-weight:700;margin-top:14px">หมายเหตุ: ค่า S ≤ 0 ตุ้ม/ระยะยกเบาเกินไปสำหรับ Qa นี้</p>` : ""}
-<div style="position:absolute;right:56px;bottom:40px;width:270px;text-align:center;font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:14px;line-height:1.6">
+<div style="position:absolute;right:96px;bottom:60px;width:270px;text-align:center;font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:14px;line-height:1.6">
 <div style="height:46px;border-bottom:1.2px solid #000"></div>
 <div style="margin-top:4px;font-size:15px">( ${esc(TITLE_BLOCK.approveByTh)} )</div>
 <div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div>
