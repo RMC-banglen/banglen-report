@@ -244,6 +244,41 @@ export const PILE_SECTIONS = {
 // บ่า (ที่รองรับ): ขนาดตามแบบ 0.20 + 0.10 ม. เหล็กในบ่า 3 เส้น DB12
 export const SHOULDER_STD = { a: 0.2, b: 0.1, bars: 3, d: 12, cover: 0.05 }; // เหล็ก 3 เส้นเว้นเท่ากัน: ระยะหุ้ม 0.05 ที่ปลาย ระยะเหล็ก 0.05 (0.05, 0.10, 0.15 จากขอบบ่า)
 
+// ===== เสามาตรฐานโรงงาน (เพิ่มแยกจาก มอก. — ห้ามแก้ T*/S* ด้านบน) =====
+// หน้าตัด: ยึดตามเส้นบอกระยะใน "แบบโรงงาน.dxf" ทั้งหมด (9 พ.ย. 2569) B,f,c,dg,tw มม. (ลาด = (B−2f−c)/2) พื้นที่ไม่หักบัว
+// วัสดุ (ลวด ปลอก เหล็กเดือย แผ่นเหล็ก): I-15/18/22/26 ยึดตามไฟล์ บ่อตะกั่ว • I-30/35 (และสี่เหลี่ยม/หกเหลี่ยม) ยึดตาม แบบโรงงาน.dxf (ผู้ใช้สั่ง)
+// cy = ลวดห่างผิวแนวตั้ง, ex = ลวดแรกห่างขอบข้าง, wp = ระยะระหว่างลวด (มม.) • plate = ความหนาแผ่นเหล็กหัวต่อ (มม.) • fac = มาตรฐานโรงงาน
+// dowel: { n, d (มม.), len (ม.), k: "DB" | "RB" } • rows = แยกชนิดแถวบน/ล่าง (เช่น I-22: บน 2-RB9 ล่าง 2-DB12 ยาว 0.40)
+const FAC = { std: "มาตรฐานโรงงาน", stdTh: "โรงงาน", fac: true, shoulder: false, extras: false, lift: 0.207, minL: 1 };
+const RB9 = { n: 4, d: 9, len: 0.3, k: "RB" }, DB12x5 = { n: 5, d: 12, len: 0.3 }, DB16x5 = { n: 5, d: 16, len: 0.4 };
+const MIX22 = { n: 4, d: 12, len: 0.4, k: "DB", rows: { top: { d: 9, k: "RB", len: 0.3 }, bot: { d: 12, k: "DB", len: 0.4 } } };
+const DB12x4L = { n: 4, d: 12, len: 0.4 };
+Object.assign(PILE_SECTIONS, {
+  // I-15: บ่อตะกั่ว ยาว 1–5 ม. ลวด 3 เส้น • 6–10 ม. ลวด 4 เส้น (คำขอจะระบุจำนวนลวด 3 หรือ 4 เส้น) ปลอก 4-Ø2.5@0.075 / 4-Ø2.5@0.15
+  F15: { ...FAC, key: "F15", label: "I-15", size: "0.15x0.15", maxL: 10, plate: 5, geo: { B: 150, f: 25, c: 70, dg: 50, tw: 50, cy: 20, ex: 25, wp: 35 },
+    rules: [{ to: 5, w4: 3, w5: 0, wires: 3, dowel: RB9 }, { to: 5, w4: 4, w5: 0, wires: 4, dowel: RB9 }, { to: 10, w4: 4, w5: 0, wires: 4, dowel: RB9 }],
+    spiral: { wire: 2.5, endLen: 0.3, endStep: 0.075, nearLen: 0.6, nearStep: 0.15, midStep: 0.3 } },
+  // I-18: บ่อตะกั่ว ลวด 1–10 ม. 4 เส้น • 11–12 ม. 6 เส้น (4 มม.) เหล็กเดือย 4-RB9×0.30 แผ่น 5 มม. ปลอก 5-Ø2.5@0.06 (0.30) / 5-Ø2.5@0.12 (0.60) / @0.30
+  F18: { ...FAC, key: "F18", label: "I-18", size: "0.18x0.18", maxL: 12, plate: 5, geo: { B: 180, f: 35, c: 70, dg: 60, tw: 60, cy: 25, ex: 35, wp: 35 },
+    rules: [{ to: 10, w4: 4, w5: 0, dowel: RB9 }, { to: 12, w4: 6, w5: 0, dowel: RB9 }],
+    spiral: { wire: 2.5, endLen: 0.3, endStep: 0.06, nearLen: 0.6, nearStep: 0.12, midStep: 0.3 } },
+  // I-22: บ่อตะกั่ว ลวด 1–11 ม. 4 มม. ×6 • 12–14 ม. 4 มม. ×4 + 5 มม. ×2 เหล็กเดือย 2-RB9×0.30 + 2-DB12×0.40 แผ่น 6 มม. ปลอก 2x7-Ø2.8@0.06 (0.40) / 4-Ø2.8@0.20 (0.80) / @0.30
+  F22: { ...FAC, key: "F22", label: "I-22", size: "0.22x0.22", maxL: 14, plate: 6, geo: { B: 220, f: 47, c: 74, dg: 70, tw: 80, cy: 30, ex: 40, wp: 35 },
+    rules: [{ to: 11, w4: 6, w5: 0, dowel: MIX22 }, { to: 14, w4: 4, w5: 2, dowel: MIX22 }],
+    spiral: { wire: 2.8, endLen: 0.4, endStep: 0.06, nearLen: 0.8, nearStep: 0.2, midStep: 0.3 } },
+  // I-26: บ่อตะกั่ว ลวด 1–12 ม. 4 มม. ×8 • 13–14 ม. 4 มม. ×6 + 5 มม. ×2 เหล็กเดือย 4-DB12×0.40 แผ่น 6 มม. ปลอก 2x7-Ø2.8@0.06 (0.40) / 6-Ø2.8@0.135 (0.80) / @0.30
+  F26: { ...FAC, key: "F26", label: "I-26", size: "0.26x0.26", maxL: 14, plate: 6, geo: { B: 260, f: 55, c: 90, dg: 90, tw: 80, cy: 35, ex: 45, wp: 40 },
+    rules: [{ to: 12, w4: 8, w5: 0, dowel: DB12x4L }, { to: 14, w4: 6, w5: 2, dowel: DB12x4L }],
+    spiral: { wire: 2.8, endLen: 0.4, endStep: 0.06, nearLen: 0.8, nearStep: 0.135, midStep: 0.3 } },
+  // I-30, I-35: แบบโรงงาน.dxf (ปลอก CD3.0 @0.05 / 0.15 / 0.25) I-35 โซนปลาย/ใกล้ยังไม่พบในแบบ ใช้ 0.50/1.00 เท่า I-30 (รอยืนยัน)
+  F30: { ...FAC, key: "F30", label: "I-30", size: "0.30x0.30", maxL: 14, plate: 8, geo: { B: 300, f: 55, c: 110, dg: 105, tw: 90, cy: 35, ex: 35, wp: 35 },
+    rules: [{ to: 12, w4: 4, w5: 4, dowel: DB12x5 }, { to: 14, w4: 2, w5: 6, dowel: DB12x5 }],
+    spiral: { wire: 3, endLen: 0.5, endStep: 0.05, nearLen: 1, nearStep: 0.15, midStep: 0.25 } },
+  F35: { ...FAC, key: "F35", label: "I-35", size: "0.35x0.35", maxL: 14, plate: 8, geo: { B: 350, f: 70, c: 140, dg: 120, tw: 110, cy: 35, ex: 35, wp: 35 },
+    rules: [{ to: 11, w4: 0, w5: 8, dowel: DB16x5 }, { to: 14, w4: 4, w5: 6, dowel: DB16x5 }],
+    spiral: { wire: 3, endLen: 0.5, endStep: 0.05, nearLen: 1, nearStep: 0.15, midStep: 0.25 } },
+});
+
 // ชื่อผู้ออกแบบ/เขียนแบบ/อนุมัติ ในตารางชื่อแบบ (คงเดิมทุกแบบ)
 export const TITLE_BLOCK = {
   company: "บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด",

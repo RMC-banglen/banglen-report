@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109074446";
-import { pileSheet } from "./pile-draw.js?v=20261109074446";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109074446";
-import { download } from "./pdf.js?v=20261109074446";
-import { esc } from "./draw2d.js?v=20261109074446";
-import { getSession, canEdit } from "./auth.js?v=20261109074446";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109074446";
-import { db } from "./db.js?v=20261109074446";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109074446";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109074446";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109094222";
+import { pileSheet } from "./pile-draw.js?v=20261109094222";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109094222";
+import { download } from "./pdf.js?v=20261109094222";
+import { esc } from "./draw2d.js?v=20261109094222";
+import { getSession, canEdit } from "./auth.js?v=20261109094222";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109094222";
+import { db } from "./db.js?v=20261109094222";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109094222";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109094222";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -23,7 +23,7 @@ function read() {
   const full = radio("pt") === "full", pieces = pnVal();
   const sp = splits.slice(0, pieces).map((v) => (parseFloat(v) > 0 ? parseFloat(v) : 0));
   return {
-    section: $("psec").value, full, L: num("pL"), pieces, joint: full || pieces >= 2, // 2 ท่อนขึ้นไป = มีหัวต่อ, ท่อนเดี่ยว = ไม่มีหัวต่อ (แบบเต็มแสดงหัวต่อ)
+    section: $("psec").value, wires: $("pWires") ? $("pWires").value : "", full, L: num("pL"), pieces, joint: full || pieces >= 2, // 2 ท่อนขึ้นไป = มีหัวต่อ, ท่อนเดี่ยว = ไม่มีหัวต่อ (แบบเต็มแสดงหัวต่อ)
    
     split: pieces >= 2 && sp.length === pieces && sp.every((v) => v > 0) ? sp : null,
     extras: extras.map((e) => ({ ...e })),
@@ -67,8 +67,9 @@ function syncUi() {
   const full = radio("pt") === "full", two = pnVal() === 2;
   $("pLbox").hidden = full; $("pnBox").hidden = full; $("plSplit").hidden = full || pnVal() < 2; renderSplitRows(); $("pjHint").textContent = full ? "" : (pnVal() >= 2 ? "เสา 2 ท่อนขึ้นไป มีหัวต่อเชื่อม (แผ่นเหล็กและเหล็กเดือย) ทุกรอยต่อ" : "ท่อนเดี่ยว ไม่มีหัวต่อเชื่อม");
   const sc = PILE_SECTIONS[$("psec").value], noSh = !(sc && sc.shoulder); if (noSh) $("psh").checked = false; $("pshBox").hidden = full || noSh; // บ่ามีเฉพาะหน้าตัดที่มีแบบบ่า $("pxBox").hidden = full || (sc && sc.extras === false); $("pshAtBox").hidden = !$("psh").checked || full || noSh;
+  if (sc && sc.fac) $("pxBox").hidden = true; // เสาโรงงานยังไม่รองรับเหล็กเสริมพิเศษ
+  if ($("pwBox")) { const hasW = !!(sc && sc.rules.some((x) => x.wires)); $("pwBox").hidden = full || !hasW; if (!hasW) $("pWires").value = ""; } // I-15 โรงงาน: เลือกลวด 3 หรือ 4 เส้น
   const L = num("pL");
-  
 }
 
 // ช่องความยาวแต่ละท่อน (ว่าง = แบ่งอัตโนมัติ) สร้างตามจำนวนท่อน ค่าอัตโนมัติแสดงเป็น placeholder
@@ -142,15 +143,15 @@ async function addPage(doc, html, first, portrait, rotate) {
   if (!first) doc.addPage("a4", por ? "portrait" : "landscape");
   doc.addImage(cv.toDataURL("image/jpeg", 0.93), "JPEG", 0, 0, por ? 595.28 : 841.89, por ? 841.89 : 595.28);
 }
-const secName = (k) => { const s = PILE_SECTIONS[k]; return (s.menu || s.label) + " มอก."; };
+const secName = (k) => { const s = PILE_SECTIONS[k]; return (s.menu || s.label) + (s.fac ? " โรงงาน" : " มอก."); };
 const blowItem = (inp) => ({ section: inp.section, L: inp.L, W: inp.blow.W, Qa: inp.blow.Qa, H: inp.blow.H });
 
 // ---- วางข้อความคำขอ → รายการเสา → PDF ทั้งชุด ----
 function pileInputOf(p, project) {
-  return { section: p.section, full: false, L: p.L, pieces: p.pieces, joint: p.pieces >= 2, split: p.split, extras: (p.extras || []).map((e) => ({ ...e })), shoulder: p.shoulder || 0, project, blow: { W: p.W, Qa: p.Qa, H: p.H } };
+  return { section: p.section, wires: p.wires || "", full: false, L: p.L, pieces: p.pieces, joint: p.pieces >= 2, split: p.split, extras: (p.extras || []).map((e) => ({ ...e })), shoulder: p.shoulder || 0, project, blow: { W: p.W, Qa: p.Qa, H: p.H } };
 }
 function loadPile(p, project) {
-  $("psec").value = p.section; $("pL").value = p.L; $("pnS").value = String(p.pieces);
+  $("psec").value = p.section; $("pL").value = p.L; $("pnS").value = String(p.pieces); if ($("pWires")) $("pWires").value = p.wires ? String(p.wires) : "";
   const pt = document.querySelector('input[name="pt"][value="len"]'); if (pt) pt.checked = true;
   splits = p.split ? p.split.map(String) : []; extras = (p.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces || 0 })); active = p;
   $("psh").checked = (p.shoulder || 0) > 0; $("pshAt").value = p.shoulder > 0 ? p.shoulder : "";
@@ -180,18 +181,20 @@ function fromTracker(r) {
   const piles = r.items.map((i) => {
     const sz = parseFloat(i.size), size = Math.round(sz < 1 ? sz * 100 : sz), kind = i.section === "S" ? "S" : "T", errs = [];
     const L = parseFloat(i.length) || 0, W = parseFloat(i.hammer) || 0, Qa = parseFloat(i.qa) || 0, H = parseFloat(i.drop) || 0;
-    if (i.std === "factory") errs.push("มาตรฐานโรงงาน ยังไม่รองรับ");
+    const fac = i.std === "factory" && kind === "T" && !!PILE_SECTIONS["F" + size];
+    if (i.std === "factory" && !fac) errs.push("มาตรฐานโรงงานขนาดนี้ ยังไม่รองรับ");
     if (i.micro || i.joint === "micro") errs.push("ไมโครไพล์ ไม่รองรับ");
-    if (!PILE_SECTIONS[kind + size]) errs.push("ไม่มีหน้าตัดนี้ในระบบ");
+    const key = (fac ? "F" : kind) + size;
+    if (!PILE_SECTIONS[key]) errs.push("ไม่มีหน้าตัดนี้ในระบบ");
     if (!L) errs.push("ไม่มีความยาว"); if (!W) errs.push("ไม่มีน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่มี Qa"); if (!H) errs.push("ไม่มีระยะยก");
-    return { section: kind + size, sizeCm: size, kind, L, pieces: i.joint === "joined" ? 2 : 1, split: null, W, Qa, H, errs, qty: i.qty };
+    return { section: key, sizeCm: size, kind, L, pieces: i.joint === "joined" ? 2 : 1, split: null, W, Qa, H, errs, qty: i.qty };
   });
   return { project: { pj: r.project || "", ow: r.owner || "", lo: r.location || "" }, piles };
 }
 // แจ้งเตือนข้อที่ควรถามกลับฝ่ายที่ขอ + ปุ่มคัดลอกข้อความถามกลับ (วางกลับในไลน์ได้เลย)
 function showAsks(notes, project) {
   const box = $("preqAsk"); if (!box) return;
-  const asks = askList(project, notes, queue, (p) => { try { return structCalc({ secKey: p.section, pieceLens: pieceLensOf(p), Qa: p.Qa }); } catch (e) { return null; } });
+  const asks = askList(project, notes, queue, (p) => { try { return structCalc({ secKey: p.section, pieceLens: pieceLensOf(p), Qa: p.Qa, wires: p.wires }); } catch (e) { return null; } });
   box.innerHTML = "";
   if (!asks.length) return;
   const d = document.createElement("div"); d.className = "al w"; d.style.margin = "6px 0";
@@ -228,15 +231,15 @@ const editable = () => canEdit(getSession());
 function syncActive() {
   if (!active || !queue.includes(active)) return;
   const i = read();
-  Object.assign(active, { section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, kind: i.section[0], sizeCm: +i.section.slice(1) });
+  Object.assign(active, { section: i.section, wires: i.wires || "", L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, kind: i.section[0], sizeCm: +i.section.slice(1) });
 }
-const slim = (p) => ({ section: p.section, L: p.L, pieces: p.pieces, split: p.split || null, W: p.W, Qa: p.Qa, H: p.H, extras: p.extras || [], shoulder: p.shoulder || 0 });
+const slim = (p) => ({ section: p.section, wires: p.wires || "", L: p.L, pieces: p.pieces, split: p.split || null, W: p.W, Qa: p.Qa, H: p.H, extras: p.extras || [], shoulder: p.shoulder || 0 });
 const projectNow = () => ({ pj: $("ppj").value.trim(), ow: $("pow").value.trim(), lo: $("plo").value.trim() });
 function jobPiles() {
   syncActive();
   if (queue.length) return queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]).map(slim);
   const i = read();
-  return i.full || !i.L || !i.section ? [] : [slim({ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder })];
+  return i.full || !i.L || !i.section ? [] : [slim({ section: i.section, wires: i.wires, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder })];
 }
 const jobSnap = () => JSON.stringify({ project: projectNow(), piles: jobPiles() });
 const isDirty = () => { const p = projectNow(); return (p.pj || jobPiles().length) && jobSnap() !== lastSaved; };
@@ -348,7 +351,7 @@ async function pdfBook() {
   syncActive();
   const b = $("bPileBook"), msg = $("pileMsg"), project = projectNow();
   let piles = queue.length ? queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]) : [];
-  if (!queue.length) { const i = read(); if (!i.full && i.L && i.section) piles = [{ section: i.section, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, errs: [] }]; }
+  if (!queue.length) { const i = read(); if (!i.full && i.L && i.section) piles = [{ section: i.section, wires: i.wires, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, errs: [] }]; }
   const noQa = piles.filter((p) => !(p.Qa > 0)); piles = piles.filter((p) => p.Qa > 0);
   if (!piles.length) { msg.textContent = "ใส่ Qa ของเสาก่อน (ใช้ในรายการคำนวณ)"; return; }
   piles = sortPiles(piles); b.disabled = true;
@@ -359,7 +362,7 @@ async function pdfBook() {
     let n = 0; const step = () => { msg.textContent = "กำลังสร้างรูปเล่ม… " + (++n) + "/" + total; };
     step(); await addPage(doc, coverPage(piles, project, logo), true, true);
     for (const p of piles) {
-      const inp = pileInputOf(p, project), plan = planPile(inp), lens = pieceLensOf(p), c = structCalc({ secKey: p.section, pieceLens: lens, Qa: p.Qa });
+      const inp = pileInputOf(p, project), plan = planPile(inp), lens = pieceLensOf(p), c = structCalc({ secKey: p.section, pieceLens: lens, Qa: p.Qa, wires: p.wires });
       step(); await addPage(doc, dividerPage(p), false, true);
       step(); await addPage(doc, calcPage1(p, project, c, logo, { cap: !!($("pShowCap") && $("pShowCap").checked) }), false, true);
       step(); await addPage(doc, calcPage2(p, project, c, logo), false, true);
@@ -425,7 +428,7 @@ document.addEventListener("wheel", (e) => { const t = e.target; if (t && t.tagNa
 
 export function initPile() {
   if (started) return; started = true;
-  $("psec").innerHTML = '<option value="">— เลือกหน้าตัดเสา —</option>' + Object.values(PILE_SECTIONS).filter((s) => !s.draft || /[?&]draft/.test(location.search)).sort((a, b) => (a.geo.sq ? 1 : 0) - (b.geo.sq ? 1 : 0) || a.geo.B - b.geo.B).map((s) => `<option value="${s.key}">${s.menu || s.label} มอก. (${s.size} ม.)</option>`).join("");
+  $("psec").innerHTML = '<option value="">— เลือกหน้าตัดเสา —</option>' + Object.values(PILE_SECTIONS).filter((s) => !s.draft || /[?&]draft/.test(location.search)).sort((a, b) => (a.fac ? 1 : 0) - (b.fac ? 1 : 0) || (a.geo.sq ? 1 : 0) - (b.geo.sq ? 1 : 0) || a.geo.B - b.geo.B).map((s) => `<option value="${s.key}">${s.menu || s.label} ${s.fac ? "โรงงาน" : "มอก."} (${s.size} ม.)</option>`).join("");
   restore(); renderExtras();
   ["pL", "pshAt", "ppj", "pow", "plo", "pW", "pQa", "pH"].forEach((id) => $(id).addEventListener("input", sched));
   $("pL").addEventListener("input", renderExtras); // ความยาวท่อนเปลี่ยน → ตัวเลือกท่อนของเหล็กเสริมอัปเดต

@@ -1,10 +1,12 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109074446";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109074446";
-import { esc } from "./draw2d.js?v=20261109074446";
+import { autoSplit } from "./pile-calc.js?v=20261109094222";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109094222";
+import { esc } from "./draw2d.js?v=20261109094222";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
+  // มาตรฐานโรงงาน: พื้นที่ตามแบบโรงงาน (ไม่หักบัว) เส้นรอบรูปประมาณจาก I มอก. ขนาดเดียวกัน
+  F15: [140, 74], F18: [216, 89], F22: [344, 105], F26: [460, 126], F30: [585, 145], F35: [805, 180],
   S18: [324, 72], S22: [484, 88], S26: [676, 104], S30: [900, 120], S35: [1225, 140], S40: [1600, 160] };
 const E = 0.75, FS = 2.5, EC = 300;
 
@@ -99,8 +101,13 @@ export function parseRequest(text, secs) {
   idxs.forEach((ix, k) => {
     const body = all.slice(ix, k + 1 < idxs.length ? idxs[k + 1] : all.length).join("\n"), m = all[ix].match(pileRe);
     const kind = /^[Ii]|ไอ/.test(m[2]) ? "T" : "S", sizeCm = Math.round(n(m[3]) < 1 ? n(m[3]) * 100 : n(m[3])), L = n(m[4]);
-    const key = kind + sizeCm, errs = [];
-    if (!secs[key]) errs.push("ไม่มีหน้าตัด " + (kind === "T" ? "I" : "S") + "-" + sizeCm + " ในระบบ");
+    // มาตรฐาน: ข้อความมีคำว่า "โรงงาน" (หรือขนาด I-15 ที่มีแต่โรงงาน) = เสาโรงงาน ไม่เขียน = มอก. (ไม่แตะ มอก.)
+    const fac = /โรงงาน/.test(body) || (kind === "T" && !secs["T" + sizeCm] && !!secs["F" + sizeCm]);
+    const key = (kind === "T" && fac ? "F" : kind) + sizeCm, errs = [], asks = [];
+    if (/ไมโคร|micro/i.test(body)) errs.push("ไมโครไพล์ ยังไม่รองรับ");
+    if (/หก\s*เหลี่ยม/.test(body)) errs.push("เสาหกเหลี่ยม ยังไม่รองรับ");
+    if (kind === "S" && fac) errs.push("เสาสี่เหลี่ยมโรงงาน ยังไม่รองรับ");
+    if (!secs[key] && !errs.some((e) => /ยังไม่รองรับ/.test(e))) errs.push("ไม่มีหน้าตัด " + (kind === "T" ? "I" : "S") + "-" + sizeCm + (fac ? " โรงงาน" : "") + " ในระบบ");
     const ex = body.match(/(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)(?:\s*\+\s*(\d+(?:\.\d+)?))?/);
     let pieces = 1, split = null;
     if (ex) { split = ex.slice(1).filter(Boolean).map(n); pieces = split.length; if (Math.abs(split.reduce((a, b) => a + b, 0) - L) > 0.01) errs.push("ความยาวแต่ละท่อนรวมไม่เท่าความยาวเสา"); }
@@ -109,7 +116,10 @@ export function parseRequest(text, secs) {
     // "ตุ้ม": วรรณยุกต์/สระอาจเรียงสลับกันตามแป้นพิมพ์ จึงรับทั้งสองลำดับ
     const W = get(/ต[ุ้]{0,2}ม\s*[:.=]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:=]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.=]?\s*(\d+(?:\.\d+)?)/);
     if (!W) errs.push("ไม่พบน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่พบ Qa"); if (!H) errs.push("ไม่พบระยะยก");
-    piles.push({ section: key, sizeCm, kind, L, pieces, split, W, Qa, H, errs });
+    // จำนวนลวด PC (เสาที่เลือกได้ เช่น I-15 โรงงาน 3 หรือ 4 เส้น): "ลวด 3 เส้น" / "4 เส้น"
+    let wires = 0; const wm = body.match(/(?:ลวด|wire|pc)[^\d\n]{0,8}(\d)\s*เส้น|(\d)\s*เส้น/i); if (wm) wires = +(wm[1] || wm[2]);
+    if (secs[key] && secs[key].rules.some((x) => x.wires)) { if (!(wires === 3 || wires === 4)) { asks.push("ไม่ระบุจำนวนลวด PC (3 หรือ 4 เส้น) ระบบใช้ตามความยาวเสา"); wires = 0; } } else wires = 0;
+    piles.push({ section: key, sizeCm, kind, L, pieces, split, W, Qa, H, wires, errs, asks });
   });
   return { project, piles, notes };
 }
@@ -201,7 +211,7 @@ export function askList(project, notes, piles, calcOf) {
   (notes || []).forEach((t) => a.push(t));
   piles.forEach((p, i) => {
     const nm = "เสาต้นที่ " + (i + 1) + " (" + (p.kind === "T" ? "I" : "S") + "-" + p.sizeCm + " ยาว " + p.L + " ม.)";
-    (p.errs || []).forEach((e) => a.push(nm + ": " + e));
+    (p.errs || []).forEach((e) => a.push(nm + ": " + e)); (p.asks || []).forEach((e) => a.push(nm + ": " + e));
     const c = calcOf && !(p.errs || []).length ? calcOf(p) : null;
     if (c && p.Qa > c.safe) a.push(nm + ": Qa " + p.Qa + " ตัน เกินกำลังเสาที่รับได้ปลอดภัย (" + (Math.floor(c.safe * 10) / 10) + " ตัน) ขอยืนยัน Qa หรือเปลี่ยนขนาดเสา");
     const b = !(p.errs || []).length && blow(p.section, p.L, p.W, p.H, p.Qa);
