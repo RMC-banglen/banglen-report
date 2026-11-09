@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261109094846";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109094846";
-import { m2, wireLayout } from "./pile-calc.js?v=20261109094846";
+import { pilePoly, esc } from "./draw2d.js?v=20261109095636";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109095636";
+import { m2, wireLayout } from "./pile-calc.js?v=20261109095636";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -359,7 +359,7 @@ export function shoulder3D(sh, x, y, s = 0.36) {
 
 // รูปด้านท่อนเสา: ปลายละ 0.33 (@0.05) + 0.66 (@0.07) ส่วนกลาง (@0.17) — ไม่ได้มาตราส่วนจริง
 export function elevation(plan, piece, y0, opts) {
-  const ex = piece.extras || [], sp = plan.sec.spiral, X0 = 110, TW = 960, a = 56, b = 116, mid = TW - 2 * (a + b), yTop = y0 + 42, sh = 44, kk = sh / 220, my = (mm) => mm * kk; // my = มม. จริงของหน้าตัดเป็นพิกเซลแนวตั้ง
+  const ex = piece.extras || [], sp = plan.sec.spiral, X0 = 110, TW = 960, nz = sp.nearLen > 0, a = nz ? 56 : 120, b = nz ? 116 : 0, mid = TW - 2 * (a + b), yTop = y0 + 42, sh = 44, kk = sh / 220, my = (mm) => mm * kk; // my = มม. จริงของหน้าตัดเป็นพิกเซลแนวตั้ง
   const ls = piece.full ? "L = 1.00-20.00 m." : m2(piece.len);
   let o = "";
   // ตำแหน่งตามระยะจริงจากหัวเสา (เหล็กเสริม/บ่า): ช่วงซ้ายถึงรอยหักกลางใช้สเกลเดียวกับโซนปลอก 0.33/0.66 ส่วนที่เหลือย่อให้พอดีด้านขวา
@@ -368,11 +368,11 @@ export function elevation(plan, piece, y0, opts) {
   o += dimH(X0, X0 + TW, y0 + 4, "", {}) + T(X0 + TW / 2, y0 - 2, ls, { size: 15 }); // ความยาวรวมของท่อน อยู่เหนือเส้น 0.33/0.66
   const xs = [X0, X0 + a, X0 + a + b, X0 + a + b + mid, X0 + a + b + mid + b, X0 + TW];
   const mz = (v) => { const s = (Math.round(v * 1000) / 1000).toFixed(3); return s.endsWith("0") ? s.slice(0, -1) : s; }; // 0.525 / 0.33
-  const labs = [mz(sp.endLen), mz(sp.nearLen), piece.full ? `L-${mz(2 * (sp.endLen + sp.nearLen))}` : mz(piece.mid), mz(sp.nearLen), mz(sp.endLen)];
-  labs.forEach((t, i) => { o += dimH(xs[i], xs[i + 1], y0 + 26, t, { size: 13 }); });
+  const labs = [mz(sp.endLen), nz ? mz(sp.nearLen) : "", piece.full ? `L-${mz(2 * (sp.endLen + sp.nearLen))}` : mz(piece.mid), nz ? mz(sp.nearLen) : "", mz(sp.endLen)]; // ไมโครไพล์: ไม่มีโซนใกล้ปลาย
+  labs.forEach((t, i) => { if (xs[i + 1] - xs[i] > 0) o += dimH(xs[i], xs[i + 1], y0 + 26, t, { size: 13 }); });
   o += `<rect x="${X0}" y="${yTop}" width="${TW}" height="${sh}" fill="#fff" stroke="${INK}" stroke-width="1.4"/>`;
   // ปลอกเกลียว: เส้นตั้ง (ห่วง) + เส้นเฉียง จำนวนรอบต่อโซนตามระยะ @ ในมาตรฐาน (ปลาย @0.05, ใกล้ @0.07, กลาง @0.17)
-  const nEnd = Math.round(sp.endLen / sp.endStep), nNear = Math.round(sp.nearLen / sp.nearStep), stMid = (b / nNear) * (sp.midStep / sp.nearStep);
+  const nEnd = Math.round(sp.endLen / sp.endStep), nNear = Math.round(sp.nearLen / sp.nearStep), stMid = nz ? (b / nNear) * (sp.midStep / sp.nearStep) : (a / nEnd) * (sp.midStep / sp.endStep);
   const nMid = Math.max(1, Math.round(mid / stMid));
   // ปลอกอยู่ห่างผิวเสา (ชิดริมลวด PC/เหล็ก DB ด้านนอก) ไม่ชิดขอบเสา
   const ins = my(25), yi0 = yTop + ins, yi1 = yTop + sh - ins;

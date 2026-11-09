@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261109094846">
+<meta name="app-version" content="20261109095636">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -36,7 +36,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261109094846">
+<link rel="stylesheet" href="css/app.css?v=20261109095636">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -163,7 +163,7 @@
 <label for="psec">หน้าตัดเสา</label><select id="psec"></select>
 <div class="mode" style="margin-top:10px"><input type="radio" name="pt" id="ptL" value="len" checked><label for="ptL">ระบุความยาว</label><input type="radio" name="pt" id="ptF" value="full"><label for="ptF">แบบเต็ม (ทุกความยาว)</label></div>
 <div id="pLbox"><label for="pL">ความยาวเสา (ม.)</label><input id="pL" type="number" step="0.01" min="1" max="40"></div>
-<div id="pwBox" hidden><label for="pWires">จำนวนลวด PC (I-15 โรงงาน)</label><select id="pWires"><option value="">ตามความยาว</option><option value="3">3 เส้น</option><option value="4">4 เส้น</option></select></div><div id="pnBox"><label for="pnS">จำนวนท่อนต่อเชื่อม</label><select id="pnS"><option value="1">ท่อนเดี่ยว</option><option value="2">2 ท่อน</option><option value="3">3 ท่อน</option><option value="4">4 ท่อน</option><option value="5">5 ท่อน</option><option value="6">6 ท่อน</option></select></div>
+<div id="pwBox" hidden><label for="pWires">จำนวนลวด PC (I-15 โรงงาน)</label><select id="pWires"><option value="">ตามความยาว</option><option value="3">3 เส้น</option><option value="4">4 เส้น</option></select></div><div id="pnBox"><label for="pnS">จำนวนท่อนต่อเชื่อม</label><select id="pnS"><option value="1">ท่อนเดี่ยว</option><option value="2">2 ท่อน</option><option value="3">3 ท่อน</option><option value="4">4 ท่อน</option><option value="5">5 ท่อน</option><option value="6">6 ท่อน</option><option value="7">7 ท่อน (ไมโครไพล์)</option><option value="8">8 ท่อน (ไมโครไพล์)</option><option value="9">9 ท่อน (ไมโครไพล์)</option><option value="10">10 ท่อน (ไมโครไพล์)</option><option value="11">11 ท่อน (ไมโครไพล์)</option><option value="12">12 ท่อน (ไมโครไพล์)</option><option value="13">13 ท่อน (ไมโครไพล์)</option><option value="14">14 ท่อน (ไมโครไพล์)</option><option value="15">15 ท่อน (ไมโครไพล์)</option><option value="16">16 ท่อน (ไมโครไพล์)</option><option value="17">17 ท่อน (ไมโครไพล์)</option><option value="18">18 ท่อน (ไมโครไพล์)</option><option value="19">19 ท่อน (ไมโครไพล์)</option><option value="20">20 ท่อน (ไมโครไพล์)</option><option value="21">21 ท่อน (ไมโครไพล์)</option><option value="22">22 ท่อน (ไมโครไพล์)</option><option value="23">23 ท่อน (ไมโครไพล์)</option><option value="24">24 ท่อน (ไมโครไพล์)</option><option value="25">25 ท่อน (ไมโครไพล์)</option><option value="26">26 ท่อน (ไมโครไพล์)</option><option value="27">27 ท่อน (ไมโครไพล์)</option><option value="28">28 ท่อน (ไมโครไพล์)</option><option value="29">29 ท่อน (ไมโครไพล์)</option><option value="30">30 ท่อน (ไมโครไพล์)</option></select></div>
 <div id="plSplit" hidden><div id="plRows"></div><p class="hint">ไม่ใส่ = แบ่งความยาวให้อัตโนมัติ (เมตรเต็มเท่ากัน เศษไปท้ายท่อน) ใส่เองได้ เช่น 7 + 10 โดยต้องใส่ครบทุกท่อน และรวมเท่าความยาวเสา</p></div>
 <p class="hint" id="pjHint"></p>
 </fieldset>
@@ -181,6 +181,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261109094846"></script>
+<script type="module" src="js/ui.js?v=20261109095636"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109094846";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109094846";
-import { esc } from "./draw2d.js?v=20261109094846";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109095636";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109095636";
+import { esc } from "./draw2d.js?v=20261109095636";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_RB = { 6: 0.283, 9: 0.636, 12: 1.131 }; // เหล็กเส้นกลม RB (SR24, fy 2400) ตร.ซม.
@@ -88,7 +88,7 @@ export function structCalc({ secKey, pieceLens, Qa, wires, opts = {} }) {
 
 // ---- ข้อความชื่อรายการ ----
 const m2 = (v) => (Math.round(v * 100) / 100).toFixed(2);
-const pcsTxt = (lens) => (lens.length > 1 ? `( ${lens.length} ท่อนต่อเชื่อม ${lens.map((v) => (Number.isInteger(v) ? v : m2(v)) + "m.").join("+")} )` : "( ท่อนเดี่ยว )");
+const pcsTxt = (lens) => (lens.length > 6 && new Set(lens).size === 1 ? `( ไมโครไพล์ ${lens.length} ท่อน ท่อนละ ${m2(lens[0])}m. )` : lens.length > 1 ? `( ${lens.length} ท่อนต่อเชื่อม ${lens.map((v) => (Number.isInteger(v) ? v : m2(v)) + "m.").join("+")} )` : "( ท่อนเดี่ยว )");
 export function pileTitle(p, lens) {
   const sec = PILE_SECTIONS[p.section], k = (+p.section.slice(1) / 100).toFixed(2);
   return sec.geo.sq ? `S-${k} x ${k} x ${m2(p.L)}m. ${pcsTxt(lens)}` : `I-${k} x ${k} x ${m2(p.L)}m. ${pcsTxt(lens)}`;

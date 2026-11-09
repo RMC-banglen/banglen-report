@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109094846";
-import { pileSheet } from "./pile-draw.js?v=20261109094846";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109094846";
-import { download } from "./pdf.js?v=20261109094846";
-import { esc } from "./draw2d.js?v=20261109094846";
-import { getSession, canEdit } from "./auth.js?v=20261109094846";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109094846";
-import { db } from "./db.js?v=20261109094846";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109094846";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109094846";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109095636";
+import { pileSheet } from "./pile-draw.js?v=20261109095636";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109095636";
+import { download } from "./pdf.js?v=20261109095636";
+import { esc } from "./draw2d.js?v=20261109095636";
+import { getSession, canEdit } from "./auth.js?v=20261109095636";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109095636";
+import { db } from "./db.js?v=20261109095636";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109095636";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109095636";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -16,7 +16,7 @@ const DB_SIZES = [10, 12, 16, 20, 25];
 let extras = [], splits = [], started = false, queue = [], active = null, curJobId = null, curCode = null;
 
 const num = (id) => { const v = parseFloat($(id).value); return v > 0 ? v : 0; };
-const pnVal = () => Math.min(6, Math.max(1, +$("pnS").value || 1));
+const pnVal = () => Math.min(30, Math.max(1, +$("pnS").value || 1));
 const radio = (n) => (document.querySelector(`input[name="${n}"]:checked`) || {}).value;
 
 function read() {
@@ -114,7 +114,7 @@ function restore() {
     $("ppj").value = (d.project && d.project.pj) || ""; $("pow").value = (d.project && d.project.ow) || ""; $("plo").value = (d.project && d.project.lo) || "";
     const r = d._raw || {};
     const pt = document.querySelector(`input[name="pt"][value="${r.pt || "len"}"]`);
-    if (pt) pt.checked = true; $("pnS").value = String(Math.min(6, Math.max(1, +r.pn || 1)));
+    if (pt) pt.checked = true; $("pnS").value = String(Math.min(30, Math.max(1, +r.pn || 1)));
     splits = Array.isArray(r.splits) ? r.splits.map((v) => (+v > 0 ? String(v) : "")) : []; // บ่า: ไม่กู้ค่าจากร่าง — เข้าหน้าใหม่ทุกครั้งต้องไม่ติ๊กบ่า (ติ๊กเองเมื่อมีบ่าเท่านั้น)
     $("psh").checked = false; $("pshAt").value = "";
     const bw = d.blow || {}; $("pW").value = bw.W || ""; $("pQa").value = bw.Qa || ""; $("pH").value = bw.H || "";
@@ -212,7 +212,7 @@ function showQueue(r) {
   queue = r.piles.map((p) => ({ ...p, project: proj }));
   const box = $("preqList"); box.innerHTML = "";
   queue.forEach((p, i) => {
-    const pl = p.pieces > 1 ? (p.split || autoSplit(p.L, p.pieces)).join("+") : "ท่อนเดี่ยว";
+    const pl = p.pieces > 6 ? `ไมโครไพล์ ${p.pieces} ท่อน × ${Math.round((p.L / p.pieces) * 100) / 100} ม.` : p.pieces > 1 ? (p.split || autoSplit(p.L, p.pieces)).join("+") : "ท่อนเดี่ยว";
     const b = document.createElement("button"); b.type = "button"; b.className = "preqrow";
     b.style.cssText = "display:block;width:100%;text-align:left;margin:3px 0";
     b.textContent = (p.errs.length ? "⚠ " : "") + (i + 1) + ". " + (p.kind === "T" ? "I" : "S") + "-" + p.sizeCm + " ยาว " + p.L + " ม. (" + pl + ") ตุ้ม " + p.W + " Qa " + p.Qa + " ยก " + p.H + (p.errs.length ? " — " + p.errs.join(", ") : "");

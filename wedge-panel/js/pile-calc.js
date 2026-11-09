@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261109094846";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261109095636";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -87,6 +87,7 @@ export function wireLayout(w4, w5, B = 220, sq = false, wl, pat, p4, fo) {
 
 // แบ่งเป็น n ท่อนอัตโนมัติ: เมตรเต็มเท่ากัน เศษไปเพิ่มท่อนท้าย (17 ม. 2 ท่อน → 8+9, 19 → 9+10, 28 ม. 3 ท่อน → 9+9+10)
 export function autoSplit(L, n = 2) {
+  if (n > 6) return Array(n).fill(r2(L / n)); // ไมโครไพล์: ท่อนสั้นเท่ากัน (เช่น 18 ม. 12 ท่อน = ท่อนละ 1.50)
   const base = Math.floor(L / n + 1e-9), lens = Array(n).fill(base);
   let extra = r2(L - base * n);
   for (let i = n - 1; i >= 0 && extra >= 1 - 1e-9; i--) { lens[i] += 1; extra = r2(extra - 1); }
@@ -95,6 +96,10 @@ export function autoSplit(L, n = 2) {
 }
 
 // input = { section, L, pieces (1|2), split ([a,b] ใส่เอง หรือว่าง), full (แบบเต็ม), joint (มีหัวต่อ), extras [{d,n,len}], shoulder (ระยะจากหัว ม. หรือว่าง), project {pj,ow,lo} }
+export const MAX_SEG = 30; // ไมโครไพล์: ท่อนต่อกันได้สูงสุด
+// ไมโครไพล์ (ท่อนสั้น ~1.5 ม.): ปลายถี่ ปลอก @ปลาย = ครึ่งหนึ่งของมาตรฐาน กลาง @1.25 เท่าของปลาย (ตามแบบโรงงาน I-22: @0.03 / @0.075)
+const r3 = (v) => Math.round(v * 1000) / 1000;
+export const microSpiral = (s, len) => ({ ...s, endLen: Math.min(s.endLen, r2(len * 0.18)), endStep: r3(s.endStep / 2), nearLen: 0, nearStep: r3(s.endStep * 1.25), midStep: r3(s.endStep * 1.25) });
 export function planPile(input) {
   const sec = PILE_SECTIONS[input.section];
   const warn = [];
@@ -102,25 +107,26 @@ export function planPile(input) {
   const joint = input.joint !== false;
   const full = !!input.full;
   const L = r2(+input.L || 0);
-  let pieces = [];
+  let pieces = [], micro = false, segN = 0;
   if (full) {
     pieces = [{ full: true, len: null, mid: null }];
   } else {
-    const np = input.pieces > 1 ? Math.min(6, Math.floor(input.pieces)) : 1;
+    const np = input.pieces > 1 ? Math.min(MAX_SEG, Math.floor(input.pieces)) : 1; micro = np > 6;
     if (!(L >= sec.minL && L <= sec.maxL * np)) warn.push(`ความยาว ${m2(L)} ม. อยู่นอกช่วง ${m2(sec.minL)}–${m2(sec.maxL * np)} ม.`);
     let lens = [L];
     if (np > 1) {
       const sp = Array.isArray(input.split) && input.split.length === np && input.split.every((v) => +v > 0) ? input.split.map((v) => r2(+v)) : autoSplit(L, np);
       const sum = r2(sp.reduce((t, v) => t + v, 0));
       if (Math.abs(sum - L) > 0.005) warn.push(`ความยาวรวมของ ${np} ท่อน ${m2(sum)} ม. ไม่เท่ากับความยาวรวม ${m2(L)} ม.`);
-      lens = sp;
+      lens = sp; segN = np;
     }
+    if (micro) lens = [...new Set(lens)]; // ไมโครไพล์: วาดเฉพาะท่อนตัวอย่าง (ท่อนยาวเท่ากันรวมเป็นแบบเดียว)
     pieces = lens.map((len) => {
       const rule = ruleFor(sec, len, input.wires);
       if (len < sec.minL || len > sec.maxL) warn.push(`ท่อนยาว ${m2(len)} ม. อยู่นอกช่วง ${m2(sec.minL)}–${m2(sec.maxL)} ม. ของตารางลวด`);
-      const s = sec.spiral, ends = 2 * (s.endLen + s.nearLen);
+      const s = micro ? microSpiral(sec.spiral, len) : sec.spiral, ends = 2 * (s.endLen + s.nearLen);
       if (len <= ends) warn.push(`ท่อนยาว ${m2(len)} ม. สั้นเกินกว่าจะมีส่วนกลาง @${m2(s.midStep)}`);
-      return { full: false, len, mid: r2(len - ends), rule };
+      return { full: false, len, mid: r2(len - ends), rule, spiral: micro ? s : undefined };
     });
   }
   const shortIdx = pieces.reduce((bi, p, i) => (p.len < pieces[bi].len ? i : bi), 0) + 1; // ไม่ได้เลือกท่อน = ท่อนสั้นที่สุดก่อน (เท่ากัน = ท่อนบน)
@@ -163,7 +169,8 @@ export function planPile(input) {
   if (full) jt = "มีหัวต่อ";
   const xl = (e) => { if (e.len) return `x${m2(e.len)}m.`; if (full) return "xLm."; const ls = [...new Set(pieces.filter((p) => p.extras.includes(e)).map((p) => p.len))]; return `x${ls.map(m2).join("/")}m.`; };
   const xt = extras.map((e) => `${e.n}-DB${e.d}${xl(e)}`).join(" ");
+  if (micro) jt = `MICROPILE ${segN} ท่อน ท่อนละ ${pieces.map((p) => m2(p.len)).join("/")} ม.`;
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
   const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq), sec.geo && sec.geo.wl, sec.geo && (sec.geo.two ? "two" : sec.geo.pat), sec.geo && sec.geo.p4, sec.fac && !sec.geo.sq ? sec.geo : undefined) : null;
-  return { sec, full, joint, pieces, extras, kinds, configs, layout, shoulder, rows, warn, title, L, project: input.project || {} };
+  return { sec: micro && pieces[0] ? { ...sec, spiral: pieces[0].spiral } : sec, micro, segN, full, joint, pieces, extras, kinds, configs, layout, shoulder, rows, warn, title, L, project: input.project || {} };
 }

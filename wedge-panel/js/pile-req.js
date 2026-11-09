@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109094846";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109094846";
-import { esc } from "./draw2d.js?v=20261109094846";
+import { autoSplit } from "./pile-calc.js?v=20261109095636";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109095636";
+import { esc } from "./draw2d.js?v=20261109095636";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -105,12 +105,14 @@ export function parseRequest(text, secs) {
     // มาตรฐาน: ข้อความมีคำว่า "โรงงาน" (หรือขนาด I-15 ที่มีแต่โรงงาน) = เสาโรงงาน ไม่เขียน = มอก. (ไม่แตะ มอก.)
     const fac = /โรงงาน/.test(body) || (kind === "T" && !secs["T" + sizeCm] && !!secs["F" + sizeCm]);
     const key = (fac ? (kind === "T" ? "F" : "Q") : kind) + sizeCm, errs = [], asks = [];
-    if (/ไมโคร|micro/i.test(body)) errs.push("ไมโครไพล์ ยังไม่รองรับ");
+    const micro = /ไมโคร|micro/i.test(body), mn = micro ? body.match(/(\d+)\s*ท่อน/) : null; // ไมโครไพล์: "(12ท่อนต่อ)" = ท่อนสั้นเท่ากัน n ท่อน
+    if (micro && !(mn && +mn[1] > 6)) errs.push("ไมโครไพล์ ไม่พบจำนวนท่อน (เช่น 12 ท่อนต่อ)");
     if (/หก\s*เหลี่ยม/.test(body)) errs.push("เสาหกเหลี่ยม ยังไม่รองรับ");
     if (!secs[key] && !errs.some((e) => /ยังไม่รองรับ/.test(e))) errs.push("ไม่มีหน้าตัด " + (kind === "T" ? "I" : "S") + "-" + sizeCm + (fac ? " โรงงาน" : "") + " ในระบบ");
     const ex = body.match(/(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)(?:\s*\+\s*(\d+(?:\.\d+)?))?/);
     let pieces = 1, split = null;
     if (ex) { split = ex.slice(1).filter(Boolean).map(n); pieces = split.length; if (Math.abs(split.reduce((a, b) => a + b, 0) - L) > 0.01) errs.push("ความยาวแต่ละท่อนรวมไม่เท่าความยาวเสา"); }
+    else if (mn && +mn[1] > 6) pieces = +mn[1];
     else if (/ต\s*[\/.]?\s*[ชซ]|ต่อ/.test(body)) pieces = 2;
     const get = (re) => { const x = body.match(re); return x ? n(x[1]) : 0; };
     // "ตุ้ม": วรรณยุกต์/สระอาจเรียงสลับกันตามแป้นพิมพ์ จึงรับทั้งสองลำดับ
@@ -141,7 +143,7 @@ export function blowSheet(p, secLabel, project, pieceLens, code) {
   const wp = r ? (r.A * p.L * 100 * DENSITY) / 1e6 : 0;
   const sz = (+size / 100).toFixed(2), len = f(p.L);
   const pile = kind === "T" ? `I &nbsp; ${sz} × ${len} ม.` : `เสาตัน ${sz} × ${sz} × ${len} ม.`;
-  const pcs = pieceLens && pieceLens.length > 1 ? `${pieceLens.length} ท่อนต่อเชื่อม (${pieceLens.map((v) => f(v)).join(" + ")} ม.)` : "ท่อนเดี่ยว";
+  const pcs = pieceLens && pieceLens.length > 6 && new Set(pieceLens).size === 1 ? `ไมโครไพล์ ${pieceLens.length} ท่อน ท่อนละ ${f(pieceLens[0])} ม.` : pieceLens && pieceLens.length > 1 ? `${pieceLens.length} ท่อนต่อเชื่อม (${pieceLens.map((v) => f(v)).join(" + ")} ม.)` : "ท่อนเดี่ยว";
   const red = (t) => `<b style="color:#c00000">${t}</b>`;
   const row = (l, s, v, u) => `<div class="r"><span>${l}</span><span>${s || ""}</span><span class="e"></span><span class="v">${v == null ? "" : v}</span><span>${u || ""}</span></div>`;
   const row3 = (l, s, v, u) => `<div class="r"><span>${l}</span><span>${s}</span><span class="e">=</span><span class="v">${v}</span><span>${u}</span></div>`;
