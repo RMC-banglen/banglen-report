@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109021213";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109021213";
-import { esc } from "./draw2d.js?v=20261109021213";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109021631";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109021631";
+import { esc } from "./draw2d.js?v=20261109021631";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -93,9 +93,9 @@ export const pieceLensOf = (p) => (p.pieces > 1 ? (p.split && p.split.length ===
 const f = (v, d = 2) => (isFinite(v) && Math.abs(v) > 1e-9 ? v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "-"); // ศูนย์แสดงเป็น - ตามใบคำนวณเดิม
 const FONT = "'Sarabun','Noto Sans Thai',Tahoma,sans-serif";
 const CSS = `<style>
-.sp{width:794px;height:1123px;background:#fff;color:#000;box-sizing:border-box;font-family:${FONT};font-size:11px;position:relative}
+.sp{width:794px;height:1123px;background:#fff;color:#000;box-sizing:border-box;font-family:${FONT};font-size:11.5px;position:relative}
 .sp *{box-sizing:border-box}
-.sp .fr{position:absolute;left:36px;right:36px;top:40px;border:1.2px solid #000}
+.sp .fr{position:absolute;left:36px;right:36px;top:40px;bottom:40px;border:1.2px solid #000;display:flex;flex-direction:column}
 .sp .hd{display:flex;border-bottom:1.2px solid #000}
 .sp .hd .lg{width:250px;padding:8px 10px;text-align:center;border-right:1.2px solid #000;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .sp .hd .lg img{width:112px}
@@ -104,13 +104,22 @@ const CSS = `<style>
 .sp .pj{display:grid;grid-template-columns:88px 10px 1fr;margin-top:3px;border-top:1px solid #000;padding-top:3px}
 .sp .bar{text-align:center;font-weight:700;font-size:13px;padding:5px;border-bottom:1px solid #000}
 .sp .sec{font-weight:700;font-size:12px;padding:5px 8px 3px}
-.sp .r{display:grid;grid-template-columns:230px 150px 18px 82px 1fr;align-items:center;min-height:17px;padding:0 8px}
+.sp .r{display:grid;grid-template-columns:210px 214px 16px 86px 1fr;align-items:center;min-height:19px;padding:0 8px}
 .sp .r.t{grid-template-columns:1fr 1fr;}
 .sp .r .v{text-align:right;padding-right:6px}
 .sp .r .e{text-align:center}
-.sp .sub{padding:2px 8px;font-weight:600}
-.sp table.tb{width:100%;border-collapse:collapse;font-size:11px}
-.sp table.tb td,.sp table.tb th{border:1px solid #777;padding:2px 5px;text-align:center}
+.sp .r>span{white-space:nowrap}
+.sp .r.w>span{white-space:normal}
+.sp.p2 .r{min-height:30px}
+.sp.p2 .sec{padding:12px 8px 6px;font-size:13px}
+.sp.p2 .bar{padding:9px;font-size:14px}
+.sp .sub{padding:3px 8px 1px;font-weight:600}
+.sp .bd>.sub{border-top:1px solid #000;margin-top:2px}
+.sp .bd>.sub:first-child{border-top:none;margin-top:0}
+.sp table.tb{width:100%;border-collapse:collapse;font-size:12px}
+.sp table.tb td,.sp table.tb th{border:none;padding:3px 5px;text-align:center;font-weight:400}
+.sp table.tb.dot td{border-bottom:1px dotted #000}
+.sp table.hd8 td,.sp table.hd8 th{border:1px solid #000;font-weight:700;padding:5px 4px}
 .sp .red{color:#c00000;font-weight:700}
 .sp table.hd8{table-layout:fixed;width:100%}
 .sp .sg{width:280px;text-align:center;font-size:12px;line-height:1.6}
@@ -167,10 +176,10 @@ ${row("TOTAL(TIS 95-2525)", "=ES+SH+CR+RE", f(ls.T95), "ksc.")}
 ${row("TOTAL(TIS420-2525)", "=ES+SH+CR+RE", f(ls.T420), "ksc.")}
 </div></div>
 <div class="grp" style="border-top:1px solid #000"><div class="vt"><span>PROPERTIES<br>OF MATERIAL</span></div><div class="bd" style="padding:4px">
-<table class="tb"><tr><th>TYPE</th><th>Pu (kg.)</th><th>Pi (kg.)</th><th>Pe = Pi-Loss (kg.)</th><th>use No.</th><th>TOTAL Pi (kg.)</th><th>TOTAL Pe (kg.)</th></tr>${mat}
+<table class="tb dot"><tr><th>TYPE</th><th>Pu (kg.)</th><th>Pi (kg.)</th><th>Pe = Pi-Loss (kg.)</th><th>use No.</th><th>TOTAL Pi (kg.)</th><th>TOTAL Pe (kg.)</th></tr>${mat}
 <tr><td colspan="5" style="text-align:right;font-weight:700">GRAND TOTAL</td><td>${f(c.totPi)}</td><td>${f(c.totPe)}</td></tr></table>
 <div style="display:flex;justify-content:space-around;padding:6px 0;font-weight:600"><span>fci = Pi / Ac = <b>${f(c.fci)}</b> ksc</span><span>fce = Pe / Ac = <b>${f(c.fce)}</b> ksc</span></div></div></div>
-<div class="grp" style="border-top:1px solid #000"><div class="vt"><span>CHECK STRESS<br>IN PC. PILE</span></div><div class="bd" style="padding:4px"><table class="tb">
+<div class="grp" style="border-top:1px solid #000"><div class="vt"><span>CHECK STRESS<br>IN PC. PILE</span></div><div class="bd" style="padding:4px"><table class="tb dot">
 <tr><th>AT TRANSFER STAGE</th><th>(M/Zx)+(fci)</th><th>&lt; 0.60 fci'</th><th>solution</th><th>-(M/Zx)+(fci)</th><th>&lt; -0.8 fci'<sup>1/2</sup></th><th>solution</th></tr>
 <tr><td></td><td>${f(g.t1)}</td><td>${f(g.t1lim)}</td><td>${ok(g.t1ok)}</td><td>${f(g.t2)}</td><td>${f(g.t2lim)}</td><td>${ok(g.t2ok)}</td></tr>
 <tr><th>AT WORKING STAGE</th><th>(M/Zx)+(fce)</th><th>&lt; 0.45 fc'</th><th>solution</th><th>-(M/Zx)+(fce)</th><th>&lt; -1.59 fc'<sup>1/2</sup></th><th>solution</th></tr>
@@ -179,7 +188,7 @@ ${row("TOTAL(TIS420-2525)", "=ES+SH+CR+RE", f(ls.T420), "ksc.")}
 ${row("Ultimate load for pile", "(0.85*fc' - 0.6*fce)*Ac/1000", f(c.ult), "ton.")}
 ${row("Safe load for pile", "(0.33*fc' - 0.27*fce)*Ac/1000", f(c.safe), "ton.")}
 ${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false })}
-<div style="border-top:1px solid #000;padding:8px 14px 18px;display:flex;justify-content:space-between;align-items:flex-end"><span class="eng" style="margin:0">ENGINEER IN CHARGE</span><div class="sg"><div class="ln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
+<div style="border-top:1px solid #000;padding:8px 14px 18px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="eng" style="margin:0">ENGINEER IN CHARGE</span><div class="sg"><div class="ln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }
 
@@ -187,9 +196,9 @@ ${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false }
 export function calcPage2(p, project, c, logoSrc = "assets/logo.png") {
   const lens = pieceLensOf(p), t = titleParts(p, lens), st = c.st, j = c.joint, w = j.weld;
   const sf = (v) => String(Math.round(v * 10000) / 10000);
-  const two = (a, b, c1, d) => `<div style="display:grid;grid-template-columns:1fr 1fr;"><div class="r" style="grid-template-columns:1fr 90px 40px">${a}</div><div class="r" style="grid-template-columns:1fr 90px 50px">${b}</div></div>`;
+  const two = (a, b, c1, d) => `<div style="display:grid;grid-template-columns:1fr 1fr;"><div class="r w" style="grid-template-columns:1fr 80px 46px">${a}</div><div class="r w" style="grid-template-columns:1fr 80px 56px">${b}</div></div>`;
   const cell = (l, v, u) => `<span>${l}</span><span class="v">${v}</span><span>${u}</span>`;
-  return `${CSS}<div class="sp"><div class="fr">${head(project, t, logoSrc)}
+  return `${CSS}<div class="sp p2"><div class="fr">${head(project, t, logoSrc)}
 <div class="bar">DESIGN OF PRESTRESSED CONCRETE PILE</div>
 <div class="sec">Design of strrups</div>
 ${two(cell("Used stirrups diameter", f(st.d, 1), "mm."), cell("Length of stirrups per loop", f(st.loopLen), "m."))}
@@ -212,7 +221,7 @@ ${row(`; For ${j.n} Dowel bar welding length`, "", f(w.dowelWeld), "cm. &nbsp; "
 ${row("; Develop length ; &nbsp;ldc = 0.075*db*fy / Sqrt(f'c)", "", f(j.ldc), "cm.")}
 ${row("; Minimum Develop length", "", f(j.minLd, 0), "cm.")}
 ${row("Use Develop Length", "", f(j.useLd, 0), "cm.")}
-<div style="border-top:1px solid #000;padding:8px 14px 18px;margin-top:6px;display:flex;justify-content:space-between;align-items:flex-end"><span class="eng" style="margin:0">ENGINEER IN CHARGE</span><div class="sg"><div class="ln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
+<div style="border-top:1px solid #000;padding:8px 14px 18px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="eng" style="margin:0">ENGINEER IN CHARGE</span><div class="sg"><div class="ln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }
 
