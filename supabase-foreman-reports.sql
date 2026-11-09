@@ -30,6 +30,9 @@ create table if not exists foreman_reports (
 -- ถ้าสร้างตารางไว้แล้วก่อนมีช่องสาเหตุที่คิด: เพิ่มช่องให้ (รันซ้ำได้)
 alter table foreman_reports add column if not exists cause text;
 
+-- ชนิดดินที่กำหนดเอง (ว่าง = ให้ระบบจับคู่จาก Blow count · 0-4 = ระดับดินอ่อน→ดินแข็ง · x = ไม่ระบุ) (รันซ้ำได้)
+alter table foreman_reports add column if not exists soil_override text;
+
 create index if not exists foreman_reports_drive_idx on foreman_reports (drive_date desc);
 
 alter table foreman_reports enable row level security;
