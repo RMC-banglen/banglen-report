@@ -277,6 +277,16 @@ Object.assign(PILE_SECTIONS, {
   F35: { ...FAC, key: "F35", label: "I-35", size: "0.35x0.35", maxL: 14, plate: 8, geo: { B: 350, f: 70, c: 140, dg: 120, tw: 110, cy: 35, ex: 35, wp: 35 },
     rules: [{ to: 11, w4: 0, w5: 8, dowel: DB16x5 }, { to: 14, w4: 4, w5: 6, dowel: DB16x5 }],
     spiral: { wire: 3, endLen: 0.5, endStep: 0.05, nearLen: 1, nearStep: 0.15, midStep: 0.25 } },
+  // เสาสี่เหลี่ยมโรงงาน (แบบโรงงาน.dxf) พื้นที่ B² ไม่หักบัว • มุมตัด 20 มม. และความยาวโซนปลอก (1.5B / 3B) ยังไม่ได้ยืนยัน
+  Q22: { ...FAC, key: "Q22", label: "[ ]", menu: "S-22", size: "0.22x0.22", maxL: 14, plate: 6, geo: { sq: true, B: 220, ch: 20, dIn: 50, pat: { 6: { row: ["L0","L1","R0"] }, 8: { row: ["L0","L1","R1","R0"] } } },
+    rules: [{ to: 12, w4: 0, w5: 6, dowel: { n: 4, d: 12, len: 0.3 } }, { to: 14, w4: 4, w5: 4, dowel: { n: 4, d: 12, len: 0.3 } }],
+    spiral: { wire: 3, endLen: 0.33, endStep: 0.04, nearLen: 0.66, nearStep: 0.1, midStep: 0.25 } },
+  Q26: { ...FAC, key: "Q26", label: "[ ]", menu: "S-26", size: "0.26x0.26", maxL: 14, plate: 9, geo: { sq: true, B: 260, ch: 20, dIn: 50, pat: { 8: { row: ["L0","L1","R1","R0"] } } },
+    rules: [{ to: 14, w4: 2, w5: 6, dowel: { n: 5, d: 12, len: 0.3 } }],
+    spiral: { wire: 4, endLen: 0.39, endStep: 0.06, nearLen: 0.78, nearStep: 0.1, midStep: 0.25 } },
+  Q30: { ...FAC, key: "Q30", label: "[ ]", menu: "S-30", size: "0.30x0.30", maxL: 14, plate: 9, geo: { sq: true, B: 300, ch: 20, dIn: 55, pat: { 10: { row: ["L0","L1","L2","R2","R0"] } } },
+    rules: [{ to: 14, w4: 0, w5: 10, dowel: { n: 4, d: 16, len: 0.4 } }],
+    spiral: { wire: 4, endLen: 0.45, endStep: 0.05, nearLen: 0.9, nearStep: 0.1, midStep: 0.25 } },
 });
 
 // ชื่อผู้ออกแบบ/เขียนแบบ/อนุมัติ ในตารางชื่อแบบ (คงเดิมทุกแบบ)

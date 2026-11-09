@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109094628";
-import { pileSheet } from "./pile-draw.js?v=20261109094628";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109094628";
-import { download } from "./pdf.js?v=20261109094628";
-import { esc } from "./draw2d.js?v=20261109094628";
-import { getSession, canEdit } from "./auth.js?v=20261109094628";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109094628";
-import { db } from "./db.js?v=20261109094628";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109094628";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109094628";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109094835";
+import { pileSheet } from "./pile-draw.js?v=20261109094835";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109094835";
+import { download } from "./pdf.js?v=20261109094835";
+import { esc } from "./draw2d.js?v=20261109094835";
+import { getSession, canEdit } from "./auth.js?v=20261109094835";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109094835";
+import { db } from "./db.js?v=20261109094835";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109094835";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109094835";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -181,10 +181,10 @@ function fromTracker(r) {
   const piles = r.items.map((i) => {
     const sz = parseFloat(i.size), size = Math.round(sz < 1 ? sz * 100 : sz), kind = i.section === "S" ? "S" : "T", errs = [];
     const L = parseFloat(i.length) || 0, W = parseFloat(i.hammer) || 0, Qa = parseFloat(i.qa) || 0, H = parseFloat(i.drop) || 0;
-    const fac = i.std === "factory" && kind === "T" && !!PILE_SECTIONS["F" + size];
+    const fac = i.std === "factory" && !!PILE_SECTIONS[(kind === "T" ? "F" : "Q") + size];
     if (i.std === "factory" && !fac) errs.push("มาตรฐานโรงงานขนาดนี้ ยังไม่รองรับ");
     if (i.micro || i.joint === "micro") errs.push("ไมโครไพล์ ไม่รองรับ");
-    const key = (fac ? "F" : kind) + size;
+    const key = (fac ? (kind === "T" ? "F" : "Q") : kind) + size;
     if (!PILE_SECTIONS[key]) errs.push("ไม่มีหน้าตัดนี้ในระบบ");
     if (!L) errs.push("ไม่มีความยาว"); if (!W) errs.push("ไม่มีน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่มี Qa"); if (!H) errs.push("ไม่มีระยะยก");
     return { section: key, sizeCm: size, kind, L, pieces: i.joint === "joined" ? 2 : 1, split: null, W, Qa, H, errs, qty: i.qty };
@@ -311,7 +311,7 @@ async function openJob(id) {
     if (!row || !row.data || row.data.kind !== "pile") { jmsg("ไม่พบงานนี้"); return false; }
     const d = row.data;
     setMode("pile");
-    showQueue({ project: d.project || { pj: "", ow: "", lo: "" }, piles: (d.piles || []).map((p) => ({ ...p, kind: p.section[0], sizeCm: +p.section.slice(1), errs: [] })) });
+    showQueue({ project: d.project || { pj: "", ow: "", lo: "" }, piles: (d.piles || []).map((p) => ({ ...p, kind: /^[TF]/.test(p.section) ? "T" : "S", sizeCm: +p.section.slice(1), errs: [] })) });
     $("preqMsg").textContent = "";
     curJobId = row.id; curCode = d.code || null; lastSaved = jobSnap(); saveDraftJob();
     try { history.replaceState(null, "", "#" + curJobId); } catch (e) {}

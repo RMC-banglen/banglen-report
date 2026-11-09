@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261109094628";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109094628";
-import { m2, wireLayout } from "./pile-calc.js?v=20261109094628";
+import { pilePoly, esc } from "./draw2d.js?v=20261109094835";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109094835";
+import { m2, wireLayout } from "./pile-calc.js?v=20261109094835";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -551,7 +551,7 @@ export function pileSheet(plan, logoHref = "assets/logo.png") {
   });
   // โหมด "ดูตาราง" (แบบเต็ม/หลายชุดลวด): วาดตำแหน่งลวดของช่วงความยาวสูงสุดในตาราง (ผู้ใช้สั่ง) ข้อความ "PC.WIRE ดูตาราง" บอกว่าจำนวนจริงดูที่ตาราง
   const gG = plan.sec.geo || {}, r0 = plan.sec.rules[plan.sec.rules.length - 1];
-  const layDim = plan.layout || wireLayout(r0.w4, r0.w5, gG.B || 220, !!gG.sq, gG.wl, gG.two ? "two" : gG.pat, plan.sec.fac ? gG.p4 : undefined, plan.sec.fac ? gG : undefined);
+  const layDim = plan.layout || wireLayout(r0.w4, r0.w5, gG.B || 220, !!gG.sq, gG.wl, gG.two ? "two" : gG.pat, plan.sec.fac && !gG.sq ? gG.p4 : undefined, plan.sec.fac && !gG.sq ? gG : undefined);
   // ---- แถว 2: หน้าตัด A / B (+ จุดยกสำหรับแบบเดี่ยว) ----
   const sa = (two ? 0.5 : 0.62) * (220 / PILE22.B) * (bigSec ? 1.3 : 1), topE = HB() * sa + (two ? 20 : 48), botE = HB() * sa + 98, cyA = y + topE;
   if (two) {

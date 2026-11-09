@@ -1,12 +1,13 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109094628";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109094628";
-import { esc } from "./draw2d.js?v=20261109094628";
+import { autoSplit } from "./pile-calc.js?v=20261109094835";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109094835";
+import { esc } from "./draw2d.js?v=20261109094835";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
   // มาตรฐานโรงงาน: พื้นที่และเส้นรอบรูปคิดจากหน้าตัดตามแบบ (ไม่หักบัว)
   F15: [140, 74.9], F18: [216, 89.3], F22: [344, 107.5], F26: [460, 129.9], F30: [585, 148.9], F35: [805, 176.0],
+  Q22: [484, 88], Q26: [676, 104], Q30: [900, 120], // สี่เหลี่ยมโรงงาน B² (ไม่หักบัว) เส้นรอบรูป 4B
   S18: [324, 72], S22: [484, 88], S26: [676, 104], S30: [900, 120], S35: [1225, 140], S40: [1600, 160] };
 const E = 0.75, FS = 2.5, EC = 300;
 
@@ -103,10 +104,9 @@ export function parseRequest(text, secs) {
     const kind = /^[Ii]|ไอ/.test(m[2]) ? "T" : "S", sizeCm = Math.round(n(m[3]) < 1 ? n(m[3]) * 100 : n(m[3])), L = n(m[4]);
     // มาตรฐาน: ข้อความมีคำว่า "โรงงาน" (หรือขนาด I-15 ที่มีแต่โรงงาน) = เสาโรงงาน ไม่เขียน = มอก. (ไม่แตะ มอก.)
     const fac = /โรงงาน/.test(body) || (kind === "T" && !secs["T" + sizeCm] && !!secs["F" + sizeCm]);
-    const key = (kind === "T" && fac ? "F" : kind) + sizeCm, errs = [], asks = [];
+    const key = (fac ? (kind === "T" ? "F" : "Q") : kind) + sizeCm, errs = [], asks = [];
     if (/ไมโคร|micro/i.test(body)) errs.push("ไมโครไพล์ ยังไม่รองรับ");
     if (/หก\s*เหลี่ยม/.test(body)) errs.push("เสาหกเหลี่ยม ยังไม่รองรับ");
-    if (kind === "S" && fac) errs.push("เสาสี่เหลี่ยมโรงงาน ยังไม่รองรับ");
     if (!secs[key] && !errs.some((e) => /ยังไม่รองรับ/.test(e))) errs.push("ไม่มีหน้าตัด " + (kind === "T" ? "I" : "S") + "-" + sizeCm + (fac ? " โรงงาน" : "") + " ในระบบ");
     const ex = body.match(/(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)(?:\s*\+\s*(\d+(?:\.\d+)?))?/);
     let pieces = 1, split = null;
@@ -137,7 +137,7 @@ const DENSITY = 2.4; // ตัน/ลบ.ม. คอนกรีตอัดแ�
 // ใบคำนวณ blow count แบบฟอร์ม Excel ของบริษัท (A4 แนวตั้ง 794×1123) หัวกระดาษ/สูตร/ลำดับบรรทัดตามต้นแบบ
 // p = {section,L,W,Qa,H}  project = {pj,ow,lo}  pieceLens = ความยาวแต่ละท่อน  code = รหัสงาน (ไม่มีก็ได้)
 export function blowSheet(p, secLabel, project, pieceLens, code) {
-  const r = blow(p.section, p.L, p.W, p.H, p.Qa), kind = p.section[0], size = p.section.slice(1);
+  const r = blow(p.section, p.L, p.W, p.H, p.Qa), kind = /^[TF]/.test(p.section) ? "T" : "S", size = p.section.slice(1);
   const wp = r ? (r.A * p.L * 100 * DENSITY) / 1e6 : 0;
   const sz = (+size / 100).toFixed(2), len = f(p.L);
   const pile = kind === "T" ? `I &nbsp; ${sz} × ${len} ม.` : `เสาตัน ${sz} × ${sz} × ${len} ม.`;

@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261109094628";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261109094835";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -138,7 +138,7 @@ export function planPile(input) {
   const grp = (keyFn) => { const m = new Map(); pieces.forEach((p, i) => { const k = keyFn(p); if (!m.has(k)) m.set(k, { key: k, idx: [], first: p }); m.get(k).idx.push(i); }); return [...m.values()].sort((a, b) => (a.first.extras.length > 0) - (b.first.extras.length > 0)); };
   let cfgs = full ? [] : grp((p) => wk(p) + "#" + ek(p)), manyCfg = false;
   if (cfgs.length > 2) { cfgs = grp((p) => (p.extras.length ? ek(p) : "")); manyCfg = true; if (cfgs.length > 2) cfgs = [cfgs[0], { key: "rest", idx: cfgs.slice(1).flatMap((g) => g.idx), first: cfgs[1].first }]; }
-  const configs = cfgs.map((g, i) => ({ letter: "AB"[i], idx: g.idx, wires: wk(g.first), extras: g.first.extras, rule: g.first.rule || null, layout: g.first.rule ? wireLayout(g.first.rule.w4, g.first.rule.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq), sec.geo && sec.geo.wl, sec.geo && (sec.geo.two ? "two" : sec.geo.pat), sec.geo && sec.geo.p4, sec.fac ? sec.geo : undefined) : null, simple: manyCfg }));
+  const configs = cfgs.map((g, i) => ({ letter: "AB"[i], idx: g.idx, wires: wk(g.first), extras: g.first.extras, rule: g.first.rule || null, layout: g.first.rule ? wireLayout(g.first.rule.w4, g.first.rule.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq), sec.geo && sec.geo.wl, sec.geo && (sec.geo.two ? "two" : sec.geo.pat), sec.geo && sec.geo.p4, sec.fac && !sec.geo.sq ? sec.geo : undefined) : null, simple: manyCfg }));
   configs.forEach((cf) => cf.idx.forEach((i) => { pieces[i].cfg = cf.letter; }));
   const kinds = { A: true, B: configs.length > 1 };
   // บ่า: อ้างระยะจากหัวเสา (ท่อนบน)
@@ -164,6 +164,6 @@ export function planPile(input) {
   const xl = (e) => { if (e.len) return `x${m2(e.len)}m.`; if (full) return "xLm."; const ls = [...new Set(pieces.filter((p) => p.extras.includes(e)).map((p) => p.len))]; return `x${ls.map(m2).join("/")}m.`; };
   const xt = extras.map((e) => `${e.n}-DB${e.d}${xl(e)}`).join(" ");
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
-  const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq), sec.geo && sec.geo.wl, sec.geo && (sec.geo.two ? "two" : sec.geo.pat), sec.geo && sec.geo.p4, sec.fac ? sec.geo : undefined) : null;
+  const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq), sec.geo && sec.geo.wl, sec.geo && (sec.geo.two ? "two" : sec.geo.pat), sec.geo && sec.geo.p4, sec.fac && !sec.geo.sq ? sec.geo : undefined) : null;
   return { sec, full, joint, pieces, extras, kinds, configs, layout, shoulder, rows, warn, title, L, project: input.project || {} };
 }
