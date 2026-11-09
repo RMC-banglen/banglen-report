@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109051006";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109051006";
-import { esc } from "./draw2d.js?v=20261109051006";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109072239";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109072239";
+import { esc } from "./draw2d.js?v=20261109072239";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -156,7 +156,8 @@ function titleParts(p, lens) {
 }
 
 // หน้า 1: คุณสมบัติหน้าตัด • ตรวจแรงยกเสา • การสูญเสียแรงอัด • วัสดุ • ตรวจหน่วยแรง • กำลังรับน้ำหนัก
-export function calcPage1(p, project, c, logoSrc = "assets/logo.png") {
+// opts.cap = แสดงตารางกำลังรับน้ำหนัก (CAPACITIES OF SECTION) ปกติซ่อนไว้ ติ๊กเลือกแสดงได้ในหน้าส่งออก
+export function calcPage1(p, project, c, logoSrc = "assets/logo.png", opts = {}) {
   const lens = pieceLensOf(p), t = titleParts(p, lens), pk = c.pick, ls = c.loss, g = c.chk;
   const ok = (b) => `<b class="cqred">${b ? "OK" : "NO.K"}</b>`;
   const mat = c.rows.map((r) => `<tr><td style="text-align:left">${r.name}</td><td>${f(r.Pu)}</td><td>${f(r.Pi)}</td><td>${f(r.Pe)}</td><td>${f(r.n)}</td><td>${f(r.totPi)}</td><td>${f(r.totPe)}</td></tr>`).join("");
@@ -194,10 +195,10 @@ ${row("TOTAL(TIS420-2525)", "=ES+SH+CR+RE", f(ls.T420), "ksc.")}
 <tr><td></td><td>${f(g.t1)}</td><td>${f(g.t1lim)}</td><td>${ok(g.t1ok)}</td><td>${f(g.t2)}</td><td>${f(g.t2lim)}</td><td>${ok(g.t2ok)}</td></tr>
 <tr><th>AT WORKING STAGE</th><th>(M/Zx)+(fce)</th><th>&lt; 0.45 fc'</th><th>solution</th><th>-(M/Zx)+(fce)</th><th>&lt; -1.59 fc'<sup>1/2</sup></th><th>solution</th></tr>
 <tr><td></td><td>${f(g.w1)}</td><td>${f(g.w1lim)}</td><td>${ok(g.w1ok)}</td><td>${f(g.w2)}</td><td>${f(g.w2lim)}</td><td>${ok(g.w2ok)}</td></tr></table></div></div>
-<div class="cqsec" style="border-top:1px solid #000">CAPACITIES OF SECTION</div>
+${opts.cap ? `<div class="cqsec" style="border-top:1px solid #000">CAPACITIES OF SECTION</div>
 ${row("Ultimate load for pile", "(0.85*fc' - 0.6*fce)*Ac/1000", f(c.ult), "ton.")}
 ${row("Safe load for pile", "(0.33*fc' - 0.27*fce)*Ac/1000", f(c.safe), "ton.")}
-${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false })}
+${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false })}` : ""}
 <div style="border-top:1px solid #000;padding:6px 70px 16px 22px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="cqeng" style="margin:0">ENGINEER IN CHARGE</span><div class="cqsg"><div class="cqln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }

@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109051006";
-import { pileSheet } from "./pile-draw.js?v=20261109051006";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109051006";
-import { download } from "./pdf.js?v=20261109051006";
-import { esc } from "./draw2d.js?v=20261109051006";
-import { getSession, canEdit } from "./auth.js?v=20261109051006";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109051006";
-import { db } from "./db.js?v=20261109051006";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109051006";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109051006";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109072239";
+import { pileSheet } from "./pile-draw.js?v=20261109072239";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109072239";
+import { download } from "./pdf.js?v=20261109072239";
+import { esc } from "./draw2d.js?v=20261109072239";
+import { getSession, canEdit } from "./auth.js?v=20261109072239";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109072239";
+import { db } from "./db.js?v=20261109072239";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109072239";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109072239";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -361,7 +361,7 @@ async function pdfBook() {
     for (const p of piles) {
       const inp = pileInputOf(p, project), plan = planPile(inp), lens = pieceLensOf(p), c = structCalc({ secKey: p.section, pieceLens: lens, Qa: p.Qa });
       step(); await addPage(doc, dividerPage(p), false, true);
-      step(); await addPage(doc, calcPage1(p, project, c, logo), false, true);
+      step(); await addPage(doc, calcPage1(p, project, c, logo, { cap: !!($("pShowCap") && $("pShowCap").checked) }), false, true);
       step(); await addPage(doc, calcPage2(p, project, c, logo), false, true);
       step(); await addPage(doc, pileSheet(plan, logo).replace('width="100%"', 'width="1188" height="840"'), false, false); // แบบเป็นหน้า A4 แนวนอน เปิดดูตรงๆ ไม่ต้องหมุนหน้า
       step(); if (p.W > 0 && p.H > 0) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), project, plan.pieces.map((q) => q.len)), false, true);
