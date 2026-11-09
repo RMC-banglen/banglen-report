@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109044911";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109044911";
-import { esc } from "./draw2d.js?v=20261109044911";
+import { autoSplit } from "./pile-calc.js?v=20261109045255";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109045255";
+import { esc } from "./draw2d.js?v=20261109045255";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -23,18 +23,24 @@ Qa. 23 t.
 
 const n = (s) => parseFloat(s);
 
-const LOC_KEY = /แขวง|เขต|(^|\s)(ต|อ|จ)\.|ตำบล|อำเภอ|จังหวัด|ถนน|ซอย|หมู่/;
+const LOC_KEY = /แขวง|เขต|(^|\s)(ต|อ|จ)\.|[ก-๙](ต|อ|จ)\.(?=[ก-๙])|ตำบล|อำเภอ|จังหวัด|ถนน|ซอย|หมู่/;
+const LOC_LINE = /^(แขวง|เขต|ต\.|อ\.|จ\.|ตำบล|อำเภอ|จังหวัด|ถนน|ซอย|หมู่|ถ\.|กรุงเทพ)/;
 const LABEL = /(หน่วยงาน|ชื่องาน|โครงการ|เจ้าของโครงการ|เจ้าของ|สถานที่ก่อสร้าง|สถานที่)/;
 // 1 บรรทัดมีได้หลายป้าย เช่น "หน่วยงาน ... เจ้าของ ..." หน่วยงาน = โครงการ ; บรรทัดไม่มีป้าย = สถานที่
 function parseHeadLine(l, p) {
-  const parts = l.split(LABEL), clean = (t) => t.replace(/^[\s:]+/, "").replace(/\.{4,}/g, "").trim();
-  if (parts.length === 1) { const t = clean(l); if (!t) return; if (!p.ow && OWNER_LINE.test(t)) { p.ow = t; return; } p.lo = (p.lo ? p.lo + " " : "") + t; return; }
-  if (clean(parts[0])) p.lo = (p.lo ? p.lo + " " : "") + clean(parts[0]);
+  const parts = l.split(LABEL), clean = (t) => t.replace(/^[\s:.]+/, "").replace(/\.{4,}/g, "").trim();
+  if (parts.length === 1) {
+    const t = clean(l); if (!t) return;
+    if (!p.ow && OWNER_LINE.test(t)) { p.ow = t; p._last = "ow"; return; }
+    if (p._last === "pj" && !LOC_LINE.test(t)) { p.pj += " " + t; return; } // ชื่อโครงการยาวขึ้นบรรทัดใหม่ ต่อกัน
+    p.lo = (p.lo ? p.lo + " " : "") + t; p._last = "lo"; return;
+  }
+  if (clean(parts[0])) { p.lo = (p.lo ? p.lo + " " : "") + clean(parts[0]); p._last = "lo"; }
   for (let i = 1; i < parts.length; i += 2) {
     const lab = parts[i], t = clean(parts[i + 1] || "");
-    if (lab === "โครงการ" || lab === "หน่วยงาน" || lab === "ชื่องาน") p.pj = t; // หน่วยงาน = โครงการ ไม่เอาคำว่า หน่วยงาน/โครงการ มาใส่ในชื่อ
-    else if (/^เจ้าของ/.test(lab)) p.ow = t;
-    else p.lo = (p.lo ? p.lo + " " : "") + t;
+    if (lab === "โครงการ" || lab === "หน่วยงาน" || lab === "ชื่องาน") { p.pj = t; p._last = "pj"; } // หน่วยงาน = โครงการ ไม่เอาคำว่า หน่วยงาน/โครงการ มาใส่ในชื่อ
+    else if (/^เจ้าของ/.test(lab)) { p.ow = t; p._last = "ow"; }
+    else { p.lo = (p.lo ? p.lo + " " : "") + t; p._last = "lo"; }
   }
 }
 
@@ -67,13 +73,13 @@ export function parseRequest(text, secs) {
     .reduce((a, l) => { if (a.length && /(คุณ|นาย|นาง|นางสาว|น\.ส\.)$/.test(a[a.length - 1])) a[a.length - 1] += l; else a.push(l); return a; }, []) // ชื่อที่ขึ้นบรรทัดใหม่หลังคำนำหน้า ต่อกลับเป็นบรรทัดเดียว
     .forEach((l) => parseHeadLine(l, project));
   if (project.ow) { // ชื่อเจ้าของตัดเฉพาะชื่อ ส่วนที่ต่อจากนั้น (แขวง/เขต/ต./อ./จ. ...) เป็นสถานที่
-    const k = project.ow.search(LOC_KEY);
+    const mk = LOC_KEY.exec(project.ow), k = mk ? mk.index + (/^[฀-๿](ต|อ|จ)./.test(mk[0]) ? 1 : 0) : -1; // ต./อ./จ. ติดท้ายชื่อ: จุดตัดอยู่หลังตัวอักษรหน้ามัน
     if (k > 0) { project.lo = (project.ow.slice(k) + (project.lo ? " " + project.lo : "")).trim(); project.ow = project.ow.slice(0, k).trim(); }
   }
   project.lo = project.lo.replace(/(แขวง|เขต)\.\s*/g, "$1").replace(/\s+/g, " ").trim();
   if (/^(คุณ|นาย|นาง|นางสาว)?$/.test(project.ow)) project.ow = "";
   if (/^[ต./อจ\s]*$/.test(project.lo)) project.lo = ""; // เหลือแต่ "ต./อ./จ." จากฟอร์มเปล่า
-  project.ow = normOwner(project.ow);
+  project.ow = normOwner(project.ow); delete project._last;
   idxs.forEach((ix, k) => {
     const body = all.slice(ix, k + 1 < idxs.length ? idxs[k + 1] : all.length).join("\n"), m = all[ix].match(pileRe);
     const kind = /^[Ii]|ไอ/.test(m[2]) ? "T" : "S", sizeCm = Math.round(n(m[3]) < 1 ? n(m[3]) * 100 : n(m[3])), L = n(m[4]);
