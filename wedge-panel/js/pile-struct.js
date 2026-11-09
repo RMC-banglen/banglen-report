@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109025100";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109025100";
-import { esc } from "./draw2d.js?v=20261109025100";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109025213";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109025213";
+import { esc } from "./draw2d.js?v=20261109025213";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -112,9 +112,9 @@ const CSS = `<style>
 .cqsp .cqr.cqw>span{white-space:normal}
 .cqsp .cqtwo{display:grid;grid-template-columns:0.9fr 1.1fr;border-bottom:1px solid #aaa}
 .cqsp .cqtwo>.cqr:last-child>span:first-child{white-space:nowrap}
-.cqsp .cqstir{position:relative}
+.cqsp .cqrows{position:relative}
 .cqsp .cqvl{position:absolute;left:45%;top:0;bottom:0;border-left:1px solid #000}
-.cqsp .cqstir>.cqtwo:last-child{border-bottom:none}
+.cqsp .cqrows>.cqtwo:last-child{border-bottom:none}
 .cqsp.cqp2 .cqr{min-height:30px}
 .cqsp.cqp2 .cqsec{padding:12px 8px 6px;font-size:13px}
 .cqsp.cqp2 .cqbar{padding:9px;font-size:14px}
@@ -210,7 +210,7 @@ export function calcPage2(p, project, c, logoSrc = "assets/logo.png") {
   const cell = (l, v, u) => `<span>${l}</span><span class="cqv">${v}</span><span>${u}</span>`;
   return `${CSS}<div class="cqsp cqp2"><div class="cqfr">${head(project, t, logoSrc)}
 <div class="cqbar">DESIGN OF PRESTRESSED CONCRETE PILE</div>
-<div class="cqstir"><div class="cqvl"></div><div class="cqsec">Design of strrups</div>
+<div class="cqstir"><div class="cqsec" style="border-bottom:1px solid #000">Design of strrups</div><div class="cqrows"><div class="cqvl"></div>
 ${two(cell("Used stirrups diameter", f(st.d, 1), "mm."), cell("Length of stirrups per loop", f(st.loopLen), "m."))}
 ${two(cell("", "", ""), cell("Volume of stirrups per loop", f(st.vol), "cm^3"))}
 ${two(cell("Range a & e at length 1.5B require volume of stirrups 0.50% of concrete volume", "", ""), cell("Require volume of stirrups", f(st.reqA), "cm^3"))}
@@ -219,7 +219,7 @@ ${two(cell("Range b & d at length 3.0B require volume of stirrups 0.20% of concr
 ${two(cell("Require number of stirrups", f(st.nB), "loops"), cell(`Used stirrups CD${f(st.d, 1)}mm.@${sf(st.nearStep)} at ${sf(st.nearLen)} m.`, f(st.usedB), "loops"))}
 ${two(cell("Range c at midle span require volume of stirrups 0.08% of concrete volume", "", ""), cell("Require volume of stirrups", f(st.reqC), "cm^3/m."))}
 ${two(cell("Require number of stirrups", f(st.nC), "loops / m."), cell(`Used stirrups CD${f(st.d, 1)}mm.@${sf(st.midStep)}`, f(st.usedC), "loops/m."))}
-</div>
+</div></div>
 <div class="cqsec" style="border-top:1px solid #000">Design of Joint welding</div>
 ${row(`Choose DB${j.d}mm. SD40 for Dowel ;`, `${f(AREA_DB[j.d])} x ${f(FY, 0)}`, f(j.cap, 0), "kg. / No.")}
 ${row("Effictive pre-stress after loss", "", f(c.fce), "ksc.")}
