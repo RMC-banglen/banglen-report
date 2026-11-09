@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109045923";
-import { pileSheet } from "./pile-draw.js?v=20261109045923";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109045923";
-import { download } from "./pdf.js?v=20261109045923";
-import { esc } from "./draw2d.js?v=20261109045923";
-import { getSession, canEdit } from "./auth.js?v=20261109045923";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109045923";
-import { db } from "./db.js?v=20261109045923";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109045923";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109045923";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109050209";
+import { pileSheet } from "./pile-draw.js?v=20261109050209";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109050209";
+import { download } from "./pdf.js?v=20261109050209";
+import { esc } from "./draw2d.js?v=20261109050209";
+import { getSession, canEdit } from "./auth.js?v=20261109050209";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109050209";
+import { db } from "./db.js?v=20261109050209";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109050209";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109050209";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -188,6 +188,21 @@ function fromTracker(r) {
   });
   return { project: { pj: r.project || "", ow: r.owner || "", lo: r.location || "" }, piles };
 }
+// แจ้งเตือนข้อที่ควรถามกลับฝ่ายที่ขอ + ปุ่มคัดลอกข้อความถามกลับ (วางกลับในไลน์ได้เลย)
+function showAsks(notes, project) {
+  const box = $("preqAsk"); if (!box) return;
+  const asks = askList(project, notes, queue, (p) => { try { return structCalc({ secKey: p.section, pieceLens: pieceLensOf(p), Qa: p.Qa }); } catch (e) { return null; } });
+  box.innerHTML = "";
+  if (!asks.length) return;
+  const d = document.createElement("div"); d.className = "al w"; d.style.margin = "6px 0";
+  d.innerHTML = "<b>ควรถามฝ่ายที่ขอ</b><br>" + asks.map((t, i) => (i + 1) + ". " + esc(t)).join("<br>");
+  const b = document.createElement("button"); b.type = "button"; b.style.marginTop = "6px"; b.textContent = "คัดลอกข้อความถามกลับ";
+  b.onclick = async () => {
+    const txt = "ขอสอบถามข้อมูลเพิ่มเติมครับ\n" + asks.map((t, i) => (i + 1) + ") " + t).join("\n");
+    try { await navigator.clipboard.writeText(txt); b.textContent = "คัดลอกแล้ว"; } catch (e) { window.prompt("คัดลอกข้อความนี้", txt); }
+  };
+  d.appendChild(document.createElement("br")); d.appendChild(b); box.appendChild(d);
+}
 function showQueue(r) {
   const msg = $("preqMsg");
   const proj = { pj: r.project.pj || $("ppj").value.trim(), ow: r.project.ow || $("pow").value.trim(), lo: r.project.lo || $("plo").value.trim() };
@@ -202,6 +217,7 @@ function showQueue(r) {
   });
   msg.textContent = queue.length ? "พบ " + queue.length + " ต้น กดแถวเพื่อดูแบบ" : "ไม่พบรายการเสา (ต้องมีบรรทัดแบบ I 0.22×19.00 ม.)";
   if (queue[0] && PILE_SECTIONS[queue[0].section]) loadPile(queue[0], proj);
+  showAsks(r.notes, proj);
 }
 // ---- บันทึกงาน: ใช้วิธีเดียวกับหน้าแผ่นกันดิน (บันทึก/บันทึกการแก้ไข • รายการงาน • ถังขยะ • คัดลอกลิงก์ • ถามเมื่อมีงานค้าง) ----
 let lastSaved = "", listRows = [];

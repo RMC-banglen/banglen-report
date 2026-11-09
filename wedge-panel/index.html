@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="20261109045923">
+<meta name="app-version" content="20261109050209">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -36,7 +36,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261109045923">
+<link rel="stylesheet" href="css/app.css?v=20261109050209">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -153,7 +153,7 @@
 </div>
 <div class="wrap" id="pileWrap" hidden>
 <aside>
-<fieldset><legend>วางข้อความคำขอ</legend><textarea id="preq" rows="7" placeholder="วางข้อความที่ขอมาตรงนี้ (คัดลอกจากไลน์ได้เลย)" style="width:100%;box-sizing:border-box"></textarea><div class="btns"><button type="button" id="preqDb">ดึงจากรายการขอ</button><button type="button" id="preqTpl">ตัวอย่างฟอร์ม</button><button type="button" class="pri" id="preqGo">อ่านข้อความ</button></div><div id="preqList"></div><p class="hint" id="preqMsg">ท่อนต่อ (ต/ช) = 2 ท่อน แบ่งอัตโนมัติ เช่น 21 ม. = 10+11 ถ้าอยากกำหนดเองให้เขียน 10+11 ในบรรทัดเสา</p></fieldset>
+<fieldset><legend>วางข้อความคำขอ</legend><textarea id="preq" rows="7" placeholder="วางข้อความที่ขอมาตรงนี้ (คัดลอกจากไลน์ได้เลย)" style="width:100%;box-sizing:border-box"></textarea><div class="btns"><button type="button" id="preqDb">ดึงจากรายการขอ</button><button type="button" id="preqTpl">ตัวอย่างฟอร์ม</button><button type="button" class="pri" id="preqGo">อ่านข้อความ</button></div><div id="preqList"></div><div id="preqAsk"></div><p class="hint" id="preqMsg">ท่อนต่อ (ต/ช) = 2 ท่อน แบ่งอัตโนมัติ เช่น 21 ม. = 10+11 ถ้าอยากกำหนดเองให้เขียน 10+11 ในบรรทัดเสา</p></fieldset>
 <fieldset><legend>ข้อมูลในตารางชื่อแบบ</legend>
 <label for="ppj">ชื่อโครงการ</label><input id="ppj" type="text" autocomplete="off">
 <label for="pow">เจ้าของโครงการ</label><input id="pow" type="text" autocomplete="off">
@@ -180,6 +180,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261109045923"></script>
+<script type="module" src="js/ui.js?v=20261109050209"></script>
 </body>
 </html>

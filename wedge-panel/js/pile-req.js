@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109045923";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109045923";
-import { esc } from "./draw2d.js?v=20261109045923";
+import { autoSplit } from "./pile-calc.js?v=20261109050209";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109050209";
+import { esc } from "./draw2d.js?v=20261109050209";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -82,6 +82,8 @@ export function parseRequest(text, secs) {
   project.lo = project.lo.replace(/(แขวง|เขต)\.\s*/g, "$1").replace(/กทม\.?|กรุงเทพฯ?(?!มหานคร)/g, "กรุงเทพมหานคร").replace(/(^|\s)(ต|อ|จ)\.\s+(?=[ก-๙])/g, "$1$2.").replace(/\s+/g, " ").trim(); // กทม. → กรุงเทพมหานคร ชื่อเต็มเสมอ • "ต. สนามจันทร์" → "ต.สนามจันทร์"
   if (/^(คุณ|นาย|นาง|นางสาว)?$/.test(project.ow)) project.ow = "";
   if (/^[ต./อจ\s]*$/.test(project.lo)) project.lo = ""; // เหลือแต่ "ต./อ./จ." จากฟอร์มเปล่า
+  const notes = [];
+  if (project.ow && !OWNER_LINE.test(project.ow) && !ORG_RE.test(project.ow)) notes.push('เจ้าของ "' + project.ow + '" ไม่มีคำนำหน้า ระบบใส่ "คุณ" ให้ (ขอยืนยันชื่อ)');
   project.ow = normOwner(project.ow); delete project._last;
   idxs.forEach((ix, k) => {
     const body = all.slice(ix, k + 1 < idxs.length ? idxs[k + 1] : all.length).join("\n"), m = all[ix].match(pileRe);
@@ -98,7 +100,7 @@ export function parseRequest(text, secs) {
     if (!W) errs.push("ไม่พบน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่พบ Qa"); if (!H) errs.push("ไม่พบระยะยก");
     piles.push({ section: key, sizeCm, kind, L, pieces, split, W, Qa, H, errs });
   });
-  return { project, piles };
+  return { project, piles, notes };
 }
 
 // ผลคำนวณ Danish: S (ซม./ครั้ง), จำนวนครั้ง/10 ซม. และ/30 ซม.
@@ -180,3 +182,19 @@ export function shortProject(pj) {
   return t.length > 36 ? t.slice(0, 36).trim() : t;
 }
 export const jobLabel = (p) => [shortProject(p && p.pj), p && p.ow].filter(Boolean).join(" ").trim();
+
+// ข้อที่ควรถามกลับฝ่ายที่ขอ: ข้อมูลขาด/ไม่แน่ใจ และ Qa ที่เกินกำลังเสา (calc = ผลคำนวณของเสาแต่ละต้น หรือ null)
+export function askList(project, notes, piles, calcOf) {
+  const a = [];
+  if (!project.pj) a.push("ไม่พบชื่อโครงการ"); if (!project.ow) a.push("ไม่พบชื่อเจ้าของโครงการ"); if (!project.lo) a.push("ไม่พบสถานที่ก่อสร้าง");
+  (notes || []).forEach((t) => a.push(t));
+  piles.forEach((p, i) => {
+    const nm = "เสาต้นที่ " + (i + 1) + " (" + (p.kind === "T" ? "I" : "S") + "-" + p.sizeCm + " ยาว " + p.L + " ม.)";
+    (p.errs || []).forEach((e) => a.push(nm + ": " + e));
+    const c = calcOf && !(p.errs || []).length ? calcOf(p) : null;
+    if (c && p.Qa > c.safe) a.push(nm + ": Qa " + p.Qa + " ตัน เกินกำลังเสาที่รับได้ปลอดภัย (" + (Math.floor(c.safe * 10) / 10) + " ตัน) ขอยืนยัน Qa หรือเปลี่ยนขนาดเสา");
+    const b = !(p.errs || []).length && blow(p.section, p.L, p.W, p.H, p.Qa);
+    if (b && !(b.S > 0)) a.push(nm + ": ตุ้ม " + p.W + " ตัน ยก " + p.H + " ซม. เบาเกินสำหรับ Qa " + p.Qa + " ตัน ขอยืนยันน้ำหนักตุ้ม/ระยะยก");
+  });
+  return a;
+}
