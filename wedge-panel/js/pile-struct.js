@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109072543";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109072543";
-import { esc } from "./draw2d.js?v=20261109072543";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109073639";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109073639";
+import { esc } from "./draw2d.js?v=20261109073639";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -190,7 +190,7 @@ ${row("TOTAL(TIS420-2525)", "=ES+SH+CR+RE", f(ls.T420), "ksc.")}
 <table class="cqtb cqdot"><tr><th>TYPE</th><th>Pu (kg.)</th><th>Pi (kg.)</th><th>Pe = Pi-Loss (kg.)</th><th>use No.</th><th>TOTAL Pi (kg.)</th><th>TOTAL Pe (kg.)</th></tr>${mat}
 <tr><td colspan="5" style="text-align:right;font-weight:700">GRAND TOTAL</td><td>${f(c.totPi)}</td><td>${f(c.totPe)}</td></tr></table>
 <div style="display:flex;justify-content:space-around;padding:6px 0;font-weight:600"><span>fci = Pi / Ac = <b>${f(c.fci)}</b> ksc</span><span>fce = Pe / Ac = <b>${f(c.fce)}</b> ksc</span></div></div></div>
-<div class="cqgrp" style="border-top:1px solid #000"><div class="cqvt"><span>CHECK STRESS<br>IN PC. PILE</span></div><div class="cqbd" style="padding:4px"><table class="cqtb cqdot">
+<div class="cqgrp" style="border-top:1px solid #000;flex:1"><div class="cqvt"><span>CHECK STRESS<br>IN PC. PILE</span></div><div class="cqbd" style="padding:4px"><table class="cqtb cqdot">
 <tr><th>AT TRANSFER STAGE</th><th>(M/Zx)+(fci)</th><th>&lt; 0.60 fci'</th><th>solution</th><th>-(M/Zx)+(fci)</th><th>&lt; -0.8 fci'<sup>1/2</sup></th><th>solution</th></tr>
 <tr><td></td><td>${f(g.t1)}</td><td>${f(g.t1lim)}</td><td>${ok(g.t1ok)}</td><td>${f(g.t2)}</td><td>${f(g.t2lim)}</td><td>${ok(g.t2ok)}</td></tr>
 <tr><th>AT WORKING STAGE</th><th>(M/Zx)+(fce)</th><th>&lt; 0.45 fc'</th><th>solution</th><th>-(M/Zx)+(fce)</th><th>&lt; -1.59 fc'<sup>1/2</sup></th><th>solution</th></tr>
