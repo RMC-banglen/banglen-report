@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109022705";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109022705";
-import { esc } from "./draw2d.js?v=20261109022705";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261109023616";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261109023616";
+import { esc } from "./draw2d.js?v=20261109023616";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_DB = { 10: 0.79, 12: 1.12, 16: 2.01, 20: 3.14, 25: 4.91 }; // ตร.ซม. (DB12 = 1.12 ตามใบคำนวณเดิม)
@@ -95,7 +95,7 @@ const FONT = "'Sarabun','Noto Sans Thai',Tahoma,sans-serif";
 const CSS = `<style>
 .cqsp{width:794px;height:1123px;background:#fff;color:#000;box-sizing:border-box;font-family:${FONT};font-size:11.5px;position:relative}
 .cqsp *{box-sizing:border-box}
-.cqsp .cqfr{position:absolute;left:36px;right:36px;top:40px;bottom:40px;border:1.2px solid #000;display:flex;flex-direction:column}
+.cqsp .cqfr{position:absolute;left:36px;right:36px;top:36px;min-height:1050px;border:1.2px solid #000;display:flex;flex-direction:column}
 .cqsp .cqhd{display:flex;border-bottom:1.2px solid #000}
 .cqsp .cqhd .cqlg{width:250px;padding:8px 10px;text-align:center;border-right:1.2px solid #000;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .cqsp .cqhd .cqlg img{width:112px}
@@ -104,7 +104,7 @@ const CSS = `<style>
 .cqsp .cqpj{display:grid;grid-template-columns:88px 10px 1fr;margin-top:3px;border-top:1px solid #000;padding-top:3px}
 .cqsp .cqbar{text-align:center;font-weight:700;font-size:13px;padding:5px;border-bottom:1px solid #000}
 .cqsp .cqsec{font-weight:700;font-size:12px;padding:5px 8px 3px}
-.cqsp .cqr{display:grid;grid-template-columns:210px 214px 16px 86px 1fr;align-items:center;min-height:19px;padding:0 8px}
+.cqsp .cqr{display:grid;grid-template-columns:210px 214px 16px 86px 1fr;align-items:center;min-height:18px;padding:0 8px}
 .cqsp .cqr.t{grid-template-columns:1fr 1fr;}
 .cqsp .cqr .cqv{text-align:right;padding-right:6px}
 .cqsp .cqr .cqe{text-align:center}
@@ -122,11 +122,15 @@ const CSS = `<style>
 .cqsp table.cqtb td,.cqsp table.cqtb th{border:none;padding:3px 5px;text-align:center;font-weight:400}
 .cqsp table.cqtb.cqdot td{border-bottom:1px dotted #000}
 .cqsp table.cqhd8 td,.cqsp table.cqhd8 th{border:1px solid #000;font-weight:700;padding:5px 4px}
+.cqsp table.cqhd8 tr:first-child>*{border-top:none}
+.cqsp table.cqhd8 tr:last-child>*{border-bottom:none}
+.cqsp table.cqhd8 tr>*:first-child{border-left:none}
+.cqsp table.cqhd8 tr>*:last-child{border-right:none}
 .cqsp .cqred{color:#c00000;font-weight:700}
 .cqsp .cqblue td{color:#1f3fd0;font-weight:400}
 .cqsp table.cqhd8{table-layout:fixed;width:100%}
 .cqsp .cqsg{width:280px;text-align:center;font-size:12px;line-height:1.6}
-.cqsp .cqsg .cqln{height:56px;border-bottom:1.2px solid #000}
+.cqsp .cqsg .cqln{height:44px;border-bottom:1.2px solid #000}
 .cqsp .cqvt{position:relative;width:30px;flex:none;border-right:1px solid #000}
 .cqsp .cqvt span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-90deg);white-space:nowrap;font-weight:700;font-size:10px;line-height:1.2;text-align:center}
 .cqsp .cqgrp{display:flex}
@@ -191,7 +195,7 @@ ${row("TOTAL(TIS420-2525)", "=ES+SH+CR+RE", f(ls.T420), "ksc.")}
 ${row("Ultimate load for pile", "(0.85*fc' - 0.6*fce)*Ac/1000", f(c.ult), "ton.")}
 ${row("Safe load for pile", "(0.33*fc' - 0.27*fce)*Ac/1000", f(c.safe), "ton.")}
 ${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false })}
-<div style="border-top:1px solid #000;padding:8px 70px 22px 22px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="cqeng" style="margin:0">ENGINEER IN CHARGE</span><div class="cqsg"><div class="cqln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
+<div style="border-top:1px solid #000;padding:6px 70px 16px 22px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="cqeng" style="margin:0">ENGINEER IN CHARGE</span><div class="cqsg"><div class="cqln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }
 
@@ -224,7 +228,7 @@ ${row(`; For ${j.n} Dowel bar welding length`, "", f(w.dowelWeld), "cm. &nbsp; "
 ${row("; Develop length ; &nbsp;ldc = 0.075*db*fy / Sqrt(f'c)", "", f(j.ldc), "cm.")}
 ${row("; Minimum Develop length", "", f(j.minLd, 0), "cm.")}
 ${row("Use Develop Length", "", f(j.useLd, 0), "cm.")}
-<div style="border-top:1px solid #000;padding:8px 70px 22px 22px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="cqeng" style="margin:0">ENGINEER IN CHARGE</span><div class="cqsg"><div class="cqln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
+<div style="border-top:1px solid #000;padding:6px 70px 16px 22px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="cqeng" style="margin:0">ENGINEER IN CHARGE</span><div class="cqsg"><div class="cqln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }
 
