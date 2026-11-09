@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109025213";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109025213";
-import { esc } from "./draw2d.js?v=20261109025213";
+import { autoSplit } from "./pile-calc.js?v=20261109043120";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261109043120";
+import { esc } from "./draw2d.js?v=20261109043120";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -28,7 +28,7 @@ const LABEL = /(หน่วยงาน|ชื่องาน|โครงก�
 // 1 บรรทัดมีได้หลายป้าย เช่น "หน่วยงาน ... เจ้าของ ..." หน่วยงาน = โครงการ ; บรรทัดไม่มีป้าย = สถานที่
 function parseHeadLine(l, p) {
   const parts = l.split(LABEL), clean = (t) => t.replace(/^[\s:]+/, "").replace(/\.{4,}/g, "").trim();
-  if (parts.length === 1) { const t = clean(l); if (t) p.lo = (p.lo ? p.lo + " " : "") + t; return; }
+  if (parts.length === 1) { const t = clean(l); if (!t) return; if (!p.ow && OWNER_LINE.test(t)) { p.ow = t; return; } p.lo = (p.lo ? p.lo + " " : "") + t; return; }
   if (clean(parts[0])) p.lo = (p.lo ? p.lo + " " : "") + clean(parts[0]);
   for (let i = 1; i < parts.length; i += 2) {
     const lab = parts[i], t = clean(parts[i + 1] || "");
@@ -38,34 +38,54 @@ function parseHeadLine(l, p) {
   }
 }
 
-// → { project:{pj,ow,lo}, piles:[{section,sizeCm,L,pieces,split,W,Qa,H,text,errs[]}] }
+// ชื่อเจ้าของแบบเต็มทางการ: บจก./บ./บริษัท.X → "บริษัท X จำกัด", บมจ. → "บริษัท X จำกัด (มหาชน)", รพ. → โรงพยาบาล, หจก. → ห้างหุ้นส่วนจำกัด, นาย/นาง/น.ส. → คุณ
+const ORG_RE = /^(บริษัท|บจก|บมจ|หจก|ห้างหุ้นส่วน|โรงพยาบาล|รพ\.|โรงเรียน|มหาวิทยาลัย|วัด|อบต|อบจ|เทศบาล|องค์การ|กรม|สำนักงาน|การไฟฟ้า|การประปา|มูลนิธิ|สหกรณ์|กองทัพ|ศาล|ธนาคาร|นิติบุคคล|สมาคม|ร้าน|หมู่บ้าน)/;
+const OWNER_LINE = /^(บริษัท|บจก|บมจ|หจก|ห้างหุ้นส่วน|รพ\.|โรงพยาบาล|คุณ|นาย|นาง|นางสาว|น\.ส\.)/;
+export function normOwner(s0) {
+  const s = String(s0 || "").normalize("NFC").replace(/\s+/g, " ").trim(); let m;
+  if (!s) return "";
+  if ((m = s.match(/^(?:บมจ\.?|บริษัท\.?\s*มหาชน)\s*(.+?)\s*(?:จำกัด)?\s*(?:\(?\s*มหาชน\s*\)?)?$/))) return "บริษัท " + m[1] + " จำกัด (มหาชน)";
+  if ((m = s.match(/^(?:บจก\.?|บ\.|บริษัท)\.?\s*(.+?)\s*\(?\s*มหาชน\s*\)?$/))) return "บริษัท " + m[1].replace(/\s*จำกัด$/, "") + " จำกัด (มหาชน)";
+  if ((m = s.match(/^(?:บจก\.?|บ\.|บริษัท)\.?\s*(.+?)\s*(?:จำกัด|จก\.?)?$/))) return "บริษัท " + m[1] + " จำกัด";
+  if ((m = s.match(/^รพ\.?\s*(.+)$/))) return "โรงพยาบาล" + m[1];
+  if ((m = s.match(/^(?:หจก\.?|ห้างหุ้นส่วนจำกัด)\s*(.+)$/))) return "ห้างหุ้นส่วนจำกัด " + m[1];
+  if ((m = s.match(/^(?:นางสาว|น\.ส\.|นาย|นาง)\.?\s*(.+)$/))) return "คุณ " + m[1].trim();
+  if (/^คุณ/.test(s) || ORG_RE.test(s)) return s;
+  return "คุณ " + s; // ไม่มีคำนำหน้า = บุคคล
+}
+
+// → { project:{pj,ow,lo}, piles:[{section,sizeCm,L,pieces,split,W,Qa,H,errs[]}] }
+// เสาแต่ละต้นเริ่มที่บรรทัดแบบ (I 0.30x22.00 ...) ไปจนถึงบรรทัดแบบถัดไป ไม่ต้องมีเส้นคั่น
 export function parseRequest(text, secs) {
-  const blocks = String(text || "").split(/\n\s*[_\-=]{3,}\s*(?:\n|$)/).map((b) => b.split("\n").map((l) => l.trim()).filter(Boolean)).filter((b) => b.length);
-  const project = { pj: "", ow: "", lo: "" }, piles = [];
   const pileRe = /(^|\s)([IiSsไอเอส])\s*[-.]?\s*(\d*\.?\d+)\s*[x×*X]\s*(\d+(?:\.\d+)?)/;
-  blocks.forEach((lines) => {
-    const idx = lines.findIndex((l) => pileRe.test(l));
-    const head = idx < 0 ? lines : lines.slice(0, idx);
-    head.reduce((a, l) => { if (a.length && /(คุณ|นาย|นาง|นางสาว|น\.ส\.)$/.test(a[a.length - 1])) a[a.length - 1] += l; else a.push(l); return a; }, []) // ชื่อที่ขึ้นบรรทัดใหม่หลังคำนำหน้า ต่อกลับเป็นบรรทัดเดียว
-      .forEach((l) => parseHeadLine(l, project));
-    if (project.ow) { // ชื่อเจ้าของตัดเฉพาะชื่อ ส่วนที่ต่อจากนั้น (แขวง/เขต/ต./อ./จ. ...) เป็นสถานที่
-      const k = project.ow.search(LOC_KEY);
-      if (k > 0) { project.lo = (project.ow.slice(k) + (project.lo ? " " + project.lo : "")).trim(); project.ow = project.ow.slice(0, k).trim(); }
-    }
-    project.lo = project.lo.replace(/(แขวง|เขต)\.\s*/g, "$1").replace(/\s+/g, " ").trim();
-    if (/^(คุณ|นาย|นาง|นางสาว)?$/.test(project.ow)) project.ow = "";
-    if (/^[ต./อจ\s]*$/.test(project.lo)) project.lo = ""; // เหลือแต่ "ต./อ./จ." จากฟอร์มเปล่า
-    if (idx < 0) return;
-    const body = lines.slice(idx).join("\n"), m = lines[idx].match(pileRe);
+  const all = String(text || "").replace(/[​-‍﻿\r]/g, "").split("\n")
+    .map((l) => l.replace(/^\s*\[?\d{1,2}[:.]\d{2}\]?\s+[^\s]{1,25}\s+(?=\S)/, "").trim()) // ตัดเวลา/ชื่อผู้ส่งที่ติดมาจากไลน์
+    .filter((l) => l && !/^[_\-=*]{3,}$/.test(l));
+  const idxs = []; all.forEach((l, i) => { if (pileRe.test(l)) idxs.push(i); });
+  const project = { pj: "", ow: "", lo: "" }, piles = [];
+  all.slice(0, idxs.length ? idxs[0] : all.length)
+    .reduce((a, l) => { if (a.length && /(คุณ|นาย|นาง|นางสาว|น\.ส\.)$/.test(a[a.length - 1])) a[a.length - 1] += l; else a.push(l); return a; }, []) // ชื่อที่ขึ้นบรรทัดใหม่หลังคำนำหน้า ต่อกลับเป็นบรรทัดเดียว
+    .forEach((l) => parseHeadLine(l, project));
+  if (project.ow) { // ชื่อเจ้าของตัดเฉพาะชื่อ ส่วนที่ต่อจากนั้น (แขวง/เขต/ต./อ./จ. ...) เป็นสถานที่
+    const k = project.ow.search(LOC_KEY);
+    if (k > 0) { project.lo = (project.ow.slice(k) + (project.lo ? " " + project.lo : "")).trim(); project.ow = project.ow.slice(0, k).trim(); }
+  }
+  project.lo = project.lo.replace(/(แขวง|เขต)\.\s*/g, "$1").replace(/\s+/g, " ").trim();
+  if (/^(คุณ|นาย|นาง|นางสาว)?$/.test(project.ow)) project.ow = "";
+  if (/^[ต./อจ\s]*$/.test(project.lo)) project.lo = ""; // เหลือแต่ "ต./อ./จ." จากฟอร์มเปล่า
+  project.ow = normOwner(project.ow);
+  idxs.forEach((ix, k) => {
+    const body = all.slice(ix, k + 1 < idxs.length ? idxs[k + 1] : all.length).join("\n"), m = all[ix].match(pileRe);
     const kind = /^[Ii]|ไอ/.test(m[2]) ? "T" : "S", sizeCm = Math.round(n(m[3]) < 1 ? n(m[3]) * 100 : n(m[3])), L = n(m[4]);
     const key = kind + sizeCm, errs = [];
-    if (!secs[key]) errs.push(`ไม่มีหน้าตัด ${kind === "T" ? "I" : "S"}-${sizeCm} ในระบบ`);
+    if (!secs[key]) errs.push("ไม่มีหน้าตัด " + (kind === "T" ? "I" : "S") + "-" + sizeCm + " ในระบบ");
     const ex = body.match(/(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)(?:\s*\+\s*(\d+(?:\.\d+)?))?/);
     let pieces = 1, split = null;
     if (ex) { split = ex.slice(1).filter(Boolean).map(n); pieces = split.length; if (Math.abs(split.reduce((a, b) => a + b, 0) - L) > 0.01) errs.push("ความยาวแต่ละท่อนรวมไม่เท่าความยาวเสา"); }
     else if (/ต\s*[\/.]?\s*[ชซ]|ต่อ/.test(body)) pieces = 2;
     const get = (re) => { const x = body.match(re); return x ? n(x[1]) : 0; };
-    const W = get(/ตุ้ม\s*[:.]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:=]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.]?\s*(\d+(?:\.\d+)?)/);
+    // "ตุ้ม": วรรณยุกต์/สระอาจเรียงสลับกันตามแป้นพิมพ์ จึงรับทั้งสองลำดับ
+    const W = get(/ต[ุ้]{0,2}ม\s*[:.=]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:=]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.=]?\s*(\d+(?:\.\d+)?)/);
     if (!W) errs.push("ไม่พบน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่พบ Qa"); if (!H) errs.push("ไม่พบระยะยก");
     piles.push({ section: key, sizeCm, kind, L, pieces, split, W, Qa, H, errs });
   });
