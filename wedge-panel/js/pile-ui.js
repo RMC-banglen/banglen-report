@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109043215";
-import { pileSheet } from "./pile-draw.js?v=20261109043215";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261109043215";
-import { download } from "./pdf.js?v=20261109043215";
-import { esc } from "./draw2d.js?v=20261109043215";
-import { getSession, canEdit } from "./auth.js?v=20261109043215";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109043215";
-import { db } from "./db.js?v=20261109043215";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109043215";
-import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109043215";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261109043230";
+import { pileSheet } from "./pile-draw.js?v=20261109043230";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261109043230";
+import { download } from "./pdf.js?v=20261109043230";
+import { esc } from "./draw2d.js?v=20261109043230";
+import { getSession, canEdit } from "./auth.js?v=20261109043230";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261109043230";
+import { db } from "./db.js?v=20261109043230";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261109043230";
+import { parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261109043230";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -158,8 +158,8 @@ function loadPile(p, project) {
   $("ppj").value = project.pj; $("pow").value = project.ow; $("plo").value = project.lo;
   $("plRows").dataset.n = ""; renderExtras(); render();
 }
-// อ่านข้อความใหม่ได้เสมอ ไม่ต้องบันทึกก่อน และไม่ถาม: งานที่เปิดอยู่ (ถ้ามี) ยังเป็นงานเดิม แก้แล้วกด บันทึกการแก้ไข ได้ (ถ้าเป็นคำขอใหม่ให้กด เริ่มงานใหม่ ก่อน)
-function readReq() { showQueue(parseRequest($("preq").value, PILE_SECTIONS)); jmsg(curJobId ? "อ่านข้อความใหม่แล้ว กดบันทึกการแก้ไขเพื่อเก็บทับงานเดิม" : ""); }
+// งานที่ยังไม่บันทึก: อ่านข้อความใหม่ได้เลย ไม่ถาม • งานที่บันทึกแล้วและมีการแก้ไข: ถามก่อน (บันทึก/ทิ้ง/ยกเลิก) แล้วยังเป็นงานเดิม แก้แล้วกด บันทึกการแก้ไข ได้
+async function readReq() { const r = parseRequest($("preq").value, PILE_SECTIONS); if (!(await guardUnsaved())) return; showQueue(r); jmsg(curJobId ? "อ่านข้อความใหม่แล้ว กดบันทึกการแก้ไขเพื่อเก็บทับงานเดิม" : ""); }
 
 // รายการคำขอจากหน้า "ติดตามรายการคำนวณเสาเข็ม" (อ่านอย่างเดียว ไม่แก้สถานะในระบบนั้น)
 async function loadTracker() {
