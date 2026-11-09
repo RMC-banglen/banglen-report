@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261109014325";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261109014554";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -18,7 +18,21 @@ function balanceSplit(pts, w4, w5 = 0) {
   const used = new Set(), key = (p) => p[0].toFixed(3) + "," + p[1].toFixed(3), pairs = [];
   pts.forEach((p) => { if (used.has(key(p))) return; used.add(key(p)); const q = pts.find((r) => r !== p && !used.has(key(r)) && Math.abs(r[0] + p[0]) < 1e-6 && Math.abs(r[1] + p[1]) < 1e-6); if (q) { used.add(key(q)); pairs.push([p, q]); } else pairs.push([p]); });
   const dist = (pr) => Math.abs(pr[0][0]) + Math.abs(pr[0][1]);
-  pairs.sort((a, b) => (w5 > w4 ? dist(a) - dist(b) : dist(b) - dist(a)));
+  // ลวด 5 มม. มากกว่า: ลวด 4 มม. อยู่ตรงกลางของกลุ่มลวด (ระหว่างเส้นริมกับเส้นใน) เช่นกลุ่มละ 3 เส้น 4 มม. คือเส้นกลาง
+  // กลุ่ม = ลวดแถวเดียวกันที่ห่างกันเท่าระยะชิดสุด; กลุ่มน้อยกว่า 3 เส้นไม่มีเส้นกลาง ใช้ลำดับ ใน→นอก
+  const score = new Map();
+  if (w5 > w4) {
+    const rows = {}; pts.forEach((p) => { (rows[p[1].toFixed(1)] = rows[p[1].toFixed(1)] || []).push(p); });
+    Object.values(rows).forEach((row) => {
+      row.sort((a, b) => a[0] - b[0]);
+      const gaps = row.slice(1).map((p, i) => p[0] - row[i][0]), thr = gaps.length ? Math.min(...gaps) * 1.5 : 0;
+      let cl = [row[0]]; const flush = () => { cl.forEach((p, i) => score.set(key(p), cl.length >= 3 ? Math.abs(i - (cl.length - 1) / 2) : 10)); };
+      row.slice(1).forEach((p) => { if (p[0] - cl[cl.length - 1][0] <= thr + 1e-6) cl.push(p); else { flush(); cl = [p]; } });
+      flush();
+    });
+  }
+  const sc = (pr) => (score.has(key(pr[0])) ? score.get(key(pr[0])) : 10);
+  pairs.sort((a, b) => (w5 > w4 ? sc(a) - sc(b) || dist(a) - dist(b) : dist(b) - dist(a)));
   const f4 = [], f5 = []; let n = w4;
   pairs.forEach((pr) => { if (n >= pr.length) { f4.push(...pr); n -= pr.length; } else f5.push(...pr); });
   return { w4: f4, w5: f5 };
