@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110084451";
-import { pileSheet } from "./pile-draw.js?v=20261110084451";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261110084451";
-import { download } from "./pdf.js?v=20261110084451";
-import { esc } from "./draw2d.js?v=20261110084451";
-import { getSession, canEdit } from "./auth.js?v=20261110084451";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110084451";
-import { db } from "./db.js?v=20261110084451";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110084451";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110084451";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110084908";
+import { pileSheet } from "./pile-draw.js?v=20261110084908";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261110084908";
+import { download } from "./pdf.js?v=20261110084908";
+import { esc } from "./draw2d.js?v=20261110084908";
+import { getSession, canEdit } from "./auth.js?v=20261110084908";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110084908";
+import { db } from "./db.js?v=20261110084908";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110084908";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110084908";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -357,8 +357,7 @@ async function pdfBook() {
   const b = $("bPileBook"), msg = $("pileMsg"), project = projectNow();
   let piles = queue.length ? queue.filter((p) => !p.errs.length && PILE_SECTIONS[p.section]) : [];
   if (!queue.length) { const i = read(); if (!i.full && i.L && i.section) piles = [{ section: i.section, wires: i.wires, L: i.L, pieces: i.pieces, split: i.split, W: i.blow.W, Qa: i.blow.Qa, H: i.blow.H, extras: i.extras, shoulder: i.shoulder, errs: [] }]; }
-  const noQa = piles.filter((p) => !(p.Qa > 0)); piles = piles.filter((p) => p.Qa > 0);
-  if (!piles.length) { msg.textContent = "ใส่ Qa ของเสาก่อน (ใช้ในรายการคำนวณ)"; return; }
+  if (!piles.length) { msg.textContent = "ใส่ข้อมูลเสาก่อน (หน้าตัดและความยาว)"; return; } // Qa ไม่บังคับ: ไม่มีค่า blow = ได้แค่รายการคำนวณกับแบบ
   piles = sortPiles(piles); b.disabled = true;
   try {
     if (!window.html2canvas || !window.jspdf) throw new Error("โหลดตัวสร้าง PDF ไม่สำเร็จ ลองรีเฟรชหน้า");
@@ -367,15 +366,15 @@ async function pdfBook() {
     let n = 0; const step = () => { msg.textContent = "กำลังสร้างรูปเล่ม… " + (++n) + "/" + total; };
     step(); await addPage(doc, coverPage(piles, project, logo), true, true);
     for (const p of piles) {
-      const inp = pileInputOf(p, project), plan = planPile(inp), lens = pieceLensOf(p), c = structCalc({ secKey: p.section, pieceLens: lens, Qa: p.Qa, wires: p.wires });
+      const inp = pileInputOf(p, project), plan = planPile(inp), lens = pieceLensOf(p), c = structCalc({ secKey: p.section, pieceLens: lens, Qa: p.Qa || 0, wires: p.wires });
       step(); await addPage(doc, dividerPage(p), false, true);
       step(); await addPage(doc, calcPage1(p, project, c, logo, { cap: !!($("pShowCap") && $("pShowCap").checked) }), false, true);
       step(); await addPage(doc, calcPage2(p, project, c, logo), false, true);
       step(); await addPage(doc, pileSheet(plan, logo).replace('width="100%"', 'width="1188" height="840"'), false, false); // แบบเป็นหน้า A4 แนวนอน เปิดดูตรงๆ ไม่ต้องหมุนหน้า
-      step(); if (p.W > 0 && p.H > 0) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), project, plan.pieces.map((q) => q.len)), false, true);
+      step(); if (p.W > 0 && p.H > 0 && p.Qa > 0) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), project, plan.pieces.map((q) => q.len)), false, true);
     }
     download(((curCode ? curCode + " " : "") + (jobLabel(project) || "รูปเล่ม") + ".pdf").replace(/[\\/:*?"<>|]/g, ""), doc.output("blob"));
-    msg.textContent = "ดาวน์โหลดแล้ว " + piles.length + " ต้น" + (noQa.length ? " (ข้าม " + noQa.length + " ต้นที่ไม่มี Qa)" : "");
+    msg.textContent = "ดาวน์โหลดแล้ว " + piles.length + " ต้น" + "";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
   b.disabled = false;
 }
@@ -393,7 +392,7 @@ async function pdfAll(withBlow = true) {
       msg.textContent = "กำลังสร้าง PDF… " + (i + 1) + "/" + ok.length;
       const inp = pileInputOf(ok[i], ok[i].project), plan = planPile(inp);
       await addPage(doc, pileSheet(plan, await logoData()).replace('width="100%"', 'width="1188" height="840"'), first); first = false;
-      if (withBlow) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
+      if (withBlow && ok[i].W > 0 && ok[i].H > 0 && ok[i].Qa > 0) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
     }
     const pj = jobLabel(ok[0].project).slice(0, 60) || "คำขอ";
     download(((curCode ? curCode + " " : "") + pj + ".pdf").replace(/[\/:*?"<>|]/g, ""), doc.output("blob"));

@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261110084451";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261110084451";
-import { esc } from "./draw2d.js?v=20261110084451";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261110084908";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261110084908";
+import { esc } from "./draw2d.js?v=20261110084908";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_RB = { 6: 0.283, 9: 0.636, 12: 1.131 }; // เหล็กเส้นกลม RB (SR24, fy 2400) ตร.ซม.
@@ -204,7 +204,7 @@ ${row("TOTAL(TIS420-2525)", "=ES+SH+CR+RE", f(ls.T420), "ksc.")}
 ${opts.cap ? `<div class="cqsec" style="border-top:1px solid #000">CAPACITIES OF SECTION</div>
 ${row("Ultimate load for pile", "(0.85*fc' - 0.6*fce)*Ac/1000", f(c.ult), "ton.")}
 ${row("Safe load for pile", "(0.33*fc' - 0.27*fce)*Ac/1000", f(c.safe), "ton.")}
-${row("<b>SAFE LOAD</b>", "", `<b>${f(c.Qa, 0)}</b>`, "ตัน", { eq: false })}` : ""}
+${row("<b>SAFE LOAD</b>", "", `<b>${c.Qa > 0 ? f(c.Qa, 0) : "-"}</b>`, "ตัน", { eq: false })}` : ""}
 <div style="border-top:1px solid #000;padding:6px 70px 16px 22px;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end"><span class="cqeng" style="margin:0">ENGINEER IN CHARGE</span><div class="cqsg"><div class="cqln"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div>
 </div></div>`;
 }
