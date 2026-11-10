@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261110020028";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261110020320";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -98,7 +98,7 @@ export function autoSplit(L, n = 2) {
 export const MICRO_LEN = 1.5; // ความยาวท่อนไมโครไพล์ (ม.)
 export const MAX_SEG = 30; // ไมโครไพล์: ท่อนต่อกันได้สูงสุด
 const r3 = (v) => Math.round(v * 1000) / 1000;
-export const microSpiral = (s, len) => ({ ...s, endLen: Math.min(0.27, r2(len * 0.18)), endStep: 0.03, nearLen: 0, nearStep: 0.075, midStep: 0.075 }); // ตามแบบไมโครไพล์ของโรงงาน: ปลาย 0.27 @0.03 กลาง @0.075 (ทุกหน้าตัด)
+export const microSpiral = (s, len) => ({ ...s, endLen: Math.min(s.endLen, r2(len * 0.27)), nearLen: 0, midStep: s.nearStep }); // ท่อนสั้น: ปลายใช้ระยะโซนหัวของหน้าตัดนั้น ส่วนที่เหลือใช้ระยะโซนถัดจากหัว (ไม่มีโซนกลาง)
 export function planPile(input) {
   const sec = PILE_SECTIONS[input.section];
   const warn = [];
