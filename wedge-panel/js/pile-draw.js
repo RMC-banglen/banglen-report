@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110022652";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110022652";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110022652";
+import { pilePoly, esc } from "./draw2d.js?v=20261110074927";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110074927";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110074927";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -23,6 +23,13 @@ const leader = (x1, y1, x2, y2, txt, o = {}) => L(x1, y1, x2, y2, 0.9) + tri(x1,
 const sqPoly = (p) => { const h = p.B / 2, c = p.ch || 20; return [[-h + c, -h], [h - c, -h], [h, -h + c], [h, h - c], [h - c, h], [-h + c, h], [-h, h - c], [-h, -h + c]]; };
 const polyOf = (p) => (p.sq ? sqPoly(p) : pilePoly(p));
 const secPts = (p, cx, cy, s) => polyOf(p).map(([x, y]) => `${f1(cx + x * s)},${f1(cy + y * s)}`).join(" ");
+// เลื่อนเส้นขอบรูปหลายเหลี่ยมเข้าด้านใน d มม. (ต่อมุมแบบมิเตอร์) ใช้วาดปลอกแหวนตามรูปหน้าตัดจริง
+function insetPoly(pts, d) {
+  const n = pts.length, area = pts.reduce((a, p, i) => a + (p[0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * p[1]), 0), sg = area > 0 ? 1 : -1;
+  const lines = pts.map((p, i) => { const q = pts[(i + 1) % n], dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy), nx = (sg * -dy) / len, ny = (sg * dx) / len; return { x: p[0] + nx * d, y: p[1] + ny * d, dx, dy }; });
+  return pts.map((_, i) => { const a = lines[(i + n - 1) % n], b = lines[i], den = a.dx * b.dy - a.dy * b.dx; if (Math.abs(den) < 1e-9) return [b.x, b.y]; const t = ((b.x - a.x) * b.dy - (b.y - a.y) * b.dx) / den; return [a.x + a.dx * t, a.y + a.dy * t]; });
+}
+const ioutline = (G) => { const b = G.B / 2, m = b - G.f, h = G.c / 2, w = G.tw / 2; return [[-b, -b], [b, -b], [b, -m], [w, -h], [w, h], [b, m], [b, b], [-b, b], [-b, m], [-w, h], [-w, -h], [-b, -m]]; };
 let NO_COLLAR = false; // มาตรฐานโรงงานไม่มี COLLAR (ปลอกริง 3x50 มม.)
 let PLATE_T = 9; // ความหนาแผ่นเหล็กหัวต่อ (มม.) ตามหน้าตัด
 let PILE22 = { B: 220, f: 65, c: 50, dg: 70, tw: 80 }; // หน้าตัดปัจจุบัน (ตั้งค่าใน pileSheet จาก plan.sec.geo)
@@ -42,7 +49,8 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   // ปลอกเกลียวอยู่ล้อมนอกลวด PC และเหล็ก DB (ห่างผิวคอนกรีต ~25 มม. ที่ปีก ~20 มม. ที่เอว)
   const G = PILE22, hb = G.B / 2, rO = hb - 25, rM = hb - G.f + 13, rW = Math.max(8, G.tw / 2 - 20), rC = G.c / 2 + 15;
   const sqr = hb - 30, ring = G.sq ? [[-sqr, -sqr], [sqr, -sqr], [sqr, sqr], [-sqr, sqr]] : [[-rO, -rO], [rO, -rO], [rO, -rM], [rW, -rC], [rW, rC], [rO, rM], [rO, rO], [-rO, rO], [-rO, rM], [-rW, rC], [-rW, -rC], [-rO, -rM]];
-  o += `<polygon points="${ring.map(([x, y]) => P(x, y)).join(" ")}" fill="none" stroke="${INK}" stroke-width="0.8"/>`;
+  const ringPts = G.cy && !G.sq ? insetPoly(ioutline(G), G.cy - 5) : ring; // มาตรฐานโรงงาน: ปลอกตามรูปหน้าตัดเลื่อนเข้า (ลวดห่างผิว cy) ไม่ใช้สูตรตายตัวของ I-22 มอก.
+  o += `<polygon points="${ringPts.map(([x, y]) => P(x, y)).join(" ")}" fill="none" stroke="${INK}" stroke-width="0.8"/>`;
   const star = (x, y, r) => [0, 60, 120].map((a) => { const t = (a * Math.PI) / 180; return L(X(x) - Math.cos(t) * r, Y(y) - Math.sin(t) * r, X(x) + Math.cos(t) * r, Y(y) + Math.sin(t) * r, 1); }).join("");
   const circ = (x, y, r, fill) => `<circle cx="${f1(X(x))}" cy="${f1(Y(y))}" r="${f1(r * s)}" fill="${fill || "#fff"}" stroke="${INK}" stroke-width="0.9"/>`;
   lay.w4.forEach(([x, y]) => { o += circ(x, y, 3, "#fff"); });
@@ -104,7 +112,7 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   // ปลอก: เส้นนอนชี้เข้าที่เส้นปลอกด้านข้างเอว
   const xCD = x1 + 36;
   const spr = plan.sec.spiral, wTxt = spr.wire.toFixed(1), stpf = (v) => String(Math.round(v * 10000) / 10000);
-  const xTip = G.sq ? hb - 30 : G.tw / 2 - 22;
+  const xTip = G.sq ? hb - 30 : G.cy ? G.tw / 2 - (G.cy - 5) : G.tw / 2 - 22;
   o += L(X(xTip) + 4, cy, xCD + 150, cy, 0.9) + tri(X(xTip), cy, 180, 5) + T(xCD, cy + 17, `CDØ${wTxt}mm.@${stpf(spr.midStep).padEnd(4, "0")}m.`, { size: 15, anchor: "start" }); // ปลายลูกศรชี้กลางเอว (กึ่งกลางความสูงเสา) เส้นอยู่ต่ำกว่าตัวหนังสือเล็กน้อย
   return o;
 }
@@ -194,7 +202,7 @@ function dowelPts(dowel) {
     const top = pts.filter((p) => p[1] < 0), bot = pts.filter((p) => p[1] >= 0);
     return { top, bot, nTop: top.length, nBot: bot.length };
   }
-  const top = dowel ? Math.floor(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, /* เหล็กคี่: เส้นกลางอยู่แถวล่าง (แถวล่างมากกว่าแถวบน 1 เส้น) */ pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), W = (Math.max(top, bot) - 1) * pitch / 2, xs = (k) => Array.from({ length: k }, (_, i) => (k > 1 ? -W + (i * 2 * W) / (k - 1) : 0)), ry = hb - 45; // ทั้งสองแถวกางเท่ากัน: เหล็กมุมบน/ล่างตรงกัน (เช่น 5 เส้น = 3 บน, ล่าง 2 เส้นที่มุม)
+  const top = dowel ? Math.floor(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, /* เหล็กคี่: เส้นกลางอยู่แถวล่าง (แถวล่างมากกว่าแถวบน 1 เส้น) */ pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), W = (Math.max(top, bot) - 1) * pitch / 2, xs = (k) => Array.from({ length: k }, (_, i) => (k > 1 ? -W + (i * 2 * W) / (k - 1) : 0)), ry = PILE22.cy ? hb - Math.round(PILE22.f * 0.75) : hb - 45; // โรงงาน: แถวเหล็กเดือยอยู่กลางปีก (ไม่ตกในเอว) • ทั้งสองแถวกางเท่ากัน: เหล็กมุมบน/ล่างตรงกัน (เช่น 5 เส้น = 3 บน, ล่าง 2 เส้นที่มุม)
   const sh = pitch * 0.3, tx = xs(top).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? -sh : x)), bx = xs(bot).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? sh : x)); // เหล็กตรงกลางแถวบน/ล่างเยื้องสลับกัน ไม่ให้ไวร์จี้ปูนติด
   const T0 = tx.map((x) => [x, -ry]), B0 = bx.map((x) => [x, ry]);
   if (dowel && dowel.rows) { // โรงงาน I-22: RB9 กับ DB12 วางไขว้ (เฉียงตรงข้าม) ให้สมดุลเหมือนลวด PC: บน = [RB, DB] ล่าง = [DB, RB]
@@ -202,9 +210,9 @@ function dowelPts(dowel) {
     const tag = (pts, r) => pts.map((p, i) => [p[0], p[1], spec(r, i)]);
     const tt = tag(T0, 0), bb = tag(B0, 1), l = (v) => Math.round((v.len ?? dowel.len) * 100);
     const lbl = (row) => { const cnt = new Map(); row.forEach((p) => cnt.set(p[2], (cnt.get(p[2]) || 0) + 1)); const ks = [...cnt.keys()]; return ks.map((k) => cnt.get(k) + "-" + (k.k || "DB") + k.d + "x" + l(k)).join("+") + "cm."; };
-    return { top: tt, bot: bb, nTop: top, nBot: bot, mixed: true, lbls: { top: lbl(tt), bot: lbl(bb) } };
+    return { top: tt, bot: bb, nTop: top, nBot: bot, edge: hb - ry, mixed: true, lbls: { top: lbl(tt), bot: lbl(bb) } };
   }
-  return { top: T0, bot: B0, nTop: top, nBot: bot };
+  return { top: T0, bot: B0, nTop: top, nBot: bot, edge: hb - ry };
 }
 export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
   const P = dowelPts(dowel), lbl = (k, row) => (P.mixed ? P.lbls[row] : dowelLbl(dowel, k, row));
@@ -247,7 +255,7 @@ export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
   // แผ่นเหล็ก 9 มม. (ซ้าย) + ปลอกริงยื่นเข้าด้านใน (ขวา) มีผนังหนา 3 มม. ด้านบน/ล่าง
   let o = `<rect x="${x}" y="${y}" width="${pw}" height="${h}" fill="#fff" stroke="${INK}" stroke-width="1.5"/>${NO_COLLAR ? "" : `<rect x="${x + pw}" y="${y}" width="${cd}" height="${h}" fill="#fff" stroke="${INK}" stroke-width="1.5"/>`}`;
   if (!NO_COLLAR) o += L(x + pw, y + wall, x + pw + cd, y + wall, 0.9) + L(x + pw, y + h - wall, x + pw + cd, y + h - wall, 0.9);
-  const yT = y + 45 * s, yB = y + (PILE22.B - 45) * s;
+  const ed = P.edge || 45, yT = y + ed * s, yB = y + (PILE22.B - ed) * s;
   // เหล็กข้ออ้อย DB: แท่งขนาดตามจริงเกินเล็กน้อย พื้นขาว ขอบดำ รอยข้อเฉียงเรียงเท่ากัน
   const bt0 = Math.max(7, (dowel ? dowel.d : 12) * s * 0.9), bt = bt0;
   const deformed = (xa, xb, yc, bt = bt0) => { let r = `<rect x="${f1(xa)}" y="${f1(yc - bt / 2)}" width="${f1(xb - xa)}" height="${f1(bt)}" fill="#fff" stroke="${INK}" stroke-width="1.2"/>`; for (let px = xa + 5; px < xb - 3; px += 7) r += L(px, yc - bt / 2, px + bt * 0.55, yc + bt / 2, 0.8); return r + L(xa, yc, xb, yc, 0.6); };
