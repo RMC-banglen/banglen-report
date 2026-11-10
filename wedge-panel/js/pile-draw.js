@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110022232";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110022232";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110022232";
+import { pilePoly, esc } from "./draw2d.js?v=20261110022257";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110022257";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110022257";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -179,7 +179,7 @@ const tw = (txt, size = 14) => txt.length * size * 0.47 + 18; // ความย
 function dowelLbl(dowel, k, row, none = "ดูตามตาราง") {
   if (!dowel) return none;
   const sp = (row && dowel.rows && dowel.rows[row]) || dowel;
-  return `${k}${sp.k || "DB"}${sp.d}mm.x${Math.round((sp.len ?? dowel.len) * 100)}cm.`;
+  return `${k}-${sp.k || "DB"}${sp.d}mm.x${Math.round((sp.len ?? dowel.len) * 100)}cm.`;
 }
 function dowelLblAll(dowel) { if (!dowel) return "ดูตามตาราง"; if (!dowel.rows) return dowelLbl(dowel, dowel.n); const n1 = Math.floor(dowel.n / 2), n2 = dowel.n - n1, a = dowel.rows.top, b = dowel.rows.bot, l = (v) => Math.round((v.len ?? dowel.len) * 100); return `${n1}-${a.k || "DB"}${a.d}x${l(a)}+${n2}-${b.k || "DB"}${b.d}x${l(b)}cm.`; }
 export function dowelTxt(d) { return !d ? "-" : d.rows ? `${Math.floor(d.n / 2)}-${d.rows.top.k}${d.rows.top.d}+${d.n - Math.floor(d.n / 2)}-${d.rows.bot.k}${d.rows.bot.d} x${m2(d.rows.top.len ?? d.len)}/${m2(d.rows.bot.len ?? d.len)}m.` : `${d.n}-${d.k || "DB"}${d.d}mm.x${m2(d.len)}m.`; }
