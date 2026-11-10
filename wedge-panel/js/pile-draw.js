@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110021915";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110021915";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110021915";
+import { pilePoly, esc } from "./draw2d.js?v=20261110022232";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110022232";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110022232";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -181,7 +181,7 @@ function dowelLbl(dowel, k, row, none = "ดูตามตาราง") {
   const sp = (row && dowel.rows && dowel.rows[row]) || dowel;
   return `${k}${sp.k || "DB"}${sp.d}mm.x${Math.round((sp.len ?? dowel.len) * 100)}cm.`;
 }
-function dowelLblAll(dowel) { if (!dowel) return "ดูตามตาราง"; if (!dowel.rows) return dowelLbl(dowel, dowel.n); const n1 = Math.floor(dowel.n / 2), n2 = dowel.n - n1, a = dowel.rows.top, b = dowel.rows.bot, l = (v) => Math.round((v.len ?? dowel.len) * 100); return `${n1}${a.k || "DB"}${a.d}x${l(a)}+${n2}${b.k || "DB"}${b.d}x${l(b)}cm.`; }
+function dowelLblAll(dowel) { if (!dowel) return "ดูตามตาราง"; if (!dowel.rows) return dowelLbl(dowel, dowel.n); const n1 = Math.floor(dowel.n / 2), n2 = dowel.n - n1, a = dowel.rows.top, b = dowel.rows.bot, l = (v) => Math.round((v.len ?? dowel.len) * 100); return `${n1}-${a.k || "DB"}${a.d}x${l(a)}+${n2}-${b.k || "DB"}${b.d}x${l(b)}cm.`; }
 export function dowelTxt(d) { return !d ? "-" : d.rows ? `${Math.floor(d.n / 2)}-${d.rows.top.k}${d.rows.top.d}+${d.n - Math.floor(d.n / 2)}-${d.rows.bot.k}${d.rows.bot.d} x${m2(d.rows.top.len ?? d.len)}/${m2(d.rows.bot.len ?? d.len)}m.` : `${d.n}-${d.k || "DB"}${d.d}mm.x${m2(d.len)}m.`; }
 function dowelPts(dowel) {
   if (PILE22.sq) { // เสาสี่เหลี่ยม: เหล็กเดือยวางตามมุม/กึ่งกลางด้าน/กลางแผ่น ตามจำนวน (4 มุม • 5 +กลาง • 6 +กลางบนล่าง • 7 +กลาง • 8 รอบ • 9 +กลาง)
@@ -201,7 +201,7 @@ function dowelPts(dowel) {
     const A = dowel.rows.top, Bs = dowel.rows.bot, spec = (r, i) => ((r + i) % 2 === 0 ? A : Bs);
     const tag = (pts, r) => pts.map((p, i) => [p[0], p[1], spec(r, i)]);
     const tt = tag(T0, 0), bb = tag(B0, 1), l = (v) => Math.round((v.len ?? dowel.len) * 100);
-    const lbl = (row) => { const cnt = new Map(); row.forEach((p) => cnt.set(p[2], (cnt.get(p[2]) || 0) + 1)); const ks = [...cnt.keys()]; return ks.map((k) => cnt.get(k) + (k.k || "DB") + k.d + "x" + l(k)).join("+") + "cm."; };
+    const lbl = (row) => { const cnt = new Map(); row.forEach((p) => cnt.set(p[2], (cnt.get(p[2]) || 0) + 1)); const ks = [...cnt.keys()]; return ks.map((k) => cnt.get(k) + "-" + (k.k || "DB") + k.d + "x" + l(k)).join("+") + "cm."; };
     return { top: tt, bot: bb, nTop: top, nBot: bot, mixed: true, lbls: { top: lbl(tt), bot: lbl(bb) } };
   }
   return { top: T0, bot: B0, nTop: top, nBot: bot };
