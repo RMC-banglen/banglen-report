@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110082842";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110082842";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110082842";
+import { pilePoly, esc } from "./draw2d.js?v=20261110083525";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110083525";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110083525";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -29,7 +29,7 @@ function insetPoly(pts, d) {
   const lines = pts.map((p, i) => { const q = pts[(i + 1) % n], dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy), nx = (sg * -dy) / len, ny = (sg * dx) / len; return { x: p[0] + nx * d, y: p[1] + ny * d, dx, dy }; });
   return pts.map((_, i) => { const a = lines[(i + n - 1) % n], b = lines[i], den = a.dx * b.dy - a.dy * b.dx; if (Math.abs(den) < 1e-9) return [b.x, b.y]; const t = ((b.x - a.x) * b.dy - (b.y - a.y) * b.dx) / den; return [a.x + a.dx * t, a.y + a.dy * t]; });
 }
-const ioutline = (G) => { const b = G.B / 2, m = b - G.f, h = G.c / 2, w = G.tw / 2; return [[-b, -b], [b, -b], [b, -m], [w, -h], [w, h], [b, m], [b, b], [-b, b], [-b, m], [-w, h], [-w, -h], [-b, -m]]; };
+const ioutline = (G) => pilePoly(G); // เส้นขอบจริงรวมบัวตัดมุม (ปลอกต้องไม่ล้นบัว)
 let NO_COLLAR = false; // มาตรฐานโรงงานไม่มี COLLAR (ปลอกริง 3x50 มม.)
 let PLATE_T = 9; // ความหนาแผ่นเหล็กหัวต่อ (มม.) ตามหน้าตัด
 let PILE22 = { B: 220, f: 65, c: 50, dg: 70, tw: 80 }; // หน้าตัดปัจจุบัน (ตั้งค่าใน pileSheet จาก plan.sec.geo)
