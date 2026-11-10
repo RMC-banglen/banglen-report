@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110082628";
-import { pileSheet } from "./pile-draw.js?v=20261110082628";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261110082628";
-import { download } from "./pdf.js?v=20261110082628";
-import { esc } from "./draw2d.js?v=20261110082628";
-import { getSession, canEdit } from "./auth.js?v=20261110082628";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110082628";
-import { db } from "./db.js?v=20261110082628";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110082628";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110082628";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110082842";
+import { pileSheet } from "./pile-draw.js?v=20261110082842";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261110082842";
+import { download } from "./pdf.js?v=20261110082842";
+import { esc } from "./draw2d.js?v=20261110082842";
+import { getSession, canEdit } from "./auth.js?v=20261110082842";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110082842";
+import { db } from "./db.js?v=20261110082842";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110082842";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110082842";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";

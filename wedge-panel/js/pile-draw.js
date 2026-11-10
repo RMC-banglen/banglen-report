@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110082628";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110082628";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110082628";
+import { pilePoly, esc } from "./draw2d.js?v=20261110082842";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110082842";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110082842";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -285,13 +285,13 @@ export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
 // แบบขยายบ่า: ภาพที่ 1 ด้านข้าง (ร่องข้างเสาถูกถมเป็นบ่า) • ภาพที่ 2 รูปตัดแนวนอนผ่านกลางร่อง (มองจากด้านบน) เห็นเหล็กวางขวาง 3 เส้น
 // เหล็กในบ่า = ท่อนสั้นวางขวางความกว้างเสา: ด้านข้างเห็นเป็นวงกลม 3 จุด ด้านบนเห็นเป็นเส้น 3 เส้น (ระยะหุ้ม 0.05 ที่ปลาย เว้นเท่ากัน)
 export function shoulderDetail(sh, x, y) {
-  const TAN = Math.tan((60 * Math.PI) / 180), kx = 84 / sh.a, /* px/m */ aW = sh.a * kx, bW = sh.b * kx;
+  const TAN = Math.tan((60 * Math.PI) / 180), kx = 84 / sh.a, /* px/m */ aW = sh.a * kx, bW = sh.b * kx, G0 = PILE22, slp = (G0.B - 2 * G0.f - G0.c) / 2, vk = Math.min(1, 220 / G0.B); // vk: หน้าตัดใหญ่ย่อแนวตั้งให้แบบขยายสูงเท่าเดิม
   const nb = sh.bars, gap = (sh.a - 2 * sh.cover) / (nb - 1), posM = Array.from({ length: nb }, (_, i) => sh.cover + i * gap), edges = [0, ...posM, sh.a];
   let o = "";
-  // ===== แบบขยาย (ด้านข้าง): ขอบปีก 65/85 และ 135/155 มม. จากหน้าตัด A-A, บ่าถมปากร่องถึงปากร่อง (65–155) =====
+  // ===== แบบขยาย (ด้านข้าง): ขอบปีก/ลาด/เอว ตามหน้าตัด A-A ของเสาต้นนี้ บ่าถมปากร่องถึงปากร่อง =====
   {
-    const sc = kx, w = 440, top = y + 46, xl = x + 20, xr = x + w + 20, bx = x + 140, mmy = (mm) => top + (mm / 1000) * sc;
-    const ys = [0, 65, 85, 135, 155, 220].map(mmy), bot = ys[5], cy = (ys[1] + ys[4]) / 2, fl1 = (ys[0] + ys[1]) / 2, xe = bx + aW + bW;
+    const sc = kx * vk, w = 440, top = y + 46, xl = x + 20, xr = x + w + 20, bx = x + 140, mmy = (mm) => top + (mm / 1000) * sc;
+    const ys = [0, G0.f, G0.f + slp, G0.f + slp + G0.c, G0.f + 2 * slp + G0.c, G0.B].map(mmy), bot = ys[5], cy = (ys[1] + ys[4]) / 2, fl1 = (ys[0] + ys[1]) / 2, xe = bx + aW + bW;
     // ลำดับความลึก: ปีกเสา = ขาว • ลาดปากร่อง = เทาอ่อน • ท้องร่อง = เทากลาง
     o += `<rect x="${xl}" y="${ys[1]}" width="${xr - xl}" height="${ys[2] - ys[1]}" fill="#ECECEA"/><rect x="${xl}" y="${ys[2]}" width="${xr - xl}" height="${ys[3] - ys[2]}" fill="#DADAD6"/><rect x="${xl}" y="${ys[3]}" width="${xr - xl}" height="${ys[4] - ys[3]}" fill="#ECECEA"/>`;
     // เส้นขอบนอกหนา เส้นร่องบาง
@@ -322,10 +322,10 @@ export function shoulderDetail(sh, x, y) {
 
 // ภาพ 3 มิติบ่า (ไม่แสดงเหล็ก) แบบไอโซเมตริก ตามภาพตัวอย่าง AutoCAD: เห็นหน้าตัดไอที่ปลายเสา (หน้าซ้าย) แกนเสาพุ่งขึ้นขวา
 // บ่าเป็นบล็อกเม็ดทรายในร่องข้างเสาด้านที่เห็น ห่างจากหัวเสา at ยาว 0.20 ม. มีเส้นบอก 0.22 ความสูง/ความกว้าง และระยะบ่า
-export function shoulder3D(sh, x, y, s = 0.36) {
-  const P = pilePoly(PILE22), LZ = 680, zs = 230, CZ = 0.866, SZ = 0.5;
+export function shoulder3D(sh, x, y, s0 = 0.36) {
+  const G0 = PILE22, HB0 = G0.B / 2, s = s0 * Math.min(1, 220 / G0.B), P = pilePoly(PILE22), LZ = 680, zs = 230, CZ = 0.866, SZ = 0.5; // หน้าตัดใหญ่ย่อภาพให้ขนาดภาพเท่าเดิม
   const X0 = x + 56, Y0 = y + 36 + LZ * SZ * s;
-  const pj = (z, u, v) => [X0 + (z * CZ + (u + 110) * CZ) * s, Y0 + (v + 110) * s - z * SZ * s + (u + 110) * SZ * s];
+  const pj = (z, u, v) => [X0 + (z * CZ + (u + HB0) * CZ) * s, Y0 + (v + HB0) * s - z * SZ * s + (u + HB0) * SZ * s];
   const pt = (arr) => arr.map((q) => q.map((n) => f1(n)).join(",")).join(" ");
   const cx = P.reduce((a2, q) => a2 + q[0], 0) / P.length, cy = P.reduce((a2, q) => a2 + q[1], 0) / P.length;
   const w3 = [0.6, -0.8, -0.6]; // ทิศมาทางผู้ดู (u, v, z): เห็นด้าน +u ด้านบน และปลายเสา
@@ -345,15 +345,15 @@ export function shoulder3D(sh, x, y, s = 0.36) {
     return `<polygon points="${pt([pj(0, f.a1[0], f.a1[1]), pj(0, f.b1[0], f.b1[1]), pj(LZ, f.b1[0], f.b1[1]), pj(LZ, f.a1[0], f.a1[1])])}" fill="rgb(${g2},${g2},${g2 - 3})" stroke="${INK}" stroke-width="1" stroke-linejoin="round"/>`;
   };
   // ผิวด้านไกล/ในร่องวาดก่อน แล้วบ่า+ส่วนลาด แล้วผิวปีกเสาด้านหน้าทับ (ส่วนลาดที่ลึกเข้าร่องต้องถูกขอบปีกเสาบังไม่ให้ทะลุเส้นเสา)
-  faces.filter((f) => f.key < 100).forEach((f) => { o += drawFace(f); });
+  faces.filter((f) => f.key < (HB0 / 110) * 100).forEach((f) => { o += drawFace(f); });
   // บ่า: บล็อกเม็ดทรายถมร่องด้านที่เห็น (u = +b) ยาว 0.20 ม. ที่ระยะ at จากหัวเสา
-  const bb = 110, m = 45, wv = 40, hv = 25, z1 = zs, z2 = zs + sh.a * 1000, z3 = z2 + sh.b * 1000;
+  const bb = HB0, m = HB0 - G0.f, wv = G0.tw / 2, hv = G0.c / 2, z1 = zs, z2 = zs + sh.a * 1000, z3 = z2 + sh.b * 1000;
   const blk = pt([pj(z1, bb, -m), pj(z2, bb, -m), pj(z2, bb, m), pj(z1, bb, m)]);
   o += `<polygon points="${blk}" fill="#fff"/><polygon points="${blk}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.5"/>`;
   // ส่วนลาด 0.10 ม.: ผิวบ่าลาดจากระดับปากร่อง (u = +b) ลงถึงก้นร่อง (u = +w) แคบลงจาก ±m เป็น ±h
   const rmp = pt([pj(z2, bb, -m), pj(z3, wv, -hv), pj(z3, wv, hv), pj(z2, bb, m)]);
   o += `<polygon points="${rmp}" fill="#fff"/><polygon points="${rmp}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.4"/>`;
-  faces.filter((f) => f.key >= 100).forEach((f) => { o += drawFace(f); });
+  faces.filter((f) => f.key >= (HB0 / 110) * 100).forEach((f) => { o += drawFace(f); });
   // หน้าตัดปลายเสา (เม็ดทราย) วาดหน้าสุด
   const end = pt(P.map(([u, v]) => pj(0, u, v)));
   o += `<polygon points="${end}" fill="#fff"/><polygon points="${end}" fill="url(#stipple)" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`;
@@ -361,20 +361,20 @@ export function shoulder3D(sh, x, y, s = 0.36) {
   const arrow = (p1, p2, sz = 5) => L(p1[0], p1[1], p2[0], p2[1], 0.9) + tri(p1[0], p1[1], (Math.atan2(p1[1] - p2[1], p1[0] - p2[0]) * 180) / Math.PI, sz) + tri(p2[0], p2[1], (Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180) / Math.PI, sz);
   const sh0 = (p, dx, dy) => [p[0] + dx, p[1] + dy];
   // 0.22 ความสูง (ซ้ายของหน้าตัด)
-  { const p1 = sh0(pj(0, -110, -110), -22, 0), p2 = sh0(pj(0, -110, 110), -22, 0);
-    o += arrow(p1, p2) + L(p1[0] + 4, p1[1], pj(0, -110, -110)[0] - 2, p1[1], 0.6) + L(p2[0] + 4, p2[1], pj(0, -110, 110)[0] - 2, p2[1], 0.6) + T(p1[0] - 6, (p1[1] + p2[1]) / 2 + 5, "0.22", { size: 15, anchor: "end" }); }
+  { const p1 = sh0(pj(0, -HB0, -HB0), -22, 0), p2 = sh0(pj(0, -HB0, HB0), -22, 0);
+    o += arrow(p1, p2) + L(p1[0] + 4, p1[1], pj(0, -HB0, -HB0)[0] - 2, p1[1], 0.6) + L(p2[0] + 4, p2[1], pj(0, -HB0, HB0)[0] - 2, p2[1], 0.6) + T(p1[0] - 6, (p1[1] + p2[1]) / 2 + 5, c2(G0.B), { size: 15, anchor: "end" }); }
   // 0.22 ความกว้าง (ใต้หน้าตัด ขนานแนว u)
-  { const p1 = sh0(pj(0, -110, 110), -10, 22), p2 = sh0(pj(0, 110, 110), -10, 22), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-    o += arrow(p1, p2) + `<text x="${f1(mid[0] - 6)}" y="${f1(mid[1] + 20)}" font-size="15" text-anchor="middle" transform="rotate(30 ${f1(mid[0] - 6)} ${f1(mid[1] + 20)})" ${FONT}>0.22</text>`; }
+  { const p1 = sh0(pj(0, -HB0, HB0), -10, 22), p2 = sh0(pj(0, HB0, HB0), -10, 22), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+    o += arrow(p1, p2) + `<text x="${f1(mid[0] - 6)}" y="${f1(mid[1] + 20)}" font-size="15" text-anchor="middle" transform="rotate(30 ${f1(mid[0] - 6)} ${f1(mid[1] + 20)})" ${FONT}>${c2(G0.B)}</text>`; }
   // ระยะบ่าจากหัวเสา (ขนานแกนเสา เหนือขอบบน)
-  { const p1 = sh0(pj(0, -110, -110), -6, -12), p2 = sh0(pj(z1, -110, -110), -6, -12), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+  { const p1 = sh0(pj(0, -HB0, -HB0), -6, -12), p2 = sh0(pj(z1, -HB0, -HB0), -6, -12), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
     o += arrow(p1, p2) + `<text x="${f1(mid[0])}" y="${f1(mid[1] - 8)}" font-size="15" text-anchor="middle" transform="rotate(-30 ${f1(mid[0])} ${f1(mid[1] - 8)})" ${FONT}>${m2(sh.at)}m.</text>`; }
   // 0.20 ความยาวบ่า (ใต้บล็อก)
-  { const p1 = sh0(pj(z1, bb, 110), 8, 20), p2 = sh0(pj(z2, bb, 110), 8, 20), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+  { const p1 = sh0(pj(z1, bb, HB0), 8, 20), p2 = sh0(pj(z2, bb, HB0), 8, 20), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
     o += arrow(p1, p2) + `<text x="${f1(mid[0] + 6)}" y="${f1(mid[1] + 20)}" font-size="15" text-anchor="middle" transform="rotate(-30 ${f1(mid[0] + 6)} ${f1(mid[1] + 20)})" ${FONT}>0.20</text>`; }
-  { const p1 = sh0(pj(z2, bb, 110), 8, 20), p2 = sh0(pj(z3, bb, 110), 8, 20), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+  { const p1 = sh0(pj(z2, bb, HB0), 8, 20), p2 = sh0(pj(z3, bb, HB0), 8, 20), mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
     o += arrow(p1, p2) + `<text x="${f1(mid[0] + 6)}" y="${f1(mid[1] + 20)}" font-size="15" text-anchor="middle" transform="rotate(-30 ${f1(mid[0] + 6)} ${f1(mid[1] + 20)})" ${FONT}>0.10</text>`; }
-  { const ty = y + 36 + LZ * SZ * s + 220 * s * 1.5 + 54; o += T(x + 120, ty, "ภาพ 3 มิติบ่า", { size: 17, weight: 700, anchor: "start" }) + L(x + 120, ty + 5, x + 250, ty + 5, 0.9); }
+  { const ty = y + 36 + LZ * SZ * s + G0.B * s * 1.5 + 54; o += T(x + 120, ty, "ภาพ 3 มิติบ่า", { size: 17, weight: 700, anchor: "start" }) + L(x + 120, ty + 5, x + 250, ty + 5, 0.9); }
   return o;
 }
 

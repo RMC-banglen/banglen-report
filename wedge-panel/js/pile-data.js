@@ -31,7 +31,7 @@ export const PILE_SECTIONS = {
     minL: 1,
     maxL: 12,
     geo: { B: 180, f: 60, c: 30, dg: 55, tw: 70, wl: 1 },
-    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    shoulder: true, // บ่าใช้ขนาดมาตรฐานเดียวกัน (0.20 + 0.10 ม. เหล็ก 3 เส้น) ปรับรูปตามหน้าตัด
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 10, w4: 2, w5: 2, dowel: { n: 4, d: 12, len: 0.3 } },
@@ -50,7 +50,7 @@ export const PILE_SECTIONS = {
     minL: 1,
     maxL: 20,
     geo: { B: 260, f: 65, c: 90, dg: 85, tw: 90, wl: 3, p4: 70 },
-    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    shoulder: true, // บ่าใช้ขนาดมาตรฐานเดียวกัน (0.20 + 0.10 ม. เหล็ก 3 เส้น) ปรับรูปตามหน้าตัด
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 12, w4: 0, w5: 6, dowel: { n: 6, d: 12, len: 0.3 } },
@@ -70,7 +70,7 @@ export const PILE_SECTIONS = {
     minL: 1,
     maxL: 20,
     geo: { B: 300, f: 75, c: 90, dg: 100, tw: 100, wl: 3, p4: 70 },
-    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    shoulder: true, // บ่าใช้ขนาดมาตรฐานเดียวกัน (0.20 + 0.10 ม. เหล็ก 3 เส้น) ปรับรูปตามหน้าตัด
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 16, w4: 2, w5: 6, dowel: { n: 5, d: 16, len: 0.4 } },
@@ -89,7 +89,7 @@ export const PILE_SECTIONS = {
     minL: 1,
     maxL: 20,
     geo: { B: 350, f: 85, c: 120, dg: 115, tw: 120, wl: 2 },
-    shoulder: false, // ยังไม่มีแบบบ่าของหน้าตัดนี้
+    shoulder: true, // บ่าใช้ขนาดมาตรฐานเดียวกัน (0.20 + 0.10 ม. เหล็ก 3 เส้น) ปรับรูปตามหน้าตัด
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางที่ผู้ใช้ส่ง 7 พ.ย. 2569 (ยาวเป็นเมตร)
     rules: [
       { to: 11, w4: 2, w5: 8, dowel: { n: 6, d: 16, len: 0.4 } },
@@ -208,7 +208,7 @@ export const PILE_SECTIONS = {
     minL: 1,
     maxL: 20,
     geo: { B: 400, f: 110, c: 120, dg: 120, tw: 160, two: true },
-    shoulder: false,
+    shoulder: true,
     // ตารางลวด PC: Excel 1 ส.ค. 2569 • เหล็กเชื่อมหัวเพลท: ตารางผู้ใช้ 7 พ.ย. 2569 ตัดสั้นลง 1 ซม. • ปลอก/ขนาดจาก 40.dxf
     rules: [
       { to: 14, w4: 0, w5: 14, dowel: { n: 5, d: 20, len: 0.45 } },
@@ -249,7 +249,7 @@ export const SHOULDER_STD = { a: 0.2, b: 0.1, bars: 3, d: 12, cover: 0.05 }; // 
 // วัสดุ (ลวด ปลอก เหล็กเดือย แผ่นเหล็ก): I-15/18/22/26 ยึดตามไฟล์ บ่อตะกั่ว • I-30/35 (และสี่เหลี่ยม/หกเหลี่ยม) ยึดตาม แบบโรงงาน.dxf (ผู้ใช้สั่ง)
 // cy = ลวดห่างผิวแนวตั้ง, ex = ลวดแรกห่างขอบข้าง, wp = ระยะระหว่างลวด (มม.) • plate = ความหนาแผ่นเหล็กหัวต่อ (มม.) • fac = มาตรฐานโรงงาน
 // dowel: { n, d (มม.), len (ม.), k: "DB" | "RB" } • rows = แยกชนิดแถวบน/ล่าง (เช่น I-22: บน 2-RB9 ล่าง 2-DB12 ยาว 0.40)
-const FAC = { std: "มาตรฐานโรงงาน", stdTh: "โรงงาน", fac: true, shoulder: false, extras: false, lift: 0.207, minL: 1 };
+const FAC = { std: "มาตรฐานโรงงาน", stdTh: "โรงงาน", fac: true, shoulder: true, extras: false, lift: 0.207, minL: 1 };
 const RB9 = { n: 4, d: 9, len: 0.3, k: "RB" }, DB12x5 = { n: 5, d: 12, len: 0.3 }, DB16x5 = { n: 5, d: 16, len: 0.4 };
 const MIX22 = { n: 4, d: 12, len: 0.4, k: "DB", rows: { top: { d: 9, k: "RB", len: 0.3 }, bot: { d: 12, k: "DB", len: 0.4 } } };
 const DB12x4L = { n: 4, d: 12, len: 0.4 };
@@ -278,13 +278,13 @@ Object.assign(PILE_SECTIONS, {
     rules: [{ to: 11, w4: 0, w5: 8, dowel: DB16x5 }, { to: 14, w4: 4, w5: 6, dowel: DB16x5 }],
     spiral: { wire: 3, endLen: 0.5, endStep: 0.05, nearLen: 1, nearStep: 0.15, midStep: 0.25 } },
   // เสาสี่เหลี่ยมโรงงาน (แบบโรงงาน.dxf) พื้นที่ B² ไม่หักบัว • มุมตัด 20 มม. และความยาวโซนปลอก (1.5B / 3B) ยังไม่ได้ยืนยัน
-  Q22: { ...FAC, key: "Q22", label: "[ ]", menu: "S-22", size: "0.22x0.22", maxL: 14, plate: 6, geo: { sq: true, B: 220, ch: 20, dIn: 50, pat: { 6: { row: ["L0","L1","R0"] }, 8: { row: ["L0","L1","R1","R0"] } } },
+  Q22: { ...FAC, shoulder: false, key: "Q22", label: "[ ]", menu: "S-22", size: "0.22x0.22", maxL: 14, plate: 6, geo: { sq: true, B: 220, ch: 20, dIn: 50, pat: { 6: { row: ["L0","L1","R0"] }, 8: { row: ["L0","L1","R1","R0"] } } },
     rules: [{ to: 12, w4: 0, w5: 6, dowel: { n: 4, d: 12, len: 0.3 } }, { to: 14, w4: 4, w5: 4, dowel: { n: 4, d: 12, len: 0.3 } }],
     spiral: { wire: 3, endLen: 0.33, endStep: 0.04, nearLen: 0.66, nearStep: 0.1, midStep: 0.25 } },
-  Q26: { ...FAC, key: "Q26", label: "[ ]", menu: "S-26", size: "0.26x0.26", maxL: 14, plate: 9, geo: { sq: true, B: 260, ch: 20, dIn: 50, pat: { 8: { row: ["L0","L1","R1","R0"] } } },
+  Q26: { ...FAC, shoulder: false, key: "Q26", label: "[ ]", menu: "S-26", size: "0.26x0.26", maxL: 14, plate: 9, geo: { sq: true, B: 260, ch: 20, dIn: 50, pat: { 8: { row: ["L0","L1","R1","R0"] } } },
     rules: [{ to: 14, w4: 2, w5: 6, dowel: { n: 5, d: 12, len: 0.3 } }],
     spiral: { wire: 4, endLen: 0.39, endStep: 0.06, nearLen: 0.78, nearStep: 0.1, midStep: 0.25 } },
-  Q30: { ...FAC, key: "Q30", label: "[ ]", menu: "S-30", size: "0.30x0.30", maxL: 14, plate: 9, geo: { sq: true, B: 300, ch: 20, dIn: 55, pat: { 10: { row: ["L0","L1","L2","R2","R0"] } } },
+  Q30: { ...FAC, shoulder: false, key: "Q30", label: "[ ]", menu: "S-30", size: "0.30x0.30", maxL: 14, plate: 9, geo: { sq: true, B: 300, ch: 20, dIn: 55, pat: { 10: { row: ["L0","L1","L2","R2","R0"] } } },
     rules: [{ to: 14, w4: 0, w5: 10, dowel: { n: 4, d: 16, len: 0.4 } }],
     spiral: { wire: 4, endLen: 0.45, endStep: 0.05, nearLen: 0.9, nearStep: 0.1, midStep: 0.25 } },
 });
