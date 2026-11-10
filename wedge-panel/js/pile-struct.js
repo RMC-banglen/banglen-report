@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261110075908";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261110075908";
-import { esc } from "./draw2d.js?v=20261110075908";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261110082628";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261110082628";
+import { esc } from "./draw2d.js?v=20261110082628";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_RB = { 6: 0.283, 9: 0.636, 12: 1.131 }; // เหล็กเส้นกลม RB (SR24, fy 2400) ตร.ซม.

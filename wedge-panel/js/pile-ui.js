@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110075908";
-import { pileSheet } from "./pile-draw.js?v=20261110075908";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261110075908";
-import { download } from "./pdf.js?v=20261110075908";
-import { esc } from "./draw2d.js?v=20261110075908";
-import { getSession, canEdit } from "./auth.js?v=20261110075908";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110075908";
-import { db } from "./db.js?v=20261110075908";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110075908";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110075908";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110082628";
+import { pileSheet } from "./pile-draw.js?v=20261110082628";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261110082628";
+import { download } from "./pdf.js?v=20261110082628";
+import { esc } from "./draw2d.js?v=20261110082628";
+import { getSession, canEdit } from "./auth.js?v=20261110082628";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110082628";
+import { db } from "./db.js?v=20261110082628";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110082628";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110082628";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -69,7 +69,8 @@ function syncUi() {
   const full = radio("pt") === "full", two = pnVal() === 2;
   const mc = isMicro(); $("pmBox").hidden = full; $("pLbox").hidden = full; $("pnBox").hidden = full || mc; $("plSplit").hidden = full || mc || pnVal() < 2;
   if ($("pmHint")) { const L0 = num("pL"), n0 = Math.round(L0 / 1.5), ok = L0 > 0 && Math.abs(n0 * 1.5 - L0) < 1e-6; $("pmHint").style.color = mc && L0 > 0 && !ok ? "#c00000" : ""; $("pmHint").textContent = !mc ? "ติ๊กเมื่อเสาเป็นท่อนสั้นละ 1.5 ม. ต่อกัน (ความยาวรวมต้องหาร 1.5 ลงตัว)" : !(L0 > 0) ? "ใส่ความยาวรวม" : ok ? `${L0} ม. = ${n0} ท่อน × 1.5 ม.` : `${L0} ม. หาร 1.5 ไม่ลงตัว — ใกล้สุด ${Math.max(3, Math.floor(L0 / 1.5) * 1.5)} หรือ ${Math.ceil(L0 / 1.5) * 1.5} ม.`; } renderSplitRows(); $("pjHint").textContent = full ? "" : (pnVal() >= 2 ? "เสา 2 ท่อนขึ้นไป มีหัวต่อเชื่อม (แผ่นเหล็กและเหล็กเดือย) ทุกรอยต่อ" : "ท่อนเดี่ยว ไม่มีหัวต่อเชื่อม");
-  const sc = PILE_SECTIONS[$("psec").value], noSh = !(sc && sc.shoulder); if (noSh) $("psh").checked = false; $("pshBox").hidden = full || noSh; // บ่ามีเฉพาะหน้าตัดที่มีแบบบ่า $("pxBox").hidden = full || (sc && sc.extras === false); $("pshAtBox").hidden = !$("psh").checked || full || noSh;
+  const sc = PILE_SECTIONS[$("psec").value], noSh = !(sc && sc.shoulder); if (noSh) $("psh").checked = false; $("pshBox").hidden = full || noSh; // บ่ามีเฉพาะหน้าตัดที่มีแบบบ่า
+  $("pxBox").hidden = full || (sc && sc.extras === false); $("pshAtBox").hidden = !$("psh").checked || full || noSh;
   if ((sc && sc.fac) || mc) $("pxBox").hidden = true; // เสาโรงงานยังไม่รองรับเหล็กเสริมพิเศษ
   if ($("pwBox")) { const hasW = !!(sc && sc.rules.some((x) => x.wires)); $("pwBox").hidden = full || !hasW; if (!hasW) $("pWires").value = ""; } // I-15 โรงงาน: เลือกลวด 3 หรือ 4 เส้น
   const L = num("pL");
