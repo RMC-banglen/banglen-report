@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110021311";
-import { pileSheet } from "./pile-draw.js?v=20261110021311";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261110021311";
-import { download } from "./pdf.js?v=20261110021311";
-import { esc } from "./draw2d.js?v=20261110021311";
-import { getSession, canEdit } from "./auth.js?v=20261110021311";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110021311";
-import { db } from "./db.js?v=20261110021311";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110021311";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110021311";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110021521";
+import { pileSheet } from "./pile-draw.js?v=20261110021521";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261110021521";
+import { download } from "./pdf.js?v=20261110021521";
+import { esc } from "./draw2d.js?v=20261110021521";
+import { getSession, canEdit } from "./auth.js?v=20261110021521";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110021521";
+import { db } from "./db.js?v=20261110021521";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110021521";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110021521";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -18,7 +18,7 @@ let extras = [], splits = [], started = false, queue = [], active = null, curJob
 const num = (id) => { const v = parseFloat($(id).value); return v > 0 ? v : 0; };
 const isMicro = () => !!($("pMicro") && $("pMicro").checked && radio("pt") !== "full");
 const microN = () => Math.max(2, Math.min(30, Math.round(num("pL") / 1.5))); // ไมโครไพล์: จำนวนท่อน = ความยาวรวม ÷ 1.5
-const pnVal = () => (isMicro() ? microN() : Math.min(6, Math.max(1, +$("pnS").value || 1)));
+const pnVal = () => (isMicro() ? microN() : Math.min(3, Math.max(1, +$("pnS").value || 1)));
 const radio = (n) => (document.querySelector(`input[name="${n}"]:checked`) || {}).value;
 
 function read() {
@@ -117,7 +117,7 @@ function restore() {
     $("ppj").value = (d.project && d.project.pj) || ""; $("pow").value = (d.project && d.project.ow) || ""; $("plo").value = (d.project && d.project.lo) || "";
     const r = d._raw || {};
     const pt = document.querySelector(`input[name="pt"][value="${r.pt || "len"}"]`);
-    if (pt) pt.checked = true; $("pnS").value = String(Math.min(6, Math.max(1, +r.pn || 1))); if ($("pMicro")) $("pMicro").checked = !!r.micro;
+    if (pt) pt.checked = true; $("pnS").value = String(Math.min(3, Math.max(1, +r.pn || 1))); if ($("pMicro")) $("pMicro").checked = !!r.micro;
     splits = Array.isArray(r.splits) ? r.splits.map((v) => (+v > 0 ? String(v) : "")) : []; // บ่า: ไม่กู้ค่าจากร่าง — เข้าหน้าใหม่ทุกครั้งต้องไม่ติ๊กบ่า (ติ๊กเองเมื่อมีบ่าเท่านั้น)
     $("psh").checked = false; $("pshAt").value = "";
     const bw = d.blow || {}; $("pW").value = bw.W || ""; $("pQa").value = bw.Qa || ""; $("pH").value = bw.H || "";
@@ -155,7 +155,7 @@ function pileInputOf(p, project) {
 }
 function loadPile(p, project) {
   const mic = p.pieces > 1 && Array.isArray(p.split) && p.split.length === p.pieces && p.split.every((v) => Math.abs(v - 1.5) < 1e-9); if ($("pMicro")) $("pMicro").checked = mic;
-  $("psec").value = p.section; $("pL").value = p.L; $("pnS").value = mic ? "1" : String(Math.min(6, p.pieces)); if ($("pWires")) $("pWires").value = p.wires ? String(p.wires) : "";
+  $("psec").value = p.section; $("pL").value = p.L; $("pnS").value = mic ? "1" : String(Math.min(3, p.pieces)); if ($("pWires")) $("pWires").value = p.wires ? String(p.wires) : "";
   const pt = document.querySelector('input[name="pt"][value="len"]'); if (pt) pt.checked = true;
   splits = p.split ? p.split.map(String) : []; extras = (p.extras || []).map((e) => ({ d: +e.d || 16, n: +e.n || 4, len: +e.len || 0, pieces: +e.pieces || 0 })); active = p;
   $("psh").checked = (p.shoulder || 0) > 0; $("pshAt").value = p.shoulder > 0 ? p.shoulder : "";

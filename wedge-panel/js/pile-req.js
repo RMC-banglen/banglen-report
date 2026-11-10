@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261110021311";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110021311";
-import { esc } from "./draw2d.js?v=20261110021311";
+import { autoSplit } from "./pile-calc.js?v=20261110021521";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110021521";
+import { esc } from "./draw2d.js?v=20261110021521";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
