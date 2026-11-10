@@ -1,12 +1,12 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110022257";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110022257";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110022257";
+import { pilePoly, esc } from "./draw2d.js?v=20261110022652";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110022652";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110022652";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
 const FONT = `font-family="Times New Roman, IBM Plex Sans Thai, Tahoma, serif"`;
-const T = (x, y, s, o = {}) => `<text x="${f1(x)}" y="${f1(y)}" font-size="${o.size || 11}" text-anchor="${o.anchor || "middle"}" ${o.weight ? `font-weight="${o.weight}"` : ""} ${o.rot ? `transform="rotate(${o.rot} ${f1(x)} ${f1(y)})"` : ""} fill="${o.fill || INK}" ${o.halo ? 'stroke="#fff" stroke-width="3.5" paint-order="stroke" stroke-linejoin="round"' : ""} ${FONT}>${esc(s)}</text>`;
+const T = (x, y, s, o = {}) => `<text x="${f1(x)}" y="${f1(y)}" font-size="${o.size || 11}" text-anchor="${o.anchor || "middle"}" ${o.weight ? `font-weight="${o.weight}"` : ""} ${o.rot ? `transform="rotate(${o.rot} ${f1(x)} ${f1(y)})"` : ""} fill="${o.fill || INK}" ${o.halo ? 'stroke="#fff" stroke-width="3.5" paint-order="stroke" stroke-linejoin="round"' : ""} ${FONT}>${esc(String(s).replace(/(\d)-(?=[A-Z])/g, "$1−"))}</text>`; // ขีดระหว่างจำนวนกับชนิดเหล็ก (4-DB12, 2-CD) ใช้เครื่องหมายลบ − ที่อยู่กึ่งกลางความสูงตัวอักษร (ขีดกลาง - ของฟอนต์ Times ต่ำเกินไป)
 const L = (x1, y1, x2, y2, w = 1, extra = "") => `<line x1="${f1(x1)}" y1="${f1(y1)}" x2="${f1(x2)}" y2="${f1(y2)}" stroke="${INK}" stroke-width="${w}" ${extra}/>`;
 const tri = (x, y, ang, sz = 6) => {
   const a = (ang * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a), p = (u, v) => `${f1(x + u * c - v * s)},${f1(y + u * s + v * c)}`;
