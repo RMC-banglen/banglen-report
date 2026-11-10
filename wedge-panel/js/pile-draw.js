@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110020320";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110020320";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110020320";
+import { pilePoly, esc } from "./draw2d.js?v=20261110021311";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110021311";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110021311";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -359,7 +359,7 @@ export function shoulder3D(sh, x, y, s = 0.36) {
 
 // รูปด้านท่อนเสา: ปลายละ 0.33 (@0.05) + 0.66 (@0.07) ส่วนกลาง (@0.17) — ไม่ได้มาตราส่วนจริง
 export function elevation(plan, piece, y0, opts) {
-  const ex = piece.extras || [], sp = plan.sec.spiral, X0 = 110, TW = 960, nz = sp.nearLen > 0, a = nz ? 56 : 120, b = nz ? 116 : 0, mid = TW - 2 * (a + b), yTop = y0 + 42, sh = 44, kk = sh / 220, my = (mm) => mm * kk; // my = มม. จริงของหน้าตัดเป็นพิกเซลแนวตั้ง
+  const ex = piece.extras || [], sp = plan.sec.spiral, mic = !!plan.micro, X0 = mic ? 310 : 110, TW = mic ? 560 : 960, nz = sp.nearLen > 0, a = nz ? 56 : (mic ? Math.round((TW * sp.endLen) / piece.len) : 120), b = nz ? 116 : 0, mid = TW - 2 * (a + b), yTop = y0 + 42, sh = 44, kk = sh / 220, my = (mm) => mm * kk; // my = มม. จริงของหน้าตัดเป็นพิกเซลแนวตั้ง
   const ls = piece.full ? "L = 1.00-20.00 m." : m2(piece.len);
   let o = "";
   // ตำแหน่งตามระยะจริงจากหัวเสา (เหล็กเสริม/บ่า): ช่วงซ้ายถึงรอยหักกลางใช้สเกลเดียวกับโซนปลอก 0.33/0.66 ส่วนที่เหลือย่อให้พอดีด้านขวา
@@ -388,7 +388,7 @@ export function elevation(plan, piece, y0, opts) {
     if (n > 1 && i > 0) jointSides.push("L");
     if (n === 1 || i < n - 1) jointSides.push("R");
   }
-  const dw = piece.rule && piece.rule.dowel, dpx = dw && piece.len ? Math.max(52, (dw.len / piece.len) * TW) : 52;
+  const dw = piece.rule && piece.rule.dowel, dpx0 = dw && piece.len ? Math.max(52, (dw.len / piece.len) * TW) : 52, dpx = mic ? Math.min(dpx0, Math.max(36, a - 12)) : dpx0; // ไมโครไพล์: เหล็กเดือยวาดสั้นไม่เกินโซนปลาย
   jointSides.forEach((sd) => {
     const px = sd === "L" ? X0 : X0 + TW - 6, dir = sd === "L" ? 1 : -1, x0d = sd === "L" ? X0 + 6 : X0 + TW - 6;
     o += `<rect x="${px}" y="${yTop}" width="6" height="${sh}" fill="${INK}"/>`;
@@ -426,9 +426,9 @@ export function elevation(plan, piece, y0, opts) {
   // ป้ายโซน 0.66 ซ้าย: ถ้าวงบ่าอยู่ทับป้าย ให้เลื่อนป้ายไปทางขวาของวง (วงและเส้นชี้บ่าไม่บังตัวหนังสือ)
   let l2 = X0 + a + b / 2 + 14;
   if (plan.shoulder && opts.first && !piece.full) { const xsh = F(Math.min(plan.shoulder.at, piece.len)); if (Math.abs(xsh - l2) < 62) l2 = xsh + 100; }
-  lbl += T(l2, sy, cdW, { size: 13, halo: true }) + T(l2, sy + 15, `@${sf(sp.nearStep)}m.`, { size: 13, halo: true });
+  if (nz) lbl += T(l2, sy, cdW, { size: 13, halo: true }) + T(l2, sy + 15, `@${sf(sp.nearStep)}m.`, { size: 13, halo: true });
   lbl += T(cx, sy, cdW, { size: 13, halo: true }) + T(cx, sy + 15, `@${sf(sp.midStep)}m.`, { size: 13, halo: true });
-  lbl += T(xs[3] + b / 2 - 14, sy, cdW, { size: 13, halo: true }) + T(xs[3] + b / 2 - 14, sy + 15, `@${sf(sp.nearStep)}m.`, { size: 13, halo: true });
+  if (nz) lbl += T(xs[3] + b / 2 - 14, sy, cdW, { size: 13, halo: true }) + T(xs[3] + b / 2 - 14, sy + 15, `@${sf(sp.nearStep)}m.`, { size: 13, halo: true }); // ไมโครไพล์: @ ใกล้ปลายไม่มี มีแต่ป้ายกลางอันเดียว
   lbl += T(X0 + TW - 48, sy, "2-" + cdW, { size: 13, halo: true }) + T(X0 + TW - 48, sy + 15, `@${sf(sp.endStep)}m.`, { size: 13, halo: true });
   const hasSh = !!(plan.shoulder && opts.first && !piece.full);
   let yy = sy + 30 + (hasSh ? 38 + (ex.length ? 22 : 0) : 0); // ระยะบ่าอยู่ใต้ป้ายปลอกทันที
