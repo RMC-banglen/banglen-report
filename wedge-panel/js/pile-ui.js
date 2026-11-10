@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110083525";
-import { pileSheet } from "./pile-draw.js?v=20261110083525";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261110083525";
-import { download } from "./pdf.js?v=20261110083525";
-import { esc } from "./draw2d.js?v=20261110083525";
-import { getSession, canEdit } from "./auth.js?v=20261110083525";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110083525";
-import { db } from "./db.js?v=20261110083525";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110083525";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110083525";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110084105";
+import { pileSheet } from "./pile-draw.js?v=20261110084105";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261110084105";
+import { download } from "./pdf.js?v=20261110084105";
+import { esc } from "./draw2d.js?v=20261110084105";
+import { getSession, canEdit } from "./auth.js?v=20261110084105";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110084105";
+import { db } from "./db.js?v=20261110084105";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110084105";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110084105";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -220,7 +220,7 @@ function showQueue(r) {
     const pl = p.pieces > 6 ? `ไมโครไพล์ ${p.pieces} ท่อน × ${Math.round((p.L / p.pieces) * 100) / 100} ม.` : p.pieces > 1 ? (p.split || autoSplit(p.L, p.pieces)).join("+") : "ท่อนเดี่ยว";
     const b = document.createElement("button"); b.type = "button"; b.className = "preqrow";
     b.style.cssText = "display:block;width:100%;text-align:left;margin:3px 0";
-    b.textContent = (p.errs.length ? "⚠ " : "") + (i + 1) + ". " + (p.kind === "T" ? "I" : "S") + "-" + p.sizeCm + " ยาว " + p.L + " ม. (" + pl + ") ตุ้ม " + p.W + " Qa " + p.Qa + " ยก " + p.H + (p.errs.length ? " — " + p.errs.join(", ") : "");
+    b.textContent = (p.errs.length ? "⚠ " : "") + (i + 1) + ". " + (p.kind === "T" ? "I" : "S") + "-" + p.sizeCm + " ยาว " + p.L + " ม. (" + pl + ")" + (p.noBlow ? " ไม่มีค่าใบ blow" : " ตุ้ม " + p.W + " Qa " + p.Qa + " ยก " + p.H) + (p.errs.length ? " — " + p.errs.join(", ") : "");
     b.onclick = () => { if (!PILE_SECTIONS[p.section]) return; syncActive(); loadPile(p, proj); }; box.appendChild(b);
   });
   msg.textContent = queue.length ? "พบ " + queue.length + " ต้น กดแถวเพื่อดูแบบ" : "ไม่พบรายการเสา (ต้องมีบรรทัดแบบ I 0.22×19.00 ม.)";

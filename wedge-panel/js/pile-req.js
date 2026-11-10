@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261110083525";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110083525";
-import { esc } from "./draw2d.js?v=20261110083525";
+import { autoSplit } from "./pile-calc.js?v=20261110084105";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110084105";
+import { esc } from "./draw2d.js?v=20261110084105";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -79,7 +79,7 @@ export function parseRequest(text, secs) {
     .reduce((a, l) => { if (a.length && /(คุณ|นาย|นาง|นางสาว|น\.ส\.)$/.test(a[a.length - 1])) a[a.length - 1] += l; else a.push(l); return a; }, []) // ชื่อที่ขึ้นบรรทัดใหม่หลังคำนำหน้า ต่อกลับเป็นบรรทัดเดียว
     .forEach((l) => parseHeadLine(l, project));
   { // ชื่อโครงการที่มีสถานที่ต่อท้ายในบรรทัดเดียว (… แขวงรามอินทรา เขต… / … ต.แม่กลอง) → ตัดส่วนสถานที่ออก และตัดเลขที่โครงการนำหน้า ("6904 :")
-    const cut = project.pj.search(/(^|\s)(แขวง|ต\.|ตำบล|ถ\.|ซ\.)/);
+    const cut = project.pj.search(/(^|\s)(แขวง|เขต|อำเภอ|จังหวัด|ต\.|อ\.|จ\.|ตำบล|ถ\.|ซ\.)/);
     if (cut > 0) { project.lo = (project.pj.slice(cut).trim() + (project.lo ? " " + project.lo : "")).trim(); project.pj = project.pj.slice(0, cut).trim(); }
   }
   if (project.ow) { // ชื่อเจ้าของตัดเฉพาะชื่อ ส่วนที่ต่อจากนั้น (แขวง/เขต/ต./อ./จ. ...) เป็นสถานที่
@@ -120,11 +120,12 @@ export function parseRequest(text, secs) {
     const get = (re) => { const x = body.match(re); return x ? n(x[1]) : 0; };
     // "ตุ้ม": วรรณยุกต์/สระอาจเรียงสลับกันตามแป้นพิมพ์ จึงรับทั้งสองลำดับ
     const W = get(/ต[ุ้]{0,2}ม\s*[:.=]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:=]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.=]?\s*(\d+(?:\.\d+)?)/);
-    if (!W) errs.push("ไม่พบน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่พบ Qa"); if (!H) errs.push("ไม่พบระยะยก");
+    const noBlow = !W && !Qa && !H; // ไม่มีค่าใบ blow เลย = ขอแค่รายการคำนวณกับแบบ ไม่เตือนเรื่องตุ้ม • มีบางค่าแต่ขาดบางค่า = เตือนตามเดิม
+    if (!noBlow) { if (!W) errs.push("ไม่พบน้ำหนักตุ้ม"); if (!Qa) errs.push("ไม่พบ Qa"); if (!H) errs.push("ไม่พบระยะยก"); }
     // จำนวนลวด PC (เสาที่เลือกได้ เช่น I-15 โรงงาน 3 หรือ 4 เส้น): "ลวด 3 เส้น" / "4 เส้น"
     let wires = 0; const wm = body.match(/(?:ลวด|wire|pc)[^\d\n]{0,8}(\d)\s*เส้น|(\d)\s*เส้น/i); if (wm) wires = +(wm[1] || wm[2]);
     if (secs[key] && secs[key].rules.some((x) => x.wires)) { if (!(wires === 3 || wires === 4)) { asks.push("ไม่ระบุจำนวนลวด PC (3 หรือ 4 เส้น) ระบบใช้ตามความยาวเสา"); wires = 0; } } else wires = 0;
-    piles.push({ section: key, sizeCm, kind, L, pieces, split, W, Qa, H, wires, errs, asks });
+    piles.push({ section: key, sizeCm, kind, L, pieces, split, W, Qa, H, noBlow, wires, errs, asks });
   });
   return { project, piles, notes };
 }
