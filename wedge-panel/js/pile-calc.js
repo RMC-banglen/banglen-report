@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261109095636";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261110015923";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -87,7 +87,6 @@ export function wireLayout(w4, w5, B = 220, sq = false, wl, pat, p4, fo) {
 
 // แบ่งเป็น n ท่อนอัตโนมัติ: เมตรเต็มเท่ากัน เศษไปเพิ่มท่อนท้าย (17 ม. 2 ท่อน → 8+9, 19 → 9+10, 28 ม. 3 ท่อน → 9+9+10)
 export function autoSplit(L, n = 2) {
-  if (n > 6) return Array(n).fill(r2(L / n)); // ไมโครไพล์: ท่อนสั้นเท่ากัน (เช่น 18 ม. 12 ท่อน = ท่อนละ 1.50)
   const base = Math.floor(L / n + 1e-9), lens = Array(n).fill(base);
   let extra = r2(L - base * n);
   for (let i = n - 1; i >= 0 && extra >= 1 - 1e-9; i--) { lens[i] += 1; extra = r2(extra - 1); }
@@ -96,6 +95,7 @@ export function autoSplit(L, n = 2) {
 }
 
 // input = { section, L, pieces (1|2), split ([a,b] ใส่เอง หรือว่าง), full (แบบเต็ม), joint (มีหัวต่อ), extras [{d,n,len}], shoulder (ระยะจากหัว ม. หรือว่าง), project {pj,ow,lo} }
+export const MICRO_LEN = 1.5; // ความยาวท่อนไมโครไพล์ (ม.)
 export const MAX_SEG = 30; // ไมโครไพล์: ท่อนต่อกันได้สูงสุด
 // ไมโครไพล์ (ท่อนสั้น ~1.5 ม.): ปลายถี่ ปลอก @ปลาย = ครึ่งหนึ่งของมาตรฐาน กลาง @1.25 เท่าของปลาย (ตามแบบโรงงาน I-22: @0.03 / @0.075)
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -111,7 +111,7 @@ export function planPile(input) {
   if (full) {
     pieces = [{ full: true, len: null, mid: null }];
   } else {
-    const np = input.pieces > 1 ? Math.min(MAX_SEG, Math.floor(input.pieces)) : 1; micro = np > 6;
+    const np = input.pieces > 1 ? Math.min(MAX_SEG, Math.floor(input.pieces)) : 1;
     if (!(L >= sec.minL && L <= sec.maxL * np)) warn.push(`ความยาว ${m2(L)} ม. อยู่นอกช่วง ${m2(sec.minL)}–${m2(sec.maxL * np)} ม.`);
     let lens = [L];
     if (np > 1) {
@@ -120,6 +120,7 @@ export function planPile(input) {
       if (Math.abs(sum - L) > 0.005) warn.push(`ความยาวรวมของ ${np} ท่อน ${m2(sum)} ม. ไม่เท่ากับความยาวรวม ${m2(L)} ม.`);
       lens = sp; segN = np;
     }
+    micro = np > 1 && lens.every((v) => Math.abs(v - MICRO_LEN) < 1e-9); // ไมโครไพล์ = ทุกท่อนยาว 1.50 ม. (ท่อนต่อกันตั้งแต่ 2 ท่อน)
     if (micro) lens = [...new Set(lens)]; // ไมโครไพล์: วาดเฉพาะท่อนตัวอย่าง (ท่อนยาวเท่ากันรวมเป็นแบบเดียว)
     pieces = lens.map((len) => {
       const rule = ruleFor(sec, len, input.wires);

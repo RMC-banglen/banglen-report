@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261109095636";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261109095636";
-import { esc } from "./draw2d.js?v=20261109095636";
+import { autoSplit } from "./pile-calc.js?v=20261110015923";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110015923";
+import { esc } from "./draw2d.js?v=20261110015923";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -106,14 +106,17 @@ export function parseRequest(text, secs) {
     const fac = /โรงงาน/.test(body) || (kind === "T" && !secs["T" + sizeCm] && !!secs["F" + sizeCm]);
     const key = (fac ? (kind === "T" ? "F" : "Q") : kind) + sizeCm, errs = [], asks = [];
     const micro = /ไมโคร|micro/i.test(body), mn = micro ? body.match(/(\d+)\s*ท่อน/) : null; // ไมโครไพล์: "(12ท่อนต่อ)" = ท่อนสั้นเท่ากัน n ท่อน
-    if (micro && !(mn && +mn[1] > 6)) errs.push("ไมโครไพล์ ไม่พบจำนวนท่อน (เช่น 12 ท่อนต่อ)");
     if (/หก\s*เหลี่ยม/.test(body)) errs.push("เสาหกเหลี่ยม ยังไม่รองรับ");
     if (!secs[key] && !errs.some((e) => /ยังไม่รองรับ/.test(e))) errs.push("ไม่มีหน้าตัด " + (kind === "T" ? "I" : "S") + "-" + sizeCm + (fac ? " โรงงาน" : "") + " ในระบบ");
     const ex = body.match(/(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)(?:\s*\+\s*(\d+(?:\.\d+)?))?/);
     let pieces = 1, split = null;
     if (ex) { split = ex.slice(1).filter(Boolean).map(n); pieces = split.length; if (Math.abs(split.reduce((a, b) => a + b, 0) - L) > 0.01) errs.push("ความยาวแต่ละท่อนรวมไม่เท่าความยาวเสา"); }
-    else if (mn && +mn[1] > 6) pieces = +mn[1];
     else if (/ต\s*[\/.]?\s*[ชซ]|ต่อ/.test(body)) pieces = 2;
+    if (micro) { // ไมโครไพล์ (มอก./โรงงาน): ท่อนละ 1.5 ม. เท่ากันทุกท่อน จำนวนท่อน = ความยาว ÷ 1.5
+      const nm = L / 1.5; split = null; pieces = 1;
+      if (!(L > 0) || Math.abs(nm - Math.round(nm)) > 1e-6 || nm < 2) errs.push("ไมโครไพล์ ความยาว " + L + " ม. หาร 1.5 ไม่ลงตัว");
+      else { pieces = Math.round(nm); split = Array(pieces).fill(1.5); if (mn && +mn[1] !== pieces) errs.push("ไมโครไพล์ ระบุ " + mn[1] + " ท่อน แต่ " + L + " ม. = " + pieces + " ท่อน"); }
+    }
     const get = (re) => { const x = body.match(re); return x ? n(x[1]) : 0; };
     // "ตุ้ม": วรรณยุกต์/สระอาจเรียงสลับกันตามแป้นพิมพ์ จึงรับทั้งสองลำดับ
     const W = get(/ต[ุ้]{0,2}ม\s*[:.=]?\s*(\d+(?:\.\d+)?)/), Qa = get(/Qa\s*[.:=]?\s*(\d+(?:\.\d+)?)/i), H = get(/ยก\s*[:.=]?\s*(\d+(?:\.\d+)?)/);
