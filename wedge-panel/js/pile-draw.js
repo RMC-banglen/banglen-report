@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110074927";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110074927";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110074927";
+import { pilePoly, esc } from "./draw2d.js?v=20261110075908";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110075908";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110075908";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -49,7 +49,9 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   // ปลอกเกลียวอยู่ล้อมนอกลวด PC และเหล็ก DB (ห่างผิวคอนกรีต ~25 มม. ที่ปีก ~20 มม. ที่เอว)
   const G = PILE22, hb = G.B / 2, rO = hb - 25, rM = hb - G.f + 13, rW = Math.max(8, G.tw / 2 - 20), rC = G.c / 2 + 15;
   const sqr = hb - 30, ring = G.sq ? [[-sqr, -sqr], [sqr, -sqr], [sqr, sqr], [-sqr, sqr]] : [[-rO, -rO], [rO, -rO], [rO, -rM], [rW, -rC], [rW, rC], [rO, rM], [rO, rO], [-rO, rO], [-rO, rM], [-rW, rC], [-rW, -rC], [-rO, -rM]];
-  const ringPts = G.cy && !G.sq ? insetPoly(ioutline(G), G.cy - 5) : ring; // มาตรฐานโรงงาน: ปลอกตามรูปหน้าตัดเลื่อนเข้า (ลวดห่างผิว cy) ไม่ใช้สูตรตายตัวของ I-22 มอก.
+  // ปลอกต้องคลุมลวด PC ทุกเส้น: ระยะเลื่อนเข้า = ห่างจากลวดที่ใกล้ผิวที่สุดลบรัศมีลวดและปลอก (ไม่เกิน cy-5)
+  const offF = () => { const ol = ioutline(G), dist = (px, py) => Math.min(...ol.map((p, i) => { const q = ol[(i + 1) % ol.length], dx = q[0] - p[0], dy = q[1] - p[1], t = Math.max(0, Math.min(1, ((px - p[0]) * dx + (py - p[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(px - p[0] - t * dx, py - p[1] - t * dy); })), ws = [...lay.w4.map((w) => [w, 2]), ...lay.w5.map((w) => [w, 2.5])]; return Math.max(5, Math.min(G.cy - 5, ...ws.map(([w, r]) => dist(w[0], w[1]) - r - 3.5))); };
+  const ringPts = G.cy && !G.sq ? insetPoly(ioutline(G), offF()) : ring; // มาตรฐานโรงงาน: ปลอกตามรูปหน้าตัดเลื่อนเข้า (ลวดห่างผิว cy) ไม่ใช้สูตรตายตัวของ I-22 มอก.
   o += `<polygon points="${ringPts.map(([x, y]) => P(x, y)).join(" ")}" fill="none" stroke="${INK}" stroke-width="0.8"/>`;
   const star = (x, y, r) => [0, 60, 120].map((a) => { const t = (a * Math.PI) / 180; return L(X(x) - Math.cos(t) * r, Y(y) - Math.sin(t) * r, X(x) + Math.cos(t) * r, Y(y) + Math.sin(t) * r, 1); }).join("");
   const circ = (x, y, r, fill) => `<circle cx="${f1(X(x))}" cy="${f1(Y(y))}" r="${f1(r * s)}" fill="${fill || "#fff"}" stroke="${INK}" stroke-width="0.9"/>`;
@@ -112,7 +114,7 @@ export function sectionA(plan, cx, cy, s, simple, ex = [], letter = "A", pcSame 
   // ปลอก: เส้นนอนชี้เข้าที่เส้นปลอกด้านข้างเอว
   const xCD = x1 + 36;
   const spr = plan.sec.spiral, wTxt = spr.wire.toFixed(1), stpf = (v) => String(Math.round(v * 10000) / 10000);
-  const xTip = G.sq ? hb - 30 : G.cy ? G.tw / 2 - (G.cy - 5) : G.tw / 2 - 22;
+  const xTip = G.sq ? hb - 30 : G.cy ? ringPts[4][0] : G.tw / 2 - 22; // ปลายลูกศรชี้ที่เส้นปลอกด้านเอว
   o += L(X(xTip) + 4, cy, xCD + 150, cy, 0.9) + tri(X(xTip), cy, 180, 5) + T(xCD, cy + 17, `CDØ${wTxt}mm.@${stpf(spr.midStep).padEnd(4, "0")}m.`, { size: 15, anchor: "start" }); // ปลายลูกศรชี้กลางเอว (กึ่งกลางความสูงเสา) เส้นอยู่ต่ำกว่าตัวหนังสือเล็กน้อย
   return o;
 }
