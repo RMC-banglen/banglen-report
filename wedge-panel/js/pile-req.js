@@ -1,7 +1,7 @@
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261110084908";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110084908";
-import { esc } from "./draw2d.js?v=20261110084908";
+import { autoSplit } from "./pile-calc.js?v=20261110085403";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110085403";
+import { esc } from "./draw2d.js?v=20261110085403";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -103,7 +103,7 @@ export function parseRequest(text, secs) {
     const body = all.slice(ix, k + 1 < idxs.length ? idxs[k + 1] : all.length).join("\n"), m = all[ix].match(pileRe);
     const kind = /^[Ii]|ไอ/.test(m[2]) ? "T" : "S", sizeCm = Math.round(n(m[3]) < 1 ? n(m[3]) * 100 : n(m[3])), L = n(m[4]);
     // มาตรฐาน: ข้อความมีคำว่า "โรงงาน" (หรือขนาด I-15 ที่มีแต่โรงงาน) = เสาโรงงาน ไม่เขียน = มอก. (ไม่แตะ มอก.)
-    const fac = /โรงงาน/.test(body) || (kind === "T" && !secs["T" + sizeCm] && !!secs["F" + sizeCm]);
+    const fac = /โรงงาน|ธรรมดา/.test(body) || (kind === "T" && !secs["T" + sizeCm] && !!secs["F" + sizeCm]); // "(ธรรมดา)" ในคำขอ = มาตรฐานโรงงาน ("(มอก)" = มอก.)
     const key = (fac ? (kind === "T" ? "F" : "Q") : kind) + sizeCm, errs = [], asks = [];
     const micro = /ไมโคร|micro/i.test(body), mn = micro ? body.match(/(\d+)\s*ท่อน/) : null; // ไมโครไพล์: "(12ท่อนต่อ)" = ท่อนสั้นเท่ากัน n ท่อน
     if (/หก\s*เหลี่ยม/.test(body)) errs.push("เสาหกเหลี่ยม ยังไม่รองรับ");
