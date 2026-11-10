@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110021521";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110021521";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110021521";
+import { pilePoly, esc } from "./draw2d.js?v=20261110021915";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110021915";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110021915";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -181,7 +181,7 @@ function dowelLbl(dowel, k, row, none = "ดูตามตาราง") {
   const sp = (row && dowel.rows && dowel.rows[row]) || dowel;
   return `${k}${sp.k || "DB"}${sp.d}mm.x${Math.round((sp.len ?? dowel.len) * 100)}cm.`;
 }
-function dowelLblAll(dowel) { return !dowel ? "ดูตามตาราง" : dowel.rows ? `${Math.floor(dowel.n / 2)}${dowel.rows.top.k}${dowel.rows.top.d}+${dowel.n - Math.floor(dowel.n / 2)}${dowel.rows.bot.k}${dowel.rows.bot.d}mm.x${Math.round(dowel.len * 100)}cm.` : dowelLbl(dowel, dowel.n); }
+function dowelLblAll(dowel) { if (!dowel) return "ดูตามตาราง"; if (!dowel.rows) return dowelLbl(dowel, dowel.n); const n1 = Math.floor(dowel.n / 2), n2 = dowel.n - n1, a = dowel.rows.top, b = dowel.rows.bot, l = (v) => Math.round((v.len ?? dowel.len) * 100); return `${n1}${a.k || "DB"}${a.d}x${l(a)}+${n2}${b.k || "DB"}${b.d}x${l(b)}cm.`; }
 export function dowelTxt(d) { return !d ? "-" : d.rows ? `${Math.floor(d.n / 2)}-${d.rows.top.k}${d.rows.top.d}+${d.n - Math.floor(d.n / 2)}-${d.rows.bot.k}${d.rows.bot.d} x${m2(d.rows.top.len ?? d.len)}/${m2(d.rows.bot.len ?? d.len)}m.` : `${d.n}-${d.k || "DB"}${d.d}mm.x${m2(d.len)}m.`; }
 function dowelPts(dowel) {
   if (PILE22.sq) { // เสาสี่เหลี่ยม: เหล็กเดือยวางตามมุม/กึ่งกลางด้าน/กลางแผ่น ตามจำนวน (4 มุม • 5 +กลาง • 6 +กลางบนล่าง • 7 +กลาง • 8 รอบ • 9 +กลาง)
@@ -196,14 +196,22 @@ function dowelPts(dowel) {
   }
   const top = dowel ? Math.floor(dowel.n / 2) : 2, bot = dowel ? dowel.n - top : 2, hb = PILE22.B / 2, /* เหล็กคี่: เส้นกลางอยู่แถวล่าง (แถวล่างมากกว่าแถวบน 1 เส้น) */ pitch = Math.min((70 * PILE22.B) / 220, (PILE22.B - 110) / Math.max(1, Math.max(top, bot) - 1)), W = (Math.max(top, bot) - 1) * pitch / 2, xs = (k) => Array.from({ length: k }, (_, i) => (k > 1 ? -W + (i * 2 * W) / (k - 1) : 0)), ry = hb - 45; // ทั้งสองแถวกางเท่ากัน: เหล็กมุมบน/ล่างตรงกัน (เช่น 5 เส้น = 3 บน, ล่าง 2 เส้นที่มุม)
   const sh = pitch * 0.3, tx = xs(top).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? -sh : x)), bx = xs(bot).map((x) => (top >= 3 && top % 2 === 1 && bot >= 3 && bot % 2 === 1 && Math.abs(x) < 1e-6 ? sh : x)); // เหล็กตรงกลางแถวบน/ล่างเยื้องสลับกัน ไม่ให้ไวร์จี้ปูนติด
-  return { top: tx.map((x) => [x, -ry]), bot: bx.map((x) => [x, ry]), nTop: top, nBot: bot };
+  const T0 = tx.map((x) => [x, -ry]), B0 = bx.map((x) => [x, ry]);
+  if (dowel && dowel.rows) { // โรงงาน I-22: RB9 กับ DB12 วางไขว้ (เฉียงตรงข้าม) ให้สมดุลเหมือนลวด PC: บน = [RB, DB] ล่าง = [DB, RB]
+    const A = dowel.rows.top, Bs = dowel.rows.bot, spec = (r, i) => ((r + i) % 2 === 0 ? A : Bs);
+    const tag = (pts, r) => pts.map((p, i) => [p[0], p[1], spec(r, i)]);
+    const tt = tag(T0, 0), bb = tag(B0, 1), l = (v) => Math.round((v.len ?? dowel.len) * 100);
+    const lbl = (row) => { const cnt = new Map(); row.forEach((p) => cnt.set(p[2], (cnt.get(p[2]) || 0) + 1)); const ks = [...cnt.keys()]; return ks.map((k) => cnt.get(k) + (k.k || "DB") + k.d + "x" + l(k)).join("+") + "cm."; };
+    return { top: tt, bot: bb, nTop: top, nBot: bot, mixed: true, lbls: { top: lbl(tt), bot: lbl(bb) } };
+  }
+  return { top: T0, bot: B0, nTop: top, nBot: bot };
 }
 export function weldingPlate(dowel, cx, cy, s, subtitle, compact = false) {
-  const P = dowelPts(dowel), lbl = (k, row) => dowelLbl(dowel, k, row);
+  const P = dowelPts(dowel), lbl = (k, row) => (P.mixed ? P.lbls[row] : dowelLbl(dowel, k, row));
   // collar หนา 3 × กว้าง 50 มม. เป็นแถบรอบขอบเพลท (วาดหนาเกินจริงให้เห็น) ตัดด้วย clipPath ให้อยู่ในขอบ
   const cid = "cl" + Math.round(cx * 7 + cy * 13), pg = secPts(PILE22, cx, cy, s);
   let o = `<defs><clipPath id="${cid}"><polygon points="${pg}"/></clipPath></defs><polygon points="${pg}" fill="#fff"/>${NO_COLLAR ? "" : `<polygon points="${pg}" fill="none" stroke="#555" stroke-width="11" clip-path="url(#${cid})"/>`}<polygon points="${pg}" fill="none" stroke="${INK}" stroke-width="1.4"/>`;
-  [...P.top, ...P.bot].forEach(([x, y]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1(5 * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
+  [...P.top, ...P.bot].forEach(([x, y, sp]) => { o += `<circle cx="${f1(cx + x * s)}" cy="${f1(cy + y * s)}" r="${f1((sp ? sp.d / 2 : 5) * s)}" fill="#fff" stroke="${INK}" stroke-width="1"/>`; });
   const xr = cx + HB() * s, tx = xr + 40;
   if (compact) {
     // สัญลักษณ์ + legend แทนป้ายชี้ (เหมือนหน้าตัด) ชื่อภาพอยู่ใต้รูป
@@ -241,9 +249,12 @@ export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
   if (!NO_COLLAR) o += L(x + pw, y + wall, x + pw + cd, y + wall, 0.9) + L(x + pw, y + h - wall, x + pw + cd, y + h - wall, 0.9);
   const yT = y + 45 * s, yB = y + (PILE22.B - 45) * s;
   // เหล็กข้ออ้อย DB: แท่งขนาดตามจริงเกินเล็กน้อย พื้นขาว ขอบดำ รอยข้อเฉียงเรียงเท่ากัน
-  const bt = Math.max(7, (dowel ? dowel.d : 12) * s * 0.9);
-  const deformed = (xa, xb, yc) => { let r = `<rect x="${f1(xa)}" y="${f1(yc - bt / 2)}" width="${f1(xb - xa)}" height="${f1(bt)}" fill="#fff" stroke="${INK}" stroke-width="1.2"/>`; for (let px = xa + 5; px < xb - 3; px += 7) r += L(px, yc - bt / 2, px + bt * 0.55, yc + bt / 2, 0.8); return r + L(xa, yc, xb, yc, 0.6); };
-  o += deformed(x + pw, x0 + len, yT) + deformed(x + pw, x0 + len, yB);
+  const bt0 = Math.max(7, (dowel ? dowel.d : 12) * s * 0.9), bt = bt0;
+  const deformed = (xa, xb, yc, bt = bt0) => { let r = `<rect x="${f1(xa)}" y="${f1(yc - bt / 2)}" width="${f1(xb - xa)}" height="${f1(bt)}" fill="#fff" stroke="${INK}" stroke-width="1.2"/>`; for (let px = xa + 5; px < xb - 3; px += 7) r += L(px, yc - bt / 2, px + bt * 0.55, yc + bt / 2, 0.8); return r + L(xa, yc, xb, yc, 0.6); };
+  if (P.mixed) { // แต่ละแถวมีทั้ง RB และ DB (ไขว้) วาดเส้นที่ยาวกว่าก่อน เส้นสั้นทับ
+    const specs = [dowel.rows.top, dowel.rows.bot].slice().sort((p, q) => (q.len ?? dowel.len) - (p.len ?? dowel.len));
+    specs.forEach((sp) => { const lenS = (sp.len ?? dowel.len) * 1000 * s, btS = Math.max(6, sp.d * s * 0.9); [yT, yB].forEach((yc) => { o += deformed(x + pw, x0 + lenS, yc, btS); }); });
+  } else o += deformed(x + pw, x0 + len, yT) + deformed(x + pw, x0 + len, yB);
   const row = (yL, txt, targets) => {
     const pts = targets.map(([px, py]) => [px + Math.abs(py - yL) / TAN60, px, py]);
     const xe = Math.max(...pts.map((p) => p[0])) + 6;
@@ -251,7 +262,7 @@ export function weldSide(dowel, x, y, s, compact = false, noLab = false) {
     pts.forEach(([sx, px, py]) => { r += L(sx, yL, px, py, 0.8) + tri(px, py, (Math.atan2(py - yL, px - sx) * 180) / Math.PI, 7); });
     return r;
   };
-  const lab = (k, row) => dowelLbl(dowel, k, row, "ดูตาราง"); // แบบเต็ม: เหล็กเดือยขึ้นกับความยาว ให้ดูตาราง
+  const lab = (k, row) => (P.mixed ? P.lbls[row] : dowelLbl(dowel, k, row, "ดูตาราง")); // แบบเต็ม: เหล็กเดือยขึ้นกับความยาว ให้ดูตาราง
   if (compact) { (noLab ? [] : [[yT, P.nTop, "top"], [yB, P.nBot, "bot"]]).forEach(([yy2, k, rw]) => { o += T(x0 + len / 2 + 10, yy2 - bt / 2 - 6, lab(k, rw), { size: 14 }); /* ป้ายอยู่เหนือเหล็กแต่ละแถว ไม่ล้นไปชนตาราง */ }); return o + capLine(x - 20, y + h + 28, "WELDING PLATE SID VIEW"); }
   o += row(yT - 26, lab(P.nTop, "top"), [[x0 + len * 0.3, yT]]);
   o += L(x + pw / 2, y + h / 2, x0 + 14, y + h / 2, 0.9) + tri(x + pw / 2, y + h / 2, 180, 7) + T(x0 + 20, y + h / 2 - 4, "PLATE " + PLATE_T + "mm.", { size: 14, anchor: "start" }) + L(x0 + 14, y + h / 2, x0 + 20 + tw("PLATE " + PLATE_T + "mm."), y + h / 2, 0.9);
@@ -491,7 +502,11 @@ export function table(plan, x, y, w) {
   rows.forEach((r, i) => {
     const yy = yb + i * rh + 23;
     o += T((cols[0] + cols[1]) / 2, yy, r.label, { size: fb }) + T((cols[1] + cols[2]) / 2, yy, r.w4 || "-", { size: fb }) + T((cols[2] + cols[3]) / 2, yy, r.w5 || "-", { size: fb });
-    o += T((cols[3] + cols[4]) / 2, yy, plan.joint && r.dowel ? dowelTxt(r.dowel) : "-", { size: fb });
+    const dm = (cols[3] + cols[4]) / 2, dd = plan.joint && r.dowel;
+    if (dd && dd.rows) { // เหล็กเดือยผสม RB+DB: แยกสองบรรทัด อ่านง่าย พอดีช่อง
+      const n1 = Math.floor(dd.n / 2), n2 = dd.n - n1, ln = (c, sp) => `${c}-${sp.k || "DB"}${sp.d} x${m2(sp.len ?? dd.len)}m.`;
+      o += T(dm, yy - 7, ln(n1, dd.rows.top), { size: fb - 1 }) + T(dm, yy + 9, ln(n2, dd.rows.bot), { size: fb - 1 });
+    } else o += T(dm, yy, dd ? dowelTxt(dd) : "-", { size: fb });
     if (i < nr - 1) o += L(x, yb + (i + 1) * rh, x + w, yb + (i + 1) * rh, 0.8);
   });
   return { svg: o, h: H };
