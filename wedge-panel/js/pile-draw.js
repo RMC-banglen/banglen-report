@@ -1,7 +1,7 @@
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261110015923";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261110015923";
-import { m2, wireLayout } from "./pile-calc.js?v=20261110015923";
+import { pilePoly, esc } from "./draw2d.js?v=20261110020028";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261110020028";
+import { m2, wireLayout } from "./pile-calc.js?v=20261110020028";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -382,7 +382,8 @@ export function elevation(plan, piece, y0, opts) {
   // หัวต่อเชื่อมเฉพาะด้านที่ต่อกับท่อนอื่น: ท่อนบนที่ปลายขวา ท่อนล่างที่ปลายซ้าย ท่อนกลาง (3 ท่อนขึ้นไป) ทั้งสองด้าน ท่อนเดี่ยวที่ปลายขวา
   // วาดเป็นแผ่นเหล็กทึบ + เหล็กเดือย (DB) 2 แนวยื่นเข้าไปในเสา
   const jointSides = [];
-  if (plan.joint) {
+  if (plan.joint && plan.micro) jointSides.push("L", "R"); // ไมโครไพล์: ท่อนตัวอย่างมีหัวต่อทั้งสองปลาย
+  else if (plan.joint) {
     const n = plan.pieces.length, i = opts.idx || 0;
     if (n > 1 && i > 0) jointSides.push("L");
     if (n === 1 || i < n - 1) jointSides.push("R");

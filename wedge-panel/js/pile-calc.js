@@ -1,5 +1,5 @@
 // คำนวณข้อมูลแบบเสาเข็ม (ไม่แตะ DOM): แบ่งท่อน เลือกลวด/เหล็กเดือยตามความยาว ปลอกเกลียว บ่า เหล็กเสริมพิเศษ
-import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261110015923";
+import { PILE_SECTIONS, SHOULDER_STD } from "./pile-data.js?v=20261110020028";
 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const m2 = (v) => r2(v).toFixed(2);
@@ -97,9 +97,8 @@ export function autoSplit(L, n = 2) {
 // input = { section, L, pieces (1|2), split ([a,b] ใส่เอง หรือว่าง), full (แบบเต็ม), joint (มีหัวต่อ), extras [{d,n,len}], shoulder (ระยะจากหัว ม. หรือว่าง), project {pj,ow,lo} }
 export const MICRO_LEN = 1.5; // ความยาวท่อนไมโครไพล์ (ม.)
 export const MAX_SEG = 30; // ไมโครไพล์: ท่อนต่อกันได้สูงสุด
-// ไมโครไพล์ (ท่อนสั้น ~1.5 ม.): ปลายถี่ ปลอก @ปลาย = ครึ่งหนึ่งของมาตรฐาน กลาง @1.25 เท่าของปลาย (ตามแบบโรงงาน I-22: @0.03 / @0.075)
 const r3 = (v) => Math.round(v * 1000) / 1000;
-export const microSpiral = (s, len) => ({ ...s, endLen: Math.min(s.endLen, r2(len * 0.18)), endStep: r3(s.endStep / 2), nearLen: 0, nearStep: r3(s.endStep * 1.25), midStep: r3(s.endStep * 1.25) });
+export const microSpiral = (s, len) => ({ ...s, endLen: Math.min(0.27, r2(len * 0.18)), endStep: 0.03, nearLen: 0, nearStep: 0.075, midStep: 0.075 }); // ตามแบบไมโครไพล์ของโรงงาน: ปลาย 0.27 @0.03 กลาง @0.075 (ทุกหน้าตัด)
 export function planPile(input) {
   const sec = PILE_SECTIONS[input.section];
   const warn = [];
@@ -170,7 +169,7 @@ export function planPile(input) {
   if (full) jt = "มีหัวต่อ";
   const xl = (e) => { if (e.len) return `x${m2(e.len)}m.`; if (full) return "xLm."; const ls = [...new Set(pieces.filter((p) => p.extras.includes(e)).map((p) => p.len))]; return `x${ls.map(m2).join("/")}m.`; };
   const xt = extras.map((e) => `${e.n}-DB${e.d}${xl(e)}`).join(" ");
-  if (micro) jt = `MICROPILE ${segN} ท่อน ท่อนละ ${pieces.map((p) => m2(p.len)).join("/")} ม.`;
+  if (micro) jt = `micropile ${segN} ท่อนต่อเชื่อม`;
   const title = `PC.PILE ${sz}x${lenTxt}m. (${jt})${xt ? " " + xt : ""}${shoulder ? ` มีบ่าที่ระยะ${m2(shoulder.at)}m.` : ""} ${sec.std}`;
   const r0 = pieces[0] && pieces[0].rule, layout = r0 ? wireLayout(r0.w4, r0.w5, sec.geo ? sec.geo.B : 220, !!(sec.geo && sec.geo.sq), sec.geo && sec.geo.wl, sec.geo && (sec.geo.two ? "two" : sec.geo.pat), sec.geo && sec.geo.p4, sec.fac && !sec.geo.sq ? sec.geo : undefined) : null;
   return { sec: micro && pieces[0] ? { ...sec, spiral: pieces[0].spiral } : sec, micro, segN, full, joint, pieces, extras, kinds, configs, layout, shoulder, rows, warn, title, L, project: input.project || {} };
