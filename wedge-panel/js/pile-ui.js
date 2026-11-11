@@ -1,14 +1,14 @@
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261110085403";
-import { pileSheet } from "./pile-draw.js?v=20261110085403";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261110085403";
-import { download } from "./pdf.js?v=20261110085403";
-import { esc } from "./draw2d.js?v=20261110085403";
-import { getSession, canEdit } from "./auth.js?v=20261110085403";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261110085403";
-import { db } from "./db.js?v=20261110085403";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261110085403";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261110085403";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261111011925";
+import { pileSheet } from "./pile-draw.js?v=20261111011925";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261111011925";
+import { download } from "./pdf.js?v=20261111011925";
+import { esc } from "./draw2d.js?v=20261111011925";
+import { getSession, canEdit } from "./auth.js?v=20261111011925";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261111011925";
+import { db } from "./db.js?v=20261111011925";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261111011925";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261111011925";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -362,14 +362,14 @@ async function pdfBook() {
   try {
     if (!window.html2canvas || !window.jspdf) throw new Error("โหลดตัวสร้าง PDF ไม่สำเร็จ ลองรีเฟรชหน้า");
     await document.fonts.ready;
-    const logo = await logoData(), doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "portrait" }), total = 1 + piles.length * 5;
+    const logo = await logoData(), doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "portrait" }), total = 1 + piles.reduce((t, p) => t + (PILE_SECTIONS[p.section].fac ? 4 : 5), 0);
     let n = 0; const step = () => { msg.textContent = "กำลังสร้างรูปเล่ม… " + (++n) + "/" + total; };
     step(); await addPage(doc, coverPage(piles, project, logo), true, true);
     for (const p of piles) {
       const inp = pileInputOf(p, project), plan = planPile(inp), lens = pieceLensOf(p), c = structCalc({ secKey: p.section, pieceLens: lens, Qa: p.Qa || 0, wires: p.wires });
       step(); await addPage(doc, dividerPage(p), false, true);
       step(); await addPage(doc, calcPage1(p, project, c, logo, { cap: !!($("pShowCap") && $("pShowCap").checked) }), false, true);
-      step(); await addPage(doc, calcPage2(p, project, c, logo), false, true);
+      if (!PILE_SECTIONS[p.section].fac) { step(); await addPage(doc, calcPage2(p, project, c, logo), false, true); } // มาตรฐานโรงงาน: ไม่แสดงเหล็กปลอก/หัวเชื่อม
       step(); await addPage(doc, pileSheet(plan, logo).replace('width="100%"', 'width="1188" height="840"'), false, false); // แบบเป็นหน้า A4 แนวนอน เปิดดูตรงๆ ไม่ต้องหมุนหน้า
       step(); if (p.W > 0 && p.H > 0 && p.Qa > 0) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), project, plan.pieces.map((q) => q.len)), false, true);
     }

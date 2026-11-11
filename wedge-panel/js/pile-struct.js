@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261110085403";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261110085403";
-import { esc } from "./draw2d.js?v=20261110085403";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261111011925";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261111011925";
+import { esc } from "./draw2d.js?v=20261111011925";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_RB = { 6: 0.283, 9: 0.636, 12: 1.131 }; // เหล็กเส้นกลม RB (SR24, fy 2400) ตร.ซม.
@@ -22,10 +22,12 @@ export function sectionProps(sec) {
   return { B, Ac, p, Ix, Zx: (Ix * 2) / B };
 }
 
-const wireSteel = (n4, n5) => {
+// มาตรฐานโรงงาน (Excel รายการคำนวณ I-0.22 รง.): Pu ลวดตามตาราง ไม่คูณ 1.05 และสัมประสิทธิ์ Pe = Pi − 0.1257·T (4 มม.) / 0.1964·T (5 มม.) • มอก.: 1.05 และ 0.125 / 0.196
+const wireSteel = (n4, n5, fac) => {
+  const f = fac ? 1 : 1.05;
   const rows = [
-    { name: "PC wire 4 mm.", Pu: 1.05 * 2274, k: 0.125, n: n4, tis420: false },
-    { name: "PC wire 5 mm.", Pu: 1.05 * 3538, k: 0.196, n: n5, tis420: false },
+    { name: "PC wire 4 mm.", Pu: f * 2274, k: fac ? 0.1257 : 0.125, n: n4, tis420: false },
+    { name: "PC wire 5 mm.", Pu: f * 3538, k: fac ? 0.1964 : 0.196, n: n5, tis420: false },
     { name: "PC.strand 9.5mm.", Pu: 10430, k: 0.548, n: 0, tis420: true },
     { name: "PCstrand12.7mm.", Pu: 18763, k: 0.987, n: 0, tis420: true },
   ];
@@ -37,13 +39,13 @@ const wireSteel = (n4, n5) => {
 export function structCalc({ secKey, pieceLens, Qa, wires, opts = {} }) {
   const sec = PILE_SECTIONS[secKey], pr = sectionProps(sec);
   // ความยาวตรวจแรงยก = ท่อนที่ยาวที่สุด ส่วนลวด/เหล็กเดือย = ตารางของท่อนที่ให้แรงอัดรวม (Pi) น้อยที่สุด (ตามใบคำนวณเดิม: I-18 10+11 ใช้ลวด 2/2, I-35 11+12 ใช้ลวด 2/8)
-  const Lmax = opts.Lmax || Math.max(...pieceLens), pi = (r) => r.w4 * 1.05 * 2274 * 0.75 + r.w5 * 1.05 * 3538 * 0.75;
+  const Lmax = opts.Lmax || Math.max(...pieceLens), puF = sec.fac ? 1 : 1.05, pi = (r) => r.w4 * puF * 2274 * 0.75 + r.w5 * puF * 3538 * 0.75;
   const cand = pieceLens.map((l) => ruleFor(sec, l, wires) || sec.rules[sec.rules.length - 1]);
   const rule = cand.reduce((m, r) => (pi(r) < pi(m) ? r : m), cand[0]);
   const w4 = opts.w4 ?? rule.w4, w5 = opts.w5 ?? rule.w5, dowel = rule.dowel;
   const w = (pr.Ac * 2400) / 100 / 100;
   const Mm = Lmax * Lmax * w * 0.0215, M = 1.3 * Mm, MZ = (M / pr.Zx) * 100;
-  const rows = wireSteel(w4, w5);
+  const rows = wireSteel(w4, w5, !!sec.fac);
   const totPi = rows.reduce((a, r) => a + r.n * r.Pi, 0), fci = totPi / pr.Ac;
   const ES = (fci * ES_MOD) / (15100 * Math.sqrt(FCI)), SH = 1200 - 11 * RH, Fcds = 0, CR = 12 * fci - 7 * Fcds;
   const RE95 = 1270 - 0.4 * ES - 0.2 * (SH + CR), RE420 = 1410 - 0.4 * ES - 0.2 * (SH + CR);
@@ -88,7 +90,7 @@ export function structCalc({ secKey, pieceLens, Qa, wires, opts = {} }) {
 
 // ---- ข้อความชื่อรายการ ----
 const m2 = (v) => (Math.round(v * 100) / 100).toFixed(2);
-const pcsTxt = (lens) => (lens.length > 6 && new Set(lens).size === 1 ? `( ไมโครไพล์ ${lens.length} ท่อน ท่อนละ ${m2(lens[0])}m. )` : lens.length > 1 ? `( ${lens.length} ท่อนต่อเชื่อม ${lens.map((v) => (Number.isInteger(v) ? v : m2(v)) + "m.").join("+")} )` : "( ท่อนเดี่ยว )");
+const pcsTxt = (lens) => (lens.length > 1 && new Set(lens).size === 1 && Math.abs(lens[0] - 1.5) < 1e-9 ? `( Micropile ${m2(lens[0])} m. ${lens.length} ท่อนต่อเชื่อม )` : lens.length > 1 ? `( ${lens.length} ท่อนต่อเชื่อม ${lens.map((v) => (Number.isInteger(v) ? v : m2(v)) + "m.").join("+")} )` : "( ท่อนเดี่ยว )");
 export function pileTitle(p, lens) {
   const sec = PILE_SECTIONS[p.section], k = (+p.section.slice(1) / 100).toFixed(2);
   return sec.geo.sq ? `S-${k} x ${k} x ${m2(p.L)}m. ${pcsTxt(lens)}` : `I-${k} x ${k} x ${m2(p.L)}m. ${pcsTxt(lens)}`;
@@ -247,7 +249,7 @@ ${row("Use Develop Length", "", f(j.useLd, 0), "cm.")}
 // หน้าคั่นก่อนรายการคำนวณของเสาแต่ละต้น
 export function dividerPage(p) {
   const lens = pieceLensOf(p), sec = PILE_SECTIONS[p.section], k = (+p.section.slice(1) / 100).toFixed(2);
-  return `${CSS}<div class="cqsp"><div style="position:absolute;left:0;right:0;top:210px;text-align:center;font-size:18px;font-weight:700;line-height:2">รายการคำนวณเสาเข็มคอนกรีตอัดแรง<br>ขนาด ${sec.geo.sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m.<br>${esc(pcsTxt(lens))}<br>${sec.fac ? "มาตรฐานโรงงาน" : "มาตรฐาน มอก.396-2549"}</div></div>`;
+  return `${CSS}<div class="cqsp"><div style="position:absolute;left:0;right:0;top:210px;text-align:center;font-size:18px;font-weight:700;line-height:2">รายการคำนวณเสาเข็มคอนกรีตอัดแรง${lens.length > 1 && lens.every((v) => Math.abs(v - 1.5) < 1e-9) ? " Micropile" : ""}<br>ขนาด ${sec.geo.sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m.<br>${esc(pcsTxt(lens))}<br>${sec.fac ? "มาตรฐานโรงงาน" : "มาตรฐาน มอก.396-2549"}</div></div>`;
 }
 
 // ปก: รายการเสาทุกต้น เรียงตามขนาดแล้วตามความยาว
