@@ -1,8 +1,8 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // ล็อกอินด้วย PIN จากตาราง worktrack_users ชุดเดียวกับเว็บรายงานการผลิต
 // session เก็บใน sessionStorage คีย์ wt_user (ใช้ร่วมกับเว็บเดิมได้เมื่ออยู่โดเมนเดียวกัน)
-import { SESSION_KEY, PERM_KEY } from "./config.js?v=20261111100208";
-import { listUsers, refreshUser } from "./db.js?v=20261111100208";
+import { SESSION_KEY, PERM_KEY } from "./config.js?v=20261111100406";
+import { listUsers, refreshUser } from "./db.js?v=20261111100406";
 
 export function getSession() {
   try { const u = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); return u && u.id ? u : null; } catch (e) { return null; }
@@ -30,7 +30,8 @@ export async function showLogin(root, onLogin) {
   root.innerHTML = '<div class="box"><img src="assets/logo.png" alt="RMC"><h2>ออกแบบและเขียนแบบ</h2><div id="lgBody">กำลังโหลดรายชื่อ…</div></div>';
   const body = root.querySelector("#lgBody");
   let users = [];
-  try { users = await listUsers(); } catch (e) { body.innerHTML = '<div class="err">เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้า</div>'; return; }
+  // แสดงเฉพาะคนที่มีสิทธิ์ใช้หน้านี้ (คนที่ไม่ได้ติ๊กสิทธิ์ "ออกแบบและเขียนแบบ" ไม่ขึ้นชื่อในหน้าล็อกอิน)
+  try { users = (await listUsers()).filter(canUse); } catch (e) { body.innerHTML = '<div class="err">เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้า</div>'; return; }
   const finish = (u) => { setSession(u); root.hidden = true; onLogin(u); };
   const pickUser = () => {
     body.innerHTML = '<div style="font-size:13px;color:var(--muted);margin-bottom:10px">เลือกชื่อผู้ใช้</div><div class="users"></div>';
