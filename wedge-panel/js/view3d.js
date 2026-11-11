@@ -1,8 +1,8 @@
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261111011925";
-import { f2, f3, fmt } from "./calc.js?v=20261111011925";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261111011925";
+import { SHOULDER } from "./standards.js?v=20261111012440";
+import { f2, f3, fmt } from "./calc.js?v=20261111012440";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261111012440";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;

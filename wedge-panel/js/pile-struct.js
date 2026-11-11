@@ -1,8 +1,8 @@
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261111011925";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261111011925";
-import { esc } from "./draw2d.js?v=20261111011925";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261111012440";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261111012440";
+import { esc } from "./draw2d.js?v=20261111012440";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_RB = { 6: 0.283, 9: 0.636, 12: 1.131 }; // เหล็กเส้นกลม RB (SR24, fy 2400) ตร.ซม.
@@ -153,7 +153,7 @@ const CSS = `<style>
 const logo = (src) => `<img src="${src}" alt="">`;
 const head = (project, title, logoSrc) => `<div class="cqhd"><div class="cqlg">${logo(logoSrc)}<div style="font-weight:700;font-size:11px;margin-top:3px">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:9.5px">299 หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div>
 <div class="cqti"><b>รายการคำนวณเสาเข็มคอนกรีตอัดแรง ขนาด ${esc(title.line1)}</b><br>${esc(title.line2)} ${title.std}
-<div class="cqpj"><span>โครงการ</span><span>:</span><span>${esc(project.pj || "")}</span><span>เจ้าของโครงการ</span><span>:</span><span>${esc(project.ow || "")}</span><span>สถานที่</span><span>:</span><span>${esc(project.lo || "")}</span></div></div></div>`;
+<div class="cqpj"><span>โครงการ</span><span>:</span><span>${esc(project.pj || "")}</span>${project.ow ? `<span>เจ้าของโครงการ</span><span>:</span><span>${esc(project.ow)}</span>` : ""}<span>สถานที่</span><span>:</span><span>${esc(project.lo || "")}</span></div></div></div>`;
 
 const row = (l, s, v, u, o = {}) => `<div class="cqr"><span>${l}</span><span>${s || ""}</span><span class="cqe">${o.eq === false ? "" : "="}</span><span class="cqv ${o.cls || ""}">${v}</span><span>${u || ""}</span></div>`;
 const rowSub = (t) => `<div class="cqsub">${t}</div>`;
@@ -263,6 +263,6 @@ export function coverPage(piles, project, logoSrc = "assets/logo.png") {
 <div style="font-weight:700;font-size:16px;margin-top:12px">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:13px">299 หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div>
 <div style="font-weight:700;margin-top:26px;font-size:16px">รายการคำนวณเสาเข็มคอนกรีตอัดแรง</div>${mixed ? "" : `<div style="margin-top:8px;font-weight:600">${stdLine}</div>`}
 <div style="margin-top:14px;font-weight:600">${list}</div>
-<div style="margin-top:80px;line-height:1.9"><div>โครงการ : &nbsp;${esc(project.pj || "")}</div><div>เจ้าของโครงการ : &nbsp;${esc(project.ow || "")}</div><div>สถานที่ : &nbsp;${esc(project.lo || "")}</div></div>
+<div style="margin-top:80px;line-height:1.9"><div>โครงการ : &nbsp;${esc(project.pj || "")}</div>${project.ow ? `<div>เจ้าของโครงการ : &nbsp;${esc(project.ow)}</div>` : ""}<div>สถานที่ : &nbsp;${esc(project.lo || "")}</div></div>
 <div style="margin:150px 80px 0 auto;width:280px;font-size:13px;line-height:1.7"><div style="height:60px;border-bottom:1.2px solid #000"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div></div>`;
 }
