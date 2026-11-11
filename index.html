@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-11d';
+var APP_VERSION='2026-11-11e';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4814,7 +4814,7 @@ window.__dataReady.then(data => {
   };
   // ===== ปูนซีเมนต์ SCG (ผลทดสอบ Mortar รายเดือน) เทียบกับกำลังอัดคอนกรีตของโรงงาน =====
   // ข้อมูล SCG เก็บในตาราง cement_scg (1 แถว = 1 เดือน) · คัดลอกตารางจากไฟล์ SCG มาวางเพื่อนำเข้าได้
-  function ScgMortarCompare({rows,canEdit}){
+  function ScgMortarCompare({rows,canEdit,onHide}){
     const db=DB;
     const MS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const [scg,setScg]=useState(null);
@@ -4898,6 +4898,7 @@ window.__dataReady.then(data => {
           <select value={fForm} onChange={e=>setFForm(e.target.value)} style={{...btn,padding:'6px 8px',fontWeight:500}}>
             <option value="">คอนกรีต: ทุกสูตร (ไม่รวม NP280)</option>{forms.map(f=><option key={f} value={f}>สูตร {f}</option>)}</select>
           {canEdit&&<button style={btnP} onClick={()=>{setOpen(o=>!o);setMsg('');}}>＋ เพิ่ม/นำเข้าข้อมูล SCG</button>}
+          {onHide&&<button style={btn} onClick={onHide}>🙈 ซ่อนหน้านี้</button>}
         </div>}>
         {open&&canEdit&&<div style={{marginBottom:14,padding:12,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10}}>
           <div style={{fontSize:13,color:'#0369a1',fontWeight:700,marginBottom:4}}>คัดลอกแถวจากตาราง SCG (ลากคลุมจาก Excel) มาวางได้เลย — เดือนเดิมจะถูกแทนที่</div>
@@ -4956,18 +4957,19 @@ window.__dataReady.then(data => {
     const [showTrend,setShowTrend]=useState(false);
     // หน้านี้ยาวขึ้นเรื่อย ๆ จนต้องเลื่อนหานาน จึงซอยเป็นแท็บย่อย
     // จำไว้ในเครื่องด้วย เปิดครั้งหน้าจะได้อยู่แท็บเดิม
+    const [scgOn,setScgOn]=useState(false);   // เปิดหน้า SCG อยู่หรือไม่ (ไม่จำข้ามการเปิดใหม่)
     const QSUBS=[
       {k:'strength',label:'กำลังอัด'},
       {k:'mix',     label:'ส่วนผสม'},
       {k:'mat',     label:'วัตถุดิบ'},
-      // หน้าเทียบปูน SCG: เห็นเฉพาะแอดมิน (คนอื่นไม่มีแท็บนี้ และไม่โหลดข้อมูล SCG เลย)
-      ...(showScg?[{k:'scg',label:'ปูน SCG เทียบสเต็ง'}]:[]),
+      // หน้าเทียบปูน SCG: ซ่อนไว้เสมอ แม้เป็นแอดมิน — เปิดเองด้วยการคลิกรัว 3 ครั้งที่แท็บ "วัตถุดิบ" (คนอื่นไม่มีแท็บนี้ และไม่โหลดข้อมูล SCG เลย)
+      ...(showScg&&scgOn?[{k:'scg',label:'ปูน SCG เทียบสเต็ง'}]:[]),
     ];
     const [sub,setSub]=useState(()=>{
       try{const v=localStorage.getItem('q_subtab');
         return QSUBS.some(x=>x.k===v)?v:'strength';}catch(e){return 'strength';}
     });
-    const pickSub=k=>{setSub(k);try{localStorage.setItem('q_subtab',k);}catch(e){}
+    const pickSub=k=>{setSub(k);if(k!=='scg'){setScgOn(false);try{localStorage.setItem('q_subtab',k);}catch(e){}}
       window.scrollTo({top:0,behavior:'smooth'});};
 
     // สีไม่ซ้ำเฉดกันเอง (เดิมมีส้ม 2 ตัวติดกัน แยกไม่ออก)
@@ -5253,7 +5255,7 @@ window.__dataReady.then(data => {
       <div className="seg" style={{marginBottom:20,flexWrap:'wrap'}}>
         {QSUBS.map(t=>(
           <button key={t.k} className={`seg__btn${sub===t.k?' is-active':''}`}
-            onClick={()=>pickSub(t.k)}>{t.label}</button>
+            onClick={e=>{if(t.k==='mat'&&e.detail===3&&showScg){setScgOn(true);setSub('scg');window.scrollTo({top:0,behavior:'smooth'});return;}pickSub(t.k);}}>{t.label}</button>
         ))}
       </div>
 
@@ -5503,7 +5505,7 @@ window.__dataReady.then(data => {
       <StoneGradationSection canEdit={canEdit}/>
       </>}
 
-      {sub==='scg'&&showScg&&<ScgMortarCompare rows={rows} canEdit={canEdit}/>}
+      {sub==='scg'&&showScg&&scgOn&&<ScgMortarCompare rows={rows} canEdit={canEdit} onHide={()=>pickSub('strength')}/>}
     </div>;
   }
 
