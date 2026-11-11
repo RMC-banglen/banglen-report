@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-11g';
+var APP_VERSION='2026-11-11h';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4812,143 +4812,7 @@ window.__dataReady.then(data => {
     if(em&&Math.abs(em-mp)/mp<=0.05&&Math.abs((Number(r.avg_ksc)||0)-em*10.197)/(em*10.197)<=0.03)return r;
     return {...r,avg_mpa:Math.round(mp*100)/100,avg_ksc:Math.round(mp*10.197),_fixed:true};
   };
-  // ===== ปูนซีเมนต์ SCG (ผลทดสอบ Mortar รายเดือน) เทียบกับกำลังอัดคอนกรีตของโรงงาน =====
-  // ข้อมูล SCG เก็บในตาราง cement_scg (1 แถว = 1 เดือน) · คัดลอกตารางจากไฟล์ SCG มาวางเพื่อนำเข้าได้
-  function ScgMortarCompare({rows,canEdit,onHide}){
-    const db=DB;
-    const MS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-    const [scg,setScg]=useState(null);
-    const [noTable,setNoTable]=useState(false);
-    const [fForm,setFForm]=useState('');       // '' = ทุกสูตรปกติ (ไม่รวม NP280 และชุดทดสอบรายชั่วโมง)
-    const [open,setOpen]=useState(false);
-    const [paste,setPaste]=useState('');
-    const [prev,setPrev]=useState(null);
-    const [msg,setMsg]=useState('');
-    const [busy,setBusy]=useState(false);
-    const load=()=>db.from('cement_scg').select('*').order('ym').then(({data,error})=>{if(error){setNoTable(true);setScg([]);return;}setNoTable(false);setScg(data||[]);}).catch(()=>{setNoTable(true);setScg([]);});
-    useEffect(()=>{load();},[]);
-    if(scg===null)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
-    const btn={padding:'7px 14px',borderRadius:8,border:'1px solid #d6d8e0',background:'#fff',cursor:'pointer',fontSize:13.5,fontWeight:600,color:'#475569'};
-    const btnP={...btn,background:'#2f5fd0',borderColor:'#2f5fd0',color:'#fff'};
-    if(noTable)return <ChartCard span="full" title="🧪 ปูน SCG เทียบสเต็งคอนกรีต">
-      <div style={{padding:'12px 14px',fontSize:14,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-cement-scg.sql</b> หนึ่งครั้ง (มีข้อมูลเดือน ม.ค.–ต.ค. 69 ใส่ไว้ให้แล้ว) จากนั้นรีเฟรชหน้านี้</div>
-    </ChartCard>;
-
-    // ---- กำลังอัดคอนกรีตของโรงงาน เฉลี่ยรายเดือน (ตามวันเก็บตัวอย่าง) แยกอายุ 1/3/7 วัน ----
-    const isHour=f=>/\(/.test(f);
-    // ตัดสูตรกำลังอัด 335 ขึ้นไป (เช่น NP335, NP345, NP355, PCE335) ออกจากหน้านี้ — เทียบเฉพาะสูตรต่ำกว่า 335
-    const fnum=f=>{const m=String(f).match(/(\d{3})/);return m?Number(m[1]):0;};
-    const tooHigh=f=>fnum(f)>=335;
-    const isNormal=f=>/^NP\d{3}$/i.test(String(f).trim());   // สูตรปกติ = NP ตามด้วยตัวเลข ไม่มีอะไรต่อท้าย (ไม่เอา NP315 CK, NP360 P, PCE…, 2D325 ฯลฯ)
-    const forms=[...new Set(rows.map(r=>r.formula_name).filter(f=>f&&isNormal(f)&&!isHour(f)&&!tooHigh(f)))].sort();
-    const okRow=r=>{const f=String(r.formula_name||'');if(!f||!isNormal(f)||isHour(f)||tooHigh(f))return false;return fForm?f===fForm:f.toUpperCase()!=='NP280';};
-    const cm={};
-    rows.forEach(r=>{if(!okRow(r))return;const a=Number(r.age_days);if(![1,3,7].includes(a))return;const k=Number(r.avg_ksc);if(!(k>0))return;
-      const ym=String(r.sample_date).slice(0,7);cm[ym]=cm[ym]||{};(cm[ym][a]=cm[ym][a]||[]).push(k);});
-    const cAvg=(ym,a)=>{const v=cm[ym]&&cm[ym][a];return v&&v.length?v.reduce((s,x)=>s+x,0)/v.length:null;};
-    const cN=(ym,a)=>{const v=cm[ym]&&cm[ym][a];return v?v.length:0;};
-    const list=scg.slice(-12);
-    const lbl=ym=>MS[Number(ym.slice(5,7))-1]+' '+String(Number(ym.slice(0,4))+543).slice(2);
-    const num=v=>v==null||v===''||!isFinite(Number(v))?null:Number(v);
-    const r0=v=>v==null?null:Math.round(v);
-    const mort=(r,a)=>num(r['s'+a]);
-    const conc=(r,a)=>r0(cAvg(r.ym,a));
-    const corr=(xs,ys)=>{const p=xs.map((x,i)=>[x,ys[i]]).filter(([x,y])=>x!=null&&y!=null);if(p.length<4)return null;
-      const n=p.length,mx=p.reduce((s,q)=>s+q[0],0)/n,my=p.reduce((s,q)=>s+q[1],0)/n;
-      let sxy=0,sxx=0,syy=0;p.forEach(([x,y])=>{sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2;syy+=(y-my)**2;});
-      return sxx&&syy?{r:sxy/Math.sqrt(sxx*syy),n}:null;};
-    const COL_M='#e07b00',COL_C='#1a56db';
-    const last=list[list.length-1],before=list[list.length-2];
-    const dPct=(a,b)=>a!=null&&b?((a-b)/b*100):null;
-    const dTxt=d=>d==null?'':(d>0?'▲ +':d<0?'▼ ':'')+d.toFixed(1)+'% จากเดือนก่อน';
-    const dCol=d=>d==null?'#64748b':d>0?'#15803d':d<0?'#b91c1c':'#64748b';
-    const m7=last?mort(last,7):null,c7=last?conc(last,7):null;
-    const m7p=before?mort(before,7):null,c7p=before?conc(before,7):null;
-    const cor7=corr(list.map(r=>mort(r,7)),list.map(r=>conc(r,7)));
-    const corWord=c=>c==null?'ข้อมูลยังน้อยเกินไป (ต้องมีอย่างน้อย 4 เดือนที่มีทั้งสองฝั่ง)':Math.abs(c.r)>=0.7?'สัมพันธ์กันชัดเจน':Math.abs(c.r)>=0.4?'สัมพันธ์กันปานกลาง':'สัมพันธ์กันน้อย';
-    const ratio=(r,a)=>{const m=mort(r,a),c=conc(r,a);return m&&c?c/m:null;};
-
-    // ---- นำเข้า: คัดลอกแถวจากตาราง SCG (เช่น "Oct-26  4360  139  180  295  370") มาวาง ----
-    const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-    const THM=[['มกราคม',1],['กุมภาพันธ์',2],['มีนาคม',3],['เมษายน',4],['พฤษภาคม',5],['มิถุนายน',6],['กรกฎาคม',7],['สิงหาคม',8],['กันยายน',9],['ตุลาคม',10],['พฤศจิกายน',11],['ธันวาคม',12],['มค',1],['กพ',2],['มีค',3],['เมย',4],['พค',5],['มิย',6],['กค',7],['สค',8],['กย',9],['ตค',10],['พย',11],['ธค',12]];
-    const monthOf=t=>{const s=String(t).replace(/\./g,'').toLowerCase();
-      if(/^[a-z]+$/.test(s))return MON[s.slice(0,3)]||0;
-      for(const [k,v] of THM)if(s===k||(s.length>=4&&k.length>=5&&k.startsWith(s)))return v;return 0;};
-    const parse=text=>{const out=[],bad=[];
-      String(text||'').split(/\r?\n/).forEach(line=>{const l=line.trim();if(!l)return;
-        const m=l.match(/^([A-Za-z]{3,9}|[฀-๿.]+)[\s\-\/.]*(\d{2,4})\s+(.+)$/);
-        const mo=m?monthOf(m[1]):0;if(!m||!mo){bad.push(l);return;}
-        let y=Number(m[2]);if(y<100)y=y>=60?y+1957:y+2000;else if(y>2400)y-=543;
-        const ns=(m[3].match(/\d+(?:[.,]\d+)?/g)||[]).map(x=>Number(x.replace(',','')));
-        if(ns.length<2){bad.push(l);return;}
-        out.push({ym:y+'-'+String(mo).padStart(2,'0'),blaine:ns[0]??null,setting_min:ns[1]??null,s1:ns[2]??null,s3:ns[3]??null,s7:ns[4]??null});});
-      return{out,bad};};
-    const doParse=()=>{const p=parse(paste);setPrev(p);setMsg(p.out.length?'':'อ่านไม่ได้ — ต้องขึ้นต้นด้วยเดือน-ปี เช่น Oct-26 หรือ ต.ค.-69 แล้วตามด้วยตัวเลข Blaine · Setting time · 1D · 3D · 7D');};
-    const doSave=async()=>{if(!prev||!prev.out.length)return;setBusy(true);
-      const {error}=await db.from('cement_scg').upsert(prev.out.map(r=>({...r,updated_at:new Date().toISOString()})),{onConflict:'ym'});
-      setBusy(false);if(error){setMsg('บันทึกไม่สำเร็จ: '+error.message);return;}
-      setPaste('');setPrev(null);setMsg('✅ บันทึกแล้ว '+prev.out.length+' เดือน');load();};
-    const editRow=r=>{setOpen(true);setPrev(null);setMsg('');
-      setPaste(MS[Number(r.ym.slice(5,7))-1]+'-'+String(Number(r.ym.slice(0,4))+543).slice(2)+'\t'+[r.blaine,r.setting_min,r.s1,r.s3,r.s7].map(v=>v==null?'':v).join('\t'));};
-    const delRow=async r=>{if(!window.confirm('ลบข้อมูล SCG เดือน '+lbl(r.ym)+' ?'))return;
-      const {error}=await db.from('cement_scg').delete().eq('ym',r.ym);if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}load();};
-
-    const th={padding:'8px 9px',textAlign:'center',fontWeight:700,fontSize:12.5,color:'#475569',background:'#f4f6fa',whiteSpace:'nowrap',borderBottom:'1px solid #e2e6ee'};
-    const td={padding:'7px 9px',fontSize:13.5,textAlign:'center',borderTop:'1px solid #eef0f4',whiteSpace:'nowrap'};
-    return <div className="grid">
-      <ChartCard span="full" title="🧪 ปูน SCG (Mortar) เทียบสเต็งคอนกรีตโรงงาน"
-        subtitle={list.length?('ข้อมูล SCG '+list.length+' เดือน ('+lbl(list[0].ym)+' – '+lbl(last.ym)+') · เทียบกับกำลังอัดคอนกรีตเฉลี่ยรายเดือนของโรงงาน (ตามวันเก็บตัวอย่าง)'):'ยังไม่มีข้อมูล SCG'}
-        right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          <select value={fForm} onChange={e=>setFForm(e.target.value)} style={{...btn,padding:'6px 8px',fontWeight:500}}>
-            <option value="">คอนกรีต: สูตร NP ปกติ (ไม่รวม NP280 และ 335 ขึ้นไป)</option>{forms.map(f=><option key={f} value={f}>สูตร {f}</option>)}</select>
-          {canEdit&&<button style={btnP} onClick={()=>{setOpen(o=>!o);setMsg('');}}>＋ เพิ่ม/นำเข้าข้อมูล SCG</button>}
-          {onHide&&<button style={btn} onClick={onHide}>🙈 ซ่อนหน้านี้</button>}
-        </div>}>
-        {open&&canEdit&&<div style={{marginBottom:14,padding:12,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10}}>
-          <div style={{fontSize:13,color:'#0369a1',fontWeight:700,marginBottom:4}}>คัดลอกแถวจากตาราง SCG (ลากคลุมจาก Excel) มาวางได้เลย — เดือนเดิมจะถูกแทนที่</div>
-          <div style={{fontSize:12.5,color:'#475569',marginBottom:6}}>วางทั้งแถวได้เลย (เดือน-ปี · Blaine · Setting time · 1D · 3D · 7D) ระบบใช้เฉพาะผล 7 วันมาเทียบ เช่น <code>Oct-26 4360 139 180 295 370</code> (ใส่ ต.ค.-69 ก็ได้)</div>
-          <textarea value={paste} onChange={e=>{setPaste(e.target.value);setPrev(null);}} rows={5} placeholder={'Oct-26\t4360\t139\t180\t295\t370'} style={{width:'100%',boxSizing:'border-box',padding:'7px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'monospace'}}/>
-          <div style={{display:'flex',gap:10,alignItems:'center',marginTop:6,flexWrap:'wrap'}}>
-            <button style={btn} onClick={doParse}>🔍 ตรวจข้อมูล</button>
-            {prev&&prev.out.length>0&&<button style={btnP} disabled={busy} onClick={doSave}>{busy?'กำลังบันทึก…':'💾 บันทึก '+prev.out.length+' เดือน'}</button>}
-            <span style={{fontSize:13,color:msg.startsWith('✅')?'#15803d':'#b45309'}}>{msg}</span></div>
-          {prev&&prev.out.length>0&&<div style={{marginTop:8,fontSize:12.5,color:'#334155'}}>จะบันทึก: {prev.out.map(r=>lbl(r.ym)+' ('+[r.blaine,r.setting_min,r.s1,r.s3,r.s7].filter(v=>v!=null).join(' · ')+')').join(' | ')}</div>}
-          {prev&&prev.bad.length>0&&<div style={{marginTop:6,fontSize:12.5,color:'#b45309'}}>ข้าม {prev.bad.length} บรรทัดที่อ่านไม่ได้: {prev.bad.slice(0,3).join(' | ')}</div>}
-        </div>}
-        {!list.length?<div style={{padding:24,textAlign:'center',color:'#94a3b8'}}>ยังไม่มีข้อมูล SCG — กด "＋ เพิ่ม/นำเข้าข้อมูล SCG"</div>:<>
-          <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',marginBottom:14}}>
-            <div className="kpi"><div className="kpi__label">ปูน SCG 7 วัน · {lbl(last.ym)}</div><div className="kpi__value" style={{color:COL_M}}>{m7==null?'–':m7} <span style={{fontSize:14}}>ksc</span></div><div style={{fontSize:12.5,color:dCol(dPct(m7,m7p))}}>{dTxt(dPct(m7,m7p))}</div></div>
-            <div className="kpi"><div className="kpi__label">คอนกรีตโรงงาน 7 วัน · {lbl(last.ym)}</div><div className="kpi__value" style={{color:COL_C}}>{c7==null?'–':c7} <span style={{fontSize:14}}>ksc</span></div><div style={{fontSize:12.5,color:dCol(dPct(c7,c7p))}}>{c7==null?'ยังไม่มีผลทดสอบเดือนนี้':dTxt(dPct(c7,c7p))}</div></div>
-            <div className="kpi"><div className="kpi__label">คอนกรีต ÷ ปูน (7 วัน)</div><div className="kpi__value">{m7&&c7?(c7/m7).toFixed(2)+'×':'–'}</div><div style={{fontSize:12.5,color:'#64748b'}}>ยิ่งนิ่งแปลว่าสเต็งคอนกรีตตามปูน</div></div>
-            <div className="kpi"><div className="kpi__label">ความสัมพันธ์ 7 วัน</div><div className="kpi__value">{cor7?cor7.r.toFixed(2):'–'}</div><div style={{fontSize:12.5,color:'#64748b'}}>{corWord(cor7)}{cor7?' ('+cor7.n+' เดือน)':''}</div></div>
-          </div>
-          <div style={{fontSize:12.5,color:'#64748b',lineHeight:1.7,marginBottom:6}}>วิธีอ่าน: เส้นส้ม = กำลังอัดมอร์ตาร์ 7 วันของปูน SCG · เส้นน้ำเงิน = กำลังอัดคอนกรีต 7 วันของโรงงาน (หน่วย ksc เดียวกัน) · ถ้าสองเส้นขึ้น-ลงไปทางเดียวกัน แปลว่าสเต็งคอนกรีตที่เปลี่ยนมีส่วนมาจากปูน · ค่าความสัมพันธ์ใกล้ 1 = ตามกันมาก ใกล้ 0 = ไม่เกี่ยวกัน (ข้อมูลมีไม่กี่เดือน ใช้ดูแนวโน้มประกอบเท่านั้น)</div>
-        </>}
-      </ChartCard>
-      {list.length>0&&<ChartCard span="full" title="กำลังอัดอายุ 7 วัน — ปูน SCG (Mortar) เทียบคอนกรีตโรงงาน"
-        subtitle={'หน่วย: ksc · ความสัมพันธ์ '+(cor7?cor7.r.toFixed(2):'–')+' · '+corWord(cor7)}
-        right={<Legend items={[{label:'ปูน SCG (Mortar)',color:COL_M},{label:'คอนกรีตโรงงาน',color:COL_C}]}/>}>
-        <LineChart categories={list.map(r=>lbl(r.ym))} unit="ksc" decimals={0} showValues height={300}
-          series={[{label:'ปูน SCG (Mortar)',color:COL_M,shape:'square',data:list.map(r=>mort(r,7))},{label:'คอนกรีตโรงงาน',color:COL_C,data:list.map(r=>conc(r,7))}]}/>
-      </ChartCard>}
-      {list.length>0&&<ChartCard span="full" title="ตารางเทียบรายเดือน (อายุ 7 วัน)" subtitle="คอนกรีต = ค่าเฉลี่ย ksc ของเดือนนั้น (เอาเมาส์ชี้ดูจำนวนชุดที่เอามาเฉลี่ย) · ผลต่าง = คอนกรีต − ปูน">
-        <div className="table-wrap" style={{margin:0,overflowX:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
-          <table style={{width:'100%',borderCollapse:'collapse',minWidth:520}}>
-            <thead><tr><th style={{...th,textAlign:'left'}}>เดือน</th><th style={{...th,color:COL_M}}>ปูน SCG 7 วัน (ksc)</th><th style={{...th,color:COL_C}}>คอนกรีตโรงงาน 7 วัน (ksc)</th><th style={th}>ผลต่าง</th><th style={th}>คอนกรีต ÷ ปูน</th>{canEdit&&<th style={th}></th>}</tr></thead>
-            <tbody>{[...list].reverse().map(r=>{const m=mort(r,7),c=conc(r,7);const d=m!=null&&c!=null?c-m:null;return <tr key={r.ym}>
-              <td style={{...td,fontWeight:700,textAlign:'left'}}>{lbl(r.ym)}</td>
-              <td style={{...td,color:COL_M,fontWeight:700}}>{m==null?'–':m}</td>
-              <td style={{...td,color:COL_C,fontWeight:700}} title={cN(r.ym,7)?'เฉลี่ยจาก '+cN(r.ym,7)+' ชุด':undefined}>{c==null?'–':c}</td>
-              <td style={td}>{d==null?'–':(d>0?'+':'')+d}</td>
-              <td style={td}>{ratio(r,7)?ratio(r,7).toFixed(2)+'×':'–'}</td>
-              {canEdit&&<td style={td}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={()=>editRow(r)}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={()=>delRow(r)}>ลบ</button></td>}
-            </tr>;})}</tbody>
-          </table>
-        </div>
-      </ChartCard>}
-    </div>;
-  }
-  function ConcreteView({year,canEdit,showScg}){
+  function ConcreteView({year,canEdit}){
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
     const [err,setErr]=useState(null);
@@ -4961,19 +4825,16 @@ window.__dataReady.then(data => {
     const [showTrend,setShowTrend]=useState(false);
     // หน้านี้ยาวขึ้นเรื่อย ๆ จนต้องเลื่อนหานาน จึงซอยเป็นแท็บย่อย
     // จำไว้ในเครื่องด้วย เปิดครั้งหน้าจะได้อยู่แท็บเดิม
-    const [scgOn,setScgOn]=useState(false);   // เปิดหน้า SCG อยู่หรือไม่ (ไม่จำข้ามการเปิดใหม่)
     const QSUBS=[
       {k:'strength',label:'กำลังอัด'},
       {k:'mix',     label:'ส่วนผสม'},
       {k:'mat',     label:'วัตถุดิบ'},
-      // หน้าเทียบปูน SCG: ซ่อนไว้เสมอ แม้เป็นแอดมิน — เปิดเองด้วยการคลิกรัว 3 ครั้งที่แท็บ "วัตถุดิบ" (คนอื่นไม่มีแท็บนี้ และไม่โหลดข้อมูล SCG เลย)
-      ...(showScg&&scgOn?[{k:'scg',label:'ปูน SCG เทียบสเต็ง'}]:[]),
     ];
     const [sub,setSub]=useState(()=>{
       try{const v=localStorage.getItem('q_subtab');
         return QSUBS.some(x=>x.k===v)?v:'strength';}catch(e){return 'strength';}
     });
-    const pickSub=k=>{setSub(k);if(k!=='scg'){setScgOn(false);try{localStorage.setItem('q_subtab',k);}catch(e){}}
+    const pickSub=k=>{setSub(k);try{localStorage.setItem('q_subtab',k);}catch(e){}
       window.scrollTo({top:0,behavior:'smooth'});};
 
     // สีไม่ซ้ำเฉดกันเอง (เดิมมีส้ม 2 ตัวติดกัน แยกไม่ออก)
@@ -5259,7 +5120,7 @@ window.__dataReady.then(data => {
       <div className="seg" style={{marginBottom:20,flexWrap:'wrap'}}>
         {QSUBS.map(t=>(
           <button key={t.k} className={`seg__btn${sub===t.k?' is-active':''}`}
-            onClick={e=>{if(t.k==='mat'&&e.detail===3&&showScg){setScgOn(true);setSub('scg');window.scrollTo({top:0,behavior:'smooth'});return;}pickSub(t.k);}}>{t.label}</button>
+            onClick={()=>pickSub(t.k)}>{t.label}</button>
         ))}
       </div>
 
@@ -5509,7 +5370,6 @@ window.__dataReady.then(data => {
       <StoneGradationSection canEdit={canEdit}/>
       </>}
 
-      {sub==='scg'&&showScg&&scgOn&&<ScgMortarCompare rows={rows} canEdit={canEdit} onHide={()=>pickSub('strength')}/>}
     </div>;
   }
 
@@ -14002,7 +13862,7 @@ window.__dataReady.then(data => {
         {tab==='overview'&&<OverviewTab year={year} canEdit={currentUser.role==='admin'||currentUser.role==='editor'}/>}
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='damage'&&<DamageDetailTab currentUser={currentUser}/>}
-        {tab==='concrete'&&<ConcreteView year={year} showScg={currentUser.role==='admin'} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
+        {tab==='concrete'&&<ConcreteView year={year} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
         {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
         {tab==='cementAdd'&&<CementAdditionTab currentUser={currentUser}/>}
