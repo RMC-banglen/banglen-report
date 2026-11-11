@@ -1,3 +1,4 @@
+/* © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต */
 :root{--bg:#EDEFEC;--surface:#FFFFFF;--surface-2:#F5F6F4;--ink:#1D2725;--muted:#5B6964;--faint:#8A9691;--line:#CDD3CF;--accent:#0F6E56;--accent-soft:#E1F2EB;--rebar:#C2522B;--rebar-2:#B07316;--pipe:#1E5FA0;--warn:#9A5B05;--warn-soft:#FBF0DC;--danger:#A32D2D;--danger-soft:#FBE8E8;--ok:#2F6B1A;--concrete:rgba(93,202,165,.20);color-scheme:light}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121816;--surface:#1A2220;--surface-2:#202A27;--ink:#E4EBE8;--muted:#9BAAA4;--faint:#6F7E78;--line:#33413D;--accent:#5DCAA5;--accent-soft:#163A30;--rebar:#E07A55;--rebar-2:#D6A045;--pipe:#6FA8E0;--warn:#E3B04B;--warn-soft:#3A2D12;--danger:#F09595;--danger-soft:#3D1E1E;--ok:#97C459;--concrete:rgba(93,202,165,.16);color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#121816;--surface:#1A2220;--surface-2:#202A27;--ink:#E4EBE8;--muted:#9BAAA4;--faint:#6F7E78;--line:#33413D;--accent:#5DCAA5;--accent-soft:#163A30;--rebar:#E07A55;--rebar-2:#D6A045;--pipe:#6FA8E0;--warn:#E3B04B;--warn-soft:#3A2D12;--danger:#F09595;--danger-soft:#3D1E1E;--ok:#97C459;--concrete:rgba(93,202,165,.16);color-scheme:dark}
@@ -193,3 +194,6 @@ nav.modes button[aria-selected="true"]{color:var(--accent);border-bottom-color:v
 /* ช่องตัวเลขไม่มีปุ่มลูกศรขึ้น-ลง (กดแล้วปัดเศษ) พิมพ์ตัวเลขเองเท่านั้น */
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+.credit{position:fixed;right:10px;bottom:4px;font-size:11px;color:var(--faint,#8a9691);opacity:.8;pointer-events:none;z-index:5;max-width:60vw;text-align:right}
+@media print{.credit{display:none}}

@@ -1,7 +1,8 @@
+// © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261111012440";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261111012440";
-import { m2, wireLayout } from "./pile-calc.js?v=20261111012440";
+import { pilePoly, esc } from "./draw2d.js?v=20261111013440";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261111013440";
+import { m2, wireLayout } from "./pile-calc.js?v=20261111013440";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
