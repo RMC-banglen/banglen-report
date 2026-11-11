@@ -1,9 +1,9 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261111095835";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261111095835";
-import { esc } from "./draw2d.js?v=20261111095835";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261111100208";
+import { ruleFor, autoSplit } from "./pile-calc.js?v=20261111100208";
+import { esc } from "./draw2d.js?v=20261111100208";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_RB = { 6: 0.283, 9: 0.636, 12: 1.131 }; // เหล็กเส้นกลม RB (SR24, fy 2400) ตร.ซม.
