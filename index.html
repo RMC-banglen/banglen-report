@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-09b';
+var APP_VERSION='2026-11-11a';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4786,6 +4786,14 @@ window.__dataReady.then(data => {
 
   // ชื่อสูตรคอนกรีต: "NP 325" กับ "NP325" คือสูตรเดียวกัน (พิมพ์เว้นวรรคต่างกัน) → รวมเป็นชื่อเดียว · ส่วนต่อท้ายที่เป็นสูตรแยกจริง เช่น "NP315 CK" "NP360 P" ยังแยกไว้
   const normFormula=s=>String(s==null?'':s).replace(/[\s\u00a0]+/g,' ').trim().replace(/^([A-Za-z]{1,3})\s+(?=\d)/,'$1');
+  // ตรวจ MPa/KSC เฉลี่ย ให้ตรงกับ kN เฉลี่ย (กำลังอัด = kN×1000 ÷ พื้นที่หน้าตัด · KSC = MPa×10.197) — ถ้าคลาดเกิน 5% (เช่น พิมพ์ผิดในชีท) คิดใหม่จาก kN · ก้อนที่แรงน้อยกว่า 300 kN (ทดสอบตอนต้น ปัดเศษหยาบ) ไม่แตะ
+  const cubeFixAvg=r=>{
+    const kn=Number(r.avg_kn);if(!(kn>=300))return r;
+    const m=String(r.cube_size||'').match(/(\d+)\s*[xX×]\s*(\d+)/);const side=m?Number(m[1])*10:150;
+    const mp=kn*1000/(side*side),em=Number(r.avg_mpa)||0;
+    if(em&&Math.abs(em-mp)/mp<=0.05&&Math.abs((Number(r.avg_ksc)||0)-em*10.197)/(em*10.197)<=0.03)return r;
+    return {...r,avg_mpa:Math.round(mp*100)/100,avg_ksc:Math.round(mp*10.197),_fixed:true};
+  };
   function ConcreteView({year,canEdit}){
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
@@ -4849,7 +4857,7 @@ window.__dataReady.then(data => {
         db.from('concrete_results').select('*').order('sample_date'),
         db.from('materials_daily').select('*').order('id')
       ]).then(([cr,mr])=>{
-        const data=(cr.data||[]).map(r=>r.formula_name==null?r:{...r,formula_name:normFormula(r.formula_name)});
+        const data=(cr.data||[]).map(r=>cubeFixAvg(r.formula_name==null?r:{...r,formula_name:normFormula(r.formula_name)}));
         const mats=mr.data||[];
         setRows(data);
         setMaterials(mats);
@@ -4887,7 +4895,8 @@ window.__dataReady.then(data => {
           avg_mpa:     Number(r['เฉลี่ย MPa']||0),
           avg_ksc:     Number(r['เฉลี่ย KSC']||0),
           _w:[r['น้ำหนักลูก1(กก.)'],r['น้ำหนักลูก2(กก.)'],r['น้ำหนักลูก3(กก.)']],
-        })).filter(r=>r.sample_date&&r.formula_name);
+        })).filter(r=>r.sample_date&&r.formula_name).map(cubeFixAvg);
+        const fixedN=rows.filter(r=>r._fixed).length;rows.forEach(r=>{delete r._fixed;});
         const db=DB;
         // ใส่น้ำหนักรายก้อนเฉพาะเมื่อฐานข้อมูลมีคอลัมน์แล้ว (ไม่งั้นทั้งชุดบันทึกไม่ผ่านหลังลบของเดิมไปแล้ว)
         db.from('concrete_results').select('weight1_kg').limit(1).then(({error:wErr})=>{
@@ -4895,7 +4904,7 @@ window.__dataReady.then(data => {
         db.from('concrete_results').delete().neq('id',0).then(()=>{
           db.from('concrete_results').insert(rows).then(({error})=>{
             if(error){setSyncMsg('❌ '+error.message);}
-            else{setSyncMsg('✅ Sync สำเร็จ '+rows.length+' แถว'); loadFromSupabase();}
+            else{setSyncMsg('✅ Sync สำเร็จ '+rows.length+' แถว'+(fixedN?' · แก้ MPa/KSC ที่ไม่ตรงกับ kN อัตโนมัติ '+fixedN+' แถว (ควรแก้ในชีทด้วย)':'')); loadFromSupabase();}
             setSyncing(false);
           });
         });
