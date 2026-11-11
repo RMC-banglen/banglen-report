@@ -1,8 +1,8 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261111095332";
-import { fmt, f2, f3 } from "./calc.js?v=20261111095332";
+import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261111095835";
+import { fmt, f2, f3 } from "./calc.js?v=20261111095835";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);

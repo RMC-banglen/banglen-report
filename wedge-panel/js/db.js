@@ -1,7 +1,7 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // Supabase: ใช้ตาราง worktrack_users ของเว็บเดิม (ล็อกอิน) และ wedge_panel_projects (โครงการ)
 // โครงการเก็บเป็นข้อมูลฟอร์ม JSON เท่านั้น ไม่เก็บผลคำนวณ ไม่เก็บ PDF
-import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=20261111095332";
+import { SUPABASE_URL, SUPABASE_KEY, TABLE_PROJECTS } from "./config.js?v=20261111095835";
 
 let client = null;
 export function db() {
