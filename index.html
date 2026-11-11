@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-11e';
+var APP_VERSION='2026-11-11f';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4836,8 +4836,11 @@ window.__dataReady.then(data => {
 
     // ---- กำลังอัดคอนกรีตของโรงงาน เฉลี่ยรายเดือน (ตามวันเก็บตัวอย่าง) แยกอายุ 1/3/7 วัน ----
     const isHour=f=>/\(/.test(f);
-    const forms=[...new Set(rows.map(r=>r.formula_name).filter(f=>f&&!isHour(f)))].sort();
-    const okRow=r=>{const f=String(r.formula_name||'');if(!f||isHour(f))return false;return fForm?f===fForm:f.toUpperCase()!=='NP280';};
+    // ตัดสูตรกำลังอัด 335 ขึ้นไป (เช่น NP335, NP345, NP355, PCE335) ออกจากหน้านี้ — เทียบเฉพาะสูตรต่ำกว่า 335
+    const fnum=f=>{const m=String(f).match(/(\d{3})/);return m?Number(m[1]):0;};
+    const tooHigh=f=>fnum(f)>=335;
+    const forms=[...new Set(rows.map(r=>r.formula_name).filter(f=>f&&!isHour(f)&&!tooHigh(f)))].sort();
+    const okRow=r=>{const f=String(r.formula_name||'');if(!f||isHour(f)||tooHigh(f))return false;return fForm?f===fForm:f.toUpperCase()!=='NP280';};
     const cm={};
     rows.forEach(r=>{if(!okRow(r))return;const a=Number(r.age_days);if(![1,3,7].includes(a))return;const k=Number(r.avg_ksc);if(!(k>0))return;
       const ym=String(r.sample_date).slice(0,7);cm[ym]=cm[ym]||{};(cm[ym][a]=cm[ym][a]||[]).push(k);});
@@ -4896,7 +4899,7 @@ window.__dataReady.then(data => {
         subtitle={list.length?('ข้อมูล SCG '+list.length+' เดือน ('+lbl(list[0].ym)+' – '+lbl(last.ym)+') · เทียบกับกำลังอัดคอนกรีตเฉลี่ยรายเดือนของโรงงาน (ตามวันเก็บตัวอย่าง)'):'ยังไม่มีข้อมูล SCG'}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           <select value={fForm} onChange={e=>setFForm(e.target.value)} style={{...btn,padding:'6px 8px',fontWeight:500}}>
-            <option value="">คอนกรีต: ทุกสูตร (ไม่รวม NP280)</option>{forms.map(f=><option key={f} value={f}>สูตร {f}</option>)}</select>
+            <option value="">คอนกรีต: ทุกสูตร (ไม่รวม NP280 และ 335 ขึ้นไป)</option>{forms.map(f=><option key={f} value={f}>สูตร {f}</option>)}</select>
           {canEdit&&<button style={btnP} onClick={()=>{setOpen(o=>!o);setMsg('');}}>＋ เพิ่ม/นำเข้าข้อมูล SCG</button>}
           {onHide&&<button style={btn} onClick={onHide}>🙈 ซ่อนหน้านี้</button>}
         </div>}>
