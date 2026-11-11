@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-11c';
+var APP_VERSION='2026-11-11d';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4943,7 +4943,7 @@ window.__dataReady.then(data => {
       </ChartCard>}
     </div>;
   }
-  function ConcreteView({year,canEdit}){
+  function ConcreteView({year,canEdit,showScg}){
     const [rows,setRows]=useState([]);
     const [loading,setLoading]=useState(true);
     const [err,setErr]=useState(null);
@@ -4960,7 +4960,8 @@ window.__dataReady.then(data => {
       {k:'strength',label:'กำลังอัด'},
       {k:'mix',     label:'ส่วนผสม'},
       {k:'mat',     label:'วัตถุดิบ'},
-      {k:'scg',     label:'ปูน SCG เทียบสเต็ง'},
+      // หน้าเทียบปูน SCG: เห็นเฉพาะแอดมิน (คนอื่นไม่มีแท็บนี้ และไม่โหลดข้อมูล SCG เลย)
+      ...(showScg?[{k:'scg',label:'ปูน SCG เทียบสเต็ง'}]:[]),
     ];
     const [sub,setSub]=useState(()=>{
       try{const v=localStorage.getItem('q_subtab');
@@ -5502,7 +5503,7 @@ window.__dataReady.then(data => {
       <StoneGradationSection canEdit={canEdit}/>
       </>}
 
-      {sub==='scg'&&<ScgMortarCompare rows={rows} canEdit={canEdit}/>}
+      {sub==='scg'&&showScg&&<ScgMortarCompare rows={rows} canEdit={canEdit}/>}
     </div>;
   }
 
@@ -13995,7 +13996,7 @@ window.__dataReady.then(data => {
         {tab==='overview'&&<OverviewTab year={year} canEdit={currentUser.role==='admin'||currentUser.role==='editor'}/>}
         {tab==='compare'&&<YearCompareTab/>}
         {tab==='damage'&&<DamageDetailTab currentUser={currentUser}/>}
-        {tab==='concrete'&&<ConcreteView year={year} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
+        {tab==='concrete'&&<ConcreteView year={year} showScg={currentUser.role==='admin'} canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).concrete)}/>}
         {tab==='worktrack'&&<WorkTrackTab currentUser={currentUser}/>}
         {tab==='calibration'&&<CalibrationTab currentUser={currentUser}/>}
         {tab==='cementAdd'&&<CementAdditionTab currentUser={currentUser}/>}
