@@ -109,7 +109,8 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(-
 /* ===== ธีมให้เข้ากับเว็บรายงานการผลิตเดิม (สีหลัก #2f5fd0, ฟอนต์ IBM Plex) — สีในแบบวาดยังเป็นของต้นแบบ ===== */
 :root{--primary:#2f5fd0;--primary-dark:#244c9b;--primary-wash:#eef3fc}
 body{font-family:"IBM Plex Sans Thai","IBM Plex Sans","Leelawadee UI",Tahoma,system-ui,sans-serif}
-:root:not([data-theme="dark"]){--bg:#f4f6f9;--ink:#1f2733;--muted:#6a7382;--line:#e8ebf1}
+:root[data-theme="light"]{--bg:#f4f6f9;--ink:#1f2733;--muted:#6a7382;--line:#e8ebf1}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f4f6f9;--ink:#1f2733;--muted:#6a7382;--line:#e8ebf1}} /* ใช้สีอ่อนเฉพาะโหมดสว่าง — เดิมกฎนี้ทับสีโหมดมืด ทำให้ตัวหนังสือเป็นสีเข้มบนพื้นมืดบนมือถือ */
 button.pri{background:var(--primary);border-color:var(--primary)}
 .mode input:checked+label,.chips button[aria-pressed="true"]{background:var(--primary);border-color:var(--primary)}
 nav.tabs button[aria-selected="true"]{border-bottom-color:var(--primary)}
