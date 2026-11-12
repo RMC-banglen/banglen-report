@@ -39,11 +39,13 @@ create table if not exists pile_fail_inspections (
   blow_per10      numeric,              -- ผลคำนวณ Blow: ครั้ง/10 ซม.
   photos          jsonb default '[]',   -- รูปตอนเสาแตก [url,...]
   cause_note      text,                 -- ข้อสังเกต / สาเหตุที่น่าจะเป็น
-  action_note     text                  -- มาตรการแก้ไข
+  action_note     text,                 -- มาตรการแก้ไข
+  problem_report_id bigint              -- ส่งเข้ารายงานปัญหาแล้ว (quality_reports.id)
 );
 
 -- ถ้าเคยรันเวอร์ชันก่อนหน้าไปแล้ว: เพิ่มคอลัมน์ที่ขาดให้ (รันซ้ำได้)
 alter table pile_fail_inspections add column if not exists prod_dates jsonb default '[]';
+alter table pile_fail_inspections add column if not exists problem_report_id bigint;   -- ส่งเข้ารายงานปัญหาแล้ว (quality_reports.id)
 alter table pile_fail_inspections add column if not exists pile_std text;
 alter table pile_fail_inspections add column if not exists hammer_drop_cm numeric;
 alter table pile_fail_inspections add column if not exists qa_ton numeric;

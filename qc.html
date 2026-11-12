@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12h';
+var APP_VERSION='2026-11-12i';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -441,6 +441,29 @@ async function makeFailPdf(rec,onStep){
   } finally { root.unmount(); host.remove(); }
 }
 
+// แปลงใบรายงานเป็นรูปภาพเดียว (JPEG) ทั้งใบ
+async function makeFailImage(rec,onStep){
+  onStep&&onStep('กำลังโหลดเครื่องมือ…');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  onStep&&onStep('กำลังเตรียมรูป…');
+  const logo=await loadAsDataUrl('logo.png');
+  const photos=(await Promise.all((rec.photos||[]).map(loadAsDataUrl))).filter(Boolean);
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-10000px;top:0;background:#fff';
+  document.body.appendChild(host);
+  const root=ReactDOM.createRoot(host);
+  root.render(<FailReport rec={rec} logo={logo} photos={photos}/>);
+  try{
+    await new Promise(r=>setTimeout(r,400));
+    try{ await document.fonts.ready; }catch(e){}
+    await Promise.all([...host.querySelectorAll('img')].map(im=>im.complete?1:new Promise(r=>{im.onload=r;im.onerror=r;})));
+    onStep&&onStep('กำลังสร้างรูปภาพ…');
+    const wrap=host.firstChild, scale=wrap.scrollHeight>4500?1.4:2;   // ใบยาวมาก (รูปเยอะ) ลดความละเอียดกันเกินขีดจำกัดของมือถือ
+    const cv=await window.html2canvas(wrap,{scale,backgroundColor:'#ffffff',useCORS:true,logging:false});
+    return await new Promise(res=>cv.toBlob(res,'image/jpeg',0.9));
+  } finally { root.unmount(); host.remove(); }
+}
+
 // ---------- หน้าหลักของเมนูตรวจเสาเฟล ----------
 function FailInspectView({me,onBack,openId}){
   const [view,setView]=useState('list');          // list | form | view
@@ -501,7 +524,46 @@ function FailDetail({rec,onBack,onEdit,onAddNext}){
     }catch(e){setErr('สร้าง PDF ไม่สำเร็จ: '+(e.message||e));}
     setBusy('');
   };
+  const baseName='ตรวจเสาเฟล-'+(rec.pile_size||'')+'-'+String(rec.drive_date||rec.inspect_date||'').slice(0,10)+(rec.id?'-'+rec.id:'');
+  const [busy2,setBusy2]=useState('');
+  const [imgOut,setImgOut]=useState(null);              // {blob,url,file,name}
+  const [sent,setSent]=useState(rec.problem_report_id||null);
+  const getImg=async()=>{ if(imgOut) return imgOut.blob; const blob=await makeFailImage(rec,setBusy2);
+    setImgOut({blob,url:URL.createObjectURL(blob),file:new File([blob],baseName+'.jpg',{type:'image/jpeg'}),name:baseName+'.jpg'}); return blob; };
+  const genImg=async()=>{ setBusy2('เริ่ม…');setErr(''); try{ await getImg(); }catch(e){ setErr('สร้างรูปภาพไม่สำเร็จ: '+(e.message||e)); } setBusy2(''); };
+  // ส่งเข้า "รายงานปัญหา" ของแดชบอร์ด (ประเภท ปัญหาหน้างาน) พร้อมแนบรูปรายงาน
+  const sendProblem=async()=>{
+    if(sent&&!window.confirm('ใบนี้ส่งเข้ารายงานปัญหาไปแล้ว (#'+sent+') ส่งซ้ำอีกหรือไม่ ?')) return;
+    if(!window.confirm('ส่งใบตรวจนี้เข้า "รายงานปัญหา" (ประเภท ปัญหาหน้างาน) พร้อมแนบรูปรายงาน ?')) return;
+    setBusy2('กำลังส่ง…');setErr('');
+    try{
+      const blob=await getImg();
+      const an=analyze(rec), pcs=piecesOf(rec);
+      const title='เสาเฟลหน้างาน '+(rec.pile_size||'')+(rec.pile_length_m!=null?'×'+fmtN(rec.pile_length_m,2):'')+' — '+([rec.customer,rec.site].filter(Boolean).join(' · ')||'ไม่ระบุหน้างาน');
+      const lines=['ตอกเฟลวันที่ '+thaiDate(rec.drive_date)+' · อายุเสา '+(rec.age_days!=null?rec.age_days+' วัน':'–'),
+        ...pcs.map(p=>p.label+(p.len!==''?' '+fmtN(p.len,2)+' ม.':'')+': ผลิต '+thaiDate(p.date)+(p.face?' · หน้าเสา '+p.face:'')),
+        rec.blow_count!=null?'Blow '+rec.blow_count+' ครั้ง/'+(rec.blow_feet||30)+' ฟุต ('+SOIL_LV[soilIdx(Number(rec.blow_count))].t+')':null,
+        rec.hammer_weight_t!=null?'ตุ้ม '+rec.hammer_weight_t+' ตัน × '+(rec.hammer_drop_cm!=null?rec.hammer_drop_cm+' ซม.':'–')+(rec.hammer_ratio!=null?' (ตุ้ม÷เสา '+fmtN(rec.hammer_ratio,2)+')':''):null,
+        'วิเคราะห์เบื้องต้น: '+an.summary,'(จากใบตรวจเสาเฟล QC #'+rec.id+')'].filter(Boolean);
+      const base={report_date:String(rec.drive_date||rec.inspect_date||'').slice(0,10),title,type:'ปัญหาหน้างาน',description:lines.join('\n'),status:'open',fix_note:rec.action_note||''};
+      const full={...base,customer_name:rec.customer||null,root_cause:rec.cause_note||(an.risks[0]?an.risks[0].x:null),exclude_kpi:false,pile_spec:(rec.pile_size||'')+(rec.pile_std?(rec.pile_std==='fac'?' รง.':' มอก.'):''),pile_qty:1};
+      let ins=await DB.from('quality_reports').insert(full).select().single();
+      if(ins.error) ins=await DB.from('quality_reports').insert(base).select().single();   // คอลัมน์เสริมไม่มี → ส่งเฉพาะช่องหลัก
+      if(ins.error) throw ins.error;
+      const rid=ins.data.id, path='reports/'+rid+'/'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.jpg';
+      const up=await DB.storage.from('quality-images').upload(path,blob,{contentType:'image/jpeg',cacheControl:'31536000'});
+      if(up.error) throw up.error;
+      const url=DB.storage.from('quality-images').getPublicUrl(path).data.publicUrl;
+      const im=await DB.from('quality_report_images').insert({report_id:rid,image_url:url});
+      if(im.error) throw im.error;
+      const lk=await DB.from('pile_fail_inspections').update({problem_report_id:rid}).eq('id',rec.id);   // จำไว้ว่าส่งแล้ว (ต้องรัน SQL คอลัมน์ problem_report_id)
+      setSent(rid);
+      if(lk.error) setErr('ส่งเข้ารายงานปัญหาแล้ว (#'+rid+') แต่จดจำสถานะไม่ได้ — ให้แอดมินรัน SQL ล่าสุด (supabase-pile-fail-inspect.sql) ปุ่มนี้จึงกดส่งซ้ำได้');
+    }catch(e){ setErr('ส่งเข้ารายงานปัญหาไม่สำเร็จ: '+(e.message||e)); }
+    setBusy2('');
+  };
   const canShare=pdf&&navigator.canShare&&navigator.canShare({files:[pdf.file]});
+  const canShareImg=imgOut&&navigator.canShare&&navigator.canShare({files:[imgOut.file]});
   return <>
     <div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
       <div><div className="who">ใบตรวจเสาเฟล #{rec.id}</div><div className="sub">{[rec.customer,rec.site].filter(Boolean).join(' · ')}</div></div></div>
@@ -520,6 +582,17 @@ function FailDetail({rec,onBack,onEdit,onAddNext}){
           {canShare&&<button className="ghost" style={{flex:'1 1 140px'}} onClick={()=>navigator.share({files:[pdf.file],title:pdf.name}).catch(()=>{})}>📤 แชร์ (LINE/Telegram)</button>}
         </div>
       </div>}
+      <div className="card">
+        <div style={{fontWeight:800,color:'var(--brand)',marginBottom:8}}>ส่งออกเป็นรูปภาพ / รายงานปัญหา</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button className="ghost" style={{flex:'1 1 170px'}} disabled={!!busy2} onClick={genImg}>{busy2&&!/ส่ง/.test(busy2)?busy2:'🖼️ สร้างรูปภาพรายงาน'}</button>
+          <button className="ghost" style={{flex:'1 1 170px',borderColor:sent?'#a7e3d4':undefined,background:sent?'#ecfdf5':undefined}} disabled={!!busy2} onClick={sendProblem}>{/ส่ง/.test(busy2)?busy2:(sent?'✔ ส่งแล้ว (#'+sent+') · ส่งซ้ำ':'📌 ส่งเข้ารายงานปัญหา')}</button></div>
+        {imgOut&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+          <a href={imgOut.url} download={imgOut.name} className="ghost" style={{textDecoration:'none',textAlign:'center',flex:'1 1 120px'}}>⬇ ดาวน์โหลดรูป</a>
+          <a href={imgOut.url} target="_blank" rel="noopener" className="ghost" style={{textDecoration:'none',textAlign:'center',flex:'1 1 120px'}}>👁 เปิดดู</a>
+          {canShareImg&&<button className="ghost" style={{flex:'1 1 120px'}} onClick={()=>navigator.share({files:[imgOut.file],title:imgOut.name}).catch(()=>{})}>📤 แชร์</button>}</div>}
+        <div className="hint" style={{marginTop:6}}>"ส่งเข้ารายงานปัญหา" สร้างรายการประเภท ปัญหาหน้างาน ในแท็บ รายงานปัญหา ของแดชบอร์ด พร้อมแนบรูปรายงานนี้</div>
+      </div>
       <div className="card" style={{padding:0,overflowX:'auto'}}>
         <div style={{zoom:0.4}}><FailReport rec={rec} logo="logo.png" photos={rec.photos||[]}/></div>
       </div>
