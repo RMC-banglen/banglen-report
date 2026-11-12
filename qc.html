@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12a';
+var APP_VERSION='2026-11-12b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -180,7 +180,21 @@ function judgeNum(v,min,max){
 //        → ตุ้ม (น้ำหนัก/ระยะยก เทียบ 0.7–2.5 เท่าของเสา) → ดิ่งเสา → รูปตอนเสาแตก → สรุป → ส่งออก PDF
 const TARGET_NORMAL = {1:350,3:415,5:435,7:450};   // ksc ตามอายุ (ตรงกับแดชบอร์ด)
 const TARGET_NP280  = {1:340,7:420};
-const PILE_SIZES = ['I18','I22','I26','I30','I35','I40','S18','S22','S26','S30','S35'];
+// พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ตามแอปแบบเสาเข็ม — T = I มอก. · F = I โรงงาน · S = สี่เหลี่ยม มอก. · Q = สี่เหลี่ยมโรงงาน
+const PILE_AP = {T18:[275,89],T22:[386,105],T26:[489,126],T30:[660,145],T35:[880,180],T40:[1240,197.5],
+  F15:[140,74.9],F18:[216,89.3],F22:[344,107.5],F26:[460,129.9],F30:[585,148.9],F35:[805,176.0],
+  Q22:[484,88],Q26:[676,104],Q30:[900,120],
+  S18:[324,72],S22:[484,88],S26:[676,104],S30:[900,120],S35:[1225,140],S40:[1600,160]};
+const PILE_SIZES = ['I15','I18','I22','I26','I30','I35','I40','S18','S22','S26','S30','S35','S40'];
+const PILE_DENSITY = 2.4;                 // ตัน/ลบ.ม. คอนกรีตอัดแรง (ใช้หาน้ำหนักเสา = A × L × 2.4)
+const pileKey = (size,std) => { const m=String(size||'').toUpperCase().match(/^([IS])\s*-?\s*(\d{2})$/); if(!m) return null; return (m[1]==='I'?(std==='fac'?'F':'T'):(std==='fac'?'Q':'S'))+m[2]; };
+// สูตรคำนวณ Blow แบบ Danish (เหมือนใบ Blow count ในแอปแบบเสาเข็ม): W ตัน · H ซม. · Qa ตัน · L ม. · A ตร.ซม.
+const BLOW_E = 0.75, BLOW_FS = 2.5, BLOW_EC = 300;
+function blowCalc(A,L,W,H,Qa){
+  if(!(A>0)||!(L>0)||!(W>0)||!(H>0)||!(Qa>0)) return null;
+  const a=BLOW_E*W*H, b=(L*100)/(A*BLOW_EC), Qu=BLOW_FS*Qa, S=a/Qu-0.5*Math.sqrt(2*a*b);
+  return {a,b,Qu,S,per10:S>0?10/S:0,per30:S>0?30/S:0};
+}
 const HAMMER_MIN = 0.7, HAMMER_MAX = 2.5;
 const SOIL_LV = [
   {t:'ดินอ่อน',e:'🟢',col:'#15803d',bg:'#dcfce7'},
@@ -286,7 +300,7 @@ function FailReport({rec,logo,photos}){
     <div data-block="2" style={blk}>{H('1. ข้อมูลเสาและหน้างาน')}
       <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
         {kv('ลูกค้า / หน้างาน',[rec.customer,rec.site].filter(Boolean).join(' · '))}
-        {kv('ขนาดเสา × ความยาว',(rec.pile_size||'–')+' × '+(rec.pile_length_m!=null&&rec.pile_length_m!==''?fmtN(rec.pile_length_m,2)+' ม.':'–'))}
+        {kv('ขนาดเสา × ความยาว',(rec.pile_size||'–')+(rec.pile_std?(rec.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(rec.pile_length_m!=null&&rec.pile_length_m!==''?fmtN(rec.pile_length_m,2)+' ม.':'–'))}
         {kv('วันที่ผลิต (ใช้นับอายุเสา)',thaiDate(rec.prod_date))}
         {kv('วันที่ตอก',thaiDate(rec.drive_date))}
         {kv('วันที่หน้าเสา (อ้างอิง)',rec.face_date)}
@@ -314,13 +328,14 @@ function FailReport({rec,logo,photos}){
       </tbody></table>
       <div style={{fontSize:12,color:'#64748b',marginTop:3}}>เกณฑ์: ≤300 ดินอ่อน · 301–599 เฝ้าระวัง 1–3 · ≥600 ดินแข็ง</div>
     </div>
-    <div data-block="5" style={blk}>{H('4. การตอก — ตุ้มและระยะยก')}
+    <div data-block="5" style={blk}>{H('4. การตอก — ตุ้ม ระยะยก และรายการคำนวณ Blow')}
       <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
-        {kv('น้ำหนักตุ้ม',rec.hammer_weight_t!=null&&rec.hammer_weight_t!==''?fmtN(rec.hammer_weight_t,2)+' ตัน':'')}
-        {kv('ระยะยกตุ้ม',rec.hammer_drop_m!=null&&rec.hammer_drop_m!==''?fmtN(rec.hammer_drop_m,2)+' ม.':'')}
-        {kv('น้ำหนักเสาเข็ม (คำนวณ)',rec.pile_weight_t!=null?fmtN(rec.pile_weight_t,2)+' ตัน'+(rec.pile_kg_per_m?'  ('+fmtN(rec.pile_kg_per_m)+' กก./ม. × '+fmtN(rec.pile_length_m,2)+' ม.)':''):'')}
+        {kv('น้ำหนักตุ้ม (W)',rec.hammer_weight_t!=null&&rec.hammer_weight_t!==''?fmtN(rec.hammer_weight_t,2)+' ตัน':'')}
+        {kv('ระยะยกตุ้ม (H)',rec.hammer_drop_cm!=null&&rec.hammer_drop_cm!==''?fmtN(rec.hammer_drop_cm,0)+' ซม.':'')}
+        {kv('น้ำหนักเสาเข็ม (คำนวณ)',rec.pile_weight_t!=null?fmtN(rec.pile_weight_t,2)+' ตัน'+(rec.pile_area_cm2?'  (หน้าตัด '+fmtN(rec.pile_area_cm2)+' ซม.² × '+fmtN(rec.pile_length_m,2)+' ม. × '+PILE_DENSITY+' ตัน/ลบ.ม.)':''):'')}
         {kv('ตุ้ม ÷ เสา',rec.hammer_ratio!=null&&isFinite(rec.hammer_ratio)?<span style={{fontWeight:800,color:rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'#15803d':'#b91c1c'}}>{fmtN(rec.hammer_ratio,2)} เท่า {rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'✔ อยู่ในเกณฑ์':'✘ นอกเกณฑ์'} (เกณฑ์ {HAMMER_MIN}–{HAMMER_MAX} เท่า)</span>:'')}
-        {kv('พลังงานตุ้มต่อครั้ง',rec.hammer_weight_t>0&&rec.hammer_drop_m>0?fmtN(rec.hammer_weight_t*rec.hammer_drop_m,2)+' ตัน·ม.':'')}
+        {kv('Qa ตามแบบ',rec.qa_ton!=null&&rec.qa_ton!==''?fmtN(rec.qa_ton,1)+' ตัน':'')}
+        {kv('ผลคำนวณ Blow (Danish)',rec.blow_s_cm!=null?(rec.blow_s_cm>0?'S = '+fmtN(rec.blow_s_cm,3)+' ซม./ครั้ง · ≈ '+fmtN(rec.blow_per10,1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้ (พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ)'):'')}
         {kv('ดิ่งเสา',rec.vertical_result==='ok'?'✔ ผ่าน':rec.vertical_result==='bad'?'✘ ไม่ผ่าน':rec.vertical_result==='na'?'ไม่ได้วัด':'')}
         {kv('ค่าที่วัดได้ (ดิ่ง)',rec.vertical_note)}
       </tbody></table>
@@ -377,7 +392,7 @@ async function makeFailPdf(rec,onStep){
 }
 
 // ---------- หน้าหลักของเมนูตรวจเสาเฟล ----------
-function FailInspectView({me,onBack}){
+function FailInspectView({me,onBack,openId}){
   const [view,setView]=useState('list');          // list | form | view
   const [list,setList]=useState(null);
   const [noTable,setNoTable]=useState(false);
@@ -385,6 +400,7 @@ function FailInspectView({me,onBack}){
   const loadList=()=>DB.from('pile_fail_inspections').select('*').order('created_at',{ascending:false}).limit(60)
     .then(({data,error})=>{if(error){setNoTable(true);setList([]);return;}setNoTable(false);setList(data||[]);}).catch(()=>{setNoTable(true);setList([]);});
   useEffect(()=>{loadList();},[]);
+  useEffect(()=>{ if(!openId) return; DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setRec(data);setView('view');} }); },[openId]);
   if(view==='form') return <FailForm me={me} init={rec} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={r=>{setRec(r);loadList();setView('view');}}/>;
   if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>setView('form')}/>;
   const badge=(ok,txt)=>ok==null?null:<span className="pill" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b',marginRight:5,fontSize:12}}>{txt}</span>;
@@ -454,9 +470,9 @@ function FailDetail({rec,onBack,onEdit}){
 
 function FailForm({me,init,onCancel,onSaved}){
   const today=todayISO();
-  const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_length_m:'',prod_date:'',face_date:'',drive_date:today,foreman_report_id:null,
+  const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_std:'tis',pile_length_m:'',prod_date:'',face_date:'',drive_date:today,foreman_report_id:null,
     strength_formula:'',strength_rows:[],blow_id:null,blow_site:'',blow_count:'',blow_feet:30,
-    hammer_weight_t:'',hammer_drop_m:'',pile_weight_t:null,pile_kg_per_m:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:''};
+    hammer_weight_t:'',hammer_drop_cm:'',qa_ton:'',pile_weight_t:null,pile_area_cm2:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:''};
   const [f,setF]=useState(()=>init?{...blank,...Object.fromEntries(Object.entries(init).map(([k,v])=>[k,v==null?(blank[k]!==undefined?blank[k]:''):v]))}:blank);
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   const [files,setFiles]=useState([]);                    // รูปใหม่ {file,preview}
@@ -465,18 +481,14 @@ function FailForm({me,init,onCancel,onSaved}){
   const [err,setErr]=useState('');
   const [reports,setReports]=useState([]);               // รายงานโฟร์แมน
   const [blows,setBlows]=useState([]);                    // Blow count
-  const [weights,setWeights]=useState({});               // ขนาด → {kg_per_m,confirmed}
   const [cr,setCr]=useState(null);                        // ผลกำลังอัดดิบช่วง ±3 วัน
-  const [wEdit,setWEdit]=useState(false);
-  const [wVal,setWVal]=useState('');
 
   useEffect(()=>{
     const since=isoAdd(today,-120);
-    DB.from('foreman_reports').select('id,drive_date,size,length_m,customer,site,cast_dates,foreman').gte('drive_date',since).order('drive_date',{ascending:false}).limit(120)
+    DB.from('foreman_reports').select('id,drive_date,size,length_m,kind,customer,site,cast_dates,foreman').gte('drive_date',since).order('drive_date',{ascending:false}).limit(120)
       .then(({data})=>setReports(data||[])).catch(()=>{});
     DB.from('blow_counts').select('id,site,pile,blows,feet,count_date').order('count_date',{ascending:false}).limit(80)
       .then(({data})=>setBlows(data||[])).catch(()=>{});
-    DB.from('qc_pile_weights').select('*').then(({data,error})=>{if(error)return;const m={};(data||[]).forEach(r=>m[r.size]={kg:Number(r.kg_per_m),confirmed:r.confirmed});setWeights(m);}).catch(()=>{});
   },[]);
 
   // ผลกำลังอัดวันผลิต ±3 วัน
@@ -496,11 +508,13 @@ function FailForm({me,init,onCancel,onSaved}){
   useEffect(()=>{ if(cr) setF(o=>({...o,strength_rows:rowsFor})); },[cr,f.strength_formula]);   // eslint-disable-line
 
   const age=f.prod_date&&f.drive_date?isoDiff(f.drive_date,f.prod_date):null;
-  const kgm=weights[f.pile_size]?weights[f.pile_size].kg:null;
+  const pKey=pileKey(f.pile_size,f.pile_std);
+  const pArea=pKey&&PILE_AP[pKey]?PILE_AP[pKey][0]:null;     // ตร.ซม. จากแอปแบบเสาเข็ม
   const len=Number(f.pile_length_m)||0;
-  const pileW=kgm&&len?kgm*len/1000:null;
+  const pileW=pArea&&len?pArea*len*100*PILE_DENSITY/1e6:null;    // ตัน
   const hw=Number(f.hammer_weight_t)||0;
   const ratio=pileW&&hw?hw/pileW:null;
+  const bc=blowCalc(pArea,len,hw,Number(f.hammer_drop_cm),Number(f.qa_ton));
   const L=f.blow_count!==''&&f.blow_count!=null?SOIL_LV[soilIdx(Number(f.blow_count))]:null;
   const S=buildStrength(rowsFor,f.prod_date);
   const sum=strengthSummary(rowsFor,f.prod_date,f.strength_formula);
@@ -508,19 +522,13 @@ function FailForm({me,init,onCancel,onSaved}){
   const pickReport=id=>{
     const r=reports.find(x=>String(x.id)===String(id));
     if(!r){set('foreman_report_id',null);return;}
-    setF(o=>({...o,foreman_report_id:r.id,customer:r.customer||o.customer,site:r.site||o.site,pile_size:PILE_SIZES.includes(String(r.size||'').toUpperCase())?String(r.size).toUpperCase():(r.size||o.pile_size),
+    setF(o=>({...o,foreman_report_id:r.id,pile_std:/รง|โรงงาน/.test(String(r.kind||''))?'fac':/มอก/.test(String(r.kind||''))?'tis':o.pile_std,customer:r.customer||o.customer,site:r.site||o.site,pile_size:PILE_SIZES.includes(String(r.size||'').toUpperCase())?String(r.size).toUpperCase():(r.size||o.pile_size),
       pile_length_m:r.length_m!=null?String(r.length_m):o.pile_length_m,drive_date:String(r.drive_date||'').slice(0,10)||o.drive_date,face_date:r.cast_dates||o.face_date}));
   };
   const pickBlow=id=>{
     const b=blows.find(x=>String(x.id)===String(id));
     if(!b){setF(o=>({...o,blow_id:null}));return;}
     setF(o=>({...o,blow_id:b.id,blow_site:b.site||'',blow_count:b.blows!=null?String(b.blows):'',blow_feet:b.feet||30}));
-  };
-  const saveWeight=async()=>{
-    const v=Number(wVal);if(!(v>0)||!f.pile_size){return;}
-    const {error}=await DB.from('qc_pile_weights').upsert({size:f.pile_size,kg_per_m:v,confirmed:true,updated_at:new Date().toISOString()},{onConflict:'size'});
-    if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
-    setWeights(w=>({...w,[f.pile_size]:{kg:v,confirmed:true}}));setWEdit(false);
   };
   const addFiles=e=>{
     const arr=[...e.target.files].map(file=>({file,preview:URL.createObjectURL(file)}));
@@ -534,11 +542,11 @@ function FailForm({me,init,onCancel,onSaved}){
     try{
       const num=v=>v===''||v==null?null:Number(v);
       const row={inspector:me.name,inspect_date:f.inspect_date||today,foreman_report_id:f.foreman_report_id||null,customer:f.customer||null,site:f.site||null,
-        pile_size:f.pile_size,pile_length_m:num(f.pile_length_m),prod_date:f.prod_date,face_date:f.face_date||null,drive_date:f.drive_date||null,age_days:age,
+        pile_size:f.pile_size,pile_std:f.pile_std||null,pile_length_m:num(f.pile_length_m),prod_date:f.prod_date,face_date:f.face_date||null,drive_date:f.drive_date||null,age_days:age,
         strength_formula:f.strength_formula||'',strength_rows:rowsFor,
         blow_id:f.blow_id||null,blow_site:f.blow_site||null,blow_count:num(f.blow_count),blow_feet:num(f.blow_feet)||30,
         vertical_result:f.vertical_result||null,vertical_note:f.vertical_note||null,
-        hammer_weight_t:num(f.hammer_weight_t),hammer_drop_m:num(f.hammer_drop_m),pile_weight_t:pileW,pile_kg_per_m:kgm,hammer_ratio:ratio,
+        hammer_weight_t:num(f.hammer_weight_t),hammer_drop_cm:num(f.hammer_drop_cm),qa_ton:num(f.qa_ton),pile_weight_t:pileW,pile_area_cm2:pArea,hammer_ratio:ratio,blow_s_cm:bc?bc.S:null,blow_per10:bc?bc.per10:null,
         cause_note:f.cause_note||null,action_note:f.action_note||null,updated_at:new Date().toISOString()};
       let id=init&&init.id;
       if(id){const {error}=await DB.from('pile_fail_inspections').update(row).eq('id',id);if(error)throw error;}
@@ -579,6 +587,8 @@ function FailForm({me,init,onCancel,onSaved}){
           <div className="field" style={{flex:1}}><label>ขนาดเสา</label>
             <select value={f.pile_size} onChange={e=>set('pile_size',e.target.value)}><option value="">— เลือก —</option>
               {[...new Set([...PILE_SIZES,f.pile_size].filter(Boolean))].map(s=><option key={s}>{s}</option>)}</select></div>
+          <div className="field" style={{flex:1}}><label>มาตรฐาน</label>
+            <select value={f.pile_std||'tis'} onChange={e=>set('pile_std',e.target.value)}><option value="tis">มอก.</option><option value="fac">โรงงาน</option></select></div>
           <div className="field" style={{flex:1}}><label>ยาว (ม.)</label>
             <input type="number" inputMode="decimal" step="0.5" value={f.pile_length_m} onChange={e=>set('pile_length_m',e.target.value)}/></div>
         </div>
@@ -624,23 +634,23 @@ function FailForm({me,init,onCancel,onSaved}){
         {L?<div><span className="verdict" style={{background:L.bg,color:L.col}}>{L.e} {L.t}</span> <span className="hint">≤300 ดินอ่อน · 301–599 เฝ้าระวัง 1–3 · ≥600 ดินแข็ง</span></div>:<div className="hint">ใส่ค่า Blow แล้วระบบบอกระดับดินให้</div>}
       </div>
 
-      {secH('④ ตุ้มและการตอก')}
+      {secH('④ ตุ้มและการตอก · รายการคำนวณ Blow')}
       <div className="card" style={{marginTop:0}}>
         <div style={{display:'flex',gap:8}}>
           <div className="field" style={{flex:1}}><label>น้ำหนักตุ้ม (ตัน)</label><input type="number" inputMode="decimal" step="0.1" value={f.hammer_weight_t} onChange={e=>set('hammer_weight_t',e.target.value)}/></div>
-          <div className="field" style={{flex:1}}><label>ระยะยกตุ้ม (ม.)</label><input type="number" inputMode="decimal" step="0.1" value={f.hammer_drop_m} onChange={e=>set('hammer_drop_m',e.target.value)}/></div>
+          <div className="field" style={{flex:1}}><label>ระยะยกตุ้ม (ซม.)</label><input type="number" inputMode="decimal" step="1" value={f.hammer_drop_cm} onChange={e=>set('hammer_drop_cm',e.target.value)}/></div>
         </div>
         <div style={{padding:'10px 12px',borderRadius:10,background:'#f8fafc',border:'1px solid var(--line)',lineHeight:1.8,fontSize:14}}>
-          {!f.pile_size||!len?<span className="hint">เลือกขนาดและความยาวเสาก่อน ระบบจะคำนวณน้ำหนักเสาให้</span>:
-            kgm==null?<span style={{color:'#b45309'}}>ยังไม่มีน้ำหนักต่อเมตรของ {f.pile_size} — กด "แก้ค่า" เพื่อใส่ (กก./เมตร)</span>:
-            <>น้ำหนักเสา = {fmtN(kgm)} กก./ม. × {fmtN(len,2)} ม. = <b>{fmtN(pileW,2)} ตัน</b>
-              {weights[f.pile_size]&&!weights[f.pile_size].confirmed&&<span style={{color:'#b45309'}}> (ค่าประมาณจากตาราง ยังไม่ยืนยัน)</span>}</>}
-          {f.pile_size&&<> <button onClick={()=>{setWEdit(v=>!v);setWVal(kgm?String(kgm):'');}} style={{border:'none',background:'none',color:'#0369a1',textDecoration:'underline',fontSize:13,cursor:'pointer'}}>แก้ค่า</button></>}
-          {wEdit&&<div className="numrow" style={{marginTop:6}}><input type="number" value={wVal} onChange={e=>setWVal(e.target.value)} placeholder="กก./เมตร"/><span className="unit">กก./ม.</span>
-            <button className="ghost" style={{width:'auto',padding:'9px 14px'}} onClick={saveWeight}>บันทึก</button></div>}
+          {!pArea||!len?<span className="hint">เลือกขนาดเสา มาตรฐาน และความยาวก่อน ระบบจะคำนวณน้ำหนักเสาให้ (จากหน้าตัดในแอปแบบเสาเข็ม)</span>:
+            <>หน้าตัด {pKey} = {fmtN(pArea)} ซม.² × {fmtN(len,2)} ม. × {PILE_DENSITY} ตัน/ลบ.ม. → น้ำหนักเสา = <b>{fmtN(pileW,2)} ตัน</b></>}
         </div>
-        {ratio!=null&&<div style={{marginTop:10,lineHeight:1.9}}>ตุ้ม ÷ เสา = <b>{fmtN(ratio,2)} เท่า</b> {chip(ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX,ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX?'อยู่ในเกณฑ์ '+HAMMER_MIN+'–'+HAMMER_MAX:ratio<HAMMER_MIN?'เบาเกินไป (<'+HAMMER_MIN+')':'หนักเกินไป (>'+HAMMER_MAX+')')}
-          {Number(f.hammer_drop_m)>0&&<div className="hint">พลังงานต่อครั้ง ≈ {fmtN(hw*Number(f.hammer_drop_m),2)} ตัน·ม.</div>}</div>}
+        {ratio!=null&&<div style={{marginTop:10,lineHeight:1.9}}>ตุ้ม ÷ เสา = <b>{fmtN(ratio,2)} เท่า</b> {chip(ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX,ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX?'อยู่ในเกณฑ์ '+HAMMER_MIN+'–'+HAMMER_MAX:ratio<HAMMER_MIN?'เบาเกินไป (<'+HAMMER_MIN+')':'หนักเกินไป (>'+HAMMER_MAX+')')}</div>}
+        <div className="field" style={{marginTop:12}}><label>Qa ตามแบบ (ตัน) — ไว้คำนวณ Blow</label>
+          <input type="number" inputMode="decimal" step="0.5" value={f.qa_ton} onChange={e=>set('qa_ton',e.target.value)} placeholder="เช่น 35"/></div>
+        {bc&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0f9ff',border:'1px solid #bae6fd',lineHeight:1.8,fontSize:14}}>
+          <b>รายการคำนวณ Blow (Danish)</b><br/>
+          {bc.S>0?<>S = <b>{fmtN(bc.S,3)} ซม./ครั้ง</b> · ≈ <b>{fmtN(bc.per10,1)} ครั้ง/10 ซม.</b> · {fmtN(bc.per30,1)} ครั้ง/30 ซม.<br/>
+            <span className="hint">E·W·H = {fmtN(bc.a,1)} · Qu = {fmtN(bc.Qu,1)} ตัน</span></>:<span style={{color:'#c0392b'}}>คำนวณไม่ได้ — พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ</span>}</div>}
         <div className="field" style={{marginTop:12}}><label>เช็คดิ่งเสา</label>
           <div className="seg">
             <button className={f.vertical_result==='ok'?'on-pass':''} onClick={()=>set('vertical_result','ok')}>ผ่าน</button>
@@ -694,7 +704,8 @@ function App(){
   const [rafts,setRafts]=useState([]);   // แพผลิตจากระบบติดตามงาน
   const [elong,setElong]=useState([]);   // ค่ามาตรฐานระยะยืดของลวด ต่อแพ/ขนาดลวด
   const [err,setErr]=useState('');
-  const [formType,setFormType]=useState(null);
+  const failId=params.get('fail');
+  const [formType,setFormType]=useState(failId?'fail':null);
   const [material,setMaterial]=useState(null);   // ใช้เฉพาะฟอร์มตรวจวัตถุดิบ
   const [preset,setPreset]=useState(null); // {raft, day, spec} ที่กดมาจากใบงานผลิต
   const [preListDay,setPreListDay]=useState(null); // จำวันที่ที่ดูอยู่ก่อนเข้าฟอร์ม
@@ -717,7 +728,7 @@ function App(){
   const me=inspectors.find(x=>x.code===code);
   if(!me) return <PickUser inspectors={inspectors}/>;
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
-  if(formType==='fail') return <FailInspectView me={me} onBack={()=>setFormType(null)}/>;
+  if(formType==='fail') return <FailInspectView me={me} openId={failId} onBack={()=>{setFormType(null);if(failId)history.replaceState(null,'',location.pathname+'?u='+(code||''));}}/>;
   if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
                                   onInspect={(n,day,spec,isChecked)=>{setPreset({raft:String(n),day,spec,isChecked});setFormType('pre');}}/>;
   if((formType==='pre'||formType==='post')&&!preset) return <PreListView me={me} rafts={rafts} formType={formType} initialDay={preListDay||undefined}
