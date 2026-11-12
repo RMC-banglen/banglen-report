@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12r';
+var APP_VERSION='2026-11-12s';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -1038,7 +1038,7 @@ function FailForm({me,init,onCancel,onSaved}){
       {secH('⑤ ใบบันทึกการตอก (ข้อมูลจริงหน้างาน)')}
       <div className="card" style={{marginTop:0}}>
         <div className="hint" style={{marginBottom:6}}>คัดตัวเลขจากใบ "Driving record" — ยิ่งครบ ระบบยิ่งวิเคราะห์สาเหตุได้แม่น (ไม่บังคับ)</div>
-        <div className="field"><label>จำนวน Blow ต่อ 1 ฟุต (30 ซม.) เรียงจากฟุตที่ 1 — พิมพ์/วางตัวเลขเว้นวรรคได้</label>
+        <div className="field"><label>จำนวน Blow ต่อ 1 ฟุต (30 ซม.) — ตัวเลขทุกแถวในใบ (แถวที่ 1 ถึง 30 = ช่วงนับ 30 ฟุต ไม่ใช่ 10 ฟุต) เรียงจากแถวที่ 1 · พิมพ์/วางเว้นวรรคได้</label>
           <textarea className="note" rows={3} placeholder="เช่น 4 6 6 8 7 8 10 11 11 12 13 15 …" value={f.log.blows} onChange={e=>setF(o=>({...o,log:{...o.log,blows:e.target.value}}))} style={{marginTop:0}}/></div>
         {logObj.blows.length>0&&<div style={{marginBottom:10}}>
           <div style={{fontSize:14,fontWeight:700,color:'var(--brand)'}}>{logObj.blows.length} ฟุต · รวม {dsF.total} ครั้ง <span className="hint" style={{fontWeight:400}}>(ใช้เป็นค่า Blow 30 ฟุตให้อัตโนมัติ)</span></div>
