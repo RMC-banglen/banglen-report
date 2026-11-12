@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13c';
+var APP_VERSION='2026-11-13e';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13461,37 +13461,13 @@ window.__dataReady.then(data => {
     const keyOfL=l=>l.find(x=>x.a===7)||l.find(x=>x.a===3)||l[0]||null;
     const strKey=r=>{const pcs=pcsOf(r);const ks=pcs.map(p=>{if(p.str_age!=null&&p.age!=null)return {a:p.age,avg:Number(p.str_age),tg:p.tgt_age!=null?Number(p.tgt_age):null,ok:p.ok_age,pl:pcs.length>1?p.label:''};const k=keyOfL(strListAt(r,p.date));return k?{...k,pl:pcs.length>1?p.label:''}:null;}).filter(Boolean);return ks.find(x=>x.ok===false)||ks[0]||null;};   // หลายท่อน: เอาท่อนที่ต่ำกว่าเกณฑ์ก่อน
     const hr=r=>r.hammer_ratio!=null?Number(r.hammer_ratio):null;
+    const strKeys=r=>{const pcs=pcsOf(r),g=[];pcs.forEach(p=>{let k=null;if(p.str_age!=null&&p.age!=null)k={a:p.age,avg:Number(p.str_age),tg:p.tgt_age!=null?Number(p.tgt_age):null,ok:p.ok_age};else k=keyOfL(strListAt(r,p.date));if(!k)return;const sig=(p.date||'')+'|'+(p.formula||'')+'|'+k.a+'|'+Math.round(k.avg);const x=g.find(y=>y.sig===sig);if(x)x.labels.push(p.label);else g.push({...k,sig,labels:[p.label]});});return g.map(x=>({...x,pl:pcs.length>1?x.labels.join(' + '):''}));};
     const flags=r=>({str:(strKey(r)||{}).ok===false,hammer:hr(r)!=null&&(hr(r)<0.7||hr(r)>2.5),vert:r.vertical_result==='bad',hard:r.blow_count!=null&&Number(r.blow_count)>=600});
     const months=[...new Set(rows.map(r=>String(r.inspect_date).slice(0,7)))].sort().reverse();
     const qq=q.trim().toLowerCase();
     const base=rows.filter(r=>(!fMonth||String(r.inspect_date).slice(0,7)===fMonth)&&(!qq||[r.customer,r.site,r.pile_size,r.inspector,r.cause_note].some(x=>String(x||'').toLowerCase().includes(qq))));
     const list=base.filter(r=>!fFlag||flags(r)[fFlag]).slice().sort((a,b)=>String(b.drive_date||'').localeCompare(String(a.drive_date||''))||b.id-a.id);   // แยกเป็นวัน ๆ ตามวันที่ตอกเฟล
     const cnt=k=>base.filter(r=>flags(r)[k]).length;
-    // ---- วิเคราะห์ภาพรวมจากใบตรวจที่กรองอยู่ (นับปัจจัยที่พบในแต่ละใบ) ----
-    const factorDefs=[
-      ['กำลังอัดที่อายุตอนตอกต่ำกว่าเกณฑ์',r=>(strKey(r)||{}).ok===false,'#b91c1c'],
-      ['ย้อนวันที่หน้าเสาเกินที่สูตรรองรับ',r=>pcsOf(r).some(p=>p.policy_ok===false),'#b91c1c'],
-      ['ตอกก่อนครบ 8 วันนับจากวันที่หน้าเสา',r=>pcsOf(r).some(p=>p.face_age!=null&&Number(p.face_age)<8),'#c2410c'],
-      ['ตุ้มเบาเกินไป (<0.7 เท่า)',r=>hr(r)!=null&&hr(r)<0.7,'#b45309'],
-      ['ตุ้มหนักเกินไป (>2.5 เท่า)',r=>hr(r)!=null&&hr(r)>2.5,'#b45309'],
-      ['เสาไม่ดิ่ง',r=>r.vertical_result==='bad','#b91c1c'],
-      ['ดินแข็ง (Blow ≥600)',r=>r.blow_count!=null&&Number(r.blow_count)>=600,'#991b1b'],
-      ['ดินเฝ้าระวัง (Blow 301–599)',r=>r.blow_count!=null&&Number(r.blow_count)>300&&Number(r.blow_count)<600,'#a16207'],
-      ['พลังงานตุ้มไม่พอตาม Qa (คำนวณ Blow ไม่ได้)',r=>r.blow_s_cm!=null&&Number(r.blow_s_cm)<=0,'#b91c1c'],
-      ['ตอกยากขึ้นแบบกระชาก (ฟุตสุดท้าย ≥1.8 เท่าของ 3 ฟุตก่อนหน้า)',r=>{const b=((r.drive_log||{}).blows||[]).map(Number);if(b.length<5)return false;const p=b.slice(-4,-1),pm=p.reduce((t,x)=>t+x,0)/p.length;return pm>0&&b[b.length-1]/pm>=1.8;},'#991b1b'],
-      ['ตอกแน่นเกินที่ต้องการ (Qa จริง ≥1.5 เท่าของแบบ)',r=>{const l=r.drive_log||{};return l.qa_act!=null&&Number(r.qa_ton)>0&&Number(l.qa_act)/Number(r.qa_ton)>=1.5;},'#b45309'],
-      ['ตอกไม่ถึงระดับปลายเสาที่กำหนด',r=>{const l=r.drive_log||{};return l.shortfall!=null&&Number(l.shortfall)>0.05;},'#c2410c'],
-      ['set จริงยังไม่ถึง Qa ตามแบบ',r=>{const l=r.drive_log||{};return l.qa_act!=null&&r.qa_ton!=null&&Number(l.qa_act)<Number(r.qa_ton);},'#b91c1c'],
-    ];
-    const factors=factorDefs.map(([t,f,c])=>({t,c,n:base.filter(f).length})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
-    const noFactor=base.filter(r=>!factorDefs.some(([t,f])=>!/เฝ้าระวัง/.test(t)&&f(r))).length;   // ไม่มีปัจจัยผิดปกติเลย (ดินเฝ้าระวังไม่นับเป็นความผิดปกติ)
-    const bySize={};base.forEach(r=>{const k=(r.pile_size||'ไม่ระบุ')+(r.pile_std?(r.pile_std==='fac'?' รง.':' มอก.'):'');bySize[k]=(bySize[k]||0)+1;});
-    const sizeList=Object.entries(bySize).sort((a,b)=>b[1]-a[1]);
-    const ages=base.map(r=>r.age_days).filter(x=>x!=null).map(Number);
-    const avgAge=ages.length?ages.reduce((s,x)=>s+x,0)/ages.length:null;
-    const s7=base.map(r=>strKey(r)).filter(Boolean).map(x=>x.avg);
-    const avgS7=s7.length?s7.reduce((s,x)=>s+x,0)/s7.length:null;
-    const topF=factors[0];
     const del=async r=>{if(!window.confirm('ลบใบตรวจ #'+r.id+' ?\n'+(r.customer||r.site||'')+' · '+(r.pile_size||'')))return;const{error}=await db.from('pile_fail_inspections').delete().eq('id',r.id);if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}setView(null);load();};
     const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
     const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
@@ -13511,25 +13487,11 @@ window.__dataReady.then(data => {
           {kpi('vert','ดิ่งไม่ผ่าน','#b91c1c')}
           {kpi('hard','ดินแข็ง (Blow ≥600)','#991b1b')}
         </div>
-        {base.length>0&&<div style={{border:'1px solid #e2e8f0',borderRadius:12,padding:'12px 14px',marginBottom:14,background:'#fafcff'}}>
-          <div style={{fontWeight:800,color:'#1a2540',marginBottom:6}}>📊 วิเคราะห์ภาพรวม ({base.length} ใบ)</div>
-          <div style={{fontSize:13.5,lineHeight:1.8,marginBottom:8,color:'#334155'}}>
-            {topF?<>ปัจจัยที่พบบ่อยที่สุดคือ <b style={{color:topF.c}}>{topF.t}</b> ({topF.n} ใบ · {Math.round(topF.n/base.length*100)}%)</>:'ยังไม่พบปัจจัยผิดปกติจากใบตรวจเหล่านี้'}
-            {noFactor>0&&<> · <b>{noFactor} ใบ</b> ({Math.round(noFactor/base.length*100)}%) ไม่พบปัจจัยผิดปกติจากตัวเลขเลย → ต้องหาสาเหตุอื่น (รอยร้าวก่อนตอก การจี้/รองหัวเสา การยกขนส่ง)</>}
-            {avgAge!=null&&<> · อายุเฉลี่ยตอนตอก {avgAge.toFixed(0)} วัน</>}{avgS7!=null&&<> · กำลังอัด 7 วันเฉลี่ย {Math.round(avgS7)} ksc</>}</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:14}}>
-            <div>{factors.length?factors.map(f=><div key={f.t} style={{display:'flex',alignItems:'center',gap:8,marginBottom:5,fontSize:13}}>
-              <div style={{flex:'0 0 215px',color:'#475569'}}>{f.t}</div>
-              <div style={{flex:1,background:'#eef0f4',borderRadius:6,height:14,overflow:'hidden'}}><div style={{width:(f.n/base.length*100)+'%',height:'100%',background:f.c}}/></div>
-              <div style={{flex:'0 0 70px',fontWeight:700,color:f.c}}>{f.n} ใบ {Math.round(f.n/base.length*100)}%</div></div>):<div style={{fontSize:13,color:'#94a3b8'}}>ไม่มีปัจจัยที่ต้องแสดง</div>}</div>
-            <div style={{fontSize:13,color:'#475569'}}><div style={{fontWeight:700,marginBottom:4}}>เสาที่เฟลแยกตามขนาด</div>{sizeList.slice(0,8).map(([k,n])=><span key={k} style={{display:'inline-block',marginRight:8,marginBottom:4,padding:'2px 9px',borderRadius:999,background:'#eef2ff',color:'#3730a3',fontWeight:700}}>{k} · {n}</span>)}</div>
-          </div>
-        </div>}
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / ขนาดเสา / ผู้ตรวจ" style={{padding:'7px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'inherit',width:'100%',boxSizing:'border-box',marginBottom:10}}/>
         <div className="table-wrap" style={{margin:0,maxHeight:'70vh',overflow:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:1100}}>
             <thead><tr>{['วันที่ตรวจ','ลูกค้า / หน้างาน','ขนาด × ยาว','วันผลิต','วันตอก','อายุ (วัน)','กำลังอัดวันผลิต','Blow 30 ฟุต / ดิน','ตุ้ม ÷ เสา','ดิ่ง','รูป','ผู้ตรวจ',''].map((h,hi)=><th key={hi} style={th}>{h}</th>)}</tr></thead>
-            <tbody>{list.map((r,i)=>{const dd=String(r.drive_date||'').slice(0,10),headDay=i===0||dd!==String(list[i-1].drive_date||'').slice(0,10),st=strKey(r),h=hr(r),L=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null;
+            <tbody>{list.map((r,i)=>{const dd=String(r.drive_date||'').slice(0,10),headDay=i===0||dd!==String(list[i-1].drive_date||'').slice(0,10),st=strKey(r),sk=strKeys(r),h=hr(r),L=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null;
               return <React.Fragment key={r.id}>{headDay&&<tr><td colSpan={13} style={{padding:'7px 11px',background:'#eef4ff',fontWeight:800,color:'#1e3a8a',fontSize:13.5}}>ตอกเฟลวันที่ {fmtD(dd)} · {list.filter(x=>String(x.drive_date||'').slice(0,10)===dd).length} ต้น</td></tr>}<tr className="fm-row" title="คลิกเพื่อดูใบตรวจ" style={{background:i%2?'#fafbfd':'#fff',cursor:'pointer'}} onClick={()=>setView(r)}>
                 <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.inspect_date)}</td>
                 <td style={{...td,minWidth:210}}>{[r.customer,r.site].filter(Boolean).join(' · ')||'–'}</td>
@@ -13537,7 +13499,7 @@ window.__dataReady.then(data => {
                 <td style={{...td,whiteSpace:'nowrap'}}>{pcsOf(r).map(p=>fmtD(p.date)).join(' + ')||'–'}</td>
                 <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.drive_date)}</td>
                 <td style={{...td,textAlign:'right'}}>{r.age_days!=null?r.age_days:'–'}</td>
-                <td style={td}>{st?chip(st.ok!==false,(st.pl?st.pl+' · ':'')+st.a+' วัน '+Math.round(st.avg)+(st.tg?' / '+st.tg:'')):<span style={{color:'#cbd5e1'}}>–</span>}</td>
+                <td style={td}>{sk.length?sk.map((k,ki)=><div key={ki} style={{marginBottom:ki<sk.length-1?3:0}}>{chip(k.ok!==false,(k.pl?k.pl+' · ':'')+k.a+' วัน '+Math.round(k.avg)+(k.tg?' / '+k.tg:''))}</div>):<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={{...td,whiteSpace:'nowrap'}}>{L?<span style={{background:L.bg,color:L.col,fontWeight:700,padding:'2px 10px',borderRadius:999,fontSize:12.5}}>{L.e} {L.t} · {r.blow_count}</span>:<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={td}>{h!=null?chip(h>=0.7&&h<=2.5,h.toFixed(2)+'×'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={td}>{r.vertical_result&&r.vertical_result!=='na'?chip(r.vertical_result==='ok',r.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
