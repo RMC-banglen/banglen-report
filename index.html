@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13i';
+var APP_VERSION='2026-11-13j';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13481,7 +13481,7 @@ window.__dataReady.then(data => {
         subtitle={'ใบตรวจจากแอป QC · '+list.length+' ใบ'+(fFlag?' (กรองเฉพาะที่มีปัญหา)':'')+' · ตรวจกำลังอัดวันผลิต ±3 วัน · Blow 30 ฟุต · ตุ้ม · ดิ่ง · รูปถ่าย · ส่งออก PDF จากแอป QC'}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           <select value={fMonth} onChange={e=>setFMonth(e.target.value)} style={sel}><option value="">ทุกเดือน</option>{months.map(m=><option key={m} value={m}>{MF[Number(m.slice(5,7))-1]+' '+(Number(m.slice(0,4))+543)}</option>)}</select>
-          {canEdit&&<a href="qc.html?fail=new" target="_blank" rel="noopener" title="เปิดฟอร์มตรวจเสาเฟลในแอป QC (แท็บใหม่) บันทึกแล้วกลับมารีเฟรชหน้านี้" style={{...btnP,textDecoration:'none',display:'inline-block'}}>＋ เพิ่มใบตรวจ</a>}
+          {canEdit&&<a href={'qc.html?fail=new&_t='+rptKey} target="_blank" rel="noopener" title="เปิดฟอร์มตรวจเสาเฟลในแอป QC (แท็บใหม่) บันทึกแล้วกลับมารีเฟรชหน้านี้" style={{...btnP,textDecoration:'none',display:'inline-block'}}>＋ เพิ่มใบตรวจ</a>}
         </div>}>
         <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',marginBottom:14}}>
           <div className="kpi"><div className="kpi__label">ใบตรวจทั้งหมด</div><div className="kpi__value">{base.length}</div></div>
@@ -13508,7 +13508,7 @@ window.__dataReady.then(data => {
                 <td style={td}>{r.vertical_result&&r.vertical_result!=='na'?chip(r.vertical_result==='ok',r.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={{...td,textAlign:'center'}}>{(r.photos||[]).length?'📷 '+r.photos.length:<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={{...td,whiteSpace:'nowrap'}}>{r.inspector||'–'}</td>
-                <td style={{...td,whiteSpace:'nowrap'}}>{canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1'} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} title="แก้ไขใบตรวจ (เปิดฟอร์มแก้ไขในแอป QC แท็บใหม่ บันทึกแล้วกลับมารีเฟรชหน้านี้)" style={{...btn,padding:'2px 10px',fontSize:12.5,textDecoration:'none',display:'inline-block'}}>✎ แก้ไข</a>}</td>
+                <td style={{...td,whiteSpace:'nowrap'}}>{canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1&_t='+rptKey} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} title="แก้ไขใบตรวจ (เปิดฟอร์มแก้ไขในแอป QC แท็บใหม่ บันทึกแล้วกลับมารีเฟรชหน้านี้)" style={{...btn,padding:'2px 10px',fontSize:12.5,textDecoration:'none',display:'inline-block'}}>✎ แก้ไข</a>}</td>
               </tr></React.Fragment>;})}
               {!list.length&&<tr><td colSpan={13} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{rows.length?'ไม่มีใบตรวจตามตัวกรอง':'ยังไม่มีใบตรวจ — ให้ QC บันทึกจากแอป QC เมนู "ตรวจเสาเฟลหน้างาน"'}</td></tr>}</tbody>
           </table>
@@ -13523,9 +13523,9 @@ window.__dataReady.then(data => {
               <div><div style={{fontSize:17,fontWeight:800,color:'#1a2540'}}>ใบตรวจเสาเฟล #{r.id}</div>
                 <div style={{fontSize:12.5,color:'#64748b'}}>ตรวจ {fmtD(r.inspect_date)} โดย {r.inspector||'–'}</div></div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1'} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>✎ แก้ไขใบตรวจ</a>}
+                {canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1&_t='+rptKey} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>✎ แก้ไขใบตรวจ</a>}
                 <button style={btnP} onClick={()=>setRpt(v=>!v)}>{rpt?'ดูแบบตาราง':'📄 ดูแบบรายงาน (PDF)'}</button>
-                <a href={'qc.html?fail='+r.id} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>↗ เปิดในแอป QC</a>
+                <a href={'qc.html?fail='+r.id+'&_t='+rptKey} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>↗ เปิดในแอป QC</a>
                 {canEdit&&<button style={{...btn,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button>}
                 <button style={btn} onClick={()=>setView(null)}>ปิด</button></div></div>
             {rpt&&<iframe key={rptKey} title="รายงานตรวจเสาเฟล" src={'qc.html?fail='+r.id+'&embed=1&_t='+rptKey} style={{width:'100%',height:'78vh',border:'1px solid #e2e8f0',borderRadius:8}}/>}
