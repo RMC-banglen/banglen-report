@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12c';
+var APP_VERSION='2026-11-12d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -415,7 +415,7 @@ function FailInspectView({me,onBack,openId}){
   const loadList=()=>DB.from('pile_fail_inspections').select('*').order('created_at',{ascending:false}).limit(60)
     .then(({data,error})=>{if(error){setNoTable(true);setList([]);return;}setNoTable(false);setList(data||[]);}).catch(()=>{setNoTable(true);setList([]);});
   useEffect(()=>{loadList();},[]);
-  useEffect(()=>{ if(!openId) return; DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setRec(data);setView('view');} }); },[openId]);
+  useEffect(()=>{ if(!openId) return; if(openId==='new'){setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setRec(data);setView('view');} }); },[openId]);
   if(view==='form') return <FailForm me={me} init={rec} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={r=>{setRec(r);loadList();setView('view');}}/>;
   if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>setView('form')}/>;
   const badge=(ok,txt)=>ok==null?null:<span className="pill" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b',marginRight:5,fontSize:12}}>{txt}</span>;
@@ -831,7 +831,7 @@ function PickForm({me,onPick}){
         <div style={{fontSize:19,fontWeight:800,color:'var(--brand)'}}>บันทึกผลทดสอบทราย/หิน</div>
         <div className="hint" style={{marginTop:3}}>ทดสอบขนาดคละทราย FM และหิน ASTM C33</div>
       </a>
-      <a href="plant.html" className="card"
+      <a href="plant.html?from=qc" className="card"
         style={{width:'100%',textAlign:'left',border:'1px solid var(--line)',textDecoration:'none',display:'block'}}>
         <div style={{fontSize:30,marginBottom:6}}>⚡</div>
         <div style={{fontSize:19,fontWeight:800,color:'var(--brand)'}}>บันทึกแอมป์เครื่องโม่</div>

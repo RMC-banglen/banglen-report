@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12d';
+var APP_VERSION='2026-11-12e';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13477,6 +13477,7 @@ window.__dataReady.then(data => {
         subtitle={'ใบตรวจจากแอป QC · '+list.length+' ใบ'+(fFlag?' (กรองเฉพาะที่มีปัญหา)':'')+' · ตรวจกำลังอัดวันผลิต ±3 วัน · Blow 30 ฟุต · ตุ้ม · ดิ่ง · รูปถ่าย · ส่งออก PDF จากแอป QC'}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           <select value={fMonth} onChange={e=>setFMonth(e.target.value)} style={sel}><option value="">ทุกเดือน</option>{months.map(m=><option key={m} value={m}>{MF[Number(m.slice(5,7))-1]+' '+(Number(m.slice(0,4))+543)}</option>)}</select>
+          {canEdit&&<a href="qc.html?fail=new" target="_blank" rel="noopener" title="เปิดฟอร์มตรวจเสาเฟลในแอป QC (แท็บใหม่) บันทึกแล้วกลับมารีเฟรชหน้านี้" style={{...btnP,textDecoration:'none',display:'inline-block'}}>＋ เพิ่มใบตรวจ</a>}
         </div>}>
         <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',marginBottom:14}}>
           <div className="kpi"><div className="kpi__label">ใบตรวจทั้งหมด</div><div className="kpi__value">{base.length}</div></div>

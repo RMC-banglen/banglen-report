@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-10-20a';
+var APP_VERSION='2026-11-12a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -132,6 +132,9 @@ function App(){
   const[img,setImg]=useState(null);
   const[reading,setReading]=useState(false);
   const[amp,setAmp]=useState('');
+  const[manual,setManual]=useState(false);   // กรอกค่าแอมป์เอง (กรณีกล้องอ่านไม่ติด)
+  const[ocr,setOcr]=useState('');            // ค่าที่ระบบอ่านจากรูป (ไว้สลับกลับ)
+  const fromQc=new URLSearchParams(location.search).get('from')==='qc';   // เปิดมาจากแอป QC → มีปุ่มย้อนกลับ
   const[sure,setSure]=useState(null);
   const[others,setOthers]=useState([]);
   const[formula,setFormula]=useState(()=>{try{return localStorage.getItem('plant_formula')||'';}catch(e){return '';}});
@@ -168,12 +171,12 @@ function App(){
   };
 
   const useShot=async dataUrl=>{
-    setImg(dataUrl);setErr('');setMsg('');setAmp('');setSure(null);setOthers([]);setTime(nowHHMM());
+    setImg(dataUrl);setErr('');setMsg('');setAmp('');setOcr('');setManual(false);setSure(null);setOthers([]);setTime(nowHHMM());
     setReading(true);
     try{const res=await readAmp(dataUrl);
-      if(res.amp==null)setErr('อ่านตัวเลขไม่ได้ — ถ่ายใหม่ให้ตรงและชัด ไม่มีแสงสะท้อน');
-      else{setAmp(String(res.amp));setSure(res.sure!==false);setOthers((res.all||[]).filter(v=>v!==res.amp));}
-    }catch(ex){setErr('อ่านรูปไม่สำเร็จ: '+ex.message+' — ลองถ่ายใหม่ (ถ้าเน็ตหลุด รอสักครู่)');}
+      if(res.amp==null)setErr('อ่านตัวเลขไม่ได้ — ถ่ายใหม่ให้ตรงและชัด ไม่มีแสงสะท้อน หรือกด "กรอกค่าเอง" ด้านล่าง');
+      else{setAmp(String(res.amp));setOcr(String(res.amp));setSure(res.sure!==false);setOthers((res.all||[]).filter(v=>v!==res.amp));}
+    }catch(ex){setErr('อ่านรูปไม่สำเร็จ: '+ex.message+' — ลองถ่ายใหม่ (ถ้าเน็ตหลุด รอสักครู่) หรือกด "กรอกค่าเอง" ด้านล่าง');}
     finally{setReading(false);}
   };
 
@@ -183,13 +186,15 @@ function App(){
   const outLow=amp!==''&&lo!=null&&ampN<lo,outHigh=amp!==''&&hi!=null&&ampN>hi;
 
   const save=async()=>{
-    if(!img||amp===''||!isFinite(ampN)||ampN<=0){setErr('กรุณาถ่ายรูปมิเตอร์ให้ระบบอ่านค่าแอมป์ก่อน');return;}
+    if(!img){setErr('กรุณาถ่ายรูปมิเตอร์ก่อน (ต้องมีรูปแนบเป็นหลักฐานเสมอ แม้จะกรอกค่าเอง)');return;}
+    if(amp===''||!isFinite(ampN)||ampN<=0){setErr(manual?'กรุณาพิมพ์ค่าแอมป์ให้ถูกต้อง':'กรุณาถ่ายรูปมิเตอร์ให้ระบบอ่านค่าแอมป์ก่อน หรือกด "กรอกค่าเอง"');return;}
     if(!formula){setErr('กรุณาเลือกสูตรคอนกรีต');return;}
     setErr('');setSaving(true);
     const [hh,mm]=String(time||nowHHMM()).split(':');
     const at=new Date();at.setHours(Number(hh)||0,Number(mm)||0,0,0);
     // อ่านไม่ชัด → ติดป้ายในหมายเหตุ ให้ QC รู้ว่าค่านี้ควรตรวจซ้ำ
-    const tag=sure===false?'[รูปไม่ชัด] ':'';
+    // กรอกเอง → ติดป้าย [พิมพ์เอง] ให้ QC ตรวจย้อนเทียบกับรูปได้
+    const tag=(manual?'[พิมพ์เอง] ':'')+(sure===false&&!manual?'[รูปไม่ชัด] ':'');
     const rec={d,read_at:at.toISOString(),formula,amp:ampN,water_l:water!==''?Number(water):null,
       sand_moisture_pct:moist,note:(tag+(note||'')).trim()||null,...(forCube?{for_cube:true}:{})};
     const{error}=await SB.from('plant_amp_readings').insert([rec]);
@@ -211,7 +216,7 @@ function App(){
         sand_moisture_pct:moist,note:note||''})});}catch(e){}
     }
     setMsg('✅ บันทึกรอบที่ '+round+' แล้ว — '+formula+' · '+ampN+' A'+(outLow||outHigh?' (นอกช่วงปกติ แจ้ง QC แล้ว)':''));
-    setImg(null);setAmp('');setSure(null);setOthers([]);setWater('');setNote('');setForCube(false);setTime(nowHHMM());
+    setImg(null);setAmp('');setOcr('');setManual(false);setSure(null);setOthers([]);setWater('');setNote('');setForCube(false);setTime(nowHHMM());
     loadToday();window.scrollTo({top:0,behavior:'smooth'});
   };
 
@@ -222,9 +227,12 @@ function App(){
 
   return(
     <div className="wrap">
-      <div className="topbar">
-        <h1>⚡ บันทึกแอมป์เครื่องโม่</h1>
-        <p>แพล้นปูน RMC บางเลน · {thDate(d)} · วันนี้บันทึกแล้ว {today.length} รอบ</p>
+      <div className="topbar" style={{display:'flex',alignItems:'center',gap:10}}>
+        {fromQc&&<a href="qc.html" style={{color:'#fff',fontSize:28,textDecoration:'none',padding:'0 6px 0 0',lineHeight:1}} title="กลับแอป QC">‹</a>}
+        <div>
+          <h1>⚡ บันทึกแอมป์เครื่องโม่</h1>
+          <p>แพล้นปูน RMC บางเลน · {thDate(d)} · วันนี้บันทึกแล้ว {today.length} รอบ</p>
+        </div>
       </div>
 
       {msg&&<div style={{margin:'14px 14px 0'}}><div className="ok">{msg}</div></div>}
@@ -249,9 +257,13 @@ function App(){
 
       <div className="card">
         <div className="card-title">2. ค่าแอมป์ (A)</div>
-        {/* ค่าแอมป์มาจากรูปเท่านั้น พิมพ์เองไม่ได้ — กันการกรอกตัวเลขแต่งเอง */}
-        <div className="amp-big" style={{background:'#f3faf9',color:amp?'#0f766e':'#b6c6c4'}}>{amp||'—'}</div>
-        {!amp&&!reading&&<div style={{marginTop:8,fontSize:13,color:'#7a8a88'}}>ค่าแอมป์อ่านจากรูปอัตโนมัติ (พิมพ์เองไม่ได้)</div>}
+        {/* ปกติอ่านจากรูปอัตโนมัติ · ถ้ากล้องอ่านไม่ติดให้กรอกเองได้ — ยังต้องมีรูปมิเตอร์แนบเสมอ และระบบติดป้าย [พิมพ์เอง] ในหมายเหตุ ให้ QC ตรวจย้อนเทียบกับรูป */}
+        {manual
+          ?<input className="amp-big" type="number" inputMode="decimal" step="0.1" min="0" value={amp} placeholder="พิมพ์ค่าแอมป์" onChange={e=>setAmp(e.target.value)}/>
+          :<div className="amp-big" style={{background:'#f3faf9',color:amp?'#0f766e':'#b6c6c4'}}>{amp||'—'}</div>}
+        {!reading&&<button className="ghost" style={{marginTop:10}} onClick={()=>{if(manual){setAmp(ocr);setManual(false);}else{setManual(true);}}}>{manual?'↩︎ ใช้ค่าที่ระบบอ่านจากรูป':'✍️ กรอกค่าเอง (กล้องอ่านไม่ติด)'}</button>}
+        {manual&&<div style={{marginTop:8,fontSize:13,color:'#b45309'}}>พิมพ์ตัวเลขตามหน้าจอมิเตอร์ · ต้องมีรูปมิเตอร์แนบ (ข้อ 1) · ใบนี้จะติดป้าย "[พิมพ์เอง]" ให้ QC ตรวจย้อนเทียบกับรูป</div>}
+        {!amp&&!reading&&!manual&&<div style={{marginTop:8,fontSize:13,color:'#7a8a88'}}>ค่าแอมป์อ่านจากรูปอัตโนมัติ — ถ้าอ่านไม่ติด กดกรอกค่าเอง</div>}
         {sure===false&&<div style={{marginTop:8,fontSize:13.5,color:'#b45309',fontWeight:700}}>⚠️ รูปไม่ค่อยชัด — ถ้าตัวเลขไม่ตรงกับมิเตอร์ ให้ถ่ายใหม่</div>}
         {sure===true&&<div style={{marginTop:8,fontSize:13.5,color:'#047857'}}>อ่านจากรูปแล้ว — ถ้าไม่ตรงกับมิเตอร์ ให้กด "ถ่ายใหม่"</div>}
         {others.length>0&&<div style={{marginTop:6,fontSize:13,color:'#5b6b69'}}>ระบบเห็นตัวเลขอื่นบนจอด้วย: {others.join(', ')} — ถ้าค่าแอมป์จริงเป็นตัวอื่น ให้ถ่ายใหม่ให้เห็นจอแอมป์จอเดียว</div>}
