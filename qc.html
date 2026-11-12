@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13e';
+var APP_VERSION='2026-11-13f';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -516,7 +516,6 @@ function FailReport({rec,logo,photos}){
     </div>;})}
     <div data-block="4" style={blk}>{H('3. ชั้นดิน — นับ Blow '+(rec.blow_feet||30)+' ฟุต')}
       <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
-        {kv('หน่วยงานที่นับ',rec.blow_site)}
         {kv('จำนวน Blow',rec.blow_count!=null&&rec.blow_count!==''?rec.blow_count+' ครั้ง / '+(rec.blow_feet||30)+' ฟุต':'')}
         {kv('ระดับชั้นดิน',L?<span style={{background:L.bg,color:L.col,fontWeight:800,padding:'1px 10px',borderRadius:999}}>{L.e} {L.t}</span>:'')}
       </tbody></table>
@@ -532,7 +531,6 @@ function FailReport({rec,logo,photos}){
         {kv('Blow ที่ต้องได้ (Danish)',rec.blow_s_cm!=null?(rec.blow_s_cm>0?'set ≤ '+fmtN(rec.blow_s_cm,3)+' ซม./ครั้ง · ≈ ≥'+fmtN(rec.blow_per10,1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้ (พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ)'):'')}
         {(()=>{const ds0=driveStats(rec);return ds0.set!=null&&kv('Blow ตอกจริง (Last ten blow)',<span style={{fontWeight:700,color:rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?'#15803d':'#b91c1c'):undefined}}>set {fmtN(ds0.set,3)} ซม./ครั้ง · ≈ {fmtN(ds0.per10,1)} ครั้ง/10 ซม.{rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?' ✔ ถึง set':' ✘ ยังไม่ถึง set'):''}</span>);})()}
         {kv('ดิ่งเสา',rec.vertical_result==='ok'?'✔ ผ่าน':rec.vertical_result==='bad'?'✘ ไม่ผ่าน':rec.vertical_result==='na'?'ไม่ได้วัด':'')}
-        {kv('ค่าที่วัดได้ (ดิ่ง)',rec.vertical_note)}
       </tbody></table>
     </div>
     {rec.drive_log&&Object.keys(rec.drive_log).length>0&&(()=>{const ds=driveStats(rec),L=rec.drive_log||{};
