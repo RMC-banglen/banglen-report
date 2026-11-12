@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13b';
+var APP_VERSION='2026-11-13d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -371,6 +371,31 @@ function observations(r){
   return out;
 }
 
+// ข้อความสั้นสำหรับแสดงในรายงาน/การ์ดสรุป (ข้อความเต็ม o.x ยังเก็บไว้)
+const SHORT_RULES = [
+  [/ปลายเสา \(10 ฟุตสุดท้าย\) เฉลี่ย ([\d.]+) ครั้ง\/ฟุต.*ชั้นแข็ง/, m=>'ปลายเสาเข้าชั้นดินแข็ง (เฉลี่ย '+m[1]+' ครั้ง/ฟุต)'],
+  [/กำลังอัด ≈ (\d+) ksc.*ไม่พร้อมตอก/, m=>'กำลังอัดไม่ถึงเกณฑ์พร้อมตอก ('+m[1]+' < '+DRIVE_MIN+')'],
+  [/ไม่พร้อมตอก/, ()=>'กำลังอัดไม่ถึงเกณฑ์พร้อมตอก'],
+  [/ย้อนวันเกินที่สูตร/, ()=>'ย้อนวันเกินที่สูตรรองรับ'],
+  [/ตอกก่อนครบ 8 วัน/, ()=>'ตอกก่อนครบ 8 วันนับจากหน้าเสา'],
+  [/ตุ้มเบาเกินไป/, ()=>'ตุ้มเบาเกินไป'],
+  [/ตุ้มหนักเกินไป/, ()=>'ตุ้มหนักเกินไป'],
+  [/เสาไม่ดิ่ง/, ()=>'เสาไม่ดิ่ง'],
+  [/คำนวณ Blow ไม่ได้/, ()=>'ตุ้มเบา/ยกต่ำ ตอกไม่เข้า'],
+  [/ตอกยังไม่ถึง set/, ()=>'ตอกยังไม่ถึง set'],
+  [/ตอกไม่ถึงระดับปลายเสา/, ()=>'ตอกไม่ถึงระดับปลายเสาตามแบบ'],
+  [/ช่วงท้ายตอกยากขึ้นมาก/, ()=>'ช่วงท้ายตอกยากขึ้นมาก'],
+  [/ตอกแน่นเกินที่ต้องการมาก/, ()=>'ตอกแน่นเกินที่ต้องการมาก'],
+  [/ดินแข็ง \(Blow (\d+)/, m=>'ดินแข็ง (Blow '+m[1]+' ครั้ง/30 ฟุต)'],
+  [/ย้อนวัน .* อยู่ในที่สูตร/, ()=>'ย้อนวันอยู่ในที่สูตรรองรับ'],
+  [/กำลังอัด ≈ (\d+) ksc/, m=>'กำลังอัดพร้อมตอก ('+m[1]+' ≥ '+DRIVE_MIN+')'],
+  [/น้ำหนักตุ้ม ([\d.]+) เท่า/, m=>'ตุ้ม '+m[1]+' เท่า'],
+  [/เช็คดิ่งเสา/, ()=>'ดิ่งเสา'],
+  [/set ถึงตามต้องการ/, ()=>'ถึง set'],
+  [/ดินอ่อน/, ()=>'ดินอ่อน'],
+];
+const shortOf = o => { for(const [re,f] of SHORT_RULES){ const m=String(o.x).match(re); if(m) return f(m); } return o.x; };
+
 // วิเคราะห์สาเหตุเบื้องต้นจากข้อมูลทั้งหมดในใบตรวจ — เรียงปัจจัยเสี่ยงตามความสำคัญ + แนวทางตรวจ/แก้ต่อ (ใช้เป็นแนวทาง ไม่ใช่ข้อสรุปตายตัว)
 function analyze(r){
   const obs=observations(r), extra=[], pcs=piecesOf(r);
@@ -394,23 +419,25 @@ function analyze(r){
   if(ds.dev!=null&&ds.dev>0) extra.push({t:'info',x:'หัวเสาเบี้ยว '+fmtN(ds.dev,1)+' ซม. ทิศ '+(ds.devDir||'–')+(ds.tip!=null&&ds.top!=null&&Math.abs(ds.top-ds.tip)>0?' (≈ '+fmtN(ds.dev/(Math.abs(ds.top-ds.tip)),2)+' ซม./ม.)':'')});
   const all=[...obs,...extra];
   const sev={bad:0,warn:1,info:2,ok:3};
-  const risks=all.filter(o=>o.t==='bad'||o.t==='warn').sort((a,b)=>sev[a.t]-sev[b.t]);
-  const oks=all.filter(o=>o.t==='ok'), infos=all.filter(o=>o.t==='info');
+  const withS=a=>a.map(o=>({...o,s:shortOf(o)}));
+  const risks=withS(all.filter(o=>o.t==='bad'||o.t==='warn').sort((a,b)=>sev[a.t]-sev[b.t]));
+  const oks=withS(all.filter(o=>o.t==='ok')), infos=withS(all.filter(o=>o.t==='info'));
   const has=re=>risks.some(o=>re.test(o.x));
   const checks=[];
-  if(has(/ไม่พร้อมตอก|ต่ำกว่าค่าเฉลี่ยวันข้างเคียง|ต่ำกว่าเกณฑ์/)) checks.push('ตรวจรอบผลิตวันนั้น: ส่วนผสม การบ่ม ผลก้อนทดสอบ และเสาต้นอื่นที่ผลิตวันเดียวกัน');
-  if(has(/ดินแข็ง/)) checks.push('ดินแข็ง: พิจารณาเพิ่มสเต็งคอนกรีต/ใช้ตุ้มที่เหมาะสม/เจาะนำ และเฝ้าระวังเสาต้นข้างเคียง');
-  if(has(/ตุ้มเบา|ตอกไม่เข้า/)) checks.push('ตุ้มเบา: เพิ่มน้ำหนักตุ้มให้อยู่ในช่วง '+HAMMER_MIN+'–'+HAMMER_MAX+' เท่าของน้ำหนักเสา หรือเพิ่มระยะยกอย่างระมัดระวัง');
-  if(has(/ตุ้มหนัก/)) checks.push('ตุ้มหนัก: ลดระยะยก/ใช้ตุ้มเบาลง และตรวจหมวกรองหัวเสา');
-  if(has(/ไม่ดิ่ง/)) checks.push('เสาไม่ดิ่ง: ตรวจแนวและหมุดก่อนตอก การตั้งเสา และแรงเยื้องศูนย์');
-  if(has(/ย้อนวันเกินที่สูตร/)) checks.push('ย้อนวันเกินนโยบาย: ตรวจว่าวันผลิตใช้สูตรตามที่ย้อนวันจริงหรือไม่ (สูตรปรับขึ้น-ลงระหว่างวัน) และไม่ย้อนวันเกินที่สูตรรองรับ');
-  if(has(/ตอกก่อนครบ 8 วัน/)) checks.push('ตอกก่อนครบ 8 วันนับจากหน้าเสา: ทบทวนการนับส่งตอก และตรวจกำลังอัดที่อายุจริงก่อนส่ง');
-  if(has(/ตอกยังไม่ถึง set/)) checks.push('ยังไม่ถึง set: ตรวจว่าตอกต่อได้อีกหรือไม่ / เพิ่มพลังงานตุ้ม และปรึกษาวิศวกรเรื่องกำลังรับน้ำหนักจริง');
-  if(has(/ตอกไม่ถึงระดับปลายเสา/)) checks.push('ปลายเสาตื้นกว่าแบบ: ตรวจชั้นดินแข็ง/สิ่งกีดขวางใต้ดิน และให้วิศวกรยืนยันการรับรอง set ก่อนตัดหัวเสา');
-  if(has(/ปลายเสา \(10 ฟุตสุดท้าย\)/)&&has(/ชั้นแข็ง/)) checks.push('ปลายเสาอยู่ในชั้นแข็ง: ตรวจว่าชั้นแข็งตื้นกว่าที่ออกแบบหรือไม่ พิจารณาเพิ่มสเต็ง/จำกัดการตอกซ้ำ และตรวจเสาต้นข้างเคียง');
-  if(has(/ช่วงท้ายตอกยากขึ้นมาก/)) checks.push('ช่วงท้ายตอกยาก: ลดการตอกซ้ำเกิน set ใช้หมวกรองหัวเสาที่ดี และตรวจรอยร้าวหัวเสา/รอยต่อหลังตอก');
-  if(!risks.length) checks.push('ข้อมูลที่ตรวจอยู่ในเกณฑ์ทั้งหมด — ตรวจเพิ่ม: รอยร้าวก่อนตอก การยกขนส่ง การจี้/รองหัวเสา และตำแหน่งที่แตก (หัวเสา/กลางต้น/รอยต่อ)');
-  const summary=risks.length?('พบปัจจัยเสี่ยง '+risks.length+' ข้อ — ที่น่าสงสัยที่สุด: '+risks[0].x):'ข้อมูลที่ตรวจทั้งหมดอยู่ในเกณฑ์ ยังไม่พบสาเหตุชัดเจนจากตัวเลข';
+  const tipHard=has(/ปลายเสา (10 ฟุตสุดท้าย)/)&&has(/ชั้นแข็ง/);
+  if(has(/ไม่พร้อมตอก|ต่ำกว่าค่าเฉลี่ยวันข้างเคียง|ต่ำกว่าเกณฑ์/)) checks.push('ตรวจรอบผลิตวันนั้น: ส่วนผสม การบ่ม ผลก้อน และเสาต้นอื่นวันเดียวกัน');
+  if(has(/ย้อนวันเกินที่สูตร/)) checks.push('ตรวจว่าวันผลิตใช้สูตรตามที่ย้อนวันจริงหรือไม่');
+  if(has(/ตอกก่อนครบ 8 วัน/)) checks.push('ทบทวนการนับส่งตอก และตรวจกำลังอัดที่อายุจริงก่อนส่ง');
+  if(has(/ตุ้มเบา|ตอกไม่เข้า/)) checks.push('เพิ่มน้ำหนักตุ้มให้อยู่ใน '+HAMMER_MIN+'–'+HAMMER_MAX+' เท่าของน้ำหนักเสา');
+  if(has(/ตุ้มหนัก/)) checks.push('ลดระยะยก/ใช้ตุ้มเบาลง และตรวจหมวกรองหัวเสา');
+  if(has(/ไม่ดิ่ง/)) checks.push('ตรวจแนวและหมุดก่อนตอก การตั้งเสา และแรงเยื้องศูนย์');
+  if(has(/ตอกยังไม่ถึง set/)) checks.push('ยังไม่ถึง set: เพิ่มพลังงานตุ้ม และให้วิศวกรประเมินกำลังรับน้ำหนักจริง');
+  if(has(/ตอกไม่ถึงระดับปลายเสา/)) checks.push('ตรวจชั้นแข็ง/สิ่งกีดขวางใต้ดิน และให้วิศวกรยืนยัน set ก่อนตัดหัวเสา');
+  if(tipHard) checks.push('ตรวจว่าชั้นแข็งตื้นกว่าแบบหรือไม่ · เพิ่มสเต็ง/จำกัดการตอกซ้ำ · เฝ้าระวังเสาต้นข้างเคียง');
+  else if(has(/ดินแข็ง/)) checks.push('เพิ่มสเต็งคอนกรีต/เจาะนำ และเฝ้าระวังเสาต้นข้างเคียง');
+  if(has(/ช่วงท้ายตอกยากขึ้นมาก/)) checks.push('ลดการตอกซ้ำเกิน set และตรวจรอยร้าวหัวเสา/รอยต่อหลังตอก');
+  if(!risks.length) checks.push('ตัวเลขอยู่ในเกณฑ์ทั้งหมด — ตรวจเพิ่ม: รอยร้าวก่อนตอก การยกขนส่ง การจี้/รองหัวเสา ตำแหน่งที่แตก');
+  const summary=risks.length?('สาเหตุที่น่าจะเป็น: '+risks[0].s+(risks.length>1?' (และอีก '+(risks.length-1)+' ข้อ)':'')):'ตัวเลขทุกข้ออยู่ในเกณฑ์ — ยังไม่พบสาเหตุชัดเจน';
   return {summary,risks,oks,infos,checks,nRisk:risks.length};
 }
 
@@ -508,25 +535,19 @@ function FailReport({rec,logo,photos}){
         {kv('ค่าที่วัดได้ (ดิ่ง)',rec.vertical_note)}
       </tbody></table>
     </div>
-    {rec.drive_log&&Object.keys(rec.drive_log).length>0&&(()=>{const ds=driveStats(rec),L=rec.drive_log||{},bl=(L.blows||[]).map(Number);
+    {rec.drive_log&&Object.keys(rec.drive_log).length>0&&(()=>{const ds=driveStats(rec),L=rec.drive_log||{};
       return <div data-block="5b" style={blk}>{H('4.1 บันทึกการตอกจริง (Driving record)')}
         <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
           {ds.last10Avg!=null&&ds.n>=5&&kv('10 ฟุตสุดท้าย (ปลายเสา)',<span style={{fontWeight:700,color:ds.tipLevel===4?'#991b1b':undefined}}>รวม {ds.last10Sum} ครั้ง ({fmtN(ds.last10Share*100,0)}% ของทั้งหมด) · เฉลี่ย {fmtN(ds.last10Avg,1)} ครั้ง/ฟุต ≈ {SOIL_LV[ds.tipLevel].e} {SOIL_LV[ds.tipLevel].t}</span>)}
           {ds.total!=null&&kv('Blow ต่อฟุต (30 ซม.)',ds.n+' ฟุต · รวม '+ds.total+' ครั้ง · สูงสุด '+ds.max+' · 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0))}
           {ds.set!=null&&kv('set จริง (10 ครั้งสุดท้าย)',fmtN(ds.set,3)+' ซม./ครั้ง ≈ '+fmtN(ds.per10,1)+' ครั้ง/10 ซม. · penetration '+(L.l10||[]).join(' / ')+' ซม.')}
           {ds.qaAct!=null&&kv('Qa ที่ตอกได้จริง (Danish)',<span style={{fontWeight:800,color:ds.qaRatio==null||ds.qaRatio>=1?'#15803d':'#b91c1c'}}>{fmtN(ds.qaAct,1)} ตัน{ds.qaRatio!=null?' ('+fmtN(ds.qaRatio,2)+' เท่าของ Qa ตามแบบ '+fmtN(Number(rec.qa_ton),1)+' ตัน) '+(ds.qaRatio>=1?'✔ ถึง set':'✘ ยังไม่ถึง set'):''}</span>)}
-          {(ds.top!=null||ds.tip!=null)&&kv('ระดับหัวเสา / ปลายเสาจริง',(ds.top!=null?fmtN(ds.top,2):'–')+' / '+(ds.tip!=null?fmtN(ds.tip,2):'–')+' ม.'+(ds.spec!=null?'  (ปลายตามแบบ '+fmtN(ds.spec,2)+' ม.'+(ds.shortfall>0.05?' · ตื้นกว่าแบบ '+fmtN(ds.shortfall,2)+' ม.':' · ถึงตามแบบ')+')':''))}
-          {ds.dev!=null&&kv('หัวเสาเบี้ยว (Deviation)',fmtN(ds.dev,1)+' ซม. ทิศ '+(ds.devDir||'–')+'  (N '+(L.dev.N??'–')+' · E '+(L.dev.E??'–')+' · W '+(L.dev.W??'–')+' · S '+(L.dev.S??'–')+')')}
         </tbody></table>
-        {bl.length>0&&<div style={{marginTop:8}}><div style={{display:'flex',alignItems:'flex-end',gap:2,height:70}}>{bl.map((v,i)=><div key={i} style={{flex:1,background:i>=bl.length-3?'#c0392b':'#0f766e',height:Math.max(3,v/(ds.max||1)*66),borderRadius:2}}/>)}</div>
-          <div style={{fontSize:11.5,color:'#64748b',marginTop:2}}>จำนวน Blow ต่อฟุต ฟุตที่ 1 → {bl.length} (แท่งแดง = 3 ฟุตสุดท้าย)</div></div>}
       </div>;})()}
     <div data-block="6" style={blk}>{H('5. วิเคราะห์สาเหตุเบื้องต้น')}
       <div style={{fontSize:14,fontWeight:800,lineHeight:1.7,color:an.nRisk?'#b91c1c':'#15803d',marginBottom:6}}>{an.summary}</div>
-      {an.risks.length>0&&<div style={{fontSize:13.5,lineHeight:1.8,marginBottom:4}}><b>ปัจจัยเสี่ยงที่พบ (เรียงตามความสำคัญ)</b>{an.risks.map((o,i)=><div key={i} style={{color:col[o.t]}}>{i+1}. {ic[o.t]} {o.x}</div>)}</div>}
-      {an.oks.length>0&&<div style={{fontSize:13,lineHeight:1.7,marginBottom:4}}><b>ที่อยู่ในเกณฑ์</b>{an.oks.map((o,i)=><div key={i} style={{color:col.ok}}>{ic.ok} {o.x}</div>)}</div>}
-      {an.infos.length>0&&<div style={{fontSize:13,lineHeight:1.7,marginBottom:4,color:col.info}}>{an.infos.map((o,i)=><div key={i}>{ic.info} {o.x}</div>)}</div>}
-      <div style={{fontSize:13.5,lineHeight:1.8,marginTop:4}}><b>แนวทางตรวจ/แก้ต่อ</b>{an.checks.map((c,i)=><div key={i}>→ {c}</div>)}</div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6,margin:'4px 0 8px'}}>{[...an.risks,...an.oks].map((o,i)=>{const bad=o.t==='bad',wn=o.t==='warn',okc=o.t==='ok';return <span key={i} style={{fontSize:13,fontWeight:(bad||wn)?800:600,padding:'3px 10px',borderRadius:999,border:'1px solid '+(bad?'#fca5a5':wn?'#fcd34d':'#86efac'),background:bad?'#fef2f2':wn?'#fffbeb':'#f0fdf4',color:bad?'#991b1b':wn?'#92400e':'#166534'}}>{bad?'✘':wn?'⚠':'✔'} {o.s}</span>;})}</div>
+      <div style={{fontSize:13.5,lineHeight:1.8}}><b>ควรทำ</b>{an.checks.slice(0,3).map((c,i)=><div key={i}>→ {c}</div>)}</div>
       {rec.cause_note&&<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>สาเหตุที่น่าจะเป็น (ผู้ตรวจ):</b> {rec.cause_note}</div>}
       {rec.action_note&&<div style={{marginTop:6,fontSize:13.5,lineHeight:1.7}}><b>มาตรการ/สิ่งที่ต้องแก้ไข:</b> {rec.action_note}</div>}
     </div>
@@ -620,7 +641,7 @@ function FailSummaryCard({rec,logo}){
     {line('ตุ้ม',rec.hammer_weight_t!=null?rec.hammer_weight_t+' ตัน × '+(rec.hammer_drop_cm!=null?rec.hammer_drop_cm+' ซม.':'–')+(rec.pile_weight_t!=null?' · เสา '+fmtN(rec.pile_weight_t,2)+' ตัน':''):null)}
     <div style={{marginTop:10,padding:'10px 14px',borderRadius:12,background:an.nRisk?'#fef2f2':'#f0fdf4',border:'2px solid '+(an.nRisk?'#fecaca':'#bbf7d0')}}>
       <div style={{fontSize:20,fontWeight:800,color:an.nRisk?RED:GRN,lineHeight:1.5}}>{an.summary}</div>
-      {an.risks.slice(1,4).map((o,i)=><div key={i} style={{fontSize:17,lineHeight:1.55,color:o.t==='bad'?RED:'#b45309'}}>• {o.x}</div>)}
+      {an.risks.slice(1,4).map((o,i)=><div key={i} style={{fontSize:17,lineHeight:1.55,color:o.t==='bad'?RED:'#b45309'}}>• {o.s}</div>)}
       {an.checks.slice(0,2).map((c,i)=><div key={i} style={{fontSize:17,lineHeight:1.55,color:'#334155'}}>→ {c}</div>)}
     </div>
     {rec.cause_note&&<div style={{marginTop:8,fontSize:17,lineHeight:1.6}}><b>สาเหตุ (QC):</b> {rec.cause_note}</div>}
@@ -1096,7 +1117,7 @@ function FailForm({me,init,onCancel,onSaved}){
           return <div>
             <div className="hint" style={{marginBottom:6}}>วิเคราะห์อัตโนมัติจากข้อมูลที่กรอก (ใช้เป็นแนวทาง ไม่ใช่ข้อสรุป):</div>
             <div style={{fontSize:14.5,fontWeight:800,lineHeight:1.6,color:an.nRisk?'#c0392b':'#15803d',marginBottom:6}}>{an.summary}</div>
-            {[...an.risks,...an.oks,...an.infos].map((o,i)=><div key={i} style={{fontSize:14,lineHeight:1.8,color:cl[o.t]}}>{ic2[o.t]} {o.x}</div>)}
+            {[...an.risks,...an.oks].map((o,i)=><div key={i} style={{fontSize:14,lineHeight:1.8,color:cl[o.t]}}>{ic2[o.t]} {o.s}</div>)}
             <div style={{marginTop:6,fontSize:13.5,lineHeight:1.8,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10,padding:'8px 12px'}}><b>แนวทางตรวจ/แก้ต่อ</b>{an.checks.map((c,i)=><div key={i}>→ {c}</div>)}</div>
           </div>;})()}
         <div className="field" style={{marginTop:10}}><label>สาเหตุที่น่าจะเป็น (ความเห็นผู้ตรวจ)</label>
