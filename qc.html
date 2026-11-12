@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13g';
+var APP_VERSION='2026-11-13h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -180,6 +180,8 @@ function judgeNum(v,min,max){
 //        → ตุ้ม (น้ำหนัก/ระยะยก เทียบ 0.7–2.5 เท่าของเสา) → ดิ่งเสา → รูปตอนเสาแตก → สรุป → ส่งออก PDF
 const TARGET_NORMAL = {1:350,3:415,5:435,7:450};   // ksc ตามอายุ (เหมือนแดชบอร์ดสเต็ง — ใช้แสดงผล 1/3/5/7 วันเทียบเกณฑ์เดิม)
 const TARGET_NP280  = {1:340,7:420};
+const DRIVE_MIN_HARD = 500;   // ดินแข็ง (Blow ≥600 ครั้ง/30 ฟุต) ต้องสเต็งอย่างน้อย 500 ksc ถ้าไม่ถึงต้องรีบเปลี่ยนสูตร
+const driveMinOf = bc => (bc!=null&&bc!==''&&Number(bc)>=600)?DRIVE_MIN_HARD:DRIVE_MIN;
 const OVERDRIVE_RATIO = 1.5;   // Qa ที่ตอกได้จริง ÷ Qa ตามแบบ ตั้งแต่เท่านี้ = ตอกแน่นเกินที่ต้องการมาก (ค่าเริ่มต้น ปรับได้)
 const JUMP_RATIO = 1.8;        // Blow ฟุตสุดท้าย ÷ เฉลี่ย 3 ฟุตก่อนหน้า ตั้งแต่เท่านี้ = ตอกยากขึ้นแบบกระชาก (ค่าเริ่มต้น ปรับได้)
 const DRIVE_MIN = 450;   // เกณฑ์ "พร้อมเอาไปตอก" ของเสาเฟล: กำลังอัดที่อายุจริงตอนตอก (แทรกค่าจากผลวันข้างเคียง) ต้องได้อย่างน้อย 450 ksc
@@ -284,26 +286,26 @@ function interp(points,x){
   return null;
 }
 const targetPoints = f => Object.entries(/^NP280$/i.test(f||'')?TARGET_NP280:TARGET_NORMAL).map(([a,v])=>[Number(a),v]).sort((x,y)=>x[0]-y[0]);
-function ageEval(rows,prod,formula,age){
+function ageEval(rows,prod,formula,age,min){
   if(age==null||!prod) return null;
   const S=buildStrength(rows,prod), pts=S.ages.map(a=>{const c=S.cell(prod,a);return c?[a,c.avg]:null;}).filter(Boolean).sort((x,y)=>x[0]-y[0]);
   if(!pts.length) return null;
-  const s=interp(pts,age), t={v:DRIVE_MIN};   // เกณฑ์พร้อมตอก = 450 ksc ทุกอายุ
+  const s=interp(pts,age), t={v:min||DRIVE_MIN};   // เกณฑ์พร้อมตอก = 450 ksc (ดินแข็ง 500) ทุกอายุ
   return {age,strength:s.v,usedAges:s.a,target:t?t.v:null,ok:t?s.v>=t.v:null};
 }
 // แถวที่เกี่ยวข้อง: ผลที่อายุข้างเคียงของอายุจริง (ที่ใช้แทรกค่า) + แถวอายุจริงตอนตอก (ค่ากลาง) เทียบเกณฑ์พร้อมตอก — ไม่เอาวันข้างเคียง/อายุที่ไม่เกี่ยวข้อง
-function relevantAges(rows,prod,formula,age){
-  const ev=ageEval(rows,prod,formula,age); if(!ev) return {ev:null,lines:[]};
+function relevantAges(rows,prod,formula,age,min){
+  const ev=ageEval(rows,prod,formula,age,min); if(!ev) return {ev:null,lines:[]};
   const S=buildStrength(rows,prod);
   const lines=ev.usedAges.map(a=>{const c=S.cell(prod,a);return {key:'m'+a,a,label:a+' วัน',avg:c?c.avg:null,tg:targetFor(formula,a),mid:false};});
-  lines.push({key:'act',a:age,label:ev.usedAges.length>1?'ค่าประมาณที่อายุ '+age+' วัน':'อายุจริงตอนตอก '+age+' วัน',sub:ev.usedAges.length>1?'(ค่ากลางของ '+ev.usedAges.join(' และ ')+' วัน)':'',avg:ev.strength,tg:DRIVE_MIN,mid:true});
+  lines.push({key:'act',a:age,label:ev.usedAges.length>1?'ค่าประมาณที่อายุ '+age+' วัน':'อายุจริงตอนตอก '+age+' วัน',sub:ev.usedAges.length>1?'(ค่ากลางของ '+ev.usedAges.join(' และ ')+' วัน)':'',avg:ev.strength,tg:ev.target,mid:true});
   lines.sort((x,y)=>x.a-y.a||(x.mid?1:0)-(y.mid?1:0));
   return {ev,lines};
 }
 // กำลังอัดที่อายุจริงตอนตอก ของวันผลิต ±3 วัน (แต่ละวันแทรกค่าจากผล 1/3/5/7 วันของวันนั้น) — ดูว่าวันผลิตสูงหรือต่ำกว่าวันข้างเคียง
-function neighborDays(rows,prod,formula,age){
+function neighborDays(rows,prod,formula,age,min){
   if(age==null||!prod) return [];
-  return [-3,-2,-1,0,1,2,3].map(n=>{const d=isoAdd(prod,n),ev=ageEval(rows,d,formula,age);return {d,off:n,isProd:n===0,v:ev?ev.strength:null,ok:ev?ev.ok:null};});
+  return [-3,-2,-1,0,1,2,3].map(n=>{const d=isoAdd(prod,n),ev=ageEval(rows,d,formula,age,min);return {d,off:n,isProd:n===0,v:ev?ev.strength:null,ok:ev?ev.ok:null};});
 }
 const pieceFormula = (r,p) => p.formula||r.strength_formula||'';
 const pieceRows = (r,p) => { const f=pieceFormula(r,p); return (r.strength_rows||[]).filter(x=>x.f==null?true:(f?x.f===f:!/^NP280$/i.test(x.f))); };
@@ -311,7 +313,8 @@ function pieceAnalysis(rec,p,n){
   const age=p.drive?isoDiff(p.drive,p.date):null, fd=parseFace(p.face);
   const backdate=fd?isoDiff(p.date,fd):null, faceAge=(fd&&p.drive)?isoDiff(p.drive,fd):null;
   const formula=pieceFormula(rec,p), group=pileGroup(rec.pile_size,rec.pile_std,n,rec.pile_length_m), maxBack=backdateMax(group,formula);
-  return {age,face:fd,backdate,faceAge,formula,group,maxBack,policyOk:(backdate!=null&&maxBack!=null)?backdate<=maxBack:null,ev:ageEval(pieceRows(rec,p),p.date,formula,age)};
+  const min=driveMinOf(rec.blow_count);
+  return {age,face:fd,backdate,faceAge,formula,group,maxBack,min,policyOk:(backdate!=null&&maxBack!=null)?backdate<=maxBack:null,ev:ageEval(pieceRows(rec,p),p.date,formula,age,min)};
 }
 
 // รวมท่อนที่ผลิตวันเดียวกันและใช้สูตรเดียวกัน → กำลังอัดเท่ากัน แสดงครั้งเดียว
@@ -355,7 +358,7 @@ function observations(r){
     if(!ev) out.push({t:'info',x:preG+'ไม่มีผลกำลังอัดเฉพาะวันผลิต (ไม่ได้เทียบ)'});
     else{
       const how=ev.usedAges.length>1?'แทรกค่าจากผล '+ev.usedAges[0]+' และ '+ev.usedAges[1]+' วัน':'ใช้ผล '+ev.usedAges[0]+' วัน';
-      out.push({t:ev.ok===false?'bad':ev.ok===true?'ok':'info',x:preG+'อายุตอนตอก '+ev.age+' วัน → กำลังอัด ≈ '+fmtN(ev.strength)+' ksc ('+how+') เทียบเกณฑ์พร้อมตอก ≥ '+fmtN(ev.target)+' ksc'+(ev.ok===false?' → ยังไม่ถึง '+fmtN(ev.target)+' ไม่พร้อมตอก':ev.ok===true?' → ถึงเกณฑ์ พร้อมตอก':'')});
+      out.push({t:ev.ok===false?'bad':ev.ok===true?'ok':'info',x:preG+'อายุตอนตอก '+ev.age+' วัน → กำลังอัด ≈ '+fmtN(ev.strength)+' ksc ('+how+') เทียบเกณฑ์พร้อมตอก ≥ '+fmtN(ev.target)+' ksc'+(ev.ok===false?' → ยังไม่ถึง '+fmtN(ev.target)+' ไม่พร้อมตอก'+(A.min>DRIVE_MIN?' (ดินแข็ง Blow ≥600 ต้อง ≥'+DRIVE_MIN_HARD+') — รีบเปลี่ยนสูตร':''):ev.ok===true?' → ถึงเกณฑ์ พร้อมตอก'+(A.min>DRIVE_MIN?' (ดินแข็ง ≥'+DRIVE_MIN_HARD+')':''):'')});
     }
   });
   if(r.blow_count!=null&&r.blow_count!==''){
@@ -377,7 +380,8 @@ function observations(r){
 // ข้อความสั้นสำหรับแสดงในรายงาน/การ์ดสรุป (ข้อความเต็ม o.x ยังเก็บไว้)
 const SHORT_RULES = [
   [/ปลายเสา \(10 ฟุตสุดท้าย\) เฉลี่ย ([\d.]+) ครั้ง\/ฟุต.*ชั้นแข็ง/, m=>'ปลายเสาเข้าชั้นดินแข็ง (เฉลี่ย '+m[1]+' ครั้ง/ฟุต)'],
-  [/กำลังอัด ≈ (\d+) ksc.*ไม่พร้อมตอก/, m=>'กำลังอัดไม่ถึงเกณฑ์พร้อมตอก ('+m[1]+' < '+DRIVE_MIN+')'],
+  [/รีบเปลี่ยนสูตร/, ()=>'ดินแข็ง: กำลังอัดไม่ถึง '+DRIVE_MIN_HARD+' → รีบเปลี่ยนสูตร'],
+  [/กำลังอัด ≈ (\d+) ksc.*≥ (\d+) ksc.*ไม่พร้อมตอก/, m=>'กำลังอัดไม่ถึงเกณฑ์พร้อมตอก ('+m[1]+' < '+m[2]+')'],
   [/ไม่พร้อมตอก/, ()=>'กำลังอัดไม่ถึงเกณฑ์พร้อมตอก'],
   [/ย้อนวันเกินที่สูตร/, ()=>'ย้อนวันเกินที่สูตรรองรับ'],
   [/ตอกก่อนครบ 8 วัน/, ()=>'ตอกก่อนครบ 8 วันนับจากหน้าเสา'],
@@ -392,7 +396,7 @@ const SHORT_RULES = [
   [/ตอกแน่นเกินที่ต้องการมาก/, ()=>'ตอกแน่นเกินที่ต้องการมาก'],
   [/ดินแข็ง \(Blow (\d+)/, m=>'ดินแข็ง (Blow '+m[1]+' ครั้ง/30 ฟุต)'],
   [/ย้อนวัน .* อยู่ในที่สูตร/, ()=>'ย้อนวันอยู่ในที่สูตรรองรับ'],
-  [/กำลังอัด ≈ (\d+) ksc/, m=>'กำลังอัดพร้อมตอก ('+m[1]+' ≥ '+DRIVE_MIN+')'],
+  [/กำลังอัด ≈ (\d+) ksc.*≥ (\d+) ksc/, m=>'กำลังอัดพร้อมตอก ('+m[1]+' ≥ '+m[2]+')'],
   [/น้ำหนักตุ้ม ([\d.]+) เท่า/, m=>'ตุ้ม '+m[1]+' เท่า'],
   [/เช็คดิ่งเสา/, ()=>'ดิ่งเสา'],
   [/set ถึงตามต้องการ/, ()=>'ถึง set'],
@@ -430,6 +434,7 @@ function analyze(r){
   const has=re=>risks.some(o=>re.test(o.x));
   const checks=[];
   const tipHard=has(/ปลายเสา (10 ฟุตสุดท้าย)/)&&has(/ชั้นแข็ง/);
+  if(has(/รีบเปลี่ยนสูตร/)) checks.push('ดินแข็งต้องสเต็ง ≥ '+DRIVE_MIN_HARD+' ksc แต่ไม่ถึง → รีบเปลี่ยนสูตรให้งานนี้ (เพิ่มสเต็ง) ก่อนส่งตอก');
   if(has(/ไม่พร้อมตอก|ต่ำกว่าค่าเฉลี่ยวันข้างเคียง|ต่ำกว่าเกณฑ์/)) checks.push('ตรวจรอบผลิตวันนั้น: ส่วนผสม การบ่ม ผลก้อน และเสาต้นอื่นวันเดียวกัน');
   if(has(/ย้อนวันเกินที่สูตร/)) checks.push('ตรวจว่าวันผลิตใช้สูตรตามที่ย้อนวันจริงหรือไม่');
   if(has(/ตอกก่อนครบ 8 วัน/)) checks.push('ทบทวนการนับส่งตอก และตรวจกำลังอัดที่อายุจริงก่อนส่ง');
@@ -503,21 +508,21 @@ function FailReport({rec,logo,photos}){
       const pf=pieceFormula(rec,p),PR=pieceRows(rec,p),S=buildStrength(PR,p.date),sum=strengthSummary(PR,p.date,pf),A=pieceAnalysis(rec,p,pcsR.length);
       return <div key={pi} data-block={'3-'+pi} style={blk}>{H((pi===0?'2. ':'2. (ต่อ) ')+'กำลังอัดคอนกรีต — ผลวันผลิตเทียบที่อายุจริงตอนตอก (ksc)'+(pf?' · สูตร '+pf:' · ทุกสูตร')+(pcsR.length>1?' — '+g.ps.map(x=>x.label).join(' + ')+' ผลิต '+dm(p.date):''))}
       {S.ages.length===0?<div style={{fontSize:13,color:'#64748b'}}>ไม่พบผลกำลังอัดช่วงวันผลิตในระบบ</div>:<>
-        {(()=>{const R=relevantAges(PR,p.date,pf,A.age);
+        {(()=>{const R=relevantAges(PR,p.date,pf,A.age,A.min);
           return <table style={{width:'100%',borderCollapse:'collapse'}}>
             <thead><tr><th style={th}>อายุ</th><th style={th}>ผลวันผลิต (ksc)</th><th style={th}>เกณฑ์</th></tr></thead>
             <tbody>{R.lines.map(l=><tr key={l.key} style={{background:l.mid?'#fffbeb':undefined}}>
               <td style={{...td,fontWeight:700}}>{l.label}{l.sub&&<div style={{fontSize:11.5,fontWeight:400,color:'#64748b'}}>{l.sub}</div>}</td>
               <td style={{...td,fontWeight:l.mid?800:600,color:(l.avg!=null&&l.tg&&l.avg<l.tg)?'#b91c1c':undefined}}>{fmtN(l.avg)}</td>
-              <td style={{...td,fontWeight:l.mid?800:400,color:l.mid?(R.ev.ok?'#15803d':'#b91c1c'):'#64748b'}}>{l.mid?('≥ '+DRIVE_MIN+' '+(R.ev.ok?'✔ พร้อมตอก':'✘ ยังไม่พร้อม')):(l.tg||'–')}</td></tr>)}</tbody>
+              <td style={{...td,fontWeight:l.mid?800:400,color:l.mid?(R.ev.ok?'#15803d':'#b91c1c'):'#64748b'}}>{l.mid?('≥ '+R.ev.target+' '+(R.ev.ok?'✔ พร้อมตอก':'✘ ยังไม่พร้อม')):(l.tg||'–')}</td></tr>)}</tbody>
           </table>;})()}
-        <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{(A.ev&&A.ev.usedAges.length>1)?'ค่าประมาณ = แทรกค่าจากผลก้อนปูนอายุที่ใกล้เคียง · ':''}เกณฑ์ของอายุ 1/3/5/7 วันเป็นเกณฑ์เดิมของโรงงาน · เกณฑ์พร้อมตอก ≥ {DRIVE_MIN} ksc</div>
-        {(()=>{const N=neighborDays(PR,p.date,pf,A.age);if(!N.some(x=>x.v!=null)) return null;
+        <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{(A.ev&&A.ev.usedAges.length>1)?'ค่าประมาณ = แทรกค่าจากผลก้อนปูนอายุที่ใกล้เคียง · ':''}เกณฑ์ของอายุ 1/3/5/7 วันเป็นเกณฑ์เดิมของโรงงาน · เกณฑ์พร้อมตอก ≥ {A.min||DRIVE_MIN} ksc{A.min>DRIVE_MIN?' (ดินแข็ง)':''}</div>
+        {(()=>{const N=neighborDays(PR,p.date,pf,A.age,A.min);if(!N.some(x=>x.v!=null)) return null;
           return <div style={{marginTop:8}}><div style={{fontSize:13,fontWeight:700,color:'#475569',marginBottom:3}}>{(A.ev&&A.ev.usedAges.length===1&&A.ev.usedAges[0]===A.age)?'ผลกำลังอัดอายุ '+A.age+' วัน':'ค่าประมาณที่อายุ '+A.age+' วัน'} — วันผลิต ± 3 วัน (ksc)</div>
             <table style={{width:'100%',borderCollapse:'collapse'}}>
               <thead><tr>{N.map(x=><th key={x.d} style={{...th,textAlign:'center',background:x.isProd?'#fef3c7':undefined}}>{dm(x.d)}{x.isProd?' ★':''}</th>)}</tr></thead>
               <tbody><tr>{N.map(x=><td key={x.d} style={{...td,textAlign:'center',fontWeight:x.isProd?800:600,background:x.isProd?'#fffbeb':undefined,color:x.v==null?'#94a3b8':x.ok===false?'#b91c1c':undefined}}>{x.v==null?'–':fmtN(x.v)}</td>)}</tr></tbody></table>
-            <div style={{fontSize:12,color:'#64748b',marginTop:3}}>★ = วันผลิตจริง · {(A.ev&&A.ev.usedAges.length>1)?'แต่ละวันแทรกค่าจากผลก้อนปูน 1/3/5/7 วันของวันนั้น · ':''}"–" = ไม่มีผลสูตรนี้ในวันนั้น · สีแดง = ต่ำกว่า {DRIVE_MIN}</div></div>;})()}
+            <div style={{fontSize:12,color:'#64748b',marginTop:3}}>★ = วันผลิตจริง · {(A.ev&&A.ev.usedAges.length>1)?'แต่ละวันแทรกค่าจากผลก้อนปูน 1/3/5/7 วันของวันนั้น · ':''}"–" = ไม่มีผลสูตรนี้ในวันนั้น · สีแดง = ต่ำกว่า {A.min||DRIVE_MIN}</div></div>;})()}
         {A.ev&&<div style={{marginTop:6,fontSize:13.5,fontWeight:800,color:A.ev.ok===false?'#b91c1c':'#15803d'}}>→ อายุตอนตอก {A.ev.age} วัน กำลังอัด {A.ev.usedAges.length>1?'≈ ':''}{fmtN(A.ev.strength)} ksc ({A.ev.usedAges.length>1?'แทรกค่าจากผล '+A.ev.usedAges.join(' และ ')+' วัน':'ผลจริงอายุ '+A.ev.usedAges[0]+' วัน'}) เกณฑ์พร้อมตอก ≥ {fmtN(A.ev.target)} ksc {A.ev.ok===false?'✘ ยังไม่ถึง ไม่พร้อมตอก':'✔ ถึงเกณฑ์ พร้อมตอก'}</div>}
       </>}
     </div>;})}
@@ -627,7 +632,7 @@ function FailSummaryCard({rec,logo}){
       {box('อายุจริงตอนตอก',minAge!=null?minAge+' วัน':'–')}
     </div>
     <table style={{width:'100%',borderCollapse:'collapse',marginBottom:12}}>
-      <thead><tr><th style={th}>ท่อน</th><th style={th}>สูตร</th><th style={th}>ย้อนวัน</th><th style={th}>อายุจริง</th><th style={th}>กำลังอัดที่อายุตอนตอก (พร้อมตอก ≥ {DRIVE_MIN})</th></tr></thead>
+      <thead><tr><th style={th}>ท่อน</th><th style={th}>สูตร</th><th style={th}>ย้อนวัน</th><th style={th}>อายุจริง</th><th style={th}>กำลังอัดที่อายุตอนตอก (พร้อมตอก ≥ {driveMinOf(rec.blow_count)})</th></tr></thead>
       <tbody>{pcs.map((p,i)=>{const A=ages[i];return <tr key={i}>
         <td style={{...td,fontWeight:800}}>{p.label}{p.len!==''?' '+fmtN(p.len,0)+' ม.':''}</td>
         <td style={td}>{A.formula||'–'}</td>
@@ -1022,20 +1027,20 @@ function FailForm({me,init,onCancel,onSaved}){
               <div style={{fontWeight:800,color:'var(--brand)'}}>{pcs.length>1?pieceLabel(pi,pcs.length):'เสาต้นนี้'} · ผลิต {thaiDate(p.date)}{p.len?' · '+p.len+' ม.':''}</div>
               <select value={p.formula||''} onChange={e=>setPd(f.prod_dates.indexOf(p),{formula:e.target.value})} style={{padding:'6px 8px',borderRadius:8,border:'1.5px solid var(--line-strong)',fontSize:14}}>
                 <option value="">ทุกสูตร (ไม่รวม NP280)</option>{formulasOn(p.date).filter(x=>!/^NP280$/i.test(x[0])).map(([nm,n])=><option key={nm} value={nm}>{nm} ({n} ชุด)</option>)}</select></div>
-            {(()=>{const R=relevantAges(PRf,p.date,pf,A.age);
+            {(()=>{const R=relevantAges(PRf,p.date,pf,A.age,A.min);
               if(!R.ev) return <div className="hint">ไม่มีผลก้อนปูนของวันผลิตนี้ในระบบ{A.age==null?' (ใส่วันที่ตอกเฟลด้วย)':''}</div>;
               return <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',fontSize:14}}>
                 <thead><tr><th style={{padding:'5px 6px',textAlign:'left'}}>อายุ</th><th style={{padding:'5px 6px'}}>ผลวันผลิต (ksc)</th><th style={{padding:'5px 6px'}}>เกณฑ์</th></tr></thead>
                 <tbody>{R.lines.map(l=><tr key={l.key} style={{borderTop:'1px solid var(--line)',background:l.mid?'#fffbeb':'transparent'}}>
                   <td style={{padding:'6px',fontWeight:700}}>{l.label}{l.sub&&<div style={{fontSize:12,fontWeight:400,color:'var(--muted)'}}>{l.sub}</div>}</td>
                   <td style={{textAlign:'center',fontWeight:l.mid?800:600,color:(l.avg!=null&&l.tg&&l.avg<l.tg)?'#c0392b':'inherit'}}>{fmtN(l.avg)}</td>
-                  <td style={{textAlign:'center',fontWeight:l.mid?800:400,color:l.mid?(R.ev.ok?'#15803d':'#c0392b'):'var(--muted)'}}>{l.mid?('≥ '+DRIVE_MIN+' '+(R.ev.ok?'✔ พร้อมตอก':'✘ ยังไม่พร้อม')):(l.tg||'–')}</td></tr>)}</tbody></table></div>;})()}
-            {(()=>{const N=neighborDays(PRf,p.date,pf,A.age);if(!N.some(x=>x.v!=null)) return null;
+                  <td style={{textAlign:'center',fontWeight:l.mid?800:400,color:l.mid?(R.ev.ok?'#15803d':'#c0392b'):'var(--muted)'}}>{l.mid?('≥ '+R.ev.target+' '+(R.ev.ok?'✔ พร้อมตอก':'✘ ยังไม่พร้อม')):(l.tg||'–')}</td></tr>)}</tbody></table></div>;})()}
+            {(()=>{const N=neighborDays(PRf,p.date,pf,A.age,A.min);if(!N.some(x=>x.v!=null)) return null;
               return <div style={{marginTop:8,overflowX:'auto'}}><div style={{fontSize:13,fontWeight:700,color:'var(--muted)',marginBottom:3}}>{(A.ev&&A.ev.usedAges.length===1&&A.ev.usedAges[0]===A.age)?'ผลกำลังอัดอายุ '+A.age+' วัน':'ค่าประมาณที่อายุ '+A.age+' วัน'} — วันผลิต ± 3 วัน (ksc)</div>
                 <table style={{borderCollapse:'collapse',width:'100%',fontSize:13.5}}>
                   <thead><tr>{N.map(x=><th key={x.d} style={{padding:'4px 3px',background:x.isProd?'#fef3c7':'transparent'}}>{dm(x.d)}{x.isProd?' ★':''}</th>)}</tr></thead>
                   <tbody><tr>{N.map(x=><td key={x.d} style={{textAlign:'center',padding:'5px 3px',fontWeight:x.isProd?800:600,background:x.isProd?'#fffbeb':'transparent',color:x.v==null?'#94a3b8':x.ok===false?'#c0392b':'inherit'}}>{x.v==null?'–':fmtN(x.v)}</td>)}</tr></tbody></table>
-                <div className="hint">★ = วันผลิตจริง · "–" = ไม่มีผลสูตรนี้ในวันนั้น · สีแดง = ต่ำกว่า {DRIVE_MIN}</div></div>;})()}
+                <div className="hint">★ = วันผลิตจริง · "–" = ไม่มีผลสูตรนี้ในวันนั้น · สีแดง = ต่ำกว่า {A.min||DRIVE_MIN}</div></div>;})()}
           </div>;})}
         </>}
       </div>
