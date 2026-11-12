@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12j';
+var APP_VERSION='2026-11-12k';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13456,10 +13456,10 @@ window.__dataReady.then(data => {
     const sIdx=n=>n<=300?0:n>=600?4:n<=400?1:n<=500?2:3;
     const TG={1:350,3:415,5:435,7:450},TG280={1:340,7:420};
     // กำลังอัดวันผลิตต่ออายุ (เทียบเกณฑ์) จากผลที่เก็บไว้ในใบตรวจ
-    const pcsOf=r=>{const a=(Array.isArray(r.prod_dates)&&r.prod_dates.length)?r.prod_dates:(r.prod_date?[{date:r.prod_date}]:[]);const list=a.filter(p=>p&&p.date),n=list.length,single=a.length===1;const lab=i=>n<=1?'เสาต้นนี้':i===0?'ท่อนล่าง':i===n-1?'ท่อนบน':'ท่อนกลาง'+(n>3?' '+i:'');return list.map((p,i)=>({date:String(p.date).slice(0,10),len:p.len,face:p.face!=null&&p.face!==''?String(p.face):(single?String(r.face_date||''):''),label:lab(i)}));};
+    const pcsOf=r=>{const a=(Array.isArray(r.prod_dates)&&r.prod_dates.length)?r.prod_dates:(r.prod_date?[{date:r.prod_date}]:[]);const list=a.filter(p=>p&&p.date),n=list.length,single=a.length===1;const lab=i=>n<=1?'เสาต้นนี้':i===0?'ท่อนล่าง':i===n-1?'ท่อนบน':'ท่อนกลาง'+(n>3?' '+i:'');return list.map((p,i)=>({...p,date:String(p.date).slice(0,10),len:p.len,face:p.face!=null&&p.face!==''?String(p.face):(single?String(r.face_date||''):''),label:lab(i)}));};
     const strListAt=(r,prod)=>{return [7].map(a=>{const v=(r.strength_rows||[]).filter(x=>String(x.d).slice(0,10)===prod&&Number(x.a)===a).map(x=>Number(x.k)).filter(x=>x>0);if(!v.length)return null;const avg=v.reduce((t,x)=>t+x,0)/v.length;const tg=(/^NP280$/i.test(r.strength_formula||'')?TG280:TG)[a]||null;return{a,avg,tg,ok:tg?avg>=tg:null};}).filter(Boolean);};
     const keyOfL=l=>l.find(x=>x.a===7)||l.find(x=>x.a===3)||l[0]||null;
-    const strKey=r=>{const pcs=pcsOf(r);const ks=pcs.map(p=>{const k=keyOfL(strListAt(r,p.date));return k?{...k,pl:pcs.length>1?p.label:''}:null;}).filter(Boolean);return ks.find(x=>x.ok===false)||ks[0]||null;};   // หลายท่อน: เอาท่อนที่ต่ำกว่าเกณฑ์ก่อน
+    const strKey=r=>{const pcs=pcsOf(r);const ks=pcs.map(p=>{if(p.str_age!=null&&p.age!=null)return {a:p.age,avg:Number(p.str_age),tg:p.tgt_age!=null?Number(p.tgt_age):null,ok:p.ok_age,pl:pcs.length>1?p.label:''};const k=keyOfL(strListAt(r,p.date));return k?{...k,pl:pcs.length>1?p.label:''}:null;}).filter(Boolean);return ks.find(x=>x.ok===false)||ks[0]||null;};   // หลายท่อน: เอาท่อนที่ต่ำกว่าเกณฑ์ก่อน
     const hr=r=>r.hammer_ratio!=null?Number(r.hammer_ratio):null;
     const flags=r=>({str:(strKey(r)||{}).ok===false,hammer:hr(r)!=null&&(hr(r)<0.7||hr(r)>2.5),vert:r.vertical_result==='bad',hard:r.blow_count!=null&&Number(r.blow_count)>=600});
     const months=[...new Set(rows.map(r=>String(r.inspect_date).slice(0,7)))].sort().reverse();
@@ -13469,13 +13469,14 @@ window.__dataReady.then(data => {
     const cnt=k=>base.filter(r=>flags(r)[k]).length;
     // ---- วิเคราะห์ภาพรวมจากใบตรวจที่กรองอยู่ (นับปัจจัยที่พบในแต่ละใบ) ----
     const factorDefs=[
-      ['กำลังอัด 7 วันต่ำกว่าเกณฑ์',r=>(strKey(r)||{}).ok===false,'#b91c1c'],
+      ['กำลังอัดที่อายุตอนตอกต่ำกว่าเกณฑ์',r=>(strKey(r)||{}).ok===false,'#b91c1c'],
+      ['ย้อนวันที่หน้าเสาเกินที่สูตรรองรับ',r=>pcsOf(r).some(p=>p.policy_ok===false),'#b91c1c'],
+      ['ตอกก่อนครบ 8 วันนับจากวันที่หน้าเสา',r=>pcsOf(r).some(p=>p.face_age!=null&&Number(p.face_age)<8),'#c2410c'],
       ['ตุ้มเบาเกินไป (<0.7 เท่า)',r=>hr(r)!=null&&hr(r)<0.7,'#b45309'],
       ['ตุ้มหนักเกินไป (>2.5 เท่า)',r=>hr(r)!=null&&hr(r)>2.5,'#b45309'],
       ['เสาไม่ดิ่ง',r=>r.vertical_result==='bad','#b91c1c'],
       ['ดินแข็ง (Blow ≥600)',r=>r.blow_count!=null&&Number(r.blow_count)>=600,'#991b1b'],
       ['ดินเฝ้าระวัง (Blow 301–599)',r=>r.blow_count!=null&&Number(r.blow_count)>300&&Number(r.blow_count)<600,'#a16207'],
-      ['ตอกก่อนอายุ 7 วัน',r=>r.age_days!=null&&Number(r.age_days)<7,'#c2410c'],
       ['พลังงานตุ้มไม่พอตาม Qa (คำนวณ Blow ไม่ได้)',r=>r.blow_s_cm!=null&&Number(r.blow_s_cm)<=0,'#b91c1c'],
       ['ตอกไม่ถึงระดับปลายเสาที่กำหนด',r=>{const l=r.drive_log||{};return l.shortfall!=null&&Number(l.shortfall)>0.05;},'#c2410c'],
       ['set จริงยังไม่ถึง Qa ตามแบบ',r=>{const l=r.drive_log||{};return l.qa_act!=null&&r.qa_ton!=null&&Number(l.qa_act)<Number(r.qa_ton);},'#b91c1c'],
@@ -13563,9 +13564,9 @@ window.__dataReady.then(data => {
               {row('ลูกค้า / หน้างาน',[r.customer,r.site].filter(Boolean).join(' · '))}
               {row('ขนาด × ความยาว',(r.pile_size||'–')+(r.pile_std?(r.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2)+' ม.':'–'))}
               {row('วันที่ตอกเฟล',fmtD(r.drive_date))}
-              {row('ท่อน · ผลิตจริง · หน้าเสา',<span>{pcsM.map((p,i)=><div key={i}><b style={{color:'#475569',marginRight:6}}>{p.label}{p.len!==''&&p.len!=null?' ('+Number(p.len)+' ม.)':''}</b>ผลิต {fmtD(p.date)} <b>(อายุ {r.drive_date?Math.round((new Date(String(r.drive_date).slice(0,10))-new Date(p.date))/864e5):'–'} วัน)</b>{p.face?<span style={{color:'#64748b'}}> · หน้าเสา {p.face}</span>:null}</div>)}{pcsM.length>1&&r.age_days!=null&&<div style={{color:'#64748b'}}>ท่อนที่อ่อนที่สุด {r.age_days} วัน</div>}</span>)}
+              {row('ท่อน · ผลิตจริง · หน้าเสา',<span>{pcsM.map((p,i)=><div key={i}><b style={{color:'#475569',marginRight:6}}>{p.label}{p.len!==''&&p.len!=null?' ('+Number(p.len)+' ม.)':''}</b>ผลิต {fmtD(p.date)} <b>(อายุจริง {r.drive_date?Math.round((new Date(String(r.drive_date).slice(0,10))-new Date(p.date))/864e5):'–'} วัน)</b>{p.face?<span style={{color:'#64748b'}}> · หน้าเสา {p.face}</span>:null}{p.formula?<span style={{color:'#0f766e'}}> · สูตร {p.formula}</span>:null}{p.backdate!=null&&<span style={{color:p.policy_ok===false?'#b91c1c':'#64748b',fontWeight:p.policy_ok===false?700:400}}> · ย้อน {p.backdate} วัน{p.face_age!=null?' (อายุตามหน้าเสา '+p.face_age+' วัน)':''}{p.policy_ok===false?' ✘ เกินที่สูตรรองรับ':p.policy_ok===true?' ✔':''}</span>}</div>)}{pcsM.length>1&&r.age_days!=null&&<div style={{color:'#64748b'}}>ท่อนที่อ่อนที่สุด {r.age_days} วัน</div>}</span>)}
               {row('วันที่หน้าเสา (อ้างอิง)',r.face_date)}
-              {row('กำลังอัดวันผลิต'+(r.strength_formula?' · '+r.strength_formula:''),pcsM.some(p=>strListAt(r,p.date).length)?<span>{pcsM.map(p=>{const sl=strListAt(r,p.date);return <div key={p.date}>{pcsM.length>1&&<b style={{color:'#475569',marginRight:6}}>{p.label}</b>}{sl.length?sl.map(x=><span key={x.a} style={{display:'inline-block',marginRight:10,color:x.ok===false?'#b91c1c':'#15803d',fontWeight:700}}>{x.a} วัน {Math.round(x.avg)}{x.tg?' / '+x.tg:''} {x.ok===false?'✘':'✔'}</span>):'ไม่มีผล'}</div>;})}</span>:'ไม่มีผลในระบบ')}
+              {row('กำลังอัดวันผลิต'+(r.strength_formula?' · '+r.strength_formula:''),pcsM.some(p=>p.str_age!=null||strListAt(r,p.date).length)?<span>{pcsM.map(p=>{const sl=strListAt(r,p.date);return <div key={p.date}>{pcsM.length>1&&<b style={{color:'#475569',marginRight:6}}>{p.label}</b>}{p.str_age!=null?<span style={{display:'inline-block',marginRight:10,color:p.ok_age===false?'#b91c1c':'#15803d',fontWeight:700}}>อายุตอนตอก {p.age} วัน ≈ {Math.round(Number(p.str_age))}{p.tgt_age!=null?' / เกณฑ์ '+Math.round(Number(p.tgt_age)):''} {p.ok_age===false?'✘':'✔'}</span>:sl.length?sl.map(x=><span key={x.a} style={{display:'inline-block',marginRight:10,color:x.ok===false?'#b91c1c':'#15803d',fontWeight:700}}>{x.a} วัน {Math.round(x.avg)}{x.tg?' / '+x.tg:''} {x.ok===false?'✘':'✔'}</span>):'ไม่มีผล'}</div>;})}</span>:'ไม่มีผลในระบบ')}
               {row('ชั้นดิน (Blow '+(r.blow_feet||30)+' ฟุต)',r.blow_count!=null?<span><b>{r.blow_count}</b> ครั้ง {L2&&<span style={{background:L2.bg,color:L2.col,fontWeight:700,padding:'1px 9px',borderRadius:999,marginLeft:6}}>{L2.e} {L2.t}</span>}{r.blow_site?<span style={{color:'#64748b'}}> · {r.blow_site}</span>:null}</span>:'')}
               {row('ตุ้ม W × H',r.hammer_weight_t!=null?Number(r.hammer_weight_t)+' ตัน × '+(r.hammer_drop_cm!=null?Number(r.hammer_drop_cm)+' ซม.':'–'):'')}
               {row('น้ำหนักเสา',r.pile_weight_t!=null?Number(r.pile_weight_t).toFixed(2)+' ตัน'+(r.pile_area_cm2?'  (หน้าตัด '+Number(r.pile_area_cm2)+' ซม.²)':''):'')}
