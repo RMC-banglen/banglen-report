@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12a';
+var APP_VERSION='2026-11-12b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13570,6 +13570,7 @@ window.__dataReady.then(data => {
     const [editId,setEditId]=useState(null);
     const [paste,setPaste]=useState('');
     const [pasteMsg,setPasteMsg]=useState('');
+    const [qcAll,setQcAll]=useState([]);
     const [qcMap,setQcMap]=useState({});      // ใบตรวจเสาเฟลจากแอป QC (pile_fail_inspections) เชื่อมกับรายการด้วย foreman_report_id
     const [qcView,setQcView]=useState(null);   // ใบตรวจ QC ที่เปิดดูอยู่
     const [saving,setSaving]=useState(false);
@@ -13581,7 +13582,7 @@ window.__dataReady.then(data => {
     const load=()=>{db.from('foreman_reports').select('*').order('drive_date',{ascending:false}).order('id',{ascending:false}).limit(5000)
       .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
     useEffect(load,[]);
-    useEffect(()=>{db.from('pile_fail_inspections').select('*').order('created_at',{ascending:true}).limit(3000).then(({data,error})=>{if(error)return;const m={};(data||[]).forEach(q=>{if(q.foreman_report_id!=null)m[q.foreman_report_id]=q;});setQcMap(m);}).catch(()=>{});},[]);
+    useEffect(()=>{db.from('pile_fail_inspections').select('*').order('created_at',{ascending:true}).limit(3000).then(({data,error})=>{if(error)return;const m={};(data||[]).forEach(q=>{if(q.foreman_report_id!=null)m[q.foreman_report_id]=q;});setQcMap(m);setQcAll(data||[]);}).catch(()=>{});},[]);
     if(rows===null)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
     if(noTable)return <div className="grid"><ChartCard span="full" title="🏗️ รายงานโฟร์แมน (เสาเข็มเฟลหน้างาน)">
       <div style={{padding:'12px 14px',fontSize:14,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-foreman-reports.sql</b> หนึ่งครั้ง จากนั้นรีเฟรชหน้านี้</div>
@@ -13599,10 +13600,14 @@ window.__dataReady.then(data => {
     const SOIL_SOFT=300,SOIL_HARD=600,soilStep=(SOIL_HARD-SOIL_SOFT)/3;
     const SOIL_LV=[{e:'🟢',t:'ดินอ่อน',col:'#15803d',bg:'#dcfce7',k:'soft'},{e:'🟡',t:'เฝ้าระวัง 1',col:'#a16207',bg:'#fef9c3',k:'mid'},{e:'🟠',t:'เฝ้าระวัง 2',col:'#c2410c',bg:'#ffedd5',k:'mid'},{e:'🔶',t:'เฝ้าระวัง 3',col:'#b91c1c',bg:'#fee2e2',k:'mid'},{e:'🔴',t:'ดินแข็ง',col:'#991b1b',bg:'#fecaca',k:'hard'}];
     const soilIdx=n=>n<=SOIL_SOFT?0:n>=SOIL_HARD?4:n<=Math.round(SOIL_SOFT+soilStep)?1:n<=Math.round(SOIL_SOFT+2*soilStep)?2:3;
+    const normSz=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const qcOf=r=>{ if(qcMap[r.id]) return qcMap[r.id];
+      const d=String(r.drive_date||'').slice(0,10),z=normSz(r.size),L=Number(r.length_m);
+      return qcAll.find(q=>q.foreman_report_id==null&&String(q.drive_date||'').slice(0,10)===d&&normSz(q.pile_size)===z&&Math.abs(Number(q.pile_length_m)-L)<0.011)||null; };
     const soilOf=r=>{   // ชนิดดินมาจากค่านับ Blow count ที่กรอกเอง (soil_override = ตัวเลข) · ยังไม่กรอก = ไม่แสดง
       const ov=r.soil_override==null?'':String(r.soil_override).trim();
       if(/^\d+$/.test(ov))return{max:Number(ov)};
-      const q=qcMap[r.id];   // ไม่ได้กรอกเอง → ใช้ค่า Blow จากใบตรวจเสาเฟลของ QC
+      const q=qcOf(r);   // ไม่ได้กรอกเอง → ใช้ค่า Blow จากใบตรวจเสาเฟลของ QC
       return q&&q.blow_count!=null?{max:Number(q.blow_count),qc:true}:null;
     };
     // สรุปกำลังอัดวันผลิตจากใบตรวจ QC (เทียบเกณฑ์ ksc ตามอายุ)
@@ -13712,7 +13717,7 @@ window.__dataReady.then(data => {
     const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
     const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
     const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['ดิน (Blow count)',r=>{const o=soilOf(r);if(!o)return<span style={{color:'#cbd5e1'}} title="ยังไม่ได้ใส่ค่านับ Blow count (คลิกแถวเพื่อใส่)">–</span>;const L=SOIL_LV[soilLv(o)];return<span title={o.qc?'ค่า Blow จากใบตรวจเสาเฟลของ QC':'ค่านับ Blow count ที่ใส่ไว้ (คลิกแถวเพื่อแก้ไข)'} style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t} · {o.max}{o.qc?' (QC)':''}</span>;},{nw:1}],
-      ['ตรวจ QC',r=>{const q=qcMap[r.id];if(!q)return<span style={{color:'#cbd5e1'}} title="ยังไม่มีใบตรวจเสาเฟลของ QC สำหรับรายการนี้">–</span>;
+      ['ตรวจ QC',r=>{const q=qcOf(r);if(!q)return<span style={{color:'#cbd5e1'}} title="ยังไม่มีใบตรวจเสาเฟลของ QC สำหรับรายการนี้">–</span>;
         const st=qcStrength(q),hr=q.hammer_ratio!=null?Number(q.hammer_ratio):null;
         const chip=(ok,t)=><span style={{display:'inline-block',padding:'1px 7px',borderRadius:999,fontSize:11.5,fontWeight:700,marginRight:3,background:ok?'#dcfce7':'#fee2e2',color:ok?'#15803d':'#b91c1c'}}>{t}</span>;
         return<button type="button" onClick={e=>{e.stopPropagation();setQcView(q);}} title="กดดูใบตรวจเสาเฟลของ QC" style={{border:'1px solid #bae6fd',background:'#f0f9ff',borderRadius:8,padding:'3px 8px',cursor:'pointer',textAlign:'left',whiteSpace:'nowrap'}}>
