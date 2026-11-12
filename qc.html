@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12v';
+var APP_VERSION='2026-11-12w';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -713,42 +713,10 @@ function FailDetail({rec,onBack,onEdit,onAddNext}){
   const [busy2,setBusy2]=useState('');
   const [sumImg,setSumImg]=useState(null);              // รูปสรุป {blob,url,file,name}
   const [pageImgs,setPageImgs]=useState(null);          // รูปรายงานเต็มแบ่งหน้า [{blob,url,file,name}]
-  const [sent,setSent]=useState(rec.problem_report_id||null);
   const mkItem=(blob,name)=>({blob,url:URL.createObjectURL(blob),file:new File([blob],name,{type:'image/jpeg'}),name});
   const getSum=async()=>{ if(sumImg) return sumImg.blob; const blob=await makeFailSummary(rec,setBusy2); setSumImg(mkItem(blob,baseName+'-สรุป.jpg')); return blob; };
   const genSum=async()=>{ setBusy2('เริ่ม…');setErr(''); try{ await getSum(); }catch(e){ setErr('สร้างรูปสรุปไม่สำเร็จ: '+(e.message||e)); } setBusy2(''); };
   const genPages=async()=>{ setBusy2('เริ่ม…');setErr(''); try{ const bl=await makeFailPageImages(rec,setBusy2); setPageImgs(bl.map((b,i)=>mkItem(b,baseName+'-หน้า'+(i+1)+'.jpg'))); }catch(e){ setErr('สร้างรูปรายงานไม่สำเร็จ: '+(e.message||e)); } setBusy2(''); };
-  // ส่งเข้า "รายงานปัญหา" ของแดชบอร์ด (ประเภท ปัญหาหน้างาน): แนบ "รูปสรุป" ตัวใหญ่อ่านชัด + รูปถ่ายรอยแตกแต่ละรูป (ไม่แนบรูปยาวทั้งใบ)
-  const sendProblem=async()=>{
-    if(sent&&!window.confirm('ใบนี้ส่งเข้ารายงานปัญหาไปแล้ว (#'+sent+') ส่งซ้ำอีกหรือไม่ ?')) return;
-    if(!window.confirm('ส่งใบตรวจนี้เข้า "รายงานปัญหา" (ประเภท ปัญหาหน้างาน) พร้อมแนบรูปสรุปและรูปถ่ายรอยแตก ?')) return;
-    setBusy2('กำลังส่ง…');setErr('');
-    try{
-      const blob=await getSum();
-      const an=analyze(rec), pcs=piecesOf(rec);
-      const title='เสาเฟลหน้างาน '+(rec.pile_size||'')+(rec.pile_length_m!=null?'×'+fmtN(rec.pile_length_m,2):'')+' — '+([rec.customer,rec.site].filter(Boolean).join(' · ')||'ไม่ระบุหน้างาน');
-      const lines=['ตอกเฟลวันที่ '+thaiDate(rec.drive_date)+' · อายุเสา '+(rec.age_days!=null?rec.age_days+' วัน':'–'),
-        ...pcs.map(p=>p.label+(p.len!==''?' '+fmtN(p.len,2)+' ม.':'')+': ผลิต '+thaiDate(p.date)+(p.face?' · หน้าเสา '+p.face:'')),
-        rec.blow_count!=null?'Blow '+rec.blow_count+' ครั้ง/'+(rec.blow_feet||30)+' ฟุต ('+SOIL_LV[soilIdx(Number(rec.blow_count))].t+')':null,
-        rec.hammer_weight_t!=null?'ตุ้ม '+rec.hammer_weight_t+' ตัน × '+(rec.hammer_drop_cm!=null?rec.hammer_drop_cm+' ซม.':'–')+(rec.hammer_ratio!=null?' (ตุ้ม÷เสา '+fmtN(rec.hammer_ratio,2)+')':''):null,
-        'วิเคราะห์เบื้องต้น: '+an.summary,'(จากใบตรวจเสาเฟล QC #'+rec.id+')'].filter(Boolean);
-      const base={report_date:String(rec.drive_date||rec.inspect_date||'').slice(0,10),title,type:'ปัญหาหน้างาน',description:lines.join('\n'),status:'open',fix_note:rec.action_note||''};
-      const full={...base,customer_name:rec.customer||null,root_cause:rec.cause_note||(an.risks[0]?an.risks[0].x:null),exclude_kpi:false,pile_spec:(rec.pile_size||'')+(rec.pile_std?(rec.pile_std==='fac'?' รง.':' มอก.'):''),pile_qty:1};
-      let ins=await DB.from('quality_reports').insert(full).select().single();
-      if(ins.error) ins=await DB.from('quality_reports').insert(base).select().single();   // คอลัมน์เสริมไม่มี → ส่งเฉพาะช่องหลัก
-      if(ins.error) throw ins.error;
-      const rid=ins.data.id, path='reports/'+rid+'/'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.jpg';
-      const up=await DB.storage.from('quality-images').upload(path,blob,{contentType:'image/jpeg',cacheControl:'31536000'});
-      if(up.error) throw up.error;
-      const url=DB.storage.from('quality-images').getPublicUrl(path).data.publicUrl;
-      const urls=[url,...(rec.photos||[])];   // รูปสรุปก่อน แล้วตามด้วยรูปถ่ายรอยแตก (ใช้ไฟล์เดิม ไม่อัปโหลดซ้ำ)
-      for(const u of urls){ const im=await DB.from('quality_report_images').insert({report_id:rid,image_url:u}); if(im.error) throw im.error; }
-      const lk=await DB.from('pile_fail_inspections').update({problem_report_id:rid}).eq('id',rec.id);   // จำไว้ว่าส่งแล้ว (ต้องรัน SQL คอลัมน์ problem_report_id)
-      setSent(rid);
-      if(lk.error) setErr('ส่งเข้ารายงานปัญหาแล้ว (#'+rid+') แต่จดจำสถานะไม่ได้ — ให้แอดมินรัน SQL ล่าสุด (supabase-pile-fail-inspect.sql) ปุ่มนี้จึงกดส่งซ้ำได้');
-    }catch(e){ setErr('ส่งเข้ารายงานปัญหาไม่สำเร็จ: '+(e.message||e)); }
-    setBusy2('');
-  };
   const canShare=pdf&&navigator.canShare&&navigator.canShare({files:[pdf.file]});
   const canShareSum=sumImg&&navigator.canShare&&navigator.canShare({files:[sumImg.file]});
   const canSharePages=pageImgs&&navigator.canShare&&navigator.canShare({files:pageImgs.map(x=>x.file)});
@@ -771,11 +739,11 @@ function FailDetail({rec,onBack,onEdit,onAddNext}){
         </div>
       </div>}
       <div className="card">
-        <div style={{fontWeight:800,color:'var(--brand)',marginBottom:8}}>ส่งออกเป็นรูปภาพ / รายงานปัญหา</div>
+        <div style={{fontWeight:800,color:'var(--brand)',marginBottom:8}}>ส่งออกเป็นรูปภาพ</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           <button className="ghost" style={{flex:'1 1 170px'}} disabled={!!busy2} onClick={genSum}>{busy2&&!/ส่ง|หน้า/.test(busy2)?busy2:'🖼️ รูปสรุป (รูปเดียว ตัวใหญ่)'}</button>
           <button className="ghost" style={{flex:'1 1 170px'}} disabled={!!busy2} onClick={genPages}>{/หน้า|โหลด|เตรียม/.test(busy2)?busy2:'🖼️ รูปรายงานเต็ม (แบ่งหน้า)'}</button>
-          <button className="ghost" style={{flex:'1 1 100%',borderColor:sent?'#a7e3d4':undefined,background:sent?'#ecfdf5':undefined}} disabled={!!busy2} onClick={sendProblem}>{/ส่ง/.test(busy2)?busy2:(sent?'✔ ส่งเข้ารายงานปัญหาแล้ว (#'+sent+') · ส่งซ้ำ':'📌 ส่งเข้ารายงานปัญหา (รูปสรุป + รูปถ่ายรอยแตก)')}</button></div>
+          </div>
         {sumImg&&<div style={{marginTop:10,padding:'8px 10px',border:'1px solid var(--line)',borderRadius:10}}>
           <div style={{fontWeight:700,marginBottom:6}}>รูปสรุป</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -787,7 +755,6 @@ function FailDetail({rec,onBack,onEdit,onAddNext}){
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {pageImgs.map((x,i)=><a key={i} href={x.url} download={x.name} className="ghost" style={{textDecoration:'none',textAlign:'center',flex:'1 1 90px'}}>⬇ หน้า {i+1}</a>)}
             {canSharePages&&<button className="ghost" style={{flex:'1 1 130px'}} onClick={()=>navigator.share({files:pageImgs.map(x=>x.file),title:baseName}).catch(()=>{})}>📤 แชร์ทุกหน้า</button>}</div></div>}
-        <div className="hint" style={{marginTop:6}}>"ส่งเข้ารายงานปัญหา" สร้างรายการประเภท ปัญหาหน้างาน ในแท็บ รายงานปัญหา ของแดชบอร์ด แนบรูปสรุป (ตัวใหญ่ อ่านชัด) กับรูปถ่ายรอยแตกแต่ละรูป ส่วนรายละเอียดเต็มดูจาก PDF/รูปรายงานเต็ม</div>
       </div>
       <div className="card" style={{padding:0,overflowX:'auto'}}>
         <div style={{zoom:0.4}}><FailReport rec={rec} logo="logo.png" photos={rec.photos||[]}/></div>
