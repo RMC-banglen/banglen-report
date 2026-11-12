@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12n';
+var APP_VERSION='2026-11-12o';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13572,7 +13572,10 @@ window.__dataReady.then(data => {
               {row('ตุ้ม W × H',r.hammer_weight_t!=null?Number(r.hammer_weight_t)+' ตัน × '+(r.hammer_drop_cm!=null?Number(r.hammer_drop_cm)+' ซม.':'–'):'')}
               {row('น้ำหนักเสา',r.pile_weight_t!=null?Number(r.pile_weight_t).toFixed(2)+' ตัน'+(r.pile_area_cm2?'  (หน้าตัด '+Number(r.pile_area_cm2)+' ซม.²)':''):'')}
               {row('ตุ้ม ÷ เสา',h!=null?<b style={{color:h>=0.7&&h<=2.5?'#15803d':'#b91c1c'}}>{h.toFixed(2)} เท่า {h>=0.7&&h<=2.5?'✔ อยู่ในเกณฑ์ (0.7–2.5)':'✘ นอกเกณฑ์ (0.7–2.5)'}</b>:'')}
-              {row('คำนวณ Blow (Qa '+(r.qa_ton!=null?Number(r.qa_ton)+' ตัน':'–')+')',r.blow_s_cm!=null?(Number(r.blow_s_cm)>0?'S = '+Number(r.blow_s_cm).toFixed(3)+' ซม./ครั้ง ≈ '+Number(r.blow_per10).toFixed(1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้'):'')}
+              {row('Blow ที่ต้องได้ (Qa '+(r.qa_ton!=null?Number(r.qa_ton)+' ตัน':'–')+') เทียบตอกจริง',r.blow_s_cm!=null?(()=>{const l=r.drive_log||{},need=Number(r.blow_s_cm)>0,act=l.set!=null?Number(l.set):null,okS=need&&act!=null?act<=Number(r.blow_s_cm)+1e-9:null;return <span>
+                <div>{need?<>ต้องได้ (Danish): set ≤ <b>{Number(r.blow_s_cm).toFixed(3)}</b> ซม./ครั้ง ≈ <b>≥{Number(r.blow_per10).toFixed(1)}</b> ครั้ง/10 ซม.</>:'ต้องได้: คำนวณไม่ได้ (พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ)'}</div>
+                {act!=null?<div>ตอกจริง (Last ten blow): {(l.l10||[]).length>0&&<>จม {(l.l10||[]).join(' / ')} ซม./10 ครั้ง → </>}set <b>{act.toFixed(3)}</b> ซม./ครั้ง ≈ <b>{Number(l.per10).toFixed(1)}</b> ครั้ง/10 ซม.{okS!=null&&<b style={{color:okS?'#15803d':'#b91c1c',marginLeft:6}}>{okS?'✔ ถึง set':'✘ ยังไม่ถึง set'}</b>}</div>:<div style={{color:'#94a3b8'}}>ยังไม่มีค่า Last ten blow จากใบตอก</div>}
+              </span>;})():'')}
               {r.drive_log&&Object.keys(r.drive_log).length>0&&row('บันทึกการตอกจริง',(()=>{const l=r.drive_log,bl=(l.blows||[]).map(Number),mx=Math.max(1,...bl);return <span>
                 {l.total!=null&&<div>Blow {bl.length} ฟุต รวม <b>{l.total}</b> ครั้ง{l.last10_avg!=null&&<> · 10 ฟุตสุดท้ายเฉลี่ย <b style={{color:Number(l.last10_avg)>=20?'#991b1b':undefined}}>{Number(l.last10_avg).toFixed(1)}</b> ครั้ง/ฟุต{Number(l.last10_avg)>=20?' (ระดับดินแข็ง)':''}</>}</div>}
                 {l.set!=null&&<div>set จริง <b>{Number(l.set).toFixed(3)}</b> ซม./ครั้ง ≈ {Number(l.per10).toFixed(1)} ครั้ง/10 ซม.{l.qa_act!=null&&<> → Qa จริง ≈ <b style={{color:r.qa_ton!=null&&Number(l.qa_act)<Number(r.qa_ton)?'#b91c1c':'#15803d'}}>{Number(l.qa_act).toFixed(1)}</b> ตัน (แบบ {r.qa_ton!=null?Number(r.qa_ton):'–'})</>}</div>}

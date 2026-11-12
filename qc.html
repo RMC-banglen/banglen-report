@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12t';
+var APP_VERSION='2026-11-12v';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -482,7 +482,8 @@ function FailReport({rec,logo,photos}){
         {kv('น้ำหนักเสาเข็ม (คำนวณ)',rec.pile_weight_t!=null?fmtN(rec.pile_weight_t,2)+' ตัน'+(rec.pile_area_cm2?'  (หน้าตัด '+fmtN(rec.pile_area_cm2)+' ซม.² × '+fmtN(rec.pile_length_m,2)+' ม. × '+PILE_DENSITY+' ตัน/ลบ.ม.)':''):'')}
         {kv('ตุ้ม ÷ เสา',rec.hammer_ratio!=null&&isFinite(rec.hammer_ratio)?<span style={{fontWeight:800,color:rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'#15803d':'#b91c1c'}}>{fmtN(rec.hammer_ratio,2)} เท่า {rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'✔ อยู่ในเกณฑ์':'✘ นอกเกณฑ์'} (เกณฑ์ {HAMMER_MIN}–{HAMMER_MAX} เท่า)</span>:'')}
         {kv('Qa ตามแบบ',rec.qa_ton!=null&&rec.qa_ton!==''?fmtN(rec.qa_ton,1)+' ตัน':'')}
-        {kv('ผลคำนวณ Blow (Danish)',rec.blow_s_cm!=null?(rec.blow_s_cm>0?'S = '+fmtN(rec.blow_s_cm,3)+' ซม./ครั้ง · ≈ '+fmtN(rec.blow_per10,1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้ (พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ)'):'')}
+        {kv('Blow ที่ต้องได้ (Danish)',rec.blow_s_cm!=null?(rec.blow_s_cm>0?'set ≤ '+fmtN(rec.blow_s_cm,3)+' ซม./ครั้ง · ≈ ≥'+fmtN(rec.blow_per10,1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้ (พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ)'):'')}
+        {(()=>{const ds0=driveStats(rec);return ds0.set!=null&&kv('Blow ตอกจริง (Last ten blow)',<span style={{fontWeight:700,color:rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?'#15803d':'#b91c1c'):undefined}}>set {fmtN(ds0.set,3)} ซม./ครั้ง · ≈ {fmtN(ds0.per10,1)} ครั้ง/10 ซม.{rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?' ✔ ถึง set':' ✘ ยังไม่ถึง set'):''}</span>);})()}
         {kv('ดิ่งเสา',rec.vertical_result==='ok'?'✔ ผ่าน':rec.vertical_result==='bad'?'✘ ไม่ผ่าน':rec.vertical_result==='na'?'ไม่ได้วัด':'')}
         {kv('ค่าที่วัดได้ (ดิ่ง)',rec.vertical_note)}
       </tbody></table>
@@ -865,7 +866,7 @@ function FailForm({me,init,onCancel,onSaved}){
   const logObj={blows:parseBlows(f.log.blows),l10:f.log.l10.map(numOrNull).filter(x=>x!=null),top:numOrNull(f.log.top),tip:numOrNull(f.log.tip),spec_tip:numOrNull(f.log.spec),dev:{N:numOrNull(f.log.N),E:numOrNull(f.log.E),W:numOrNull(f.log.W),S:numOrNull(f.log.S)}};
   const dsF=driveStats({drive_log:logObj,pile_area_cm2:pArea,pile_length_m:len,hammer_weight_t:hw,hammer_drop_cm:Number(f.hammer_drop_cm),qa_ton:Number(f.qa_ton)});
   const hasLog=logObj.blows.length>0||logObj.l10.length>0||logObj.top!=null||logObj.tip!=null||logObj.spec_tip!=null||Object.values(logObj.dev).some(x=>x!=null);
-  useEffect(()=>{ const t=logObj.blows.reduce((s,x)=>s+x,0); if(logObj.blows.length&&String(t)!==String(f.blow_count)) setF(o=>({...o,blow_count:String(t)})); },[f.log.blows]);   // รวม Blow จากใบ = ค่า Blow 30 ฟุต
+  useEffect(()=>{ const t=logObj.blows.reduce((s,x)=>s+x,0); if(logObj.blows.length>10&&String(t)!==String(f.blow_count)) setF(o=>({...o,blow_count:String(t)})); },[f.log.blows]);   // รวม Blow จากใบ = ค่า Blow 30 ฟุต
   const L=f.blow_count!==''&&f.blow_count!=null?SOIL_LV[soilIdx(Number(f.blow_count))]:null;
 
   const doneIds=(()=>{const st=new Set(),un=[];const nz=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -1037,7 +1038,8 @@ function FailForm({me,init,onCancel,onSaved}){
           <input type="number" inputMode="decimal" step="0.5" value={f.qa_ton} onChange={e=>set('qa_ton',e.target.value)} placeholder="เช่น 35"/></div>
         {bc&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0f9ff',border:'1px solid #bae6fd',lineHeight:1.8,fontSize:14}}>
           <b>รายการคำนวณ Blow (Danish)</b><br/>
-          {bc.S>0?<>S = <b>{fmtN(bc.S,3)} ซม./ครั้ง</b> · ≈ <b>{fmtN(bc.per10,1)} ครั้ง/10 ซม.</b> · {fmtN(bc.per30,1)} ครั้ง/30 ซม.<br/>
+          {bc.S>0?<>ต้องได้: set ≤ <b>{fmtN(bc.S,3)} ซม./ครั้ง</b> · ≈ <b>≥{fmtN(bc.per10,1)} ครั้ง/10 ซม.</b> · {fmtN(bc.per30,1)} ครั้ง/30 ซม.<br/>
+            {dsF.set!=null&&<>ตอกจริง (Last ten blow): set <b>{fmtN(dsF.set,3)}</b> ซม./ครั้ง ≈ <b>{fmtN(dsF.per10,1)}</b> ครั้ง/10 ซม. <b style={{color:dsF.set<=bc.S?'#15803d':'#c0392b'}}>{dsF.set<=bc.S?'✔ ถึง set':'✘ ยังไม่ถึง set'}</b><br/></>}
             <span className="hint">E·W·H = {fmtN(bc.a,1)} · Qu = {fmtN(bc.Qu,1)} ตัน</span></>:<span style={{color:'#c0392b'}}>คำนวณไม่ได้ — พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ</span>}</div>}
         <div className="field" style={{marginTop:12}}><label>เช็คดิ่งเสา</label>
           <div className="seg">
@@ -1050,10 +1052,10 @@ function FailForm({me,init,onCancel,onSaved}){
       {secH('⑤ ใบบันทึกการตอก (ข้อมูลจริงหน้างาน)')}
       <div className="card" style={{marginTop:0}}>
         <div className="hint" style={{marginBottom:6}}>คัดตัวเลขจากใบ "Driving record" — ยิ่งครบ ระบบยิ่งวิเคราะห์สาเหตุได้แม่น (ไม่บังคับ)</div>
-        <div className="field"><label>จำนวน Blow ต่อ 1 ฟุต (30 ซม.) — ตัวเลขทุกแถวในใบ (แถวที่ 1 ถึง 30 = ช่วงนับ 30 ฟุต ไม่ใช่ 10 ฟุต) เรียงจากแถวที่ 1 · พิมพ์/วางเว้นวรรคได้</label>
-          <textarea className="note" rows={3} placeholder="เช่น 4 6 6 8 7 8 10 11 11 12 13 15 …" value={f.log.blows} onChange={e=>setF(o=>({...o,log:{...o.log,blows:e.target.value}}))} style={{marginTop:0}}/></div>
+        <div className="field"><label>จำนวน Blow ต่อ 1 ฟุต (30 ซม.) — ใส่ <b>10 ฟุตสุดท้าย</b> (10 แถวสุดท้ายที่ตอกในใบ เรียงจากบนลงล่าง) · ใส่ทั้งใบได้ ระบบใช้ 10 ตัวท้ายวิเคราะห์ · พิมพ์/วางเว้นวรรคได้</label>
+          <textarea className="note" rows={3} placeholder="เช่น 10 ฟุตสุดท้าย: 16 16 18 19 23 28 29 38 45 61" value={f.log.blows} onChange={e=>setF(o=>({...o,log:{...o.log,blows:e.target.value}}))} style={{marginTop:0}}/></div>
         {logObj.blows.length>0&&<div style={{marginBottom:10}}>
-          <div style={{fontSize:14,fontWeight:700,color:'var(--brand)'}}>{logObj.blows.length} ฟุต · รวม {dsF.total} ครั้ง <span className="hint" style={{fontWeight:400}}>(ใช้เป็นค่า Blow 30 ฟุตให้อัตโนมัติ)</span></div>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--brand)'}}>{logObj.blows.length} ฟุต · รวม {dsF.total} ครั้ง <span className="hint" style={{fontWeight:400}}>{logObj.blows.length>10?'(ใส่ทั้งใบ — ใช้เป็นค่า Blow 30 ฟุตให้อัตโนมัติ)':'(ใส่ 10 ฟุตสุดท้าย — ค่า Blow 30 ฟุตรวมให้กรอกที่ข้อ ③)'}</span></div>
           <div style={{display:'flex',alignItems:'flex-end',gap:2,height:64,marginTop:6}}>{logObj.blows.map((v,i)=><div key={i} title={'ฟุตที่ '+(i+1)+': '+v} style={{flex:1,minWidth:3,background:i>=logObj.blows.length-3?'#c0392b':'#0f766e',height:Math.max(3,v/dsF.max*60),borderRadius:2}}/>)}</div>
           <div className="hint">ฟุตที่ 1 → {logObj.blows.length} · แท่งแดง = 3 ฟุตสุดท้าย · สูงสุด {dsF.max} ครั้ง/ฟุต</div></div>}
         <div className="field"><label>Last ten blow penetration — เสาจมกี่ ซม. ต่อการตอก 10 ครั้ง (3 ชุดสุดท้ายในใบ เช่น 4.0 · 3.7 · 3.0)</label>
