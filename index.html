@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12c';
+var APP_VERSION='2026-11-12d';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13456,8 +13456,10 @@ window.__dataReady.then(data => {
     const sIdx=n=>n<=300?0:n>=600?4:n<=400?1:n<=500?2:3;
     const TG={1:350,3:415,5:435,7:450},TG280={1:340,7:420};
     // กำลังอัดวันผลิตต่ออายุ (เทียบเกณฑ์) จากผลที่เก็บไว้ในใบตรวจ
-    const strList=r=>{const prod=String(r.prod_date||'').slice(0,10);return [1,3,5,7].map(a=>{const v=(r.strength_rows||[]).filter(x=>String(x.d).slice(0,10)===prod&&Number(x.a)===a).map(x=>Number(x.k)).filter(x=>x>0);if(!v.length)return null;const avg=v.reduce((t,x)=>t+x,0)/v.length;const tg=(/^NP280$/i.test(r.strength_formula||'')?TG280:TG)[a]||null;return{a,avg,tg,ok:tg?avg>=tg:null};}).filter(Boolean);};
-    const strKey=r=>{const l=strList(r);return l.find(x=>x.a===7)||l.find(x=>x.a===3)||l[0]||null;};
+    const pcsOf=r=>{const a=(Array.isArray(r.prod_dates)&&r.prod_dates.length)?r.prod_dates:(r.prod_date?[{date:r.prod_date}]:[]);return a.filter(p=>p&&p.date).map((p,i)=>({date:String(p.date).slice(0,10),len:p.len,label:'ท่อนที่ '+(i+1)}));};
+    const strListAt=(r,prod)=>{return [1,3,5,7].map(a=>{const v=(r.strength_rows||[]).filter(x=>String(x.d).slice(0,10)===prod&&Number(x.a)===a).map(x=>Number(x.k)).filter(x=>x>0);if(!v.length)return null;const avg=v.reduce((t,x)=>t+x,0)/v.length;const tg=(/^NP280$/i.test(r.strength_formula||'')?TG280:TG)[a]||null;return{a,avg,tg,ok:tg?avg>=tg:null};}).filter(Boolean);};
+    const keyOfL=l=>l.find(x=>x.a===7)||l.find(x=>x.a===3)||l[0]||null;
+    const strKey=r=>{const pcs=pcsOf(r);const ks=pcs.map(p=>{const k=keyOfL(strListAt(r,p.date));return k?{...k,pl:pcs.length>1?p.label:''}:null;}).filter(Boolean);return ks.find(x=>x.ok===false)||ks[0]||null;};   // หลายท่อน: เอาท่อนที่ต่ำกว่าเกณฑ์ก่อน
     const hr=r=>r.hammer_ratio!=null?Number(r.hammer_ratio):null;
     const flags=r=>({str:(strKey(r)||{}).ok===false,hammer:hr(r)!=null&&(hr(r)<0.7||hr(r)>2.5),vert:r.vertical_result==='bad',hard:r.blow_count!=null&&Number(r.blow_count)>=600});
     const months=[...new Set(rows.map(r=>String(r.inspect_date).slice(0,7)))].sort().reverse();
@@ -13492,10 +13494,10 @@ window.__dataReady.then(data => {
                 <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.inspect_date)}</td>
                 <td style={{...td,minWidth:210}}>{[r.customer,r.site].filter(Boolean).join(' · ')||'–'}</td>
                 <td style={{...td,whiteSpace:'nowrap',fontWeight:700}}>{r.pile_size||'–'}{r.pile_std?(r.pile_std==='fac'?' รง.':' มอก.'):''} × {r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2):'–'}</td>
-                <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.prod_date)}</td>
+                <td style={{...td,whiteSpace:'nowrap'}}>{pcsOf(r).map(p=>fmtD(p.date)).join(' + ')||'–'}</td>
                 <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.drive_date)}</td>
                 <td style={{...td,textAlign:'right'}}>{r.age_days!=null?r.age_days:'–'}</td>
-                <td style={td}>{st?chip(st.ok!==false,st.a+' วัน '+Math.round(st.avg)+(st.tg?' / '+st.tg:'')):<span style={{color:'#cbd5e1'}}>–</span>}</td>
+                <td style={td}>{st?chip(st.ok!==false,(st.pl?st.pl+' · ':'')+st.a+' วัน '+Math.round(st.avg)+(st.tg?' / '+st.tg:'')):<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={{...td,whiteSpace:'nowrap'}}>{L?<span style={{background:L.bg,color:L.col,fontWeight:700,padding:'2px 10px',borderRadius:999,fontSize:12.5}}>{L.e} {L.t} · {r.blow_count}</span>:<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={td}>{h!=null?chip(h>=0.7&&h<=2.5,h.toFixed(2)+'×'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={td}>{r.vertical_result&&r.vertical_result!=='na'?chip(r.vertical_result==='ok',r.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
@@ -13507,7 +13509,7 @@ window.__dataReady.then(data => {
         </div>
       </ChartCard>
 
-      {view&&(()=>{const r=view,L2=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null,h=hr(r),sl=strList(r);
+      {view&&(()=>{const r=view,L2=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null,h=hr(r),pcsM=pcsOf(r);
         const row=(k,v)=><tr><td style={{padding:'6px 10px',background:'#f8fafc',fontWeight:600,width:'38%',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{k}</td><td style={{padding:'6px 10px',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{v==null||v===''?'–':v}</td></tr>;
         return <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setView(null);}}>
           <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:720,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
@@ -13521,9 +13523,9 @@ window.__dataReady.then(data => {
             <table style={{width:'100%',borderCollapse:'collapse',border:'1px solid #eef0f4'}}><tbody>
               {row('ลูกค้า / หน้างาน',[r.customer,r.site].filter(Boolean).join(' · '))}
               {row('ขนาด × ความยาว',(r.pile_size||'–')+(r.pile_std?(r.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2)+' ม.':'–'))}
-              {row('วันที่ผลิต → วันที่ตอก',fmtD(r.prod_date)+' → '+fmtD(r.drive_date)+(r.age_days!=null?'  (อายุ '+r.age_days+' วัน)':''))}
+              {row('วันที่ผลิต → วันที่ตอก',pcsM.map(p=>(pcsM.length>1?p.label+' ':'')+fmtD(p.date)).join(' · ')+' → '+fmtD(r.drive_date)+(r.age_days!=null?'  (อายุ'+(pcsM.length>1?'ท่อนอ่อนสุด ':' ')+r.age_days+' วัน)':''))}
               {row('วันที่หน้าเสา (อ้างอิง)',r.face_date)}
-              {row('กำลังอัดวันผลิต'+(r.strength_formula?' · '+r.strength_formula:''),sl.length?<span>{sl.map(x=><span key={x.a} style={{display:'inline-block',marginRight:10,color:x.ok===false?'#b91c1c':'#15803d',fontWeight:700}}>{x.a} วัน {Math.round(x.avg)}{x.tg?' / '+x.tg:''} {x.ok===false?'✘':'✔'}</span>)}</span>:'ไม่มีผลในระบบ')}
+              {row('กำลังอัดวันผลิต'+(r.strength_formula?' · '+r.strength_formula:''),pcsM.some(p=>strListAt(r,p.date).length)?<span>{pcsM.map(p=>{const sl=strListAt(r,p.date);return <div key={p.date}>{pcsM.length>1&&<b style={{color:'#475569',marginRight:6}}>{p.label}</b>}{sl.length?sl.map(x=><span key={x.a} style={{display:'inline-block',marginRight:10,color:x.ok===false?'#b91c1c':'#15803d',fontWeight:700}}>{x.a} วัน {Math.round(x.avg)}{x.tg?' / '+x.tg:''} {x.ok===false?'✘':'✔'}</span>):'ไม่มีผล'}</div>;})}</span>:'ไม่มีผลในระบบ')}
               {row('ชั้นดิน (Blow '+(r.blow_feet||30)+' ฟุต)',r.blow_count!=null?<span><b>{r.blow_count}</b> ครั้ง {L2&&<span style={{background:L2.bg,color:L2.col,fontWeight:700,padding:'1px 9px',borderRadius:999,marginLeft:6}}>{L2.e} {L2.t}</span>}{r.blow_site?<span style={{color:'#64748b'}}> · {r.blow_site}</span>:null}</span>:'')}
               {row('ตุ้ม W × H',r.hammer_weight_t!=null?Number(r.hammer_weight_t)+' ตัน × '+(r.hammer_drop_cm!=null?Number(r.hammer_drop_cm)+' ซม.':'–'):'')}
               {row('น้ำหนักเสา',r.pile_weight_t!=null?Number(r.pile_weight_t).toFixed(2)+' ตัน'+(r.pile_area_cm2?'  (หน้าตัด '+Number(r.pile_area_cm2)+' ซม.²)':''):'')}

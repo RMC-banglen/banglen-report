@@ -16,7 +16,8 @@ create table if not exists pile_fail_inspections (
   pile_size       text,                 -- เช่น I22
   pile_std        text,                 -- tis = มอก. · fac = โรงงาน
   pile_length_m   numeric,
-  prod_date       date,                 -- วันที่ผลิต (ยึดวันนี้นับอายุเสา)
+  prod_date       date,                 -- วันที่ผลิต (ถ้าหลายท่อน = วันที่เก่าสุด)
+  prod_dates      jsonb default '[]',   -- วันที่ผลิตแต่ละท่อน [{date,len}] (เสาต่อกันหลายท่อน ผลิตคนละวัน)
   face_date       text,                 -- วันที่หน้าเสา (อ้างอิง อาจย้อนวัน)
   drive_date      date,                 -- วันที่ตอก
   age_days        int,                  -- อายุเสา = วันที่ตอก − วันที่ผลิต
@@ -42,6 +43,7 @@ create table if not exists pile_fail_inspections (
 );
 
 -- ถ้าเคยรันเวอร์ชันก่อนหน้าไปแล้ว: เพิ่มคอลัมน์ที่ขาดให้ (รันซ้ำได้)
+alter table pile_fail_inspections add column if not exists prod_dates jsonb default '[]';
 alter table pile_fail_inspections add column if not exists pile_std text;
 alter table pile_fail_inspections add column if not exists hammer_drop_cm numeric;
 alter table pile_fail_inspections add column if not exists qa_ton numeric;
