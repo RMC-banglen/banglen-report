@@ -63,3 +63,6 @@ create index if not exists pile_fail_inspections_date_idx on pile_fail_inspectio
 create index if not exists pile_fail_inspections_foreman_idx on pile_fail_inspections (foreman_report_id);
 
 select 'pile_fail_inspections' t, count(*) n from pile_fail_inspections;
+
+-- ข้อสังเกตหน้างาน (กดเลือก + พิมพ์เพิ่ม)
+alter table pile_fail_inspections add column if not exists site_obs jsonb default '{}';
