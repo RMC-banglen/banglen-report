@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12e';
+var APP_VERSION='2026-11-12g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -215,7 +215,7 @@ const mean = a => a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
 // รวมผลกำลังอัดวันผลิต ±3 วัน เป็นตาราง วัน × อายุ  (rows = [{d,a,k}] ผลรายชุด)
 function buildStrength(rows,prod){
   const dates=prod?[-3,-2,-1,0,1,2,3].map(n=>isoAdd(prod,n)):[];
-  const ages=[...new Set((rows||[]).map(r=>r.a))].filter(a=>[1,3,5,7,28].includes(a)).sort((a,b)=>a-b);
+  const ages=[...new Set((rows||[]).map(r=>r.a))].filter(a=>a===7).sort((a,b)=>a-b);   // เทียบเฉพาะกำลังอัดอายุ 7 วัน
   const cell=(d,a)=>{const v=(rows||[]).filter(r=>String(r.d).slice(0,10)===d&&r.a===a).map(r=>r.k);return v.length?{avg:mean(v),n:v.length}:null;};
   return {dates,ages,cell};
 }
@@ -231,8 +231,12 @@ function strengthSummary(rows,prod,formula){
 }
 
 // เสา 1 ต้นอาจผลิตหลายวัน (ต่อกันหลายท่อน) → prod_dates = [{date,len}] · ใบเก่าที่มีวันเดียว (prod_date) ใช้เป็น 1 ท่อน
+const pieceLabel = (i,n) => n<=1?'เสาต้นนี้':i===0?'ท่อนล่าง':i===n-1?'ท่อนบน':'ท่อนกลาง'+(n>3?' '+i:'');
 const piecesOf = r => { const a=(Array.isArray(r.prod_dates)&&r.prod_dates.length)?r.prod_dates:(r.prod_date?[{date:r.prod_date}]:[]);
-  return a.filter(p=>p&&p.date).map((p,i)=>({date:String(p.date).slice(0,10),len:p.len==null?'':p.len,label:'ท่อนที่ '+(i+1)})); };
+  const list=a.filter(p=>p&&p.date), single=a.length===1;   // ใบเก่า/ท่อนเดียว: วันที่หน้าเสาเก็บอยู่ที่ตัวใบ
+  return list.map((p,i)=>({date:String(p.date).slice(0,10),len:p.len==null?'':p.len,
+    face:p.face!=null&&p.face!==''?String(p.face):(single?String(r.face_date||''):''),
+    drive:String(r.drive_date||'').slice(0,10),label:pieceLabel(i,list.length)})); };
 const keyOfSum = sum => sum.find(s=>s.age===7&&s.prod!=null)||sum.find(s=>s.age===3&&s.prod!=null)||sum.find(s=>s.prod!=null)||null;
 // ตัวแทนผลกำลังอัดของใบตรวจ (ใช้ในรายการ): ท่อนที่ต่ำกว่าเกณฑ์มาก่อน
 function strengthKeyAll(r){
@@ -271,6 +275,31 @@ function observations(r){
   return out;
 }
 
+// วิเคราะห์สาเหตุเบื้องต้นจากข้อมูลทั้งหมดในใบตรวจ — เรียงปัจจัยเสี่ยงตามความสำคัญ + แนวทางตรวจ/แก้ต่อ (ใช้เป็นแนวทาง ไม่ใช่ข้อสรุปตายตัว)
+function analyze(r){
+  const obs=observations(r), extra=[], pcs=piecesOf(r);
+  pcs.forEach(p=>{
+    const age=p.drive?isoDiff(p.drive,p.date):null;
+    if(age!=null&&age<7) extra.push({t:'warn',x:(pcs.length>1?p.label+': ':'')+'ตอกตอนอายุ '+age+' วัน (น้อยกว่า 7 วัน) ยังไม่ถึงอายุที่ใช้เทียบกำลังอัด จึงยืนยันกำลังอัดจริงไม่ได้'});
+  });
+  if(r.blow_s_cm!=null&&r.blow_s_cm!==''&&Number(r.blow_s_cm)<=0) extra.push({t:'bad',x:'คำนวณ Blow ไม่ได้ — พลังงานตุ้ม (น้ำหนัก × ระยะยก) น้อยกว่าที่ Qa ต้องการ ตุ้มเบา/ยกต่ำเกินไป ตอกไม่เข้า'});
+  const all=[...obs,...extra];
+  const sev={bad:0,warn:1,info:2,ok:3};
+  const risks=all.filter(o=>o.t==='bad'||o.t==='warn').sort((a,b)=>sev[a.t]-sev[b.t]);
+  const oks=all.filter(o=>o.t==='ok'), infos=all.filter(o=>o.t==='info');
+  const has=re=>risks.some(o=>re.test(o.x));
+  const checks=[];
+  if(has(/ต่ำกว่าเกณฑ์ \d+ ksc|วันผลิตต่ำกว่าค่าเฉลี่ย/)) checks.push('ตรวจรอบผลิตวันนั้น: ส่วนผสม การบ่ม ผลก้อนทดสอบ และเสาต้นอื่นที่ผลิตวันเดียวกัน');
+  if(has(/ดินแข็ง/)) checks.push('ดินแข็ง: พิจารณาเพิ่มสเต็งคอนกรีต/ใช้ตุ้มที่เหมาะสม/เจาะนำ และเฝ้าระวังเสาต้นข้างเคียง');
+  if(has(/ตุ้มเบา|ตอกไม่เข้า/)) checks.push('ตุ้มเบา: เพิ่มน้ำหนักตุ้มให้อยู่ในช่วง '+HAMMER_MIN+'–'+HAMMER_MAX+' เท่าของน้ำหนักเสา หรือเพิ่มระยะยกอย่างระมัดระวัง');
+  if(has(/ตุ้มหนัก/)) checks.push('ตุ้มหนัก: ลดระยะยก/ใช้ตุ้มเบาลง และตรวจหมวกรองหัวเสา');
+  if(has(/ไม่ดิ่ง/)) checks.push('เสาไม่ดิ่ง: ตรวจแนวและหมุดก่อนตอก การตั้งเสา และแรงเยื้องศูนย์');
+  if(has(/อายุ .* วัน \(น้อยกว่า 7/)) checks.push('อายุเสาน้อย: ตรวจเกณฑ์อายุก่อนตอก และเก็บผลกำลังอัดย้อนหลังให้ครบ');
+  if(!risks.length) checks.push('ข้อมูลที่ตรวจอยู่ในเกณฑ์ทั้งหมด — ตรวจเพิ่ม: รอยร้าวก่อนตอก การยกขนส่ง การจี้/รองหัวเสา และตำแหน่งที่แตก (หัวเสา/กลางต้น/รอยต่อ)');
+  const summary=risks.length?('พบปัจจัยเสี่ยง '+risks.length+' ข้อ — ที่น่าสงสัยที่สุด: '+risks[0].x):'ข้อมูลที่ตรวจทั้งหมดอยู่ในเกณฑ์ ยังไม่พบสาเหตุชัดเจนจากตัวเลข';
+  return {summary,risks,oks,infos,checks,nRisk:risks.length};
+}
+
 // ย่อรูปสำหรับรายงาน (ใหญ่กว่ารูปในใบตรวจอื่นเล็กน้อย)
 async function loadAsDataUrl(url){
   try{
@@ -289,7 +318,7 @@ function loadScript(src){
 // ---------- ใบรายงาน (ใช้ทั้งแสดงบนจอและแปลงเป็น PDF) ----------
 function FailReport({rec,logo,photos}){
   const pcsR=piecesOf(rec);
-  const obs=observations(rec);
+  const an=analyze(rec);
   const L=rec.blow_count!=null&&rec.blow_count!==''?SOIL_LV[soilIdx(Number(rec.blow_count))]:null;
   const th={border:'1px solid #cbd5e1',padding:'5px 8px',background:'#f1f5f9',fontSize:12.5,textAlign:'center',fontWeight:700};
   const td={border:'1px solid #cbd5e1',padding:'5px 8px',fontSize:13,textAlign:'center'};
@@ -313,16 +342,18 @@ function FailReport({rec,logo,photos}){
       <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
         {kv('ลูกค้า / หน้างาน',[rec.customer,rec.site].filter(Boolean).join(' · '))}
         {kv('ขนาดเสา × ความยาว',(rec.pile_size||'–')+(rec.pile_std?(rec.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(rec.pile_length_m!=null&&rec.pile_length_m!==''?fmtN(rec.pile_length_m,2)+' ม.':'–'))}
-        {pcsR.map((p,i)=><React.Fragment key={i}>{kv(pcsR.length>1?'วันที่ผลิต '+p.label+(p.len?' ('+p.len+' ม.)':''):'วันที่ผลิต (ใช้นับอายุเสา)',thaiDate(p.date)+(rec.drive_date?'   → อายุตอนตอก '+isoDiff(rec.drive_date,p.date)+' วัน':''))}</React.Fragment>)}
-        {kv('วันที่ตอก',thaiDate(rec.drive_date))}
-        {kv('วันที่หน้าเสา (อ้างอิง)',rec.face_date)}
-        {kv(pcsR.length>1?'อายุเสาตอนตอก (ท่อนที่อ่อนที่สุด)':'อายุเสาตอนตอก',rec.age_days!=null?rec.age_days+' วัน (นับจากวันที่ผลิต)':'–')}
+        {kv('วันที่ตอกเฟล',thaiDate(rec.drive_date))}
       </tbody></table>
+      <table style={{width:'100%',borderCollapse:'collapse',marginTop:8}}>
+        <thead><tr><th style={th}>ท่อน</th><th style={th}>ความยาว</th><th style={th}>วันที่หน้าเสา (อ้างอิง)</th><th style={th}>วันที่ผลิตจริง</th><th style={th}>อายุตอนตอก</th></tr></thead>
+        <tbody>{pcsR.map((p,i)=><tr key={i}><td style={{...td,fontWeight:700}}>{p.label}</td><td style={td}>{p.len!==''?fmtN(p.len,2)+' ม.':'–'}</td><td style={td}>{p.face||'–'}</td><td style={td}>{thaiDate(p.date)}</td><td style={{...td,fontWeight:800}}>{p.drive?isoDiff(p.drive,p.date)+' วัน':'–'}</td></tr>)}</tbody>
+      </table>
+      <div style={{fontSize:12,color:'#64748b',marginTop:3}}>อายุนับจากวันที่ผลิตจริง ถึงวันที่ตอกเฟล (วันที่หน้าเสาอาจย้อนวัน ใช้อ้างอิงเท่านั้น){pcsR.length>1&&rec.age_days!=null?' · ท่อนที่อ่อนที่สุด '+rec.age_days+' วัน':''}</div>
     </div>
-    {pcsR.length===0&&<div data-block="3" style={blk}>{H('2. กำลังอัดคอนกรีต วันผลิต ± 3 วัน (ksc)')}<div style={{fontSize:13,color:'#64748b'}}>ไม่มีวันที่ผลิต</div></div>}
+    {pcsR.length===0&&<div data-block="3" style={blk}>{H('2. กำลังอัดคอนกรีตอายุ 7 วัน — วันผลิต ± 3 วัน (ksc)')}<div style={{fontSize:13,color:'#64748b'}}>ไม่มีวันที่ผลิต</div></div>}
     {pcsR.map((p,pi)=>{
       const S=buildStrength(rec.strength_rows||[],p.date),sum=strengthSummary(rec.strength_rows||[],p.date,rec.strength_formula);
-      return <div key={pi} data-block={'3-'+pi} style={blk}>{H(pi===0?'2. กำลังอัดคอนกรีต วันผลิต ± 3 วัน (ksc)'+(rec.strength_formula?' · สูตร '+rec.strength_formula:' · ทุกสูตร')+(pcsR.length>1?' — '+p.label+' ผลิต '+dm(p.date):''):'2. (ต่อ) กำลังอัด — '+p.label+' ผลิต '+dm(p.date))}
+      return <div key={pi} data-block={'3-'+pi} style={blk}>{H(pi===0?'2. กำลังอัดคอนกรีตอายุ 7 วัน — วันผลิต ± 3 วัน (ksc)'+(rec.strength_formula?' · สูตร '+rec.strength_formula:' · ทุกสูตร')+(pcsR.length>1?' — '+p.label+' ผลิต '+dm(p.date):''):'2. (ต่อ) กำลังอัด — '+p.label+' ผลิต '+dm(p.date))}
       {S.ages.length===0?<div style={{fontSize:13,color:'#64748b'}}>ไม่พบผลกำลังอัดช่วงวันผลิตในระบบ</div>:<>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr><th style={th}>อายุ</th>{S.dates.map(d=><th key={d} style={{...th,background:d===p.date?'#fde68a':th.background}}>{dm(d)}{d===p.date?' ★':''}</th>)}<th style={th}>เกณฑ์</th></tr></thead>
@@ -355,8 +386,12 @@ function FailReport({rec,logo,photos}){
         {kv('ค่าที่วัดได้ (ดิ่ง)',rec.vertical_note)}
       </tbody></table>
     </div>
-    <div data-block="6" style={blk}>{H('5. ข้อสังเกตจากข้อมูล')}
-      <div style={{fontSize:13.5,lineHeight:1.8}}>{obs.length?obs.map((o,i)=><div key={i} style={{color:col[o.t]}}>{ic[o.t]} {o.x}</div>):'–'}</div>
+    <div data-block="6" style={blk}>{H('5. วิเคราะห์สาเหตุเบื้องต้น')}
+      <div style={{fontSize:14,fontWeight:800,lineHeight:1.7,color:an.nRisk?'#b91c1c':'#15803d',marginBottom:6}}>{an.summary}</div>
+      {an.risks.length>0&&<div style={{fontSize:13.5,lineHeight:1.8,marginBottom:4}}><b>ปัจจัยเสี่ยงที่พบ (เรียงตามความสำคัญ)</b>{an.risks.map((o,i)=><div key={i} style={{color:col[o.t]}}>{i+1}. {ic[o.t]} {o.x}</div>)}</div>}
+      {an.oks.length>0&&<div style={{fontSize:13,lineHeight:1.7,marginBottom:4}}><b>ที่อยู่ในเกณฑ์</b>{an.oks.map((o,i)=><div key={i} style={{color:col.ok}}>{ic.ok} {o.x}</div>)}</div>}
+      {an.infos.length>0&&<div style={{fontSize:13,lineHeight:1.7,marginBottom:4,color:col.info}}>{an.infos.map((o,i)=><div key={i}>{ic.info} {o.x}</div>)}</div>}
+      <div style={{fontSize:13.5,lineHeight:1.8,marginTop:4}}><b>แนวทางตรวจ/แก้ต่อ</b>{an.checks.map((c,i)=><div key={i}>→ {c}</div>)}</div>
       {rec.cause_note&&<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>สาเหตุที่น่าจะเป็น (ผู้ตรวจ):</b> {rec.cause_note}</div>}
       {rec.action_note&&<div style={{marginTop:6,fontSize:13.5,lineHeight:1.7}}><b>มาตรการ/สิ่งที่ต้องแก้ไข:</b> {rec.action_note}</div>}
     </div>
@@ -412,12 +447,16 @@ function FailInspectView({me,onBack,openId}){
   const [list,setList]=useState(null);
   const [noTable,setNoTable]=useState(false);
   const [rec,setRec]=useState(null);              // ใบที่เปิดดู/แก้
+  const [formKey,setFormKey]=useState(0);
+  // เสาเฟลอีกต้นวันเดียวกัน: เอาข้อมูลร่วมของหน้างานไปให้ (วันที่ตอก ลูกค้า/หน้างาน Blow ตุ้ม Qa) — ขนาด/ท่อน/ดิ่ง/รูปกรอกใหม่
+  const carryOf=r=>({inspect_date:r.inspect_date,drive_date:String(r.drive_date||'').slice(0,10),customer:r.customer,site:r.site,pile_std:r.pile_std,blow_id:r.blow_id,blow_site:r.blow_site,blow_count:r.blow_count,blow_feet:r.blow_feet,hammer_weight_t:r.hammer_weight_t,hammer_drop_cm:r.hammer_drop_cm,qa_ton:r.qa_ton});
+  const addNext=r=>{setRec(carryOf(r));setFormKey(k=>k+1);setView('form');};
   const loadList=()=>DB.from('pile_fail_inspections').select('*').order('created_at',{ascending:false}).limit(60)
     .then(({data,error})=>{if(error){setNoTable(true);setList([]);return;}setNoTable(false);setList(data||[]);}).catch(()=>{setNoTable(true);setList([]);});
   useEffect(()=>{loadList();},[]);
   useEffect(()=>{ if(!openId) return; if(openId==='new'){setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setRec(data);setView('view');} }); },[openId]);
-  if(view==='form') return <FailForm me={me} init={rec} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={r=>{setRec(r);loadList();setView('view');}}/>;
-  if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>setView('form')}/>;
+  if(view==='form') return <FailForm key={formKey} me={me} init={rec} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={(r,opt)=>{loadList();if(opt&&opt.next){addNext(r);}else{setRec(r);setView('view');}}}/>;
+  if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>{setFormKey(k=>k+1);setView('form');}} onAddNext={()=>addNext(rec)}/>;
   const badge=(ok,txt)=>ok==null?null:<span className="pill" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b',marginRight:5,fontSize:12}}>{txt}</span>;
   return <>
     <div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
@@ -428,7 +467,10 @@ function FailInspectView({me,onBack,openId}){
       <div className="sec">ใบตรวจล่าสุด</div>
       {list===null&&<div className="hint">กำลังโหลด…</div>}
       {list&&!list.length&&!noTable&&<div className="hint">ยังไม่มีใบตรวจ</div>}
-      {(list||[]).map(r=>{
+      {(()=>{const dayOf=r=>String(r.drive_date||r.inspect_date||'').slice(0,10);const ds=[...new Set((list||[]).map(dayOf))].sort().reverse();
+        return ds.map(day=>{const items=(list||[]).filter(r=>dayOf(r)===day);return <div key={day}>
+        <div className="sec" style={{display:'flex',justifyContent:'space-between'}}><span>ตอกเฟลวันที่ {thaiDate(day)}</span><span style={{fontWeight:600,color:'var(--muted)'}}>{items.length} ต้น</span></div>
+        {items.map(r=>{
         const sk=strengthKeyAll(r),key=sk&&sk.k,pcsL=piecesOf(r);
         return <button key={r.id} className="card" style={{width:'100%',textAlign:'left',cursor:'pointer'}} onClick={()=>{setRec(r);setView('view');}}>
           <div style={{fontWeight:800,color:'var(--brand)'}}>{[r.customer,r.site].filter(Boolean).join(' · ')||'(ไม่ระบุหน้างาน)'}</div>
@@ -441,11 +483,12 @@ function FailInspectView({me,onBack,openId}){
           </div>
           <div className="hint" style={{marginTop:4}}>ตรวจ {thaiDate(r.inspect_date)} โดย {r.inspector||'–'}</div>
         </button>;})}
+        </div>;});})()}
     </div>
   </>;
 }
 
-function FailDetail({rec,onBack,onEdit}){
+function FailDetail({rec,onBack,onEdit,onAddNext}){
   const [busy,setBusy]=useState('');
   const [pdf,setPdf]=useState(null);   // {url,file}
   const [err,setErr]=useState('');
@@ -466,6 +509,7 @@ function FailDetail({rec,onBack,onEdit}){
       <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
         <button className="bigbtn" style={{flex:'1 1 200px'}} disabled={!!busy} onClick={gen}>{busy?busy:'📄 สร้าง PDF รายงาน'}</button>
         <button className="ghost" style={{flex:'0 0 auto',width:'auto',padding:'13px 20px'}} onClick={onEdit}>✎ แก้ไข</button>
+        <button className="ghost" style={{flex:'1 1 100%'}} onClick={onAddNext}>＋ เพิ่มเสาเฟลอีกต้น (วันที่ตอกเดียวกัน)</button>
       </div>
       {err&&<div className="card" style={{color:'#c0392b'}}>{err}</div>}
       {pdf&&<div className="card" style={{background:'#ecfdf5',borderColor:'#a7e3d4'}}>
@@ -485,16 +529,16 @@ function FailDetail({rec,onBack,onEdit}){
 
 function FailForm({me,init,onCancel,onSaved}){
   const today=todayISO();
-  const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_std:'tis',pile_length_m:'',prod_dates:[{date:'',len:''}],face_date:'',drive_date:today,foreman_report_id:null,
+  const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_std:'tis',pile_length_m:'',prod_dates:[{date:'',face:'',len:''}],face_date:'',drive_date:today,foreman_report_id:null,
     strength_formula:'',strength_rows:[],blow_id:null,blow_site:'',blow_count:'',blow_feet:30,
     hammer_weight_t:'',hammer_drop_cm:'',qa_ton:'',pile_weight_t:null,pile_area_cm2:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:''};
   const [f,setF]=useState(()=>{
     const o=init?{...blank,...Object.fromEntries(Object.entries(init).map(([k,v])=>[k,v==null?(blank[k]!==undefined?blank[k]:''):v]))}:blank;
-    const pd=piecesOf(o).map(p=>({date:p.date,len:p.len===''?'':String(p.len)}));
-    return {...o,prod_dates:pd.length?pd:[{date:'',len:''}]};
+    const pd=piecesOf(o).map(p=>({date:p.date,face:p.face||'',len:p.len===''?'':String(p.len)}));
+    return {...o,prod_dates:pd.length?pd:[{date:'',face:'',len:''}]};
   });
   const setPd=(i,patch)=>setF(o=>({...o,prod_dates:o.prod_dates.map((p,j)=>j===i?{...p,...patch}:p)}));
-  const addPd=()=>setF(o=>({...o,prod_dates:[...o.prod_dates,{date:'',len:''}]}));
+  const addPd=()=>setF(o=>({...o,prod_dates:[...o.prod_dates,{date:'',face:'',len:''}]}));
   const delPd=i=>setF(o=>({...o,prod_dates:o.prod_dates.filter((_,j)=>j!==i)}));
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   const [files,setFiles]=useState([]);                    // รูปใหม่ {file,preview}
@@ -533,6 +577,8 @@ function FailForm({me,init,onCancel,onSaved}){
   useEffect(()=>{ if(cr) setF(o=>({...o,strength_rows:rowsFor})); },[cr,f.strength_formula]);   // eslint-disable-line
 
   const pieceAges=pcs.map(p=>f.drive_date?isoDiff(f.drive_date,p.date):null);
+  const sumLen=f.prod_dates.reduce((t,p)=>t+(Number(p.len)||0),0);
+  const lenMismatch=sumLen>0&&Number(f.pile_length_m)>0&&Math.abs(sumLen-Number(f.pile_length_m))>0.011;
   const age=pieceAges.filter(x=>x!=null).length?Math.min(...pieceAges.filter(x=>x!=null)):null;   // ท่อนที่อ่อนที่สุด
   const pKey=pileKey(f.pile_size,f.pile_std);
   const pArea=pKey&&PILE_AP[pKey]?PILE_AP[pKey][0]:null;     // ตร.ซม. จากแอปแบบเสาเข็ม
@@ -547,8 +593,10 @@ function FailForm({me,init,onCancel,onSaved}){
     const r=reports.find(x=>String(x.id)===String(id));
     if(!r){set('foreman_report_id',null);return;}
     setF(o=>({...o,foreman_report_id:r.id,pile_std:/รง|โรงงาน/.test(String(r.kind||''))?'fac':/มอก/.test(String(r.kind||''))?'tis':o.pile_std,customer:r.customer||o.customer,site:r.site||o.site,pile_size:PILE_SIZES.includes(String(r.size||'').toUpperCase())?String(r.size).toUpperCase():(r.size||o.pile_size),
-      prod_dates:(()=>{const sg=String(r.segs||'').split('+').map(x=>parseFloat(x)).filter(x=>x>0);return sg.length>1?sg.map((l,i)=>({date:(o.prod_dates[i]||{}).date||'',len:String(l)})):o.prod_dates;})(),
-      pile_length_m:r.length_m!=null?String(r.length_m):o.pile_length_m,drive_date:String(r.drive_date||'').slice(0,10)||o.drive_date,face_date:r.cast_dates||o.face_date}));
+      prod_dates:(()=>{const sg=String(r.segs||'').split('+').map(x=>parseFloat(x)).filter(x=>x>0);const n=Math.max(sg.length,1);
+        const fc=String(r.cast_dates||'').split(/\s*[-–,]\s*/).map(x=>x.trim()).filter(Boolean);
+        return Array.from({length:n},(_,i)=>{const ex=o.prod_dates[i]||{};return {date:ex.date||'',face:fc.length===n?fc[i]:(n===1?String(r.cast_dates||''):(fc[i]||'')),len:sg[i]?String(sg[i]):(n===1?'':'')};});})(),
+      pile_length_m:r.length_m!=null?String(r.length_m):o.pile_length_m,drive_date:String(r.drive_date||'').slice(0,10)||o.drive_date}));
   };
   const pickBlow=id=>{
     const b=blows.find(x=>String(x.id)===String(id));
@@ -560,14 +608,14 @@ function FailForm({me,init,onCancel,onSaved}){
     setFiles(o=>[...o,...arr]);e.target.value='';
   };
 
-  const save=async()=>{
+  const save=async(next)=>{
     if(!pcs.length){setErr('กรุณาใส่วันที่ผลิต (ใช้นับอายุเสา)');return;}
-    if(!f.pile_size||!f.pile_length_m){setErr('กรุณาใส่ขนาดและความยาวเสา');return;}
+    if(!f.pile_size||!(Number(f.pile_length_m)>0||sumLen>0)){setErr('กรุณาใส่ขนาดและความยาวเสา');return;}
     setSaving(true);setErr('');
     try{
       const num=v=>v===''||v==null?null:Number(v);
       const row={inspector:me.name,inspect_date:f.inspect_date||today,foreman_report_id:f.foreman_report_id||null,customer:f.customer||null,site:f.site||null,
-        pile_size:f.pile_size,pile_std:f.pile_std||null,pile_length_m:num(f.pile_length_m),prod_date:pcs.map(p=>p.date).sort()[0],prod_dates:pcs.map(p=>({date:p.date,len:p.len===''?null:Number(p.len)})),face_date:f.face_date||null,drive_date:f.drive_date||null,age_days:age,
+        pile_size:f.pile_size,pile_std:f.pile_std||null,pile_length_m:num(f.pile_length_m)!=null?num(f.pile_length_m):(sumLen>0?sumLen:null),prod_date:pcs.map(p=>p.date).sort()[0],prod_dates:pcs.map(p=>({date:p.date,face:p.face||'',len:p.len===''?null:Number(p.len)})),face_date:pcs.map(p=>p.face).filter(Boolean).join(' · ')||null,drive_date:f.drive_date||null,age_days:age,
         strength_formula:f.strength_formula||'',strength_rows:rowsFor,
         blow_id:f.blow_id||null,blow_site:f.blow_site||null,blow_count:num(f.blow_count),blow_feet:num(f.blow_feet)||30,
         vertical_result:f.vertical_result||null,vertical_note:f.vertical_note||null,
@@ -586,7 +634,7 @@ function FailForm({me,init,onCancel,onSaved}){
       }
       const {data:fin,error:e2}=await DB.from('pile_fail_inspections').update({photos:urls}).eq('id',id).select().single();
       if(e2)throw e2;
-      onSaved(fin);
+      onSaved(fin,next?{next:true}:null);
     }catch(e){setErr('บันทึกไม่สำเร็จ: '+(e.message||e)+(/prod_dates|column/i.test(String(e.message||e))?' — ให้แอดมินรัน SQL ล่าสุด (supabase-pile-fail-inspect.sql) ใน Supabase ก่อน':''));}
     setSaving(false);
   };
@@ -601,11 +649,19 @@ function FailForm({me,init,onCancel,onSaved}){
 
       {secH('① ข้อมูลเสาและหน้างาน')}
       <div className="card" style={{marginTop:0}}>
-        <div className="field"><label>เลือกจากรายงานโฟร์แมน (ไม่บังคับ — ใส่ข้อมูลให้เอง)</label>
+        <div className="field"><label>วันที่ตอกเฟล ★ (เริ่มจากวันนี้ แล้วเลือกว่าเป็นเสาต้นไหน)</label>
+          <input type="date" value={f.drive_date} onChange={e=>set('drive_date',e.target.value)}/></div>
+        <div className="field"><label>เลือกเสาเฟลจากรายงานโฟร์แมน (ไม่บังคับ — เลือกแล้วระบบกรอกให้ ท่อนต่อ/วันที่หน้าเสา)</label>
           <select value={f.foreman_report_id||''} onChange={e=>pickReport(e.target.value)}>
             <option value="">— ไม่เลือก / กรอกเอง —</option>
-            {reports.map(r=><option key={r.id} value={r.id}>{thaiDate(String(r.drive_date).slice(0,10))} · {r.size}×{r.length_m||'?'} · {(r.customer||r.site||'').slice(0,34)}</option>)}
-          </select></div>
+            <optgroup label={'ตอกเฟลวันที่ '+thaiDate(f.drive_date)}>
+              {reports.filter(r=>String(r.drive_date).slice(0,10)===f.drive_date).map(r=><option key={r.id} value={r.id}>{r.size}×{r.length_m||'?'}{r.segs?' ('+r.segs+')':''} · {(r.customer||r.site||'').slice(0,34)}</option>)}
+            </optgroup>
+            <optgroup label="วันอื่น (120 วันล่าสุด)">
+              {reports.filter(r=>String(r.drive_date).slice(0,10)!==f.drive_date).map(r=><option key={r.id} value={r.id}>{thaiDate(String(r.drive_date).slice(0,10))} · {r.size}×{r.length_m||'?'} · {(r.customer||r.site||'').slice(0,28)}</option>)}
+            </optgroup>
+          </select>
+          {reports.filter(r=>String(r.drive_date).slice(0,10)===f.drive_date).length===0&&<div className="hint" style={{color:'#b45309'}}>ไม่พบรายงานโฟร์แมนของวันที่ตอกนี้ — เลือกจากวันอื่น หรือกรอกเอง</div>}</div>
         {inp('customer','ลูกค้า')}
         {inp('site','หน้างาน')}
         <div style={{display:'flex',gap:8}}>
@@ -617,21 +673,23 @@ function FailForm({me,init,onCancel,onSaved}){
           <div className="field" style={{flex:1}}><label>ยาว (ม.)</label>
             <input type="number" inputMode="decimal" step="0.5" value={f.pile_length_m} onChange={e=>set('pile_length_m',e.target.value)}/></div>
         </div>
-        <div className="field"><label>วันที่ผลิต ★ (ใช้นับอายุเสา) — เสาต่อกันหลายท่อน ผลิตคนละวัน กดเพิ่มท่อนได้</label>
-          {f.prod_dates.map((p,i)=><div key={i} style={{display:'flex',gap:6,marginBottom:6,alignItems:'center'}}>
-            <span style={{minWidth:78,fontSize:12.5,color:'var(--muted)',lineHeight:1.3}}>ท่อนที่ {i+1}{p.len?<><br/>({p.len} ม.)</>:null}</span>
-            <input type="date" style={{flex:'1 1 0',minWidth:0}} value={p.date} onChange={e=>setPd(i,{date:e.target.value})}/>
-            {f.prod_dates.length>1&&<button onClick={()=>delPd(i)} style={{border:'none',background:'#fdecea',color:'#c0392b',borderRadius:8,width:34,height:38,fontSize:18,cursor:'pointer'}}>×</button>}
+        <div className="field"><label>ท่อนของเสาต้นนี้ — ความยาว · วันที่หน้าเสา · วันที่ผลิตจริง (เสาต่อกัน กดเพิ่มท่อนได้)</label>
+          {f.prod_dates.map((p,i)=><div key={i} style={{border:'1px solid var(--line)',borderRadius:12,padding:'8px 10px',marginBottom:8,background:'#fafbfd'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <b style={{color:'var(--brand)',fontSize:14.5}}>{pieceLabel(i,f.prod_dates.length)}</b>
+              {f.prod_dates.length>1&&<button onClick={()=>delPd(i)} style={{border:'none',background:'#fdecea',color:'#c0392b',borderRadius:8,width:34,height:34,fontSize:18,cursor:'pointer'}}>×</button>}</div>
+            <div style={{display:'flex',gap:8}}>
+              <div className="field" style={{flex:'0 0 30%',minWidth:0,marginBottom:0}}><label>ยาว (ม.)</label><input type="number" inputMode="decimal" step="0.5" value={p.len} onChange={e=>setPd(i,{len:e.target.value})}/></div>
+              <div className="field" style={{flex:1,minWidth:0,marginBottom:0}}><label>วันที่หน้าเสา (อ้างอิง)</label><input type="text" placeholder="เช่น 7/10/69" value={p.face} onChange={e=>setPd(i,{face:e.target.value})}/></div></div>
+            <div className="field" style={{marginTop:8,marginBottom:0}}><label>วันที่ผลิตจริง ★ (ใช้เทียบผลกำลังอัด/นับอายุ)</label><input type="date" value={p.date} onChange={e=>setPd(i,{date:e.target.value})}/></div>
+            <div style={{marginTop:8,fontWeight:800,color:'var(--brand)',fontSize:14.5}}>อายุตอนตอก: {p.date&&f.drive_date?isoDiff(f.drive_date,p.date)+' วัน':'—'} <span className="hint" style={{fontWeight:400}}>ผลิตจริง → ตอกเฟล</span></div>
           </div>)}
-          <button className="ghost" style={{padding:'9px'}} onClick={addPd}>＋ เพิ่มท่อน / วันที่ผลิตอีกวัน</button></div>
-        <div className="field"><label>วันที่ตอก</label><input type="date" value={f.drive_date} onChange={e=>set('drive_date',e.target.value)}/></div>
-        {inp('face_date','วันที่หน้าเสา (อ้างอิงเท่านั้น — อาจย้อนวัน ไม่ตรงวันผลิต)',{placeholder:'เช่น 7/10/69'})}
-        <div style={{padding:'10px 12px',borderRadius:10,background:'#f0fdfa',border:'1px solid #99f6e4',fontWeight:800,color:'var(--brand)',lineHeight:1.8}}>
-          {pcs.length<=1?<>อายุเสาตอนตอก: {age!=null?(age+' วัน'):'— (ใส่วันที่ผลิต)'} <span className="hint" style={{fontWeight:400}}>นับจากวันที่ผลิต</span></>:
-            <>อายุเสาตอนตอก: {pcs.map((p,i)=>'ท่อน '+(i+1)+' = '+(pieceAges[i]!=null?pieceAges[i]+' วัน':'–')).join(' · ')}<br/><span className="hint" style={{fontWeight:400}}>ท่อนที่อ่อนที่สุด {age!=null?age+' วัน':'–'}</span></>}</div>
+          <button className="ghost" style={{padding:'9px'}} onClick={addPd}>＋ เพิ่มท่อน (ท่อนต่อ)</button>
+          {lenMismatch&&<div className="hint" style={{color:'#b45309',marginTop:6}}>⚠️ ความยาวรวมท่อน {fmtN(sumLen,2)} ม. ไม่เท่าความยาวเสา {fmtN(Number(f.pile_length_m),2)} ม. — ตรวจอีกครั้ง</div>}</div>
+        {pcs.length>1&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0fdfa',border:'1px solid #99f6e4',fontWeight:800,color:'var(--brand)'}}>ท่อนที่อ่อนที่สุด: {age!=null?age+' วัน':'—'} <span className="hint" style={{fontWeight:400}}>(ใช้เป็นอายุหลักของเสา)</span></div>}
       </div>
 
-      {secH('② กำลังอัดคอนกรีต วันผลิต ± 3 วัน')}
+      {secH('② กำลังอัดคอนกรีต 7 วัน — วันผลิต ± 3 วัน')}
       <div className="card" style={{marginTop:0}}>
         {!pcs.length&&<div className="hint">ใส่วันที่ผลิตก่อน ระบบจะดึงผลกำลังอัดวันนั้นกับก่อน/หลัง 3 วันมาเทียบให้ (หลายท่อนจะเทียบทุกท่อน)</div>}
         {pcs.length>0&&cr===null&&<div className="hint">กำลังดึงผล…</div>}
@@ -705,8 +763,13 @@ function FailForm({me,init,onCancel,onSaved}){
 
       {secH('⑥ สรุป')}
       <div className="card" style={{marginTop:0}}>
-        <div className="hint" style={{marginBottom:6}}>ข้อสังเกตอัตโนมัติจากข้อมูลที่กรอก (ใช้เป็นแนวทาง ไม่ใช่ข้อสรุป):</div>
-        {observations({...f,strength_rows:rowsFor,hammer_ratio:ratio}).map((o,i)=><div key={i} style={{fontSize:14,lineHeight:1.8,color:{ok:'#15803d',bad:'#c0392b',warn:'#b45309',info:'#475569'}[o.t]}}>{{ok:'✔',bad:'✘',warn:'⚠',info:'ℹ'}[o.t]} {o.x}</div>)}
+        {(()=>{const an=analyze({...f,strength_rows:rowsFor,hammer_ratio:ratio,blow_s_cm:bc?bc.S:null});const cl={ok:'#15803d',bad:'#c0392b',warn:'#b45309',info:'#475569'},ic2={ok:'✔',bad:'✘',warn:'⚠',info:'ℹ'};
+          return <div>
+            <div className="hint" style={{marginBottom:6}}>วิเคราะห์อัตโนมัติจากข้อมูลที่กรอก (ใช้เป็นแนวทาง ไม่ใช่ข้อสรุป):</div>
+            <div style={{fontSize:14.5,fontWeight:800,lineHeight:1.6,color:an.nRisk?'#c0392b':'#15803d',marginBottom:6}}>{an.summary}</div>
+            {[...an.risks,...an.oks,...an.infos].map((o,i)=><div key={i} style={{fontSize:14,lineHeight:1.8,color:cl[o.t]}}>{ic2[o.t]} {o.x}</div>)}
+            <div style={{marginTop:6,fontSize:13.5,lineHeight:1.8,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:10,padding:'8px 12px'}}><b>แนวทางตรวจ/แก้ต่อ</b>{an.checks.map((c,i)=><div key={i}>→ {c}</div>)}</div>
+          </div>;})()}
         <div className="field" style={{marginTop:10}}><label>สาเหตุที่น่าจะเป็น (ความเห็นผู้ตรวจ)</label>
           <textarea className="note" rows={3} value={f.cause_note} onChange={e=>set('cause_note',e.target.value)} style={{marginTop:0}}/></div>
         <div className="field"><label>มาตรการ / สิ่งที่ต้องแก้ไข</label>
@@ -715,8 +778,9 @@ function FailForm({me,init,onCancel,onSaved}){
       {err&&<div className="card" style={{color:'#c0392b',borderColor:'#f3b8b0',background:'#fdecea'}}>{err}</div>}
     </div>
     <div className="bottom"><div className="inner">
-      <button className="ghost" style={{flex:'0 0 30%'}} onClick={onCancel}>ยกเลิก</button>
-      <button className="bigbtn" disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'💾 บันทึกใบตรวจ'}</button>
+      <button className="ghost" style={{flex:'0 0 22%',padding:'12px 4px'}} onClick={onCancel}>ยกเลิก</button>
+      <button className="ghost" style={{flex:'1 1 0',padding:'12px 4px',fontSize:13.5}} disabled={saving} onClick={()=>save(true)}>💾＋ บันทึก แล้วเพิ่มเสาเฟลอีกต้น</button>
+      <button className="bigbtn" style={{flex:'1 1 0',padding:'14px 4px',fontSize:16}} disabled={saving} onClick={()=>save(false)}>{saving?'กำลังบันทึก…':'💾 บันทึกใบตรวจ'}</button>
     </div></div>
   </>;
 }
