@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12i';
+var APP_VERSION='2026-11-12j';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -195,6 +195,26 @@ function blowCalc(A,L,W,H,Qa){
   const a=BLOW_E*W*H, b=(L*100)/(A*BLOW_EC), Qu=BLOW_FS*Qa, S=a/Qu-0.5*Math.sqrt(2*a*b);
   return {a,b,Qu,S,per10:S>0?10/S:0,per30:S>0?30/S:0};
 }
+// ใบบันทึกการตอก (Driving record): Blow ต่อ 1 ฟุต (30 ซม.) · Last ten blow penetration · ระดับหัว/ปลายเสาจริง · เบี้ยว N/E/W/S
+// blowCalc = set ที่ "ต้องได้" ตาม Qa · ตรงนี้คือ set ที่ "ตอกได้จริง" (เฉลี่ยของ 10 ครั้งสุดท้าย) แล้วย้อนหา Qa ที่ทำได้จริงด้วยสูตร Danish เดียวกัน
+const parseBlows = t => String(t||'').split(/[\s,;]+/).filter(x=>/^\d+(?:\.\d+)?$/.test(x)).map(Number).slice(0,60);
+const numOrNull = v => v===''||v==null||!isFinite(Number(v))?null:Number(v);
+function driveStats(r){
+  const L=r.drive_log||{}, out={}, blows=(L.blows||[]).map(Number).filter(x=>x>=0);
+  if(blows.length){const n=blows.length,sum=blows.reduce((t,x)=>t+x,0),l3=blows.slice(-3);
+    out.n=n;out.total=sum;out.max=Math.max(...blows);out.avg=sum/n;out.last3=l3.reduce((t,x)=>t+x,0)/l3.length;out.ratio=out.avg>0?out.last3/out.avg:null;}
+  const l10=(L.l10||[]).map(Number).filter(x=>x>0);
+  if(l10.length){out.set=(l10.reduce((t,x)=>t+x,0)/l10.length)/10;out.per10=out.set>0?10/out.set:null;}   // set = ซม./ครั้ง (penetration 10 ครั้ง ÷ 10)
+  const A=Number(r.pile_area_cm2),Ln=Number(r.pile_length_m),W=Number(r.hammer_weight_t),H=Number(r.hammer_drop_cm),Qa=Number(r.qa_ton);
+  if(out.set>0&&A>0&&Ln>0&&W>0&&H>0){const a=BLOW_E*W*H,b=Ln*100/(A*BLOW_EC),Qu=a/(out.set+0.5*Math.sqrt(2*a*b));out.qaAct=Qu/BLOW_FS;if(Qa>0)out.qaRatio=out.qaAct/Qa;}
+  const top=numOrNull(L.top),tip=numOrNull(L.tip),spec=numOrNull(L.spec_tip);
+  out.top=top;out.tip=tip;out.spec=spec;
+  if(tip!=null&&spec!=null)out.shortfall=Math.round((tip-spec)*100)/100;           // >0 = ตอกตื้นกว่าระดับปลายเสาที่กำหนด
+  if(top!=null&&tip!=null&&Ln>0)out.lenGap=Math.round((Math.abs(top-tip)-Ln)*100)/100;   // ≠0 = ระดับหัว/ปลายไม่ตรงกับความยาวเสา
+  const d=L.dev||{},nn=numOrNull(d.N)||0,ee=numOrNull(d.E)||0,ww=numOrNull(d.W)||0,ss=numOrNull(d.S)||0;
+  if([d.N,d.E,d.W,d.S].some(x=>numOrNull(x)!=null)){const x=ee-ww,y=nn-ss;out.dev=Math.hypot(x,y);out.devDir=(y>0?'N':y<0?'S':'')+(x>0?'E':x<0?'W':'');}
+  return out;
+}
 const HAMMER_MIN = 0.7, HAMMER_MAX = 2.5;
 const SOIL_LV = [
   {t:'ดินอ่อน',e:'🟢',col:'#15803d',bg:'#dcfce7'},
@@ -283,6 +303,18 @@ function analyze(r){
     if(age!=null&&age<7) extra.push({t:'warn',x:(pcs.length>1?p.label+': ':'')+'ตอกตอนอายุ '+age+' วัน (น้อยกว่า 7 วัน) ยังไม่ถึงอายุที่ใช้เทียบกำลังอัด จึงยืนยันกำลังอัดจริงไม่ได้'});
   });
   if(r.blow_s_cm!=null&&r.blow_s_cm!==''&&Number(r.blow_s_cm)<=0) extra.push({t:'bad',x:'คำนวณ Blow ไม่ได้ — พลังงานตุ้ม (น้ำหนัก × ระยะยก) น้อยกว่าที่ Qa ต้องการ ตุ้มเบา/ยกต่ำเกินไป ตอกไม่เข้า'});
+  const ds=driveStats(r), qaT=Number(r.qa_ton);
+  if(ds.qaAct!=null&&qaT>0){
+    if(ds.qaRatio<1) extra.push({t:'bad',x:'ตอกยังไม่ถึง set ที่ต้องการ — set จริง '+fmtN(ds.set,3)+' ซม./ครั้ง ให้ Qa ≈ '+fmtN(ds.qaAct,1)+' ตัน ต่ำกว่า Qa ตามแบบ '+fmtN(qaT,1)+' ตัน'});
+    else extra.push({t:ds.qaRatio>=1.5?'warn':'ok',x:'set ถึงตามต้องการ — Qa ที่ตอกได้จริง ≈ '+fmtN(ds.qaAct,1)+' ตัน (แบบ '+fmtN(qaT,1)+' ตัน = '+fmtN(ds.qaRatio,2)+' เท่า)'+(ds.qaRatio>=1.5?' ตอกแน่นเกินที่ต้องการมาก ถ้ายังตอกต่อหลังถึง set หัวเสาเสี่ยงแตก':'')});
+  }
+  if(ds.shortfall!=null&&ds.shortfall>0.05){
+    const reached=ds.qaRatio!=null&&ds.qaRatio>=1;
+    extra.push({t:reached?'warn':'bad',x:'ตอกไม่ถึงระดับปลายเสาที่กำหนด (ปลายเสาจริง '+fmtN(ds.tip,2)+' ม. · ตามแบบ '+fmtN(ds.spec,2)+' ม. ขาด '+fmtN(ds.shortfall,2)+' ม.)'+(reached?' แต่ถึง set แล้ว → น่าจะติดชั้นแข็ง':' และยังไม่ถึง set')});
+  }
+  if(ds.ratio!=null&&ds.ratio>=2.5) extra.push({t:'warn',x:'ช่วงท้ายตอกยากขึ้นมาก — 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0)+' ครั้ง/ฟุต (สูงสุด '+ds.max+') เทียบเฉลี่ยทั้งช่วง '+fmtN(ds.avg,1)+' = '+fmtN(ds.ratio,1)+' เท่า หัวเสารับแรงกระแทกสูง/ติดชั้นแข็ง'});
+  if(ds.lenGap!=null&&Math.abs(ds.lenGap)>0.05) extra.push({t:'info',x:'ระดับหัว/ปลายเสาจริงไม่ตรงกับความยาวเสา (ต่างกัน '+fmtN(Math.abs(ds.lenGap),2)+' ม.) — ตรวจตัวเลขในใบบันทึก'});
+  if(ds.dev!=null&&ds.dev>0) extra.push({t:'info',x:'หัวเสาเบี้ยว '+fmtN(ds.dev,1)+' ซม. ทิศ '+(ds.devDir||'–')+(ds.tip!=null&&ds.top!=null&&Math.abs(ds.top-ds.tip)>0?' (≈ '+fmtN(ds.dev/(Math.abs(ds.top-ds.tip)),2)+' ซม./ม.)':'')});
   const all=[...obs,...extra];
   const sev={bad:0,warn:1,info:2,ok:3};
   const risks=all.filter(o=>o.t==='bad'||o.t==='warn').sort((a,b)=>sev[a.t]-sev[b.t]);
@@ -295,6 +327,9 @@ function analyze(r){
   if(has(/ตุ้มหนัก/)) checks.push('ตุ้มหนัก: ลดระยะยก/ใช้ตุ้มเบาลง และตรวจหมวกรองหัวเสา');
   if(has(/ไม่ดิ่ง/)) checks.push('เสาไม่ดิ่ง: ตรวจแนวและหมุดก่อนตอก การตั้งเสา และแรงเยื้องศูนย์');
   if(has(/อายุ .* วัน \(น้อยกว่า 7/)) checks.push('อายุเสาน้อย: ตรวจเกณฑ์อายุก่อนตอก และเก็บผลกำลังอัดย้อนหลังให้ครบ');
+  if(has(/ตอกยังไม่ถึง set/)) checks.push('ยังไม่ถึง set: ตรวจว่าตอกต่อได้อีกหรือไม่ / เพิ่มพลังงานตุ้ม และปรึกษาวิศวกรเรื่องกำลังรับน้ำหนักจริง');
+  if(has(/ตอกไม่ถึงระดับปลายเสา/)) checks.push('ปลายเสาตื้นกว่าแบบ: ตรวจชั้นดินแข็ง/สิ่งกีดขวางใต้ดิน และให้วิศวกรยืนยันการรับรอง set ก่อนตัดหัวเสา');
+  if(has(/ช่วงท้ายตอกยากขึ้นมาก/)) checks.push('ช่วงท้ายตอกยาก: ลดการตอกซ้ำเกิน set ใช้หมวกรองหัวเสาที่ดี และตรวจรอยร้าวหัวเสา/รอยต่อหลังตอก');
   if(!risks.length) checks.push('ข้อมูลที่ตรวจอยู่ในเกณฑ์ทั้งหมด — ตรวจเพิ่ม: รอยร้าวก่อนตอก การยกขนส่ง การจี้/รองหัวเสา และตำแหน่งที่แตก (หัวเสา/กลางต้น/รอยต่อ)');
   const summary=risks.length?('พบปัจจัยเสี่ยง '+risks.length+' ข้อ — ที่น่าสงสัยที่สุด: '+risks[0].x):'ข้อมูลที่ตรวจทั้งหมดอยู่ในเกณฑ์ ยังไม่พบสาเหตุชัดเจนจากตัวเลข';
   return {summary,risks,oks,infos,checks,nRisk:risks.length};
@@ -386,6 +421,18 @@ function FailReport({rec,logo,photos}){
         {kv('ค่าที่วัดได้ (ดิ่ง)',rec.vertical_note)}
       </tbody></table>
     </div>
+    {rec.drive_log&&Object.keys(rec.drive_log).length>0&&(()=>{const ds=driveStats(rec),L=rec.drive_log||{},bl=(L.blows||[]).map(Number);
+      return <div data-block="5b" style={blk}>{H('4.1 บันทึกการตอกจริง (Driving record)')}
+        <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
+          {ds.total!=null&&kv('Blow ต่อฟุต (30 ซม.)',ds.n+' ฟุต · รวม '+ds.total+' ครั้ง · สูงสุด '+ds.max+' · 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0))}
+          {ds.set!=null&&kv('set จริง (10 ครั้งสุดท้าย)',fmtN(ds.set,3)+' ซม./ครั้ง ≈ '+fmtN(ds.per10,1)+' ครั้ง/10 ซม. · penetration '+(L.l10||[]).join(' / ')+' ซม.')}
+          {ds.qaAct!=null&&kv('Qa ที่ตอกได้จริง (Danish)',<span style={{fontWeight:800,color:ds.qaRatio==null||ds.qaRatio>=1?'#15803d':'#b91c1c'}}>{fmtN(ds.qaAct,1)} ตัน{ds.qaRatio!=null?' ('+fmtN(ds.qaRatio,2)+' เท่าของ Qa ตามแบบ '+fmtN(Number(rec.qa_ton),1)+' ตัน) '+(ds.qaRatio>=1?'✔ ถึง set':'✘ ยังไม่ถึง set'):''}</span>)}
+          {(ds.top!=null||ds.tip!=null)&&kv('ระดับหัวเสา / ปลายเสาจริง',(ds.top!=null?fmtN(ds.top,2):'–')+' / '+(ds.tip!=null?fmtN(ds.tip,2):'–')+' ม.'+(ds.spec!=null?'  (ปลายตามแบบ '+fmtN(ds.spec,2)+' ม.'+(ds.shortfall>0.05?' · ตื้นกว่าแบบ '+fmtN(ds.shortfall,2)+' ม.':' · ถึงตามแบบ')+')':''))}
+          {ds.dev!=null&&kv('หัวเสาเบี้ยว (Deviation)',fmtN(ds.dev,1)+' ซม. ทิศ '+(ds.devDir||'–')+'  (N '+(L.dev.N??'–')+' · E '+(L.dev.E??'–')+' · W '+(L.dev.W??'–')+' · S '+(L.dev.S??'–')+')')}
+        </tbody></table>
+        {bl.length>0&&<div style={{marginTop:8}}><div style={{display:'flex',alignItems:'flex-end',gap:2,height:70}}>{bl.map((v,i)=><div key={i} style={{flex:1,background:i>=bl.length-3?'#c0392b':'#0f766e',height:Math.max(3,v/(ds.max||1)*66),borderRadius:2}}/>)}</div>
+          <div style={{fontSize:11.5,color:'#64748b',marginTop:2}}>จำนวน Blow ต่อฟุต ฟุตที่ 1 → {bl.length} (แท่งแดง = 3 ฟุตสุดท้าย)</div></div>}
+      </div>;})()}
     <div data-block="6" style={blk}>{H('5. วิเคราะห์สาเหตุเบื้องต้น')}
       <div style={{fontSize:14,fontWeight:800,lineHeight:1.7,color:an.nRisk?'#b91c1c':'#15803d',marginBottom:6}}>{an.summary}</div>
       {an.risks.length>0&&<div style={{fontSize:13.5,lineHeight:1.8,marginBottom:4}}><b>ปัจจัยเสี่ยงที่พบ (เรียงตามความสำคัญ)</b>{an.risks.map((o,i)=><div key={i} style={{color:col[o.t]}}>{i+1}. {ic[o.t]} {o.x}</div>)}</div>}
@@ -604,11 +651,13 @@ function FailForm({me,init,onCancel,onSaved}){
   const today=todayISO();
   const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_std:'tis',pile_length_m:'',prod_dates:[{date:'',face:'',len:''}],face_date:'',drive_date:today,foreman_report_id:null,
     strength_formula:'',strength_rows:[],blow_id:null,blow_site:'',blow_count:'',blow_feet:30,
-    hammer_weight_t:'',hammer_drop_cm:'',qa_ton:'',pile_weight_t:null,pile_area_cm2:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:''};
+    hammer_weight_t:'',hammer_drop_cm:'',qa_ton:'',pile_weight_t:null,pile_area_cm2:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:'',log:{blows:'',l10:['','',''],top:'',tip:'',spec:'',N:'',E:'',W:'',S:''}};
   const [f,setF]=useState(()=>{
     const o=init?{...blank,...Object.fromEntries(Object.entries(init).map(([k,v])=>[k,v==null?(blank[k]!==undefined?blank[k]:''):v]))}:blank;
     const pd=piecesOf(o).map(p=>({date:p.date,face:p.face||'',len:p.len===''?'':String(p.len)}));
-    return {...o,prod_dates:pd.length?pd:[{date:'',face:'',len:''}]};
+    const dl=(init&&init.drive_log&&Object.keys(init.drive_log).length)?init.drive_log:null, sv=v=>v==null?'':String(v);
+    const log=dl?{blows:(dl.blows||[]).join(' '),l10:[0,1,2].map(i=>sv((dl.l10||[])[i])),top:sv(dl.top),tip:sv(dl.tip),spec:sv(dl.spec_tip),N:sv((dl.dev||{}).N),E:sv((dl.dev||{}).E),W:sv((dl.dev||{}).W),S:sv((dl.dev||{}).S)}:blank.log;
+    return {...o,prod_dates:pd.length?pd:[{date:'',face:'',len:''}],log};
   });
   const setPd=(i,patch)=>setF(o=>({...o,prod_dates:o.prod_dates.map((p,j)=>j===i?{...p,...patch}:p)}));
   const addPd=()=>setF(o=>({...o,prod_dates:[...o.prod_dates,{date:'',face:'',len:''}]}));
@@ -663,6 +712,11 @@ function FailForm({me,init,onCancel,onSaved}){
   const hw=Number(f.hammer_weight_t)||0;
   const ratio=pileW&&hw?hw/pileW:null;
   const bc=blowCalc(pArea,len,hw,Number(f.hammer_drop_cm),Number(f.qa_ton));
+  // ใบบันทึกการตอก → ข้อมูลจริง
+  const logObj={blows:parseBlows(f.log.blows),l10:f.log.l10.map(numOrNull).filter(x=>x!=null),top:numOrNull(f.log.top),tip:numOrNull(f.log.tip),spec_tip:numOrNull(f.log.spec),dev:{N:numOrNull(f.log.N),E:numOrNull(f.log.E),W:numOrNull(f.log.W),S:numOrNull(f.log.S)}};
+  const dsF=driveStats({drive_log:logObj,pile_area_cm2:pArea,pile_length_m:len,hammer_weight_t:hw,hammer_drop_cm:Number(f.hammer_drop_cm),qa_ton:Number(f.qa_ton)});
+  const hasLog=logObj.blows.length>0||logObj.l10.length>0||logObj.top!=null||logObj.tip!=null||logObj.spec_tip!=null||Object.values(logObj.dev).some(x=>x!=null);
+  useEffect(()=>{ const t=logObj.blows.reduce((s,x)=>s+x,0); if(logObj.blows.length&&String(t)!==String(f.blow_count)) setF(o=>({...o,blow_count:String(t)})); },[f.log.blows]);   // รวม Blow จากใบ = ค่า Blow 30 ฟุต
   const L=f.blow_count!==''&&f.blow_count!=null?SOIL_LV[soilIdx(Number(f.blow_count))]:null;
 
   const doneIds=(()=>{const st=new Set(),un=[];const nz=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -701,6 +755,7 @@ function FailForm({me,init,onCancel,onSaved}){
       const row={inspector:me.name,inspect_date:f.inspect_date||today,foreman_report_id:f.foreman_report_id||null,customer:f.customer||null,site:f.site||null,
         pile_size:f.pile_size,pile_std:f.pile_std||null,pile_length_m:num(f.pile_length_m)!=null?num(f.pile_length_m):(sumLen>0?sumLen:null),prod_date:pcs.map(p=>p.date).sort()[0],prod_dates:pcs.map(p=>({date:p.date,face:p.face||'',len:p.len===''?null:Number(p.len)})),face_date:pcs.map(p=>p.face).filter(Boolean).join(' · ')||null,drive_date:f.drive_date||null,age_days:age,
         strength_formula:f.strength_formula||'',strength_rows:rowsFor,
+        drive_log:hasLog?{...logObj,set:dsF.set??null,per10:dsF.per10??null,qa_act:dsF.qaAct??null,total:dsF.total??null,shortfall:dsF.shortfall??null,dev_mag:dsF.dev??null}:{},
         blow_id:f.blow_id||null,blow_site:f.blow_site||null,blow_count:num(f.blow_count),blow_feet:num(f.blow_feet)||30,
         vertical_result:f.vertical_result||null,vertical_note:f.vertical_note||null,
         hammer_weight_t:num(f.hammer_weight_t),hammer_drop_cm:num(f.hammer_drop_cm),qa_ton:num(f.qa_ton),pile_weight_t:pileW,pile_area_cm2:pArea,hammer_ratio:ratio,blow_s_cm:bc?bc.S:null,blow_per10:bc?bc.per10:null,
@@ -838,7 +893,31 @@ function FailForm({me,init,onCancel,onSaved}){
         {inp('vertical_note','ค่าที่วัดได้ (ถ้ามี)',{placeholder:'เช่น เอียง 2 ซม. ที่ความสูง 1 ม.'})}
       </div>
 
-      {secH('⑤ รูปถ่ายตอนเสาเข็มแตก')}
+      {secH('⑤ ใบบันทึกการตอก (ข้อมูลจริงหน้างาน)')}
+      <div className="card" style={{marginTop:0}}>
+        <div className="hint" style={{marginBottom:6}}>คัดตัวเลขจากใบ "Driving record" — ยิ่งครบ ระบบยิ่งวิเคราะห์สาเหตุได้แม่น (ไม่บังคับ)</div>
+        <div className="field"><label>จำนวน Blow ต่อ 1 ฟุต (30 ซม.) เรียงจากฟุตที่ 1 — พิมพ์/วางตัวเลขเว้นวรรคได้</label>
+          <textarea className="note" rows={3} placeholder="เช่น 4 6 6 8 7 8 10 11 11 12 13 15 …" value={f.log.blows} onChange={e=>setF(o=>({...o,log:{...o.log,blows:e.target.value}}))} style={{marginTop:0}}/></div>
+        {logObj.blows.length>0&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--brand)'}}>{logObj.blows.length} ฟุต · รวม {dsF.total} ครั้ง <span className="hint" style={{fontWeight:400}}>(ใช้เป็นค่า Blow 30 ฟุตให้อัตโนมัติ)</span></div>
+          <div style={{display:'flex',alignItems:'flex-end',gap:2,height:64,marginTop:6}}>{logObj.blows.map((v,i)=><div key={i} title={'ฟุตที่ '+(i+1)+': '+v} style={{flex:1,minWidth:3,background:i>=logObj.blows.length-3?'#c0392b':'#0f766e',height:Math.max(3,v/dsF.max*60),borderRadius:2}}/>)}</div>
+          <div className="hint">ฟุตที่ 1 → {logObj.blows.length} · แท่งแดง = 3 ฟุตสุดท้าย · สูงสุด {dsF.max} ครั้ง/ฟุต</div></div>}
+        <div className="field"><label>Last ten blow penetration (ซม.) — 3 ชุดสุดท้ายในใบ</label>
+          <div style={{display:'flex',gap:8}}>{[0,1,2].map(i=><input key={i} type="number" inputMode="decimal" step="0.1" placeholder={'ชุด '+(i+1)} value={f.log.l10[i]} onChange={e=>setF(o=>({...o,log:{...o.log,l10:o.log.l10.map((x,j)=>j===i?e.target.value:x)}}))} style={{flex:1,minWidth:0}}/>)}</div></div>
+        <div style={{display:'flex',gap:8}}>
+          <div className="field" style={{flex:1,minWidth:0}}><label>ระดับหัวเสาจริง (ม.)</label><input type="number" inputMode="decimal" step="0.01" placeholder="+1.50" value={f.log.top} onChange={e=>setF(o=>({...o,log:{...o.log,top:e.target.value}}))}/></div>
+          <div className="field" style={{flex:1,minWidth:0}}><label>ระดับปลายเสาจริง (ม.)</label><input type="number" inputMode="decimal" step="0.01" placeholder="-23.50" value={f.log.tip} onChange={e=>setF(o=>({...o,log:{...o.log,tip:e.target.value}}))}/></div>
+          <div className="field" style={{flex:1,minWidth:0}}><label>ปลายเสาตามแบบ (ม.)</label><input type="number" inputMode="decimal" step="0.01" placeholder="-25.00" value={f.log.spec} onChange={e=>setF(o=>({...o,log:{...o.log,spec:e.target.value}}))}/></div></div>
+        <div className="field"><label>หัวเสาเบี้ยว Deviation (ซม.) — ทิศ N / E / W / S</label>
+          <div style={{display:'flex',gap:8}}>{['N','E','W','S'].map(k=><input key={k} type="number" inputMode="decimal" step="0.1" placeholder={k} value={f.log[k]} onChange={e=>setF(o=>({...o,log:{...o.log,[k]:e.target.value}}))} style={{flex:1,minWidth:0}}/>)}</div></div>
+        {hasLog&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0f9ff',border:'1px solid #bae6fd',lineHeight:1.8,fontSize:14}}>
+          {dsF.set!=null&&<div>set จริง (เฉลี่ย 10 ครั้งสุดท้าย) = <b>{fmtN(dsF.set,3)} ซม./ครั้ง</b> ≈ {fmtN(dsF.per10,1)} ครั้ง/10 ซม.{dsF.qaAct!=null&&<> → Qa ที่ตอกได้จริง ≈ <b>{fmtN(dsF.qaAct,1)} ตัน</b>{dsF.qaRatio!=null&&<span style={{color:dsF.qaRatio>=1?'#15803d':'#c0392b',fontWeight:700}}> ({fmtN(dsF.qaRatio,2)} เท่าของ Qa ตามแบบ)</span>}</>}</div>}
+          {dsF.shortfall!=null&&<div>ปลายเสา {dsF.shortfall>0.05?<b style={{color:'#b45309'}}>ตื้นกว่าแบบ {fmtN(dsF.shortfall,2)} ม.</b>:'ถึงระดับตามแบบ'}</div>}
+          {dsF.dev!=null&&<div>หัวเสาเบี้ยวรวม ≈ {fmtN(dsF.dev,1)} ซม. ทิศ {dsF.devDir||'–'}</div>}
+          {dsF.set==null&&logObj.l10.length===0&&<div className="hint">ใส่ Last ten blow penetration เพื่อคำนวณ set จริงและ Qa ที่ตอกได้</div>}</div>}
+      </div>
+
+      {secH('⑥ รูปถ่ายตอนเสาเข็มแตก')}
       <div className="card" style={{marginTop:0}}>
         <label className="ghost" style={{display:'block',textAlign:'center',cursor:'pointer'}}>📷 ถ่าย/เลือกรูป
           <input type="file" accept="image/*" multiple capture="environment" style={{display:'none'}} onChange={addFiles}/></label>
@@ -849,9 +928,9 @@ function FailForm({me,init,onCancel,onSaved}){
         <div className="hint" style={{marginTop:6}}>แนะนำถ่าย: รอยแตกใกล้ ๆ · ทั้งต้นเสา · หัวเสา/ปลายเสา · หน้างานรวม</div>
       </div>
 
-      {secH('⑥ สรุป')}
+      {secH('⑦ สรุป')}
       <div className="card" style={{marginTop:0}}>
-        {(()=>{const an=analyze({...f,strength_rows:rowsFor,hammer_ratio:ratio,blow_s_cm:bc?bc.S:null});const cl={ok:'#15803d',bad:'#c0392b',warn:'#b45309',info:'#475569'},ic2={ok:'✔',bad:'✘',warn:'⚠',info:'ℹ'};
+        {(()=>{const an=analyze({...f,strength_rows:rowsFor,hammer_ratio:ratio,blow_s_cm:bc?bc.S:null,drive_log:logObj,pile_area_cm2:pArea,pile_length_m:len});const cl={ok:'#15803d',bad:'#c0392b',warn:'#b45309',info:'#475569'},ic2={ok:'✔',bad:'✘',warn:'⚠',info:'ℹ'};
           return <div>
             <div className="hint" style={{marginBottom:6}}>วิเคราะห์อัตโนมัติจากข้อมูลที่กรอก (ใช้เป็นแนวทาง ไม่ใช่ข้อสรุป):</div>
             <div style={{fontSize:14.5,fontWeight:800,lineHeight:1.6,color:an.nRisk?'#c0392b':'#15803d',marginBottom:6}}>{an.summary}</div>

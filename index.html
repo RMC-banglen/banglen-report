@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12h';
+var APP_VERSION='2026-11-12i';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13477,6 +13477,8 @@ window.__dataReady.then(data => {
       ['ดินเฝ้าระวัง (Blow 301–599)',r=>r.blow_count!=null&&Number(r.blow_count)>300&&Number(r.blow_count)<600,'#a16207'],
       ['ตอกก่อนอายุ 7 วัน',r=>r.age_days!=null&&Number(r.age_days)<7,'#c2410c'],
       ['พลังงานตุ้มไม่พอตาม Qa (คำนวณ Blow ไม่ได้)',r=>r.blow_s_cm!=null&&Number(r.blow_s_cm)<=0,'#b91c1c'],
+      ['ตอกไม่ถึงระดับปลายเสาที่กำหนด',r=>{const l=r.drive_log||{};return l.shortfall!=null&&Number(l.shortfall)>0.05;},'#c2410c'],
+      ['set จริงยังไม่ถึง Qa ตามแบบ',r=>{const l=r.drive_log||{};return l.qa_act!=null&&r.qa_ton!=null&&Number(l.qa_act)<Number(r.qa_ton);},'#b91c1c'],
     ];
     const factors=factorDefs.map(([t,f,c])=>({t,c,n:base.filter(f).length})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
     const noFactor=base.filter(r=>!factorDefs.some(([t,f])=>!/เฝ้าระวัง/.test(t)&&f(r))).length;   // ไม่มีปัจจัยผิดปกติเลย (ดินเฝ้าระวังไม่นับเป็นความผิดปกติ)
@@ -13567,6 +13569,12 @@ window.__dataReady.then(data => {
               {row('น้ำหนักเสา',r.pile_weight_t!=null?Number(r.pile_weight_t).toFixed(2)+' ตัน'+(r.pile_area_cm2?'  (หน้าตัด '+Number(r.pile_area_cm2)+' ซม.²)':''):'')}
               {row('ตุ้ม ÷ เสา',h!=null?<b style={{color:h>=0.7&&h<=2.5?'#15803d':'#b91c1c'}}>{h.toFixed(2)} เท่า {h>=0.7&&h<=2.5?'✔ อยู่ในเกณฑ์ (0.7–2.5)':'✘ นอกเกณฑ์ (0.7–2.5)'}</b>:'')}
               {row('คำนวณ Blow (Qa '+(r.qa_ton!=null?Number(r.qa_ton)+' ตัน':'–')+')',r.blow_s_cm!=null?(Number(r.blow_s_cm)>0?'S = '+Number(r.blow_s_cm).toFixed(3)+' ซม./ครั้ง ≈ '+Number(r.blow_per10).toFixed(1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้'):'')}
+              {r.drive_log&&Object.keys(r.drive_log).length>0&&row('บันทึกการตอกจริง',(()=>{const l=r.drive_log,bl=(l.blows||[]).map(Number),mx=Math.max(1,...bl);return <span>
+                {l.total!=null&&<div>Blow {bl.length} ฟุต รวม <b>{l.total}</b> ครั้ง</div>}
+                {l.set!=null&&<div>set จริง <b>{Number(l.set).toFixed(3)}</b> ซม./ครั้ง ≈ {Number(l.per10).toFixed(1)} ครั้ง/10 ซม.{l.qa_act!=null&&<> → Qa จริง ≈ <b style={{color:r.qa_ton!=null&&Number(l.qa_act)<Number(r.qa_ton)?'#b91c1c':'#15803d'}}>{Number(l.qa_act).toFixed(1)}</b> ตัน (แบบ {r.qa_ton!=null?Number(r.qa_ton):'–'})</>}</div>}
+                {(l.top!=null||l.tip!=null)&&<div>ระดับหัว/ปลายเสาจริง {l.top!=null?l.top:'–'} / {l.tip!=null?l.tip:'–'} ม.{l.spec_tip!=null&&<> (แบบ {l.spec_tip}{l.shortfall>0.05?<b style={{color:'#b45309'}}> · ตื้นกว่า {l.shortfall} ม.</b>:' · ถึงตามแบบ'})</>}</div>}
+                {l.dev_mag!=null&&<div>หัวเสาเบี้ยว {Number(l.dev_mag).toFixed(1)} ซม.</div>}
+                {bl.length>0&&<div style={{display:'flex',alignItems:'flex-end',gap:2,height:44,marginTop:4}}>{bl.map((v,i)=><div key={i} title={'ฟุตที่ '+(i+1)+': '+v} style={{flex:1,minWidth:3,maxWidth:14,background:i>=bl.length-3?'#c0392b':'#0f766e',height:Math.max(3,v/mx*40),borderRadius:2}}/>)}</div>}</span>;})())}
               {row('ดิ่งเสา',r.vertical_result==='ok'?'✔ ผ่าน':r.vertical_result==='bad'?'✘ ไม่ผ่าน':r.vertical_result==='na'?'ไม่ได้วัด':'')}
               {row('ค่าที่วัด (ดิ่ง)',r.vertical_note)}
               {row('สาเหตุที่น่าจะเป็น (QC)',r.cause_note)}
