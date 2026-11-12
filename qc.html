@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12x';
+var APP_VERSION='2026-11-12y';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -100,7 +100,7 @@ const DB = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 </script>
 
 <script type="text/babel" data-presets="react">
-const {useState,useEffect,useRef} = React;
+const {useState,useEffect,useRef,useMemo} = React;
 
 const FORMS = {
   pre:  {label:'ตรวจก่อนผลิต', full:'ระบบตรวจสอบก่อนผลิตเสาเข็มคอนกรีตอัดแรง ตาม มอก.396-2549', icon:'🧰'},
@@ -707,7 +707,19 @@ function FailInspectView({me,onBack,openId,openEdit}){
   </>;
 }
 
-function FailDetail({rec,onBack,onEdit,onAddNext}){
+function FailDetail({rec:recIn,onBack,onEdit,onAddNext}){
+  // ใบที่บันทึกไว้ก่อนมีตาราง ±3 วัน เก็บผลเฉพาะวันผลิต → ดึงผลวันข้างเคียงมาเติมให้ตอนเปิดดู (วันที่ใบเก็บไว้แล้วใช้ค่าเดิม)
+  const [extra,setExtra]=useState([]);
+  useEffect(()=>{
+    const ds=piecesOf(recIn).map(p=>p.date).filter(Boolean).sort(); if(!ds.length) return;
+    let off=false;
+    DB.from('concrete_results').select('sample_date,formula_name,age_days,avg_ksc').gte('sample_date',isoAdd(ds[0],-3)).lte('sample_date',isoAdd(ds[ds.length-1],3)).limit(5000)
+      .then(({data,error})=>{ if(off||error) return; const have=new Set((recIn.strength_rows||[]).map(r=>String(r.d).slice(0,10)));
+        setExtra((data||[]).map(r=>({d:String(r.sample_date).slice(0,10),f:normF(r.formula_name),a:Number(r.age_days),k:Number(r.avg_ksc)})).filter(r=>r.k>0&&!/\(/.test(r.f)&&!have.has(r.d))); })
+      .catch(()=>{});
+    return ()=>{off=true;};
+  },[recIn.id]);   // eslint-disable-line
+  const rec=useMemo(()=>extra.length?{...recIn,strength_rows:[...(recIn.strength_rows||[]),...extra]}:recIn,[recIn,extra]);
   const [busy,setBusy]=useState('');
   const [pdf,setPdf]=useState(null);   // {url,file}
   const [err,setErr]=useState('');
