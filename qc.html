@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13k';
+var APP_VERSION='2026-11-13l';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -707,6 +707,16 @@ async function makeFailPageImages(rec,onStep){
 }
 
 // ---------- หน้าหลักของเมนูตรวจเสาเฟล ----------
+// หน้าฝังรายงาน (ให้แดชบอร์ดเปิดดูในหน้าเดียว) — อ่านอย่างเดียว ไม่ต้องเลือกชื่อผู้ตรวจ
+function FailEmbed({id}){
+  const [rec,setRec]=useState(null);
+  const [err,setErr]=useState('');
+  useEffect(()=>{ DB.from('pile_fail_inspections').select('*').eq('id',id).single().then(({data,error})=>{ if(error||!data) setErr('ไม่พบใบตรวจ #'+id); else setRec(data); }).catch(()=>setErr('เชื่อมต่อฐานข้อมูลไม่ได้')); },[id]);
+  if(err) return <div className="wrap"><div className="card" style={{marginTop:20,color:'#92400e'}}>{err}</div></div>;
+  if(!rec) return <div className="wrap"><div className="card" style={{marginTop:20,color:'#78839a'}}>กำลังโหลดรายงาน…</div></div>;
+  return <FailDetail rec={rec} embed={true} onBack={()=>{}} onEdit={()=>{}} onAddNext={()=>{}}/>;
+}
+
 function FailInspectView({me,onBack,openId,openEdit}){
   const [view,setView]=useState('list');          // list | form | view
   const [list,setList]=useState(null);
@@ -753,7 +763,7 @@ function FailInspectView({me,onBack,openId,openEdit}){
   </>;
 }
 
-function FailDetail({rec:recIn,onBack,onEdit,onAddNext}){
+function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
   // ใบที่บันทึกไว้ก่อนมีตาราง ±3 วัน เก็บผลเฉพาะวันผลิต → ดึงผลวันข้างเคียงมาเติมให้ตอนเปิดดู (วันที่ใบเก็บไว้แล้วใช้ค่าเดิม)
   const [extra,setExtra]=useState([]);
   useEffect(()=>{
@@ -790,13 +800,13 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext}){
   const canShareSum=sumImg&&navigator.canShare&&navigator.canShare({files:[sumImg.file]});
   const canSharePages=pageImgs&&navigator.canShare&&navigator.canShare({files:pageImgs.map(x=>x.file)});
   return <>
-    <div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
-      <div><div className="who">ใบตรวจเสาเฟล #{rec.id}</div><div className="sub">{[rec.customer,rec.site].filter(Boolean).join(' · ')}</div></div></div>
+    {!embed&&<div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
+      <div><div className="who">ใบตรวจเสาเฟล #{rec.id}</div><div className="sub">{[rec.customer,rec.site].filter(Boolean).join(' · ')}</div></div></div>}
     <div className="wrap">
       <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
         <button className="bigbtn" style={{flex:'1 1 200px'}} disabled={!!busy} onClick={gen}>{busy?busy:'📄 สร้าง PDF รายงาน'}</button>
-        <button className="ghost" style={{flex:'0 0 auto',width:'auto',padding:'13px 20px'}} onClick={onEdit}>✎ แก้ไข</button>
-        <button className="ghost" style={{flex:'1 1 100%'}} onClick={onAddNext}>＋ เพิ่มเสาเฟลอีกต้น (วันที่ตอกเดียวกัน)</button>
+        {!embed&&<button className="ghost" style={{flex:'0 0 auto',width:'auto',padding:'13px 20px'}} onClick={onEdit}>✎ แก้ไข</button>}
+        {!embed&&<button className="ghost" style={{flex:'1 1 100%'}} onClick={onAddNext}>＋ เพิ่มเสาเฟลอีกต้น (วันที่ตอกเดียวกัน)</button>}
       </div>
       {err&&<div className="card" style={{color:'#c0392b'}}>{err}</div>}
       {pdf&&<div className="card" style={{background:'#ecfdf5',borderColor:'#a7e3d4'}}>
@@ -826,7 +836,7 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext}){
             {canSharePages&&<button className="ghost" style={{flex:'1 1 130px'}} onClick={()=>navigator.share({files:pageImgs.map(x=>x.file),title:baseName}).catch(()=>{})}>📤 แชร์ทุกหน้า</button>}</div></div>}
       </div>
       <div className="card" style={{padding:0,overflowX:'auto'}}>
-        <div style={{zoom:0.4}}><FailReport rec={rec} logo="logo.png" photos={rec.photos||[]}/></div>
+        <div style={{zoom:embed?0.9:0.4}}><FailReport rec={rec} logo="logo.png" photos={rec.photos||[]}/></div>
       </div>
     </div>
   </>;
@@ -1197,6 +1207,7 @@ function App(){
     }).catch(()=>setErr('เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจอินเทอร์เน็ต'));
   },[]);
 
+  if(params.get('embed')==='1'&&failId&&/^\d+$/.test(failId)) return <FailEmbed id={failId}/>;
   if(err) return <div className="wrap"><div className="card" style={{marginTop:20,color:'#92400e',background:'#fffbeb',borderColor:'#fde68a',lineHeight:1.9}}>⚠️ {err}</div></div>;
   if(!inspectors) return <div className="wrap"><div className="card" style={{marginTop:20,color:'#78839a'}}>กำลังโหลด…</div></div>;
 

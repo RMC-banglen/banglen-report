@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13f';
+var APP_VERSION='2026-11-13g';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13440,6 +13440,8 @@ window.__dataReady.then(data => {
     const [fFlag,setFFlag]=useState('');     // '' ทั้งหมด · str · hammer · vert · hard
     const [q,setQ]=useState('');
     const [view,setView]=useState(null);
+    const [rpt,setRpt]=useState(false);   // เปิดรายงานแบบ PDF ในหน้าต่างรายละเอียด
+    useEffect(()=>{setRpt(false);},[view&&view.id]);
     const load=()=>{db.from('pile_fail_inspections').select('*').order('inspect_date',{ascending:false}).order('id',{ascending:false}).limit(3000)
       .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
     useEffect(load,[]);
@@ -13515,16 +13517,18 @@ window.__dataReady.then(data => {
       {view&&(()=>{const r=view,L2=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null,h=hr(r),pcsM=pcsOf(r);
         const row=(k,v)=><tr><td style={{padding:'6px 10px',background:'#f8fafc',fontWeight:600,width:'38%',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{k}</td><td style={{padding:'6px 10px',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{v==null||v===''?'–':v}</td></tr>;
         return <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setView(null);}}>
-          <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:720,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
+          <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:rpt?1000:720,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
             <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start',marginBottom:10,flexWrap:'wrap'}}>
               <div><div style={{fontSize:17,fontWeight:800,color:'#1a2540'}}>ใบตรวจเสาเฟล #{r.id}</div>
                 <div style={{fontSize:12.5,color:'#64748b'}}>ตรวจ {fmtD(r.inspect_date)} โดย {r.inspector||'–'}</div></div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 {canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1'} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>✎ แก้ไขใบตรวจ</a>}
-                <a href={'qc.html?fail='+r.id} target="_blank" rel="noopener" style={{...btnP,textDecoration:'none',display:'inline-block'}}>📄 เปิด/สร้าง PDF ในแอป QC</a>
+                <button style={btnP} onClick={()=>setRpt(v=>!v)}>{rpt?'⬅ กลับรายละเอียด':'📄 ดูรายงาน (PDF)'}</button>
+                <a href={'qc.html?fail='+r.id} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>↗ เปิดในแอป QC</a>
                 {canEdit&&<button style={{...btn,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button>}
                 <button style={btn} onClick={()=>setView(null)}>ปิด</button></div></div>
-            <table style={{width:'100%',borderCollapse:'collapse',border:'1px solid #eef0f4'}}><tbody>
+            {rpt&&<iframe title="รายงานตรวจเสาเฟล" src={'qc.html?fail='+r.id+'&embed=1'} style={{width:'100%',height:'78vh',border:'1px solid #e2e8f0',borderRadius:8}}/>}
+            {!rpt&&<table style={{width:'100%',borderCollapse:'collapse',border:'1px solid #eef0f4'}}><tbody>
               {row('ลูกค้า / หน้างาน',[r.customer,r.site].filter(Boolean).join(' · '))}
               {row('ขนาด × ความยาว',(r.pile_size||'–')+(r.pile_std?(r.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2)+' ม.':'–'))}
               {row('วันที่ตอกเฟล',fmtD(r.drive_date))}
@@ -13547,8 +13551,8 @@ window.__dataReady.then(data => {
               {row('ดิ่งเสา',r.vertical_result==='ok'?'✔ ผ่าน':r.vertical_result==='bad'?'✘ ไม่ผ่าน':r.vertical_result==='na'?'ไม่ได้วัด':'')}
               {row('สาเหตุที่น่าจะเป็น (QC)',r.cause_note)}
               {row('มาตรการ / ต้องแก้ไข',r.action_note)}
-            </tbody></table>
-            {(r.photos||[]).length>0&&<div style={{marginTop:12}}><div style={{fontSize:13,fontWeight:700,color:'#475569',marginBottom:6}}>รูปถ่ายตอนเสาแตก ({r.photos.length})</div>
+            </tbody></table>}
+            {!rpt&&(r.photos||[]).length>0&&<div style={{marginTop:12}}><div style={{fontSize:13,fontWeight:700,color:'#475569',marginBottom:6}}>รูปถ่ายตอนเสาแตก ({r.photos.length})</div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{r.photos.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener"><img src={u} alt="" style={{width:150,height:112,objectFit:'cover',borderRadius:8,border:'1px solid #e2e8f0'}}/></a>)}</div></div>}
           </div></div>;})()}
     </div>;
