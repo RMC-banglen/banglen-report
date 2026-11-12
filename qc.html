@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13i';
+var APP_VERSION='2026-11-13j';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -182,13 +182,7 @@ const TARGET_NORMAL = {1:350,3:415,5:435,7:450};   // ksc ตามอายุ 
 const TARGET_NP280  = {1:340,7:420};
 const DRIVE_MIN_HARD = 500;   // ดินแข็ง (Blow ≥600 ครั้ง/30 ฟุต) ต้องสเต็งอย่างน้อย 500 ksc ถ้าไม่ถึงต้องรีบเปลี่ยนสูตร
 const driveMinOf = bc => (bc!=null&&bc!==''&&Number(bc)>=600)?DRIVE_MIN_HARD:DRIVE_MIN;
-// ข้อสังเกตหน้างาน (ไปดูหน้างานแล้วพบอะไร) — กดเลือกได้หลายข้อ + พิมพ์เพิ่ม
-const SITE_OBS_TAGS = [
-  'แตกที่หัวเสา','แตกกลางต้น','แตกที่รอยต่อ','แตกที่ปลายเสา',
-  'มีรอยร้าวก่อนตอก','ยก/ขนส่งไม่เรียบร้อย เสากระแทก','ผิวเสาไม่ดี (รังผึ้ง/เหล็กโผล่)',
-  'หมวก/วัสดุรองหัวเสาไม่ดีหรือเสื่อม','ตอกเยื้องศูนย์/ไม่ได้แนว','ตุ้มตกไม่ตรงศูนย์',
-  'มีสิ่งกีดขวางใต้ดิน','ตอกซ้ำเกินจำเป็น','เสาข้างเคียงถูกดันตัว',
-];
+// ข้อสังเกตหน้างาน (ไปดูหน้างานแล้วพบอะไร) — พิมพ์เอง เก็บใน site_obs.note
 const soOf = r => ({tags:(r&&r.site_obs&&Array.isArray(r.site_obs.tags))?r.site_obs.tags:[], note:(r&&r.site_obs&&r.site_obs.note)||''});
 const OVERDRIVE_RATIO = 1.5;   // Qa ที่ตอกได้จริง ÷ Qa ตามแบบ ตั้งแต่เท่านี้ = ตอกแน่นเกินที่ต้องการมาก (ค่าเริ่มต้น ปรับได้)
 const JUMP_RATIO = 1.8;        // Blow ฟุตสุดท้าย ÷ เฉลี่ย 3 ฟุตก่อนหน้า ตั้งแต่เท่านี้ = ตอกยากขึ้นแบบกระชาก (ค่าเริ่มต้น ปรับได้)
@@ -456,8 +450,8 @@ function analyze(r){
   if(has(/ตอกแน่นเกินที่ต้องการมาก/)) checks.push('หยุดตอกเมื่อถึง set · ลดการตอกซ้ำ และตรวจรอยร้าวหัวเสา');
   if(has(/ตอกยากขึ้นแบบกระชาก/)) checks.push('ตรวจสิ่งกีดขวาง/ชั้นแข็งตื้น · ลดระยะยกช่วงท้าย · ตรวจรอยร้าวหัวเสา');
   if(has(/ช่วงท้ายตอกยากขึ้นมาก/)) checks.push('ลดการตอกซ้ำเกิน set และตรวจรอยร้าวหัวเสา/รอยต่อหลังตอก');
-  if(!risks.length&&!soOf(r).tags.length) checks.push('ตัวเลขอยู่ในเกณฑ์ทั้งหมด — ตรวจเพิ่ม: รอยร้าวก่อนตอก การยกขนส่ง การจี้/รองหัวเสา ตำแหน่งที่แตก');
-  const summary=risks.length?('สาเหตุที่น่าจะเป็น: '+risks[0].s+(risks.length>1?' (และอีก '+(risks.length-1)+' ข้อ)':'')):(soOf(r).tags.length?'ตัวเลขทุกข้ออยู่ในเกณฑ์ — สาเหตุที่พบหน้างาน: '+soOf(r).tags.join(', '):'ตัวเลขทุกข้ออยู่ในเกณฑ์ — ยังไม่พบสาเหตุชัดเจน');
+  if(!risks.length&&!soOf(r).note.trim()) checks.push('ตัวเลขอยู่ในเกณฑ์ทั้งหมด — ตรวจเพิ่ม: รอยร้าวก่อนตอก การยกขนส่ง การจี้/รองหัวเสา ตำแหน่งที่แตก');
+  const summary=risks.length?('สาเหตุที่น่าจะเป็น: '+risks[0].s+(risks.length>1?' (และอีก '+(risks.length-1)+' ข้อ)':'')):(soOf(r).note.trim()?'ตัวเลขทุกข้ออยู่ในเกณฑ์ — ดูข้อสังเกตหน้างาน':'ตัวเลขทุกข้ออยู่ในเกณฑ์ — ยังไม่พบสาเหตุชัดเจน');
   return {summary,risks,oks,infos,checks,nRisk:risks.length};
 }
 
@@ -566,7 +560,7 @@ function FailReport({rec,logo,photos}){
       <div style={{fontSize:14,fontWeight:800,lineHeight:1.7,color:an.nRisk?'#b91c1c':'#15803d',marginBottom:6}}>{an.summary}</div>
       <div style={{display:'flex',flexWrap:'wrap',gap:6,margin:'4px 0 8px'}}>{[...an.risks,...an.oks].map((o,i)=>{const bad=o.t==='bad',wn=o.t==='warn',okc=o.t==='ok';return <span key={i} style={{fontSize:13,fontWeight:(bad||wn)?800:600,padding:'3px 10px',borderRadius:999,border:'1px solid '+(bad?'#fca5a5':wn?'#fcd34d':'#86efac'),background:bad?'#fef2f2':wn?'#fffbeb':'#f0fdf4',color:bad?'#991b1b':wn?'#92400e':'#166534'}}>{bad?'✘':wn?'⚠':'✔'} {o.s}</span>;})}</div>
       <div style={{fontSize:13.5,lineHeight:1.8}}><b>ควรทำ</b>{an.checks.slice(0,3).map((c,i)=><div key={i}>→ {c}</div>)}</div>
-      {(()=>{const so=soOf(rec);return (so.tags.length||so.note)?<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>ข้อสังเกตหน้างาน:</b> {so.tags.join(' · ')}{so.note?(so.tags.length?' — ':'')+so.note:''}</div>:null;})()}
+      {(()=>{const so=soOf(rec);return so.note.trim()?<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>ข้อสังเกตหน้างาน:</b> {so.note}</div>:null;})()}
       {rec.cause_note&&<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>สาเหตุที่น่าจะเป็น (ผู้ตรวจ):</b> {rec.cause_note}</div>}
       {rec.action_note&&<div style={{marginTop:6,fontSize:13.5,lineHeight:1.7}}><b>มาตรการ/สิ่งที่ต้องแก้ไข:</b> {rec.action_note}</div>}
     </div>
@@ -662,7 +656,7 @@ function FailSummaryCard({rec,logo}){
       {an.risks.slice(1,4).map((o,i)=><div key={i} style={{fontSize:17,lineHeight:1.55,color:o.t==='bad'?RED:'#b45309'}}>• {o.s}</div>)}
       {an.checks.slice(0,2).map((c,i)=><div key={i} style={{fontSize:17,lineHeight:1.55,color:'#334155'}}>→ {c}</div>)}
     </div>
-    {(()=>{const so=soOf(rec);return (so.tags.length||so.note)?<div style={{marginTop:8,fontSize:17,lineHeight:1.6}}><b>ข้อสังเกตหน้างาน:</b> {so.tags.join(' · ')}{so.note?(so.tags.length?' — ':'')+so.note:''}</div>:null;})()}
+    {(()=>{const so=soOf(rec);return so.note.trim()?<div style={{marginTop:8,fontSize:17,lineHeight:1.6}}><b>ข้อสังเกตหน้างาน:</b> {so.note}</div>:null;})()}
     {rec.cause_note&&<div style={{marginTop:8,fontSize:17,lineHeight:1.6}}><b>สาเหตุ (QC):</b> {rec.cause_note}</div>}
     {rec.action_note&&<div style={{fontSize:17,lineHeight:1.6}}><b>มาตรการ:</b> {rec.action_note}</div>}
   </div>;
@@ -1134,12 +1128,11 @@ function FailForm({me,init,onCancel,onSaved}){
         <div className="hint" style={{marginTop:6}}>แนะนำถ่าย: รอยแตกใกล้ ๆ · ทั้งต้นเสา · หัวเสา/ปลายเสา · หน้างานรวม</div>
       </div>
 
-      {secH('⑦ ข้อสังเกตหน้างาน — สาเหตุอื่นที่ไปดูแล้วพบ')}
+      {secH('⑦ ข้อสังเกตหน้างาน')}
       <div className="card" style={{marginTop:0}}>
-        <div className="hint" style={{marginBottom:8}}>กดเลือกได้หลายข้อ (ไม่บังคับ) — ใช้เสริมจากตัวเลข เมื่อตัวเลขอยู่ในเกณฑ์แต่เสายังเฟล</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{SITE_OBS_TAGS.map(t=>{const on=soOf(f).tags.includes(t);return <button key={t} type="button" onClick={()=>setF(o=>{const so=soOf(o);return {...o,site_obs:{...so,tags:on?so.tags.filter(x=>x!==t):[...so.tags,t]}};})} style={{padding:'8px 12px',borderRadius:999,border:'1.5px solid '+(on?'var(--brand)':'var(--line-strong)'),background:on?'#e6f4f1':'#fff',color:on?'var(--brand)':'#334155',fontWeight:on?800:500,fontSize:14,cursor:'pointer'}}>{on?'✔ ':''}{t}</button>;})}</div>
-        <div className="field" style={{marginTop:12}}><label>ข้อสังเกตอื่นๆ ที่พบหน้างาน</label>
-          <textarea className="note" rows={3} placeholder="เช่น ดินบริเวณนี้เป็นทรายแน่น · มีคอนกรีตเก่าใต้ดิน · รถปั้นจั่นวางไม่ได้ระดับ" value={soOf(f).note} onChange={e=>setF(o=>({...o,site_obs:{...soOf(o),note:e.target.value}}))} style={{marginTop:0}}/></div>
+        <div className="hint" style={{marginBottom:6}}>พิมพ์สิ่งที่ไปดูแล้วพบหน้างาน (ไม่บังคับ) — ใช้เสริมจากตัวเลข เมื่อตัวเลขอยู่ในเกณฑ์แต่เสายังเฟล</div>
+        <div className="field" style={{marginTop:0}}><label>ข้อสังเกตหน้างาน</label>
+          <textarea className="note" rows={4} placeholder="เช่น แตกที่หัวเสา · ดินแน่นมีคอนกรีตเก่าใต้ดิน · หมวกรองหัวเสาเสื่อม · รถปั้นจั่นวางไม่ได้ระดับ" value={soOf(f).note} onChange={e=>setF(o=>({...o,site_obs:{...soOf(o),note:e.target.value}}))} style={{marginTop:0}}/></div>
       </div>
 
       {secH('⑧ สรุป')}
