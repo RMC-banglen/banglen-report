@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12b';
+var APP_VERSION='2026-11-12c';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13431,6 +13431,115 @@ window.__dataReady.then(data => {
   // นับ Blow count 30 ฟุต — ประวัติที่โฟร์แมนส่งในกลุ่ม Telegram (บอทอ่านแล้วบันทึกลงตาราง blow_counts และตอบระดับดินกลับ)
   // ระดับ: ดินอ่อน ≤ 300 · ดินปานกลาง 301–599 แบ่งเฝ้าระวัง 3 ระดับเท่าๆ กัน · ดินแข็ง ≥ 600 = ต้องเพิ่มสเต็งคอนกรีตช่วย (เกณฑ์เดียวกับบอท)
   // ============================================================
+  // ===== ตรวจสอบเสาเฟล (QC) — หน้าแยกจากรายงานเสาเฟลของโฟร์แมน · ข้อมูลมาจากแอป QC (ตาราง pile_fail_inspections) =====
+  function FailInspectPanel({canEdit}){
+    const db=DB;
+    const [rows,setRows]=useState(null);
+    const [noTable,setNoTable]=useState(false);
+    const [fMonth,setFMonth]=useState('');
+    const [fFlag,setFFlag]=useState('');     // '' ทั้งหมด · str · hammer · vert · hard
+    const [q,setQ]=useState('');
+    const [view,setView]=useState(null);
+    const load=()=>{db.from('pile_fail_inspections').select('*').order('inspect_date',{ascending:false}).order('id',{ascending:false}).limit(3000)
+      .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
+    useEffect(load,[]);
+    if(rows===null)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
+    if(noTable)return <div className="grid"><ChartCard span="full" title="🔍 ตรวจสอบเสาเฟล (QC)">
+      <div style={{padding:'12px 14px',fontSize:14,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-pile-fail-inspect.sql</b> หนึ่งครั้ง จากนั้นรีเฟรชหน้านี้</div>
+    </ChartCard></div>;
+    const btn={padding:'7px 14px',borderRadius:8,border:'1px solid #d6d8e0',background:'#fff',cursor:'pointer',fontSize:13.5,fontWeight:600,color:'#475569'};
+    const btnP={...btn,background:'#2f5fd0',borderColor:'#2f5fd0',color:'#fff'};
+    const sel={...btn,padding:'6px 8px',fontWeight:500};
+    const fmtD=d=>{if(!d)return'–';const p=String(d).slice(0,10).split('-');return Number(p[2])+'/'+Number(p[1])+'/'+String(Number(p[0])+543).slice(2);};
+    const MF=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    const SL=[{e:'🟢',t:'ดินอ่อน',col:'#15803d',bg:'#dcfce7'},{e:'🟡',t:'เฝ้าระวัง 1',col:'#a16207',bg:'#fef9c3'},{e:'🟠',t:'เฝ้าระวัง 2',col:'#c2410c',bg:'#ffedd5'},{e:'🔶',t:'เฝ้าระวัง 3',col:'#b91c1c',bg:'#fee2e2'},{e:'🔴',t:'ดินแข็ง',col:'#991b1b',bg:'#fecaca'}];
+    const sIdx=n=>n<=300?0:n>=600?4:n<=400?1:n<=500?2:3;
+    const TG={1:350,3:415,5:435,7:450},TG280={1:340,7:420};
+    // กำลังอัดวันผลิตต่ออายุ (เทียบเกณฑ์) จากผลที่เก็บไว้ในใบตรวจ
+    const strList=r=>{const prod=String(r.prod_date||'').slice(0,10);return [1,3,5,7].map(a=>{const v=(r.strength_rows||[]).filter(x=>String(x.d).slice(0,10)===prod&&Number(x.a)===a).map(x=>Number(x.k)).filter(x=>x>0);if(!v.length)return null;const avg=v.reduce((t,x)=>t+x,0)/v.length;const tg=(/^NP280$/i.test(r.strength_formula||'')?TG280:TG)[a]||null;return{a,avg,tg,ok:tg?avg>=tg:null};}).filter(Boolean);};
+    const strKey=r=>{const l=strList(r);return l.find(x=>x.a===7)||l.find(x=>x.a===3)||l[0]||null;};
+    const hr=r=>r.hammer_ratio!=null?Number(r.hammer_ratio):null;
+    const flags=r=>({str:(strKey(r)||{}).ok===false,hammer:hr(r)!=null&&(hr(r)<0.7||hr(r)>2.5),vert:r.vertical_result==='bad',hard:r.blow_count!=null&&Number(r.blow_count)>=600});
+    const months=[...new Set(rows.map(r=>String(r.inspect_date).slice(0,7)))].sort().reverse();
+    const qq=q.trim().toLowerCase();
+    const base=rows.filter(r=>(!fMonth||String(r.inspect_date).slice(0,7)===fMonth)&&(!qq||[r.customer,r.site,r.pile_size,r.inspector,r.cause_note].some(x=>String(x||'').toLowerCase().includes(qq))));
+    const list=base.filter(r=>!fFlag||flags(r)[fFlag]);
+    const cnt=k=>base.filter(r=>flags(r)[k]).length;
+    const del=async r=>{if(!window.confirm('ลบใบตรวจ #'+r.id+' ?\n'+(r.customer||r.site||'')+' · '+(r.pile_size||'')))return;const{error}=await db.from('pile_fail_inspections').delete().eq('id',r.id);if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}setView(null);load();};
+    const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
+    const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
+    const chip=(ok,t)=><span style={{display:'inline-block',padding:'1px 8px',borderRadius:999,fontSize:12,fontWeight:700,background:ok?'#dcfce7':'#fee2e2',color:ok?'#15803d':'#b91c1c',whiteSpace:'nowrap'}}>{t}</span>;
+    const kpi=(k,label,color)=><div className="kpi" role="button" tabIndex={0} style={{cursor:'pointer',borderColor:fFlag===k?color:undefined,background:fFlag===k?'#fffbeb':undefined}} onClick={()=>setFFlag(fFlag===k?'':k)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.currentTarget.click();}}}><div className="kpi__label">{label}{fFlag===k?' (กำลังแสดง)':' · คลิกดู'}</div><div className="kpi__value" style={{color}}>{cnt(k)}</div></div>;
+    return <div className="grid">
+      <ChartCard span="full" title="🔍 ตรวจสอบเสาเฟล (QC)"
+        subtitle={'ใบตรวจจากแอป QC · '+list.length+' ใบ'+(fFlag?' (กรองเฉพาะที่มีปัญหา)':'')+' · ตรวจกำลังอัดวันผลิต ±3 วัน · Blow 30 ฟุต · ตุ้ม · ดิ่ง · รูปถ่าย · ส่งออก PDF จากแอป QC'}
+        right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          <select value={fMonth} onChange={e=>setFMonth(e.target.value)} style={sel}><option value="">ทุกเดือน</option>{months.map(m=><option key={m} value={m}>{MF[Number(m.slice(5,7))-1]+' '+(Number(m.slice(0,4))+543)}</option>)}</select>
+        </div>}>
+        <div className="kpi-row" style={{gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',marginBottom:14}}>
+          <div className="kpi"><div className="kpi__label">ใบตรวจทั้งหมด</div><div className="kpi__value">{base.length}</div></div>
+          {kpi('str','กำลังอัดต่ำกว่าเกณฑ์','#b91c1c')}
+          {kpi('hammer','ตุ้มนอกเกณฑ์ 0.7–2.5','#b45309')}
+          {kpi('vert','ดิ่งไม่ผ่าน','#b91c1c')}
+          {kpi('hard','ดินแข็ง (Blow ≥600)','#991b1b')}
+        </div>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / ขนาดเสา / ผู้ตรวจ" style={{padding:'7px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'inherit',width:'100%',boxSizing:'border-box',marginBottom:10}}/>
+        <div className="table-wrap" style={{margin:0,maxHeight:'70vh',overflow:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
+          <table style={{width:'100%',borderCollapse:'collapse',minWidth:1100}}>
+            <thead><tr>{['วันที่ตรวจ','ลูกค้า / หน้างาน','ขนาด × ยาว','วันผลิต','วันตอก','อายุ (วัน)','กำลังอัดวันผลิต','Blow 30 ฟุต / ดิน','ตุ้ม ÷ เสา','ดิ่ง','รูป','ผู้ตรวจ'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>{list.map((r,i)=>{const st=strKey(r),h=hr(r),L=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null;
+              return <tr key={r.id} className="fm-row" title="คลิกเพื่อดูใบตรวจ" style={{background:i%2?'#fafbfd':'#fff',cursor:'pointer'}} onClick={()=>setView(r)}>
+                <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.inspect_date)}</td>
+                <td style={{...td,minWidth:210}}>{[r.customer,r.site].filter(Boolean).join(' · ')||'–'}</td>
+                <td style={{...td,whiteSpace:'nowrap',fontWeight:700}}>{r.pile_size||'–'}{r.pile_std?(r.pile_std==='fac'?' รง.':' มอก.'):''} × {r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2):'–'}</td>
+                <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.prod_date)}</td>
+                <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.drive_date)}</td>
+                <td style={{...td,textAlign:'right'}}>{r.age_days!=null?r.age_days:'–'}</td>
+                <td style={td}>{st?chip(st.ok!==false,st.a+' วัน '+Math.round(st.avg)+(st.tg?' / '+st.tg:'')):<span style={{color:'#cbd5e1'}}>–</span>}</td>
+                <td style={{...td,whiteSpace:'nowrap'}}>{L?<span style={{background:L.bg,color:L.col,fontWeight:700,padding:'2px 10px',borderRadius:999,fontSize:12.5}}>{L.e} {L.t} · {r.blow_count}</span>:<span style={{color:'#cbd5e1'}}>–</span>}</td>
+                <td style={td}>{h!=null?chip(h>=0.7&&h<=2.5,h.toFixed(2)+'×'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
+                <td style={td}>{r.vertical_result&&r.vertical_result!=='na'?chip(r.vertical_result==='ok',r.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
+                <td style={{...td,textAlign:'center'}}>{(r.photos||[]).length?'📷 '+r.photos.length:<span style={{color:'#cbd5e1'}}>–</span>}</td>
+                <td style={{...td,whiteSpace:'nowrap'}}>{r.inspector||'–'}</td>
+              </tr>;})}
+              {!list.length&&<tr><td colSpan={12} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{rows.length?'ไม่มีใบตรวจตามตัวกรอง':'ยังไม่มีใบตรวจ — ให้ QC บันทึกจากแอป QC เมนู "ตรวจเสาเฟลหน้างาน"'}</td></tr>}</tbody>
+          </table>
+        </div>
+      </ChartCard>
+
+      {view&&(()=>{const r=view,L2=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null,h=hr(r),sl=strList(r);
+        const row=(k,v)=><tr><td style={{padding:'6px 10px',background:'#f8fafc',fontWeight:600,width:'38%',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{k}</td><td style={{padding:'6px 10px',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{v==null||v===''?'–':v}</td></tr>;
+        return <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setView(null);}}>
+          <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:720,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start',marginBottom:10,flexWrap:'wrap'}}>
+              <div><div style={{fontSize:17,fontWeight:800,color:'#1a2540'}}>ใบตรวจเสาเฟล #{r.id}</div>
+                <div style={{fontSize:12.5,color:'#64748b'}}>ตรวจ {fmtD(r.inspect_date)} โดย {r.inspector||'–'}</div></div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                <a href={'qc.html?fail='+r.id} target="_blank" rel="noopener" style={{...btnP,textDecoration:'none',display:'inline-block'}}>📄 เปิด/สร้าง PDF ในแอป QC</a>
+                {canEdit&&<button style={{...btn,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button>}
+                <button style={btn} onClick={()=>setView(null)}>ปิด</button></div></div>
+            <table style={{width:'100%',borderCollapse:'collapse',border:'1px solid #eef0f4'}}><tbody>
+              {row('ลูกค้า / หน้างาน',[r.customer,r.site].filter(Boolean).join(' · '))}
+              {row('ขนาด × ความยาว',(r.pile_size||'–')+(r.pile_std?(r.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2)+' ม.':'–'))}
+              {row('วันที่ผลิต → วันที่ตอก',fmtD(r.prod_date)+' → '+fmtD(r.drive_date)+(r.age_days!=null?'  (อายุ '+r.age_days+' วัน)':''))}
+              {row('วันที่หน้าเสา (อ้างอิง)',r.face_date)}
+              {row('กำลังอัดวันผลิต'+(r.strength_formula?' · '+r.strength_formula:''),sl.length?<span>{sl.map(x=><span key={x.a} style={{display:'inline-block',marginRight:10,color:x.ok===false?'#b91c1c':'#15803d',fontWeight:700}}>{x.a} วัน {Math.round(x.avg)}{x.tg?' / '+x.tg:''} {x.ok===false?'✘':'✔'}</span>)}</span>:'ไม่มีผลในระบบ')}
+              {row('ชั้นดิน (Blow '+(r.blow_feet||30)+' ฟุต)',r.blow_count!=null?<span><b>{r.blow_count}</b> ครั้ง {L2&&<span style={{background:L2.bg,color:L2.col,fontWeight:700,padding:'1px 9px',borderRadius:999,marginLeft:6}}>{L2.e} {L2.t}</span>}{r.blow_site?<span style={{color:'#64748b'}}> · {r.blow_site}</span>:null}</span>:'')}
+              {row('ตุ้ม W × H',r.hammer_weight_t!=null?Number(r.hammer_weight_t)+' ตัน × '+(r.hammer_drop_cm!=null?Number(r.hammer_drop_cm)+' ซม.':'–'):'')}
+              {row('น้ำหนักเสา',r.pile_weight_t!=null?Number(r.pile_weight_t).toFixed(2)+' ตัน'+(r.pile_area_cm2?'  (หน้าตัด '+Number(r.pile_area_cm2)+' ซม.²)':''):'')}
+              {row('ตุ้ม ÷ เสา',h!=null?<b style={{color:h>=0.7&&h<=2.5?'#15803d':'#b91c1c'}}>{h.toFixed(2)} เท่า {h>=0.7&&h<=2.5?'✔ อยู่ในเกณฑ์ (0.7–2.5)':'✘ นอกเกณฑ์ (0.7–2.5)'}</b>:'')}
+              {row('คำนวณ Blow (Qa '+(r.qa_ton!=null?Number(r.qa_ton)+' ตัน':'–')+')',r.blow_s_cm!=null?(Number(r.blow_s_cm)>0?'S = '+Number(r.blow_s_cm).toFixed(3)+' ซม./ครั้ง ≈ '+Number(r.blow_per10).toFixed(1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้'):'')}
+              {row('ดิ่งเสา',r.vertical_result==='ok'?'✔ ผ่าน':r.vertical_result==='bad'?'✘ ไม่ผ่าน':r.vertical_result==='na'?'ไม่ได้วัด':'')}
+              {row('ค่าที่วัด (ดิ่ง)',r.vertical_note)}
+              {row('สาเหตุที่น่าจะเป็น (QC)',r.cause_note)}
+              {row('มาตรการ / ต้องแก้ไข',r.action_note)}
+            </tbody></table>
+            {(r.photos||[]).length>0&&<div style={{marginTop:12}}><div style={{fontSize:13,fontWeight:700,color:'#475569',marginBottom:6}}>รูปถ่ายตอนเสาแตก ({r.photos.length})</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{r.photos.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener"><img src={u} alt="" style={{width:150,height:112,objectFit:'cover',borderRadius:8,border:'1px solid #e2e8f0'}}/></a>)}</div></div>}
+          </div></div>;})()}
+    </div>;
+  }
+
   function BlowCountPanel({canEdit}){
     const db=DB;
     const SOFT=300,HARD=600;
@@ -13570,9 +13679,6 @@ window.__dataReady.then(data => {
     const [editId,setEditId]=useState(null);
     const [paste,setPaste]=useState('');
     const [pasteMsg,setPasteMsg]=useState('');
-    const [qcAll,setQcAll]=useState([]);
-    const [qcMap,setQcMap]=useState({});      // ใบตรวจเสาเฟลจากแอป QC (pile_fail_inspections) เชื่อมกับรายการด้วย foreman_report_id
-    const [qcView,setQcView]=useState(null);   // ใบตรวจ QC ที่เปิดดูอยู่
     const [saving,setSaving]=useState(false);
     const [err,setErr]=useState('');
     const [oth,setOth]=useState({});        // ช่องที่เลือก "อื่นๆ (พิมพ์เอง)" ในดรอปดาวน์
@@ -13582,7 +13688,6 @@ window.__dataReady.then(data => {
     const load=()=>{db.from('foreman_reports').select('*').order('drive_date',{ascending:false}).order('id',{ascending:false}).limit(5000)
       .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
     useEffect(load,[]);
-    useEffect(()=>{db.from('pile_fail_inspections').select('*').order('created_at',{ascending:true}).limit(3000).then(({data,error})=>{if(error)return;const m={};(data||[]).forEach(q=>{if(q.foreman_report_id!=null)m[q.foreman_report_id]=q;});setQcMap(m);setQcAll(data||[]);}).catch(()=>{});},[]);
     if(rows===null)return <div style={{padding:40,textAlign:'center',color:'#888'}}>กำลังโหลด...</div>;
     if(noTable)return <div className="grid"><ChartCard span="full" title="🏗️ รายงานโฟร์แมน (เสาเข็มเฟลหน้างาน)">
       <div style={{padding:'12px 14px',fontSize:14,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,lineHeight:1.8}}>ยังไม่ได้สร้างตารางในฐานข้อมูล — เปิด Supabase → SQL Editor แล้วรันไฟล์ <b>supabase-foreman-reports.sql</b> หนึ่งครั้ง จากนั้นรีเฟรชหน้านี้</div>
@@ -13600,20 +13705,10 @@ window.__dataReady.then(data => {
     const SOIL_SOFT=300,SOIL_HARD=600,soilStep=(SOIL_HARD-SOIL_SOFT)/3;
     const SOIL_LV=[{e:'🟢',t:'ดินอ่อน',col:'#15803d',bg:'#dcfce7',k:'soft'},{e:'🟡',t:'เฝ้าระวัง 1',col:'#a16207',bg:'#fef9c3',k:'mid'},{e:'🟠',t:'เฝ้าระวัง 2',col:'#c2410c',bg:'#ffedd5',k:'mid'},{e:'🔶',t:'เฝ้าระวัง 3',col:'#b91c1c',bg:'#fee2e2',k:'mid'},{e:'🔴',t:'ดินแข็ง',col:'#991b1b',bg:'#fecaca',k:'hard'}];
     const soilIdx=n=>n<=SOIL_SOFT?0:n>=SOIL_HARD?4:n<=Math.round(SOIL_SOFT+soilStep)?1:n<=Math.round(SOIL_SOFT+2*soilStep)?2:3;
-    const normSz=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-    const qcOf=r=>{ if(qcMap[r.id]) return qcMap[r.id];
-      const d=String(r.drive_date||'').slice(0,10),z=normSz(r.size),L=Number(r.length_m);
-      return qcAll.find(q=>q.foreman_report_id==null&&String(q.drive_date||'').slice(0,10)===d&&normSz(q.pile_size)===z&&Math.abs(Number(q.pile_length_m)-L)<0.011)||null; };
     const soilOf=r=>{   // ชนิดดินมาจากค่านับ Blow count ที่กรอกเอง (soil_override = ตัวเลข) · ยังไม่กรอก = ไม่แสดง
       const ov=r.soil_override==null?'':String(r.soil_override).trim();
-      if(/^\d+$/.test(ov))return{max:Number(ov)};
-      const q=qcOf(r);   // ไม่ได้กรอกเอง → ใช้ค่า Blow จากใบตรวจเสาเฟลของ QC
-      return q&&q.blow_count!=null?{max:Number(q.blow_count),qc:true}:null;
+      return /^\d+$/.test(ov)?{max:Number(ov)}:null;
     };
-    // สรุปกำลังอัดวันผลิตจากใบตรวจ QC (เทียบเกณฑ์ ksc ตามอายุ)
-    const QC_TG={1:350,3:415,5:435,7:450},QC_TG280={1:340,7:420};
-    const qcStrengthList=q=>{const prod=String(q.prod_date||'').slice(0,10);return [1,3,5,7].map(a=>{const v=(q.strength_rows||[]).filter(x=>String(x.d).slice(0,10)===prod&&Number(x.a)===a).map(x=>Number(x.k)).filter(x=>x>0);if(!v.length)return null;const avg=v.reduce((t,x)=>t+x,0)/v.length;const tg=(/^NP280$/i.test(q.strength_formula||'')?QC_TG280:QC_TG)[a]||null;return{a,avg,tg,ok:tg?avg>=tg:null};}).filter(Boolean);};
-    const qcStrength=q=>{const l=qcStrengthList(q);return l.find(x=>x.a===7)||l.find(x=>x.a===3)||l[0]||null;};
     const soilLv=o=>soilIdx(o.max);
     const soilKey=r=>{const o=soilOf(r);return o?SOIL_LV[soilLv(o)].k:'none';};
     const base=inYear.filter(r=>(!fFac||r.factory===fFac)&&(!fSoil||soilKey(r)===fSoil)&&(!fSize||r.size===fSize)&&(!fMan||r.foreman===fMan)
@@ -13716,24 +13811,16 @@ window.__dataReady.then(data => {
     const probOpts=[...new Set(['Fail','เสาแตกปีกขณะตอก','เสาแตกผ่ากลาง','เสาหักกลางต้น','เสาหัก 1 ท่อน','หัวเสาแตก','ตอกแตกใต้เพลท','หักท่อนแรก',...countBy(rows,r=>r.remark).filter(([k,n])=>k!=='ไม่ระบุ'&&n>=2).map(([k])=>k)])];
     const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
     const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
-    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['ดิน (Blow count)',r=>{const o=soilOf(r);if(!o)return<span style={{color:'#cbd5e1'}} title="ยังไม่ได้ใส่ค่านับ Blow count (คลิกแถวเพื่อใส่)">–</span>;const L=SOIL_LV[soilLv(o)];return<span title={o.qc?'ค่า Blow จากใบตรวจเสาเฟลของ QC':'ค่านับ Blow count ที่ใส่ไว้ (คลิกแถวเพื่อแก้ไข)'} style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t} · {o.max}{o.qc?' (QC)':''}</span>;},{nw:1}],
-      ['ตรวจ QC',r=>{const q=qcOf(r);if(!q)return<span style={{color:'#cbd5e1'}} title="ยังไม่มีใบตรวจเสาเฟลของ QC สำหรับรายการนี้">–</span>;
-        const st=qcStrength(q),hr=q.hammer_ratio!=null?Number(q.hammer_ratio):null;
-        const chip=(ok,t)=><span style={{display:'inline-block',padding:'1px 7px',borderRadius:999,fontSize:11.5,fontWeight:700,marginRight:3,background:ok?'#dcfce7':'#fee2e2',color:ok?'#15803d':'#b91c1c'}}>{t}</span>;
-        return<button type="button" onClick={e=>{e.stopPropagation();setQcView(q);}} title="กดดูใบตรวจเสาเฟลของ QC" style={{border:'1px solid #bae6fd',background:'#f0f9ff',borderRadius:8,padding:'3px 8px',cursor:'pointer',textAlign:'left',whiteSpace:'nowrap'}}>
-          <span style={{fontSize:12,fontWeight:800,color:'#0369a1',marginRight:4}}>📋 QC</span>
-          {st&&chip(st.ok!==false,'อัด'+st.a+'ว. '+Math.round(st.avg))}
-          {hr!=null&&chip(hr>=0.7&&hr<=2.5,'ตุ้ม '+hr.toFixed(2)+'×')}
-          {q.vertical_result&&q.vertical_result!=='na'&&chip(q.vertical_result==='ok','ดิ่ง'+(q.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'))}
-          {(q.photos||[]).length>0&&<span style={{fontSize:11.5}}>📷{q.photos.length}</span>}</button>;},{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['ลูกค้า',r=>r.customer,{w:190}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['ท่อนต่อ (ม.)',r=>r.segs,{nw:1}],['ปั้นจั่น',r=>r.crane,{nw:1}],['สาเหตุที่คิด',r=>r.cause,{w:170}],['หน้างาน',r=>r.site,{w:200}]];
+    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['ดิน (Blow count)',r=>{const o=soilOf(r);if(!o)return<span style={{color:'#cbd5e1'}} title="ยังไม่ได้ใส่ค่านับ Blow count (คลิกแถวเพื่อใส่)">–</span>;const L=SOIL_LV[soilLv(o)];return<span title="ค่านับ Blow count ที่ใส่ไว้ (คลิกแถวเพื่อแก้ไข)" style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t} · {o.max}</span>;},{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['ลูกค้า',r=>r.customer,{w:190}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['ท่อนต่อ (ม.)',r=>r.segs,{nw:1}],['ปั้นจั่น',r=>r.crane,{nw:1}],['สาเหตุที่คิด',r=>r.cause,{w:170}],['หน้างาน',r=>r.site,{w:200}]];
     const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
     const P=(k,label,opts,ph)=>{const v=form[k]||'';const custom=!!oth[k]||(v!==''&&!opts.includes(v));
       return <div style={{minWidth:0}}><label style={lbl}>{label}</label>
         <select style={inp} value={custom?'__other':v} onChange={e=>{const x=e.target.value;if(x==='__other'){setOth({...oth,[k]:true});setForm({...form,[k]:custom?v:''});}else{setOth({...oth,[k]:false});setForm({...form,[k]:x});}}}>
           <option value="">— เลือก —</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}<option value="__other">อื่นๆ (พิมพ์เอง)</option></select>
         {custom&&<input style={{...inp,marginTop:6}} value={v} placeholder={ph||'พิมพ์เอง'} onChange={e=>setForm({...form,[k]:e.target.value})}/>}</div>;};
-    if(fview==='blow')return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'}]} value={fview} onChange={setFview}/></div><BlowCountPanel canEdit={canEdit}/></div>;
-    return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'}]} value={fview} onChange={setFview}/></div><div className="grid">
+    if(fview==='inspect')return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'},{value:'inspect',label:'🔍 ตรวจสอบเสาเฟล (QC)'}]} value={fview} onChange={setFview}/></div><FailInspectPanel canEdit={canEdit}/></div>;
+    if(fview==='blow')return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'},{value:'inspect',label:'🔍 ตรวจสอบเสาเฟล (QC)'}]} value={fview} onChange={setFview}/></div><BlowCountPanel canEdit={canEdit}/></div>;
+    return<div><div style={{marginBottom:14}}><Segmented options={[{value:'fail',label:'🏗️ เสาเฟลหน้างาน'},{value:'blow',label:'🔨 นับ Blow count 30 ฟุต'},{value:'inspect',label:'🔍 ตรวจสอบเสาเฟล (QC)'}]} value={fview} onChange={setFview}/></div><div className="grid">
       <ChartCard span="full" title="🏗️ รายงานโฟร์แมน — เสาเข็มเฟลหน้างาน"
         subtitle={`ปี ${year?year+543:'ทั้งหมด'}${fMonth?' · เดือน'+MF[fMonth-1]:''} · ${list0.length} รายการ · แซมรวม ${totalFix} ต้น${fPend?' · แสดงเฉพาะรอสรุป '+list.length+' รายการ':''}`}
         right={<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
@@ -13768,7 +13855,7 @@ window.__dataReady.then(data => {
               {COLS.map(c=>{const o=c[2]||{};const v=c[1](r);return<td key={c[0]} style={{...td,whiteSpace:o.nw?'nowrap':'normal',minWidth:o.w||undefined,fontWeight:o.b?700:400,textAlign:o.r?'right':'left',color:o.fix&&/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{v==null?'':v}</td>;})}
               {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={e=>{e.stopPropagation();openEdit(r);}}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={e=>{e.stopPropagation();del(r);}}>ลบ</button></td>}
             </tr>)}
-            {!list.length&&<tr><td colSpan={18} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{fPend?'ไม่มีงานที่รอสรุปแล้ว 🎉':'ยังไม่มีรายการ'}{!fPend&&canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
+            {!list.length&&<tr><td colSpan={17} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{fPend?'ไม่มีงานที่รอสรุปแล้ว 🎉':'ยังไม่มีรายการ'}{!fPend&&canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
           </table>
         </div>
       </ChartCard>
@@ -13812,35 +13899,6 @@ window.__dataReady.then(data => {
           </div>
         </div>
       </div>}
-
-      {qcView&&(()=>{const q=qcView,L2=q.blow_count!=null?SOIL_LV[soilIdx(Number(q.blow_count))]:null,hr=q.hammer_ratio!=null?Number(q.hammer_ratio):null,sl=qcStrengthList(q);
-        const row=(k,v)=><tr><td style={{padding:'6px 10px',background:'#f8fafc',fontWeight:600,width:'38%',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{k}</td><td style={{padding:'6px 10px',borderTop:'1px solid #eef0f4',fontSize:13.5}}>{v==null||v===''?'–':v}</td></tr>;
-        return <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setQcView(null);}}>
-          <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:720,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start',marginBottom:10}}>
-              <div><div style={{fontSize:17,fontWeight:800,color:'#1a2540'}}>📋 ใบตรวจเสาเฟล QC #{q.id}</div>
-                <div style={{fontSize:12.5,color:'#64748b'}}>ตรวจ {fmtD(q.inspect_date)} โดย {q.inspector||'–'}</div></div>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <a href={'qc.html?fail='+q.id} target="_blank" rel="noopener" style={{...btnP,textDecoration:'none',display:'inline-block'}}>📄 เปิด/สร้าง PDF ในแอป QC</a>
-                <button style={btn} onClick={()=>setQcView(null)}>ปิด</button></div></div>
-            <table style={{width:'100%',borderCollapse:'collapse',border:'1px solid #eef0f4'}}><tbody>
-              {row('ลูกค้า / หน้างาน',[q.customer,q.site].filter(Boolean).join(' · '))}
-              {row('ขนาด × ความยาว',(q.pile_size||'–')+(q.pile_std?(q.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(q.pile_length_m!=null?Number(q.pile_length_m).toFixed(2)+' ม.':'–'))}
-              {row('วันที่ผลิต → วันที่ตอก',fmtD(q.prod_date)+' → '+fmtD(q.drive_date)+(q.age_days!=null?'  (อายุ '+q.age_days+' วัน)':''))}
-              {row('กำลังอัดวันผลิต',sl.length?<span>{sl.map(x=><span key={x.a} style={{display:'inline-block',marginRight:10,color:x.ok===false?'#b91c1c':'#15803d',fontWeight:700}}>{x.a} วัน {Math.round(x.avg)}{x.tg?' / '+x.tg:''} {x.ok===false?'✘':'✔'}</span>)}</span>:'ไม่มีผลในระบบ')}
-              {row('ชั้นดิน (Blow '+(q.blow_feet||30)+' ฟุต)',q.blow_count!=null?<span><b>{q.blow_count}</b> ครั้ง {L2&&<span style={{background:L2.bg,color:L2.col,fontWeight:700,padding:'1px 9px',borderRadius:999,marginLeft:6}}>{L2.e} {L2.t}</span>}</span>:'')}
-              {row('ตุ้ม W × H',q.hammer_weight_t!=null?Number(q.hammer_weight_t)+' ตัน × '+(q.hammer_drop_cm!=null?Number(q.hammer_drop_cm)+' ซม.':'–'):'')}
-              {row('น้ำหนักเสา',q.pile_weight_t!=null?Number(q.pile_weight_t).toFixed(2)+' ตัน'+(q.pile_area_cm2?'  (หน้าตัด '+Number(q.pile_area_cm2)+' ซม.²)':''):'')}
-              {row('ตุ้ม ÷ เสา',hr!=null?<b style={{color:hr>=0.7&&hr<=2.5?'#15803d':'#b91c1c'}}>{hr.toFixed(2)} เท่า {hr>=0.7&&hr<=2.5?'✔ อยู่ในเกณฑ์ (0.7–2.5)':'✘ นอกเกณฑ์ (0.7–2.5)'}</b>:'')}
-              {row('คำนวณ Blow (Qa '+(q.qa_ton!=null?Number(q.qa_ton)+' ตัน':'–')+')',q.blow_s_cm!=null?(Number(q.blow_s_cm)>0?'S = '+Number(q.blow_s_cm).toFixed(3)+' ซม./ครั้ง ≈ '+Number(q.blow_per10).toFixed(1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้'):'')}
-              {row('ดิ่งเสา',q.vertical_result==='ok'?'✔ ผ่าน':q.vertical_result==='bad'?'✘ ไม่ผ่าน':q.vertical_result==='na'?'ไม่ได้วัด':'')}
-              {row('ค่าที่วัด (ดิ่ง)',q.vertical_note)}
-              {row('สาเหตุที่น่าจะเป็น (QC)',q.cause_note)}
-              {row('มาตรการ / ต้องแก้ไข',q.action_note)}
-            </tbody></table>
-            {(q.photos||[]).length>0&&<div style={{marginTop:12}}><div style={{fontSize:13,fontWeight:700,color:'#475569',marginBottom:6}}>รูปถ่ายตอนเสาแตก ({q.photos.length})</div>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{q.photos.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener"><img src={u} alt="" style={{width:150,height:112,objectFit:'cover',borderRadius:8,border:'1px solid #e2e8f0'}}/></a>)}</div></div>}
-          </div></div>;})()}
 
       {imp&&<div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'24px 12px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)setImp(null);}}>
         <div style={{background:'#fff',borderRadius:14,padding:20,width:'100%',maxWidth:640,boxShadow:'0 20px 60px rgba(0,0,0,.3)'}}>
