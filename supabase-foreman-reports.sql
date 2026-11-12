@@ -30,6 +30,9 @@ create table if not exists foreman_reports (
 -- ถ้าสร้างตารางไว้แล้วก่อนมีช่องสาเหตุที่คิด: เพิ่มช่องให้ (รันซ้ำได้)
 alter table foreman_reports add column if not exists cause text;
 
+-- วันที่ผลิตจริงของแต่ละท่อน เรียงล่าง→บน คั่นด้วยจุลภาค เช่น 2026-10-13,2026-11-01 (รันซ้ำได้)
+alter table foreman_reports add column if not exists prod_dates text;
+
 -- ค่านับ Blow count ที่กรอกเอง (ตัวเลข) ใช้แสดงชนิดดินของหน้างาน (รันซ้ำได้)
 alter table foreman_reports add column if not exists soil_override text;
 

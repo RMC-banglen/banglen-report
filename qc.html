@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12g';
+var APP_VERSION='2026-11-12h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -546,13 +546,16 @@ function FailForm({me,init,onCancel,onSaved}){
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState('');
   const [reports,setReports]=useState([]);               // รายงานโฟร์แมน
+  const [doneIns,setDoneIns]=useState([]);                // ใบตรวจที่บันทึกแล้ว (ไว้ซ่อนเสาที่ตรวจแล้ว)
+  const [showDone,setShowDone]=useState(false);
   const [blows,setBlows]=useState([]);                    // Blow count
   const [cr,setCr]=useState(null);                        // ผลกำลังอัดดิบช่วง ±3 วัน
 
   useEffect(()=>{
     const since=isoAdd(today,-120);
-    DB.from('foreman_reports').select('id,drive_date,size,length_m,kind,segs,customer,site,cast_dates,foreman').gte('drive_date',since).order('drive_date',{ascending:false}).limit(120)
+    DB.from('foreman_reports').select('*').gte('drive_date',since).order('drive_date',{ascending:false}).limit(120)
       .then(({data})=>setReports(data||[])).catch(()=>{});
+    DB.from('pile_fail_inspections').select('id,foreman_report_id,drive_date,pile_size,pile_length_m').limit(3000).then(({data})=>setDoneIns(data||[])).catch(()=>{});
     DB.from('blow_counts').select('id,site,pile,blows,feet,count_date').order('count_date',{ascending:false}).limit(80)
       .then(({data})=>setBlows(data||[])).catch(()=>{});
   },[]);
@@ -589,13 +592,21 @@ function FailForm({me,init,onCancel,onSaved}){
   const bc=blowCalc(pArea,len,hw,Number(f.hammer_drop_cm),Number(f.qa_ton));
   const L=f.blow_count!==''&&f.blow_count!=null?SOIL_LV[soilIdx(Number(f.blow_count))]:null;
 
+  const doneIds=(()=>{const st=new Set(),un=[];const nz=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    doneIns.forEach(q=>{if(init&&init.id&&q.id===init.id)return;if(q.foreman_report_id!=null)st.add(String(q.foreman_report_id));else un.push(q);});
+    un.forEach(q=>{const m=reports.find(r=>!st.has(String(r.id))&&String(r.drive_date).slice(0,10)===String(q.drive_date||'').slice(0,10)&&nz(r.size)===nz(q.pile_size)&&Math.abs(Number(r.length_m)-Number(q.pile_length_m))<0.011);if(m)st.add(String(m.id));});
+    return st;})();
+  const pickable=r=>showDone||String(r.id)===String(f.foreman_report_id)||!doneIds.has(String(r.id));
+  const dayRows=reports.filter(r=>String(r.drive_date).slice(0,10)===f.drive_date);
+  const dayDone=dayRows.filter(r=>doneIds.has(String(r.id))).length;
   const pickReport=id=>{
     const r=reports.find(x=>String(x.id)===String(id));
     if(!r){set('foreman_report_id',null);return;}
     setF(o=>({...o,foreman_report_id:r.id,pile_std:/รง|โรงงาน/.test(String(r.kind||''))?'fac':/มอก/.test(String(r.kind||''))?'tis':o.pile_std,customer:r.customer||o.customer,site:r.site||o.site,pile_size:PILE_SIZES.includes(String(r.size||'').toUpperCase())?String(r.size).toUpperCase():(r.size||o.pile_size),
-      prod_dates:(()=>{const sg=String(r.segs||'').split('+').map(x=>parseFloat(x)).filter(x=>x>0);const n=Math.max(sg.length,1);
+      prod_dates:(()=>{const sg=String(r.segs||'').split('+').map(x=>parseFloat(x)).filter(x=>x>0);const n=Math.max(sg.length,String(r.prod_dates||'').split(',').filter(Boolean).length,1);
         const fc=String(r.cast_dates||'').split(/\s*[-–,]\s*/).map(x=>x.trim()).filter(Boolean);
-        return Array.from({length:n},(_,i)=>{const ex=o.prod_dates[i]||{};return {date:ex.date||'',face:fc.length===n?fc[i]:(n===1?String(r.cast_dates||''):(fc[i]||'')),len:sg[i]?String(sg[i]):(n===1?'':'')};});})(),
+        const pv=String(r.prod_dates||'').split(',').map(x=>x.trim());
+        return Array.from({length:n},(_,i)=>{const ex=o.prod_dates[i]||{};return {date:pv[i]||ex.date||'',face:fc.length===n?fc[i]:(n===1?String(r.cast_dates||''):(fc[i]||'')),len:sg[i]?String(sg[i]):(n===1?'':'')};});})(),
       pile_length_m:r.length_m!=null?String(r.length_m):o.pile_length_m,drive_date:String(r.drive_date||'').slice(0,10)||o.drive_date}));
   };
   const pickBlow=id=>{
@@ -655,13 +666,15 @@ function FailForm({me,init,onCancel,onSaved}){
           <select value={f.foreman_report_id||''} onChange={e=>pickReport(e.target.value)}>
             <option value="">— ไม่เลือก / กรอกเอง —</option>
             <optgroup label={'ตอกเฟลวันที่ '+thaiDate(f.drive_date)}>
-              {reports.filter(r=>String(r.drive_date).slice(0,10)===f.drive_date).map(r=><option key={r.id} value={r.id}>{r.size}×{r.length_m||'?'}{r.segs?' ('+r.segs+')':''} · {(r.customer||r.site||'').slice(0,34)}</option>)}
+              {dayRows.filter(pickable).map(r=><option key={r.id} value={r.id}>{doneIds.has(String(r.id))?'✔ ตรวจแล้ว · ':''}{r.size}×{r.length_m||'?'}{r.segs?' ('+r.segs+')':''} · {(r.customer||r.site||'').slice(0,34)}</option>)}
             </optgroup>
             <optgroup label="วันอื่น (120 วันล่าสุด)">
-              {reports.filter(r=>String(r.drive_date).slice(0,10)!==f.drive_date).map(r=><option key={r.id} value={r.id}>{thaiDate(String(r.drive_date).slice(0,10))} · {r.size}×{r.length_m||'?'} · {(r.customer||r.site||'').slice(0,28)}</option>)}
+              {reports.filter(r=>String(r.drive_date).slice(0,10)!==f.drive_date&&pickable(r)).map(r=><option key={r.id} value={r.id}>{doneIds.has(String(r.id))?'✔ ตรวจแล้ว · ':''}{thaiDate(String(r.drive_date).slice(0,10))} · {r.size}×{r.length_m||'?'} · {(r.customer||r.site||'').slice(0,28)}</option>)}
             </optgroup>
           </select>
-          {reports.filter(r=>String(r.drive_date).slice(0,10)===f.drive_date).length===0&&<div className="hint" style={{color:'#b45309'}}>ไม่พบรายงานโฟร์แมนของวันที่ตอกนี้ — เลือกจากวันอื่น หรือกรอกเอง</div>}</div>
+          {dayRows.length===0&&<div className="hint" style={{color:'#b45309'}}>ไม่พบรายงานโฟร์แมนของวันที่ตอกนี้ — เลือกจากวันอื่น หรือกรอกเอง</div>}
+          {dayRows.length>0&&dayDone>=dayRows.length&&!showDone&&<div className="hint" style={{color:'#15803d'}}>✔ ตรวจครบทุกต้นของวันที่ตอกนี้แล้ว ({dayDone} ต้น)</div>}
+          {doneIds.size>0&&<label className="hint" style={{display:'flex',gap:6,alignItems:'center',marginTop:4,cursor:'pointer'}}><input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)} style={{width:'auto'}}/>แสดงเสาที่ตรวจแล้วด้วย (ซ่อนไว้ {doneIds.size} ต้น)</label>}</div>
         {inp('customer','ลูกค้า')}
         {inp('site','หน้างาน')}
         <div style={{display:'flex',gap:8}}>
@@ -684,7 +697,9 @@ function FailForm({me,init,onCancel,onSaved}){
             <div className="field" style={{marginTop:8,marginBottom:0}}><label>วันที่ผลิตจริง ★ (ใช้เทียบผลกำลังอัด/นับอายุ)</label><input type="date" value={p.date} onChange={e=>setPd(i,{date:e.target.value})}/></div>
             <div style={{marginTop:8,fontWeight:800,color:'var(--brand)',fontSize:14.5}}>อายุตอนตอก: {p.date&&f.drive_date?isoDiff(f.drive_date,p.date)+' วัน':'—'} <span className="hint" style={{fontWeight:400}}>ผลิตจริง → ตอกเฟล</span></div>
           </div>)}
-          <button className="ghost" style={{padding:'9px'}} onClick={addPd}>＋ เพิ่มท่อน (ท่อนต่อ)</button>
+          <div style={{display:'flex',gap:8}}>
+            <button className="ghost" style={{padding:'9px',flex:1}} onClick={addPd}>＋ เพิ่มท่อน (ท่อนต่อ)</button>
+            {f.prod_dates.length>1&&<button className="ghost" style={{padding:'9px',flex:1}} onClick={()=>setF(o=>({...o,prod_dates:[...o.prod_dates].reverse()}))}>⇅ สลับท่อนล่าง/บน</button>}</div>
           {lenMismatch&&<div className="hint" style={{color:'#b45309',marginTop:6}}>⚠️ ความยาวรวมท่อน {fmtN(sumLen,2)} ม. ไม่เท่าความยาวเสา {fmtN(Number(f.pile_length_m),2)} ม. — ตรวจอีกครั้ง</div>}</div>
         {pcs.length>1&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0fdfa',border:'1px solid #99f6e4',fontWeight:800,color:'var(--brand)'}}>ท่อนที่อ่อนที่สุด: {age!=null?age+' วัน':'—'} <span className="hint" style={{fontWeight:400}}>(ใช้เป็นอายุหลักของเสา)</span></div>}
       </div>

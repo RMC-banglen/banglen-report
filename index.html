@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12g';
+var APP_VERSION='2026-11-12h';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13700,7 +13700,7 @@ window.__dataReady.then(data => {
     const db=DB;
     const pad2=n=>String(n).padStart(2,'0');
     const todayIso=()=>{const n=new Date();return n.getFullYear()+'-'+pad2(n.getMonth()+1)+'-'+pad2(n.getDate());};
-    const EMPTY=()=>({drive_date:todayIso(),factory:'บางเลน',size:'',length_m:'',kind:'',fail_of:'',customer:'',site:'',cast_dates:'',foreman:'',fix:'',remark:'Fail',cause:'',segs:'',crane:'',soil_override:''});
+    const EMPTY=()=>({drive_date:todayIso(),factory:'บางเลน',size:'',length_m:'',kind:'',fail_of:'',customer:'',site:'',cast_dates:'',foreman:'',fix:'',remark:'Fail',cause:'',segs:'',crane:'',soil_override:'',prod_dates:''});
     const [rows,setRows]=useState(null);
     const [noTable,setNoTable]=useState(false);
     const [yr,setYr]=useState(null);
@@ -13767,7 +13767,7 @@ window.__dataReady.then(data => {
     const btn={padding:'7px 14px',borderRadius:8,border:'1px solid #d6d8e0',background:'#fff',cursor:'pointer',fontSize:13.5,fontWeight:600,color:'#475569'};
     const btnP={...btn,background:'#2f5fd0',borderColor:'#2f5fd0',color:'#fff'};
     const sel={...btn,padding:'6px 8px',fontWeight:500};
-    const toRow=f=>({drive_date:f.drive_date,factory:f.factory||null,size:(f.size||'').trim()||null,length_m:f.length_m===''||f.length_m==null?null:Number(f.length_m),kind:f.kind||null,fail_of:f.fail_of||null,customer:f.customer||null,site:f.site||null,cast_dates:f.cast_dates||null,foreman:f.foreman||null,fix:f.fix||null,remark:f.remark||null,segs:f.segs||null,crane:f.crane||null,...((f.cause||(rows.length&&('cause' in rows[0])))?{cause:f.cause||null}:{}),...((f.soil_override||(rows.length&&('soil_override' in rows[0])))?{soil_override:f.soil_override||null}:{})});
+    const toRow=f=>({drive_date:f.drive_date,factory:f.factory||null,size:(f.size||'').trim()||null,length_m:f.length_m===''||f.length_m==null?null:Number(f.length_m),kind:f.kind||null,fail_of:f.fail_of||null,customer:f.customer||null,site:f.site||null,cast_dates:/^[-,\s]*$/.test(f.cast_dates||'')?null:f.cast_dates,foreman:f.foreman||null,fix:f.fix||null,remark:f.remark||null,segs:/^[+\s]*$/.test(f.segs||'')?null:f.segs,crane:f.crane||null,...(((f.prod_dates&&!/^[,\s]*$/.test(f.prod_dates))||(rows.length&&('prod_dates' in rows[0])))?{prod_dates:/^[,\s]*$/.test(f.prod_dates||'')?null:f.prod_dates}:{}),...((f.cause||(rows.length&&('cause' in rows[0])))?{cause:f.cause||null}:{}),...((f.soil_override||(rows.length&&('soil_override' in rows[0])))?{soil_override:f.soil_override||null}:{})});
     const openNew=()=>{setForm(EMPTY());setEditId(null);setPaste('');setPasteMsg('');setErr('');setOth({});};
     const openEdit=r=>{setForm({...EMPTY(),...Object.fromEntries(Object.keys(EMPTY()).map(k=>[k,r[k]==null?'':String(r[k])])),drive_date:String(r.drive_date||'').slice(0,10)});setEditId(r.id);setPaste('');setPasteMsg('');setErr('');setOth({});};
     const doPaste=()=>{
@@ -13783,7 +13783,7 @@ window.__dataReady.then(data => {
       const row={...toRow(form),updated_at:new Date().toISOString()};
       const res=editId?await db.from('foreman_reports').update(row).eq('id',editId):await db.from('foreman_reports').insert([{...row,source:'form'}]);
       setSaving(false);
-      if(res.error){setErr('บันทึกไม่สำเร็จ: '+(/cause|soil_override/.test(res.error.message)?'ยังไม่ได้รัน SQL ล่าสุดใน Supabase (supabase-foreman-reports.sql) — ':'')+res.error.message);return;}
+      if(res.error){setErr('บันทึกไม่สำเร็จ: '+(/cause|soil_override|prod_dates/.test(res.error.message)?'ยังไม่ได้รัน SQL ล่าสุดใน Supabase (supabase-foreman-reports.sql) — ':'')+res.error.message);return;}
       setForm(null);setEditId(null);load();
     };
     const del=async r=>{if(!window.confirm('ลบรายการนี้ ?\n'+fmtD(r.drive_date)+' · '+(r.size||'')+'×'+(r.length_m||'')+' · '+(r.customer||r.site||''))) return;
@@ -13849,7 +13849,7 @@ window.__dataReady.then(data => {
     const probOpts=[...new Set(['Fail','เสาแตกปีกขณะตอก','เสาแตกผ่ากลาง','เสาหักกลางต้น','เสาหัก 1 ท่อน','หัวเสาแตก','ตอกแตกใต้เพลท','หักท่อนแรก',...countBy(rows,r=>r.remark).filter(([k,n])=>k!=='ไม่ระบุ'&&n>=2).map(([k])=>k)])];
     const th={padding:'9px 11px',textAlign:'left',fontWeight:700,whiteSpace:'nowrap',fontSize:12.5,color:'#475569',background:'#f4f6fa',position:'sticky',top:0,zIndex:2,boxShadow:'0 1px 0 #e2e6ee'};
     const td={padding:'9px 11px',fontSize:13.5,borderTop:'1px solid #eef0f4',verticalAlign:'top',lineHeight:1.5};
-    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['ดิน (Blow count)',r=>{const o=soilOf(r);if(!o)return<span style={{color:'#cbd5e1'}} title="ยังไม่ได้ใส่ค่านับ Blow count (คลิกแถวเพื่อใส่)">–</span>;const L=SOIL_LV[soilLv(o)];return<span title="ค่านับ Blow count ที่ใส่ไว้ (คลิกแถวเพื่อแก้ไข)" style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t} · {o.max}</span>;},{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['ลูกค้า',r=>r.customer,{w:190}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['ท่อนต่อ (ม.)',r=>r.segs,{nw:1}],['ปั้นจั่น',r=>r.crane,{nw:1}],['สาเหตุที่คิด',r=>r.cause,{w:170}],['หน้างาน',r=>r.site,{w:200}]];
+    const COLS=[['วันที่ตอก',r=>fmtD(r.drive_date),{nw:1}],['โรงงาน',r=>r.factory,{nw:1}],['ขนาด',r=>r.size,{nw:1,b:1}],['ยาว',r=>r.length_m!=null?Number(r.length_m).toFixed(2):'',{nw:1,r:1}],['ประเภท',r=>r.kind,{nw:1}],['ปัญหา',r=>r.remark,{w:150}],['ดิน (Blow count)',r=>{const o=soilOf(r);if(!o)return<span style={{color:'#cbd5e1'}} title="ยังไม่ได้ใส่ค่านับ Blow count (คลิกแถวเพื่อใส่)">–</span>;const L=SOIL_LV[soilLv(o)];return<span title="ค่านับ Blow count ที่ใส่ไว้ (คลิกแถวเพื่อแก้ไข)" style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:L.bg,color:L.col,fontWeight:700,fontSize:12.5}}>{L.e} {L.t} · {o.max}</span>;},{nw:1}],['เฟลจาก',r=>r.fail_of,{nw:1}],['แก้ไข',r=>r.fix,{nw:1,b:1,fix:1}],['ลูกค้า',r=>r.customer,{w:190}],['วันที่หน้าเสา',r=>r.cast_dates,{nw:1}],['โฟร์แมน',r=>r.foreman,{nw:1}],['ท่อนต่อ ล่าง+บน (ม.)',r=>r.segs,{nw:1}],['ผลิตจริง ล่าง/บน',r=>String(r.prod_dates||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>fmtD(x)).join(' / '),{nw:1}],['ปั้นจั่น',r=>r.crane,{nw:1}],['สาเหตุที่คิด',r=>r.cause,{w:170}],['หน้างาน',r=>r.site,{w:200}]];
     const F=(k,label,props)=><div style={{minWidth:0}}><label style={lbl}>{label}</label><input style={inp} value={form[k]||''} onChange={e=>setForm({...form,[k]:e.target.value})} {...(props||{})}/></div>;
     const P=(k,label,opts,ph)=>{const v=form[k]||'';const custom=!!oth[k]||(v!==''&&!opts.includes(v));
       return <div style={{minWidth:0}}><label style={lbl}>{label}</label>
@@ -13893,7 +13893,7 @@ window.__dataReady.then(data => {
               {COLS.map(c=>{const o=c[2]||{};const v=c[1](r);return<td key={c[0]} style={{...td,whiteSpace:o.nw?'nowrap':'normal',minWidth:o.w||undefined,fontWeight:o.b?700:400,textAlign:o.r?'right':'left',color:o.fix&&/รอ\s*สรุป/.test(r.fix||'')?'#b45309':'#1a2540'}}>{v==null?'':v}</td>;})}
               {canEdit&&<td style={{...td,whiteSpace:'nowrap'}}><button style={{...btn,padding:'2px 8px',fontSize:12}} onClick={e=>{e.stopPropagation();openEdit(r);}}>แก้</button> <button style={{...btn,padding:'2px 8px',fontSize:12,color:'#dc2626'}} onClick={e=>{e.stopPropagation();del(r);}}>ลบ</button></td>}
             </tr>)}
-            {!list.length&&<tr><td colSpan={17} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{fPend?'ไม่มีงานที่รอสรุปแล้ว 🎉':'ยังไม่มีรายการ'}{!fPend&&canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
+            {!list.length&&<tr><td colSpan={18} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{fPend?'ไม่มีงานที่รอสรุปแล้ว 🎉':'ยังไม่มีรายการ'}{!fPend&&canEdit?' — กด "＋ เพิ่มรายการ" หรือ "นำเข้าจาก Excel"':''}</td></tr>}</tbody>
           </table>
         </div>
       </ChartCard>
@@ -13924,10 +13924,30 @@ window.__dataReady.then(data => {
             {F('fail_of','เฟลจากกี่ต้น',{placeholder:'1/60'})}
             {F('customer','ชื่อลูกค้า')}
             {F('site','หน้างาน')}
-            {F('cast_dates','วันที่หน้าเสา',{placeholder:'7/10/69'})}
             {F('foreman','โฟร์แมนรายงาน')}
             {P('fix','แก้ไข',['แซม 1 ต้น','แซม 2 ต้น','แซม 3 ต้น','รอสรุป'],'เช่น แซม 4 ต้น')}
-            {F('segs','ท่อนต่อ ความยาวแต่ละท่อน ม. (เช่น 8+7)',{placeholder:'8+7'})}
+            {(()=>{
+              // ท่อน (ล่าง → บน): ยาว · วันที่หน้าเสา · วันที่ผลิตจริง — เก็บเป็น segs "ล่าง+บน" · cast_dates "ล่าง-บน" · prod_dates "ล่าง,บน"
+              const sg=String(form.segs||'').split('+'),fc=String(form.cast_dates||'').split(/\s*[-–,]\s*/),pd=String(form.prod_dates||'').split(',');
+              const n=Math.max(sg.length,fc.length,pd.length,1),gt=(a,i)=>(a[i]||'').trim();
+              const pcs=Array.from({length:n},(_,i)=>({len:gt(sg,i),face:gt(fc,i),prod:gt(pd,i)}));
+              const write=arr=>setForm({...form,segs:arr.map(p=>p.len).join('+'),cast_dates:arr.map(p=>p.face).join('-'),prod_dates:arr.map(p=>p.prod).join(',')});
+              const upd=(i,k,v)=>write(pcs.map((p,j)=>j===i?{...p,[k]:v}:p));
+              const lab=i=>n<=1?'เสาต้นนี้ (ท่อนเดียว)':i===0?'ท่อนล่าง (ตอกก่อน)':i===n-1?'ท่อนบน (ต่อ)':'ท่อนกลาง';
+              return <div style={{gridColumn:'1 / -1',minWidth:0}}>
+                <label style={lbl}>ท่อน (เรียงจากล่าง → บน) — ความยาว · วันที่หน้าเสา · วันที่ผลิตจริง</label>
+                {pcs.map((p,i)=><div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'8px 10px',marginBottom:8,background:'#fafbfd'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><b style={{color:'#0f766e',fontSize:13.5}}>{lab(i)}</b>
+                    {n>1&&<button type="button" style={{...btn,padding:'1px 9px',color:'#dc2626'}} onClick={()=>write(pcs.filter((_,j)=>j!==i))}>×</button>}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8}}>
+                    <div><label style={lbl}>ยาว (ม.)</label><input style={inp} inputMode="decimal" placeholder="เช่น 9" value={p.len} onChange={e=>upd(i,'len',e.target.value)}/></div>
+                    <div><label style={lbl}>วันที่หน้าเสา</label><input style={inp} placeholder="7/10/69" value={p.face} onChange={e=>upd(i,'face',e.target.value)}/></div>
+                    <div><label style={lbl}>วันที่ผลิตจริง</label><input style={inp} type="date" value={p.prod} onChange={e=>upd(i,'prod',e.target.value)}/></div></div>
+                </div>)}
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button type="button" style={btn} onClick={()=>write([...pcs,{len:'',face:'',prod:''}])}>＋ เพิ่มท่อน</button>
+                  {n>1&&<button type="button" style={btn} onClick={()=>write([...pcs].reverse())}>⇅ สลับล่าง/บน</button>}</div>
+              </div>;})()}
             {F('crane','ปั้นจั่น')}
           </div>
           {err&&<div style={{marginTop:10,color:'#dc2626',fontSize:13.5}}>{err}</div>}
