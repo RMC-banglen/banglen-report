@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12z';
+var APP_VERSION='2026-11-13b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -311,6 +311,8 @@ function pieceAnalysis(rec,p,n){
   return {age,face:fd,backdate,faceAge,formula,group,maxBack,policyOk:(backdate!=null&&maxBack!=null)?backdate<=maxBack:null,ev:ageEval(pieceRows(rec,p),p.date,formula,age)};
 }
 
+// รวมท่อนที่ผลิตวันเดียวกันและใช้สูตรเดียวกัน → กำลังอัดเท่ากัน แสดงครั้งเดียว
+const groupPieces = (r,pcs) => { const g=[]; pcs.forEach(p=>{ const f=pieceFormula(r,p), x=g.find(y=>y.date===p.date&&y.f===f); if(x) x.ps.push(p); else g.push({date:p.date,f,ps:[p]}); }); return g; };
 const pieceLabel = (i,n) => n<=1?'เสาต้นนี้':i===0?'ท่อนล่าง':i===n-1?'ท่อนบน':'ท่อนกลาง'+(n>3?' '+i:'');
 const piecesOf = r => { const a=(Array.isArray(r.prod_dates)&&r.prod_dates.length)?r.prod_dates:(r.prod_date?[{date:r.prod_date}]:[]);
   const list=a.filter(p=>p&&p.date), single=a.length===1;   // ใบเก่า/ท่อนเดียว: วันที่หน้าเสาเก็บอยู่ที่ตัวใบ
@@ -330,20 +332,27 @@ function observations(r){
   const out=[];
   const pcsO=piecesOf(r), nO=pcsO.length;
   if(!(r.strength_rows||[]).length) out.push({t:'info',x:'ยังไม่มีผลกำลังอัดของวันผลิตในระบบ (ไม่ได้เทียบ)'});
+  const seenG=new Set(), seenB=new Set();
   pcsO.forEach(p=>{
-    const A=pieceAnalysis(r,p,nO), pre=((nO>1?p.label:'')+(A.formula?(nO>1?' ':'')+'['+A.formula+']':'')).trim();
+    const A=pieceAnalysis(r,p,nO);
+    // ท่อนที่ผลิตวันเดียวกัน สูตรเดียวกัน หน้าเสาเดียวกัน → ข้อสังเกตเหมือนกัน แสดงครั้งเดียว
+    const sameP=pcsO.filter(q=>q.date===p.date&&pieceFormula(r,q)===A.formula&&String(q.face||'')===String(p.face||'')), bk=p.date+'|'+A.formula+'|'+(p.face||'');
+    const pre=((nO>1?sameP.map(x=>x.label).join(' + '):'')+(A.formula?(nO>1?' ':'')+'['+A.formula+']':'')).trim();
     const preS=pre?pre+': ':'';
-    if(A.age!=null){
+    if(A.age!=null&&!seenB.has(bk)){ seenB.add(bk);
       if(A.backdate!=null) out.push({t:'info',x:preS+'หน้าเสาย้อนวัน '+A.backdate+' วัน (หน้าเสา '+dm(A.face)+' · ผลิตจริง '+dm(p.date)+') → อายุตามหน้าเสา '+A.faceAge+' วัน แต่อายุจริงตอนตอก '+A.age+' วัน'});
       if(A.faceAge!=null&&A.faceAge<8) out.push({t:'warn',x:preS+'ตอกก่อนครบ 8 วันนับจากวันที่หน้าเสา (อายุตามหน้าเสา '+A.faceAge+' วัน)'});
       if(A.policyOk===false) out.push({t:'bad',x:preS+'ย้อนวันเกินที่สูตร '+A.formula+' รองรับ ('+GROUP_TH[A.group]+' ย้อนได้ไม่เกิน '+A.maxBack+' วัน แต่ย้อน '+A.backdate+' วัน) — สูตรที่ใช้จริงวันผลิตอาจไม่พอสำหรับอายุตอนตอก'});
       else if(A.policyOk===true) out.push({t:'ok',x:preS+'ย้อนวัน '+A.backdate+' วัน อยู่ในที่สูตร '+A.formula+' รองรับ ('+GROUP_TH[A.group]+')'});
     }
-    const ev=A.ev;
-    if(!ev) out.push({t:'info',x:preS+'ไม่มีผลกำลังอัดเฉพาะวันผลิต (ไม่ได้เทียบ)'});
+    const ev=A.ev, gk=p.date+'|'+A.formula;
+    if(seenG.has(gk)) return; seenG.add(gk);
+    const gs=groupPieces(r,pcsO).find(y=>y.date===p.date&&y.f===A.formula), gl=gs&&gs.ps.length>1?gs.ps.map(x=>x.label).join(' + '):p.label;
+    const preS2=((nO>1?gl:'')+(A.formula?(nO>1?' ':'')+'['+A.formula+']':'')).trim(), preG=preS2?preS2+': ':'';
+    if(!ev) out.push({t:'info',x:preG+'ไม่มีผลกำลังอัดเฉพาะวันผลิต (ไม่ได้เทียบ)'});
     else{
       const how=ev.usedAges.length>1?'แทรกค่าจากผล '+ev.usedAges[0]+' และ '+ev.usedAges[1]+' วัน':'ใช้ผล '+ev.usedAges[0]+' วัน';
-      out.push({t:ev.ok===false?'bad':ev.ok===true?'ok':'info',x:preS+'อายุตอนตอก '+ev.age+' วัน → กำลังอัด ≈ '+fmtN(ev.strength)+' ksc ('+how+') เทียบเกณฑ์พร้อมตอก ≥ '+fmtN(ev.target)+' ksc'+(ev.ok===false?' → ยังไม่ถึง '+fmtN(ev.target)+' ไม่พร้อมตอก':ev.ok===true?' → ถึงเกณฑ์ พร้อมตอก':'')});
+      out.push({t:ev.ok===false?'bad':ev.ok===true?'ok':'info',x:preG+'อายุตอนตอก '+ev.age+' วัน → กำลังอัด ≈ '+fmtN(ev.strength)+' ksc ('+how+') เทียบเกณฑ์พร้อมตอก ≥ '+fmtN(ev.target)+' ksc'+(ev.ok===false?' → ยังไม่ถึง '+fmtN(ev.target)+' ไม่พร้อมตอก':ev.ok===true?' → ถึงเกณฑ์ พร้อมตอก':'')});
     }
   });
   if(r.blow_count!=null&&r.blow_count!==''){
@@ -456,9 +465,9 @@ function FailReport({rec,logo,photos}){
       <div style={{fontSize:12,color:'#64748b',marginTop:3}}>อายุนับจากวันที่ผลิตจริง ถึงวันที่ตอกเฟล (วันที่หน้าเสาอาจย้อนวัน ใช้อ้างอิงเท่านั้น){pcsR.length>1&&rec.age_days!=null?' · ท่อนที่อ่อนที่สุด '+rec.age_days+' วัน':''}</div>
     </div>
     {pcsR.length===0&&<div data-block="3" style={blk}>{H('2. กำลังอัดคอนกรีต — ผลวันผลิตเทียบที่อายุจริงตอนตอก (ksc)')}<div style={{fontSize:13,color:'#64748b'}}>ไม่มีวันที่ผลิต</div></div>}
-    {pcsR.map((p,pi)=>{
+    {groupPieces(rec,pcsR).map((g,pi)=>{ const p=g.ps[0];
       const pf=pieceFormula(rec,p),PR=pieceRows(rec,p),S=buildStrength(PR,p.date),sum=strengthSummary(PR,p.date,pf),A=pieceAnalysis(rec,p,pcsR.length);
-      return <div key={pi} data-block={'3-'+pi} style={blk}>{H((pi===0?'2. ':'2. (ต่อ) ')+'กำลังอัดคอนกรีต — ผลวันผลิตเทียบที่อายุจริงตอนตอก (ksc)'+(pf?' · สูตร '+pf:' · ทุกสูตร')+(pcsR.length>1?' — '+p.label+' ผลิต '+dm(p.date):''))}
+      return <div key={pi} data-block={'3-'+pi} style={blk}>{H((pi===0?'2. ':'2. (ต่อ) ')+'กำลังอัดคอนกรีต — ผลวันผลิตเทียบที่อายุจริงตอนตอก (ksc)'+(pf?' · สูตร '+pf:' · ทุกสูตร')+(pcsR.length>1?' — '+g.ps.map(x=>x.label).join(' + ')+' ผลิต '+dm(p.date):''))}
       {S.ages.length===0?<div style={{fontSize:13,color:'#64748b'}}>ไม่พบผลกำลังอัดช่วงวันผลิตในระบบ</div>:<>
         {(()=>{const R=relevantAges(PR,p.date,pf,A.age);
           return <table style={{width:'100%',borderCollapse:'collapse'}}>
