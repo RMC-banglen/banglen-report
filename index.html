@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13h';
+var APP_VERSION='2026-11-13i';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13440,8 +13440,9 @@ window.__dataReady.then(data => {
     const [fFlag,setFFlag]=useState('');     // '' ทั้งหมด · str · hammer · vert · hard
     const [q,setQ]=useState('');
     const [view,setView]=useState(null);
-    const [rpt,setRpt]=useState(true);   // เปิดรายงานแบบ PDF ในหน้าต่างรายละเอียด
-    useEffect(()=>{setRpt(true);},[view&&view.id]);
+    const [rpt,setRpt]=useState(true);
+    const [rptKey,setRptKey]=useState(()=>Date.now());   // กันแอป QC ที่แคชไว้เป็นเวอร์ชันเก่า: ทุกครั้งที่เปิดดึงไฟล์ใหม่   // เปิดรายงานแบบ PDF ในหน้าต่างรายละเอียด
+    useEffect(()=>{setRpt(true);setRptKey(Date.now());},[view&&view.id]);
     const load=()=>{db.from('pile_fail_inspections').select('*').order('inspect_date',{ascending:false}).order('id',{ascending:false}).limit(3000)
       .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
     useEffect(load,[]);
@@ -13527,7 +13528,7 @@ window.__dataReady.then(data => {
                 <a href={'qc.html?fail='+r.id} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>↗ เปิดในแอป QC</a>
                 {canEdit&&<button style={{...btn,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button>}
                 <button style={btn} onClick={()=>setView(null)}>ปิด</button></div></div>
-            {rpt&&<iframe title="รายงานตรวจเสาเฟล" src={'qc.html?fail='+r.id+'&embed=1'} style={{width:'100%',height:'78vh',border:'1px solid #e2e8f0',borderRadius:8}}/>}
+            {rpt&&<iframe key={rptKey} title="รายงานตรวจเสาเฟล" src={'qc.html?fail='+r.id+'&embed=1&_t='+rptKey} style={{width:'100%',height:'78vh',border:'1px solid #e2e8f0',borderRadius:8}}/>}
             {!rpt&&<table style={{width:'100%',borderCollapse:'collapse',border:'1px solid #eef0f4'}}><tbody>
               {row('ลูกค้า / หน้างาน',[r.customer,r.site].filter(Boolean).join(' · '))}
               {row('ขนาด × ความยาว',(r.pile_size||'–')+(r.pile_std?(r.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2)+' ม.':'–'))}
