@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13b';
+var APP_VERSION='2026-11-13c';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13478,7 +13478,8 @@ window.__dataReady.then(data => {
       ['ดินแข็ง (Blow ≥600)',r=>r.blow_count!=null&&Number(r.blow_count)>=600,'#991b1b'],
       ['ดินเฝ้าระวัง (Blow 301–599)',r=>r.blow_count!=null&&Number(r.blow_count)>300&&Number(r.blow_count)<600,'#a16207'],
       ['พลังงานตุ้มไม่พอตาม Qa (คำนวณ Blow ไม่ได้)',r=>r.blow_s_cm!=null&&Number(r.blow_s_cm)<=0,'#b91c1c'],
-      ['ปลายเสาอยู่ในชั้นแข็ง (10 ฟุตสุดท้าย ≥20 ครั้ง/ฟุต)',r=>{const l=r.drive_log||{};return l.last10_avg!=null&&Number(l.last10_avg)>=20;},'#991b1b'],
+      ['ตอกยากขึ้นแบบกระชาก (ฟุตสุดท้าย ≥1.8 เท่าของ 3 ฟุตก่อนหน้า)',r=>{const b=((r.drive_log||{}).blows||[]).map(Number);if(b.length<5)return false;const p=b.slice(-4,-1),pm=p.reduce((t,x)=>t+x,0)/p.length;return pm>0&&b[b.length-1]/pm>=1.8;},'#991b1b'],
+      ['ตอกแน่นเกินที่ต้องการ (Qa จริง ≥1.5 เท่าของแบบ)',r=>{const l=r.drive_log||{};return l.qa_act!=null&&Number(r.qa_ton)>0&&Number(l.qa_act)/Number(r.qa_ton)>=1.5;},'#b45309'],
       ['ตอกไม่ถึงระดับปลายเสาที่กำหนด',r=>{const l=r.drive_log||{};return l.shortfall!=null&&Number(l.shortfall)>0.05;},'#c2410c'],
       ['set จริงยังไม่ถึง Qa ตามแบบ',r=>{const l=r.drive_log||{};return l.qa_act!=null&&r.qa_ton!=null&&Number(l.qa_act)<Number(r.qa_ton);},'#b91c1c'],
     ];

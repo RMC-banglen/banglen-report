@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13f';
+var APP_VERSION='2026-11-13g';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -180,6 +180,8 @@ function judgeNum(v,min,max){
 //        → ตุ้ม (น้ำหนัก/ระยะยก เทียบ 0.7–2.5 เท่าของเสา) → ดิ่งเสา → รูปตอนเสาแตก → สรุป → ส่งออก PDF
 const TARGET_NORMAL = {1:350,3:415,5:435,7:450};   // ksc ตามอายุ (เหมือนแดชบอร์ดสเต็ง — ใช้แสดงผล 1/3/5/7 วันเทียบเกณฑ์เดิม)
 const TARGET_NP280  = {1:340,7:420};
+const OVERDRIVE_RATIO = 1.5;   // Qa ที่ตอกได้จริง ÷ Qa ตามแบบ ตั้งแต่เท่านี้ = ตอกแน่นเกินที่ต้องการมาก (ค่าเริ่มต้น ปรับได้)
+const JUMP_RATIO = 1.8;        // Blow ฟุตสุดท้าย ÷ เฉลี่ย 3 ฟุตก่อนหน้า ตั้งแต่เท่านี้ = ตอกยากขึ้นแบบกระชาก (ค่าเริ่มต้น ปรับได้)
 const DRIVE_MIN = 450;   // เกณฑ์ "พร้อมเอาไปตอก" ของเสาเฟล: กำลังอัดที่อายุจริงตอนตอก (แทรกค่าจากผลวันข้างเคียง) ต้องได้อย่างน้อย 450 ksc
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ตามแอปแบบเสาเข็ม — T = I มอก. · F = I โรงงาน · S = สี่เหลี่ยม มอก. · Q = สี่เหลี่ยมโรงงาน
 const PILE_AP = {T18:[275,89],T22:[386,105],T26:[489,126],T30:[660,145],T35:[880,180],T40:[1240,197.5],
@@ -204,6 +206,7 @@ function driveStats(r){
   const L=r.drive_log||{}, out={}, blows=(L.blows||[]).map(Number).filter(x=>x>=0);
   if(blows.length){const n=blows.length,sum=blows.reduce((t,x)=>t+x,0),l3=blows.slice(-3);
     const t10=blows.slice(-10), s10=t10.reduce((t,x)=>t+x,0); out.last10N=t10.length; out.last10Sum=s10; out.last10Avg=s10/t10.length; out.last10Share=sum>0?s10/sum:null; out.tipLevel=soilIdx(Math.round(out.last10Avg*30));
+    if(blows.length>=5){ const prev=blows.slice(-4,-1), pm=prev.reduce((t,x)=>t+x,0)/prev.length; out.jumpLast=blows[blows.length-1]; out.jumpPrev=pm; out.jump=pm>0?blows[blows.length-1]/pm:null; }
     out.n=n;out.total=sum;out.max=Math.max(...blows);out.avg=sum/n;out.last3=l3.reduce((t,x)=>t+x,0)/l3.length;out.ratio=out.avg>0?out.last3/out.avg:null;}
   const l10=(L.l10||[]).map(Number).filter(x=>x>0);
   if(l10.length){out.set=(l10.reduce((t,x)=>t+x,0)/l10.length)/10;out.per10=out.set>0?10/out.set:null;}   // set = ซม./ครั้ง (penetration 10 ครั้ง ÷ 10)
@@ -385,6 +388,7 @@ const SHORT_RULES = [
   [/ตอกยังไม่ถึง set/, ()=>'ตอกยังไม่ถึง set'],
   [/ตอกไม่ถึงระดับปลายเสา/, ()=>'ตอกไม่ถึงระดับปลายเสาตามแบบ'],
   [/ช่วงท้ายตอกยากขึ้นมาก/, ()=>'ช่วงท้ายตอกยากขึ้นมาก'],
+  [/ตอกยากขึ้นแบบกระชาก — ฟุตสุดท้าย (\d+)/, m=>'ตอกยากขึ้นแบบกระชาก (ฟุตสุดท้าย '+m[1]+' ครั้ง)'],
   [/ตอกแน่นเกินที่ต้องการมาก/, ()=>'ตอกแน่นเกินที่ต้องการมาก'],
   [/ดินแข็ง \(Blow (\d+)/, m=>'ดินแข็ง (Blow '+m[1]+' ครั้ง/30 ฟุต)'],
   [/ย้อนวัน .* อยู่ในที่สูตร/, ()=>'ย้อนวันอยู่ในที่สูตรรองรับ'],
@@ -403,7 +407,7 @@ function analyze(r){
   const ds=driveStats(r), qaT=Number(r.qa_ton);
   if(ds.qaAct!=null&&qaT>0){
     if(ds.qaRatio<1) extra.push({t:'bad',x:'ตอกยังไม่ถึง set ที่ต้องการ — set จริง '+fmtN(ds.set,3)+' ซม./ครั้ง ให้ Qa ≈ '+fmtN(ds.qaAct,1)+' ตัน ต่ำกว่า Qa ตามแบบ '+fmtN(qaT,1)+' ตัน'});
-    else extra.push({t:ds.qaRatio>=1.5?'warn':'ok',x:'set ถึงตามต้องการ — Qa ที่ตอกได้จริง ≈ '+fmtN(ds.qaAct,1)+' ตัน (แบบ '+fmtN(qaT,1)+' ตัน = '+fmtN(ds.qaRatio,2)+' เท่า)'+(ds.qaRatio>=1.5?' ตอกแน่นเกินที่ต้องการมาก ถ้ายังตอกต่อหลังถึง set หัวเสาเสี่ยงแตก':'')});
+    else extra.push({t:ds.qaRatio>=OVERDRIVE_RATIO?'warn':'ok',x:'set ถึงตามต้องการ — Qa ที่ตอกได้จริง ≈ '+fmtN(ds.qaAct,1)+' ตัน (แบบ '+fmtN(qaT,1)+' ตัน = '+fmtN(ds.qaRatio,2)+' เท่า)'+(ds.qaRatio>=OVERDRIVE_RATIO?' ตอกแน่นเกินที่ต้องการมาก ถ้ายังตอกต่อหลังถึง set หัวเสาเสี่ยงแตก':'')});
   }
   if(ds.shortfall!=null&&ds.shortfall>0.05){
     const reached=ds.qaRatio!=null&&ds.qaRatio>=1;
@@ -411,9 +415,10 @@ function analyze(r){
   }
   if(ds.last10Avg!=null&&ds.n>=5){
     const allIdx=r.blow_count!=null&&r.blow_count!==''?soilIdx(Number(r.blow_count)):null;
-    if(ds.tipLevel===4) extra.push({t:'warn',x:'ปลายเสา (10 ฟุตสุดท้าย) เฉลี่ย '+fmtN(ds.last10Avg,1)+' ครั้ง/ฟุต ≈ ระดับดินแข็ง (เทียบสเกลเกณฑ์ 30 ฟุต ≥600 = ≥20 ครั้ง/ฟุต)'+(allIdx!=null&&allIdx<4?' แม้ภาพรวม 30 ฟุตอยู่ระดับ '+SOIL_LV[allIdx].t:'')+' — ปลายเสาอยู่ในชั้นแข็ง'});
+    if(ds.tipLevel===4) extra.push({t:'info',x:'ปลายเสา (10 ฟุตสุดท้าย) เฉลี่ย '+fmtN(ds.last10Avg,1)+' ครั้ง/ฟุต ≈ ระดับดินแข็ง (เทียบสเกลเกณฑ์ 30 ฟุต ≥600 = ≥20 ครั้ง/ฟุต)'+(allIdx!=null&&allIdx<4?' แม้ภาพรวม 30 ฟุตอยู่ระดับ '+SOIL_LV[allIdx].t:'')+' — ปลายเสาอยู่ในชั้นแข็ง'});
     else if(ds.tipLevel>=1) extra.push({t:'info',x:'ปลายเสา (10 ฟุตสุดท้าย) เฉลี่ย '+fmtN(ds.last10Avg,1)+' ครั้ง/ฟุต ≈ ระดับ'+SOIL_LV[ds.tipLevel].t});
   }
+  if(ds.jump!=null&&ds.jump>=JUMP_RATIO) extra.push({t:'warn',x:'ตอกยากขึ้นแบบกระชาก — ฟุตสุดท้าย '+ds.jumpLast+' ครั้ง เทียบ 3 ฟุตก่อนหน้าเฉลี่ย '+fmtN(ds.jumpPrev,1)+' ('+fmtN(ds.jump,1)+' เท่า) น่าจะชนชั้นแข็งหรือสิ่งกีดขวาง'});
   if(ds.ratio!=null&&ds.ratio>=2.5) extra.push({t:'warn',x:'ช่วงท้ายตอกยากขึ้นมาก — 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0)+' ครั้ง/ฟุต (สูงสุด '+ds.max+') เทียบเฉลี่ยทั้งช่วง '+fmtN(ds.avg,1)+' = '+fmtN(ds.ratio,1)+' เท่า หัวเสารับแรงกระแทกสูง/ติดชั้นแข็ง'});
   if(ds.lenGap!=null&&Math.abs(ds.lenGap)>0.05) extra.push({t:'info',x:'ระดับหัว/ปลายเสาจริงไม่ตรงกับความยาวเสา (ต่างกัน '+fmtN(Math.abs(ds.lenGap),2)+' ม.) — ตรวจตัวเลขในใบบันทึก'});
   if(ds.dev!=null&&ds.dev>0) extra.push({t:'info',x:'หัวเสาเบี้ยว '+fmtN(ds.dev,1)+' ซม. ทิศ '+(ds.devDir||'–')+(ds.tip!=null&&ds.top!=null&&Math.abs(ds.top-ds.tip)>0?' (≈ '+fmtN(ds.dev/(Math.abs(ds.top-ds.tip)),2)+' ซม./ม.)':'')});
@@ -435,6 +440,8 @@ function analyze(r){
   if(has(/ตอกไม่ถึงระดับปลายเสา/)) checks.push('ตรวจชั้นแข็ง/สิ่งกีดขวางใต้ดิน และให้วิศวกรยืนยัน set ก่อนตัดหัวเสา');
   if(tipHard) checks.push('ตรวจว่าชั้นแข็งตื้นกว่าแบบหรือไม่ · เพิ่มสเต็ง/จำกัดการตอกซ้ำ · เฝ้าระวังเสาต้นข้างเคียง');
   else if(has(/ดินแข็ง/)) checks.push('เพิ่มสเต็งคอนกรีต/เจาะนำ และเฝ้าระวังเสาต้นข้างเคียง');
+  if(has(/ตอกแน่นเกินที่ต้องการมาก/)) checks.push('หยุดตอกเมื่อถึง set · ลดการตอกซ้ำ และตรวจรอยร้าวหัวเสา');
+  if(has(/ตอกยากขึ้นแบบกระชาก/)) checks.push('ตรวจสิ่งกีดขวาง/ชั้นแข็งตื้น · ลดระยะยกช่วงท้าย · ตรวจรอยร้าวหัวเสา');
   if(has(/ช่วงท้ายตอกยากขึ้นมาก/)) checks.push('ลดการตอกซ้ำเกิน set และตรวจรอยร้าวหัวเสา/รอยต่อหลังตอก');
   if(!risks.length) checks.push('ตัวเลขอยู่ในเกณฑ์ทั้งหมด — ตรวจเพิ่ม: รอยร้าวก่อนตอก การยกขนส่ง การจี้/รองหัวเสา ตำแหน่งที่แตก');
   const summary=risks.length?('สาเหตุที่น่าจะเป็น: '+risks[0].s+(risks.length>1?' (และอีก '+(risks.length-1)+' ข้อ)':'')):'ตัวเลขทุกข้ออยู่ในเกณฑ์ — ยังไม่พบสาเหตุชัดเจน';
@@ -536,7 +543,7 @@ function FailReport({rec,logo,photos}){
     {rec.drive_log&&Object.keys(rec.drive_log).length>0&&(()=>{const ds=driveStats(rec),L=rec.drive_log||{};
       return <div data-block="5b" style={blk}>{H('4.1 บันทึกการตอกจริง (Driving record)')}
         <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
-          {ds.last10Avg!=null&&ds.n>=5&&kv('10 ฟุตสุดท้าย (ปลายเสา)',<span style={{fontWeight:700,color:ds.tipLevel===4?'#991b1b':undefined}}>รวม {ds.last10Sum} ครั้ง ({fmtN(ds.last10Share*100,0)}% ของทั้งหมด) · เฉลี่ย {fmtN(ds.last10Avg,1)} ครั้ง/ฟุต ≈ {SOIL_LV[ds.tipLevel].e} {SOIL_LV[ds.tipLevel].t}</span>)}
+          {ds.last10Avg!=null&&ds.n>=5&&kv('10 ฟุตสุดท้าย (ปลายเสา)',<span style={{fontWeight:700}}>รวม {ds.last10Sum} ครั้ง ({fmtN(ds.last10Share*100,0)}% ของทั้งหมด) · เฉลี่ย {fmtN(ds.last10Avg,1)} ครั้ง/ฟุต ≈ {SOIL_LV[ds.tipLevel].e} {SOIL_LV[ds.tipLevel].t}</span>)}
           {ds.total!=null&&kv('Blow ต่อฟุต (30 ซม.)',ds.n+' ฟุต · รวม '+ds.total+' ครั้ง · สูงสุด '+ds.max+' · 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0))}
           {ds.set!=null&&kv('set จริง (10 ครั้งสุดท้าย)',fmtN(ds.set,3)+' ซม./ครั้ง ≈ '+fmtN(ds.per10,1)+' ครั้ง/10 ซม. · penetration '+(L.l10||[]).join(' / ')+' ซม.')}
           {ds.qaAct!=null&&kv('Qa ที่ตอกได้จริง (Danish)',<span style={{fontWeight:800,color:ds.qaRatio==null||ds.qaRatio>=1?'#15803d':'#b91c1c'}}>{fmtN(ds.qaAct,1)} ตัน{ds.qaRatio!=null?' ('+fmtN(ds.qaRatio,2)+' เท่าของ Qa ตามแบบ '+fmtN(Number(rec.qa_ton),1)+' ตัน) '+(ds.qaRatio>=1?'✔ ถึง set':'✘ ยังไม่ถึง set'):''}</span>)}
@@ -633,7 +640,6 @@ function FailSummaryCard({rec,logo}){
       {rec.hammer_ratio!=null&&chip('ตุ้ม '+fmtN(rec.hammer_ratio,2)+'× '+(rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'✔':'✘'),rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX,'ham')}
       {rec.vertical_result&&rec.vertical_result!=='na'&&chip('ดิ่ง '+(rec.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'),rec.vertical_result==='ok','ver')}
       {ds.qaRatio!=null&&chip('Qa จริง ≈ '+fmtN(ds.qaAct,1)+' ตัน '+(ds.qaRatio>=1?'✔':'✘'),ds.qaRatio>=1,'qa')}
-      {ds.last10Avg!=null&&ds.n>=5&&ds.tipLevel>=3&&chip('ปลายเสาอยู่ในชั้น'+SOIL_LV[ds.tipLevel].t+' ('+fmtN(ds.last10Avg,0)+' ครั้ง/ฟุต)',false,'tipsoil')}
       {ds.shortfall!=null&&ds.shortfall>0.05&&chip('ปลายเสาตื้นกว่าแบบ '+fmtN(ds.shortfall,2)+' ม.',false,'tip')}
     </div>
     {line('ตุ้ม',rec.hammer_weight_t!=null?rec.hammer_weight_t+' ตัน × '+(rec.hammer_drop_cm!=null?rec.hammer_drop_cm+' ซม.':'–')+(rec.pile_weight_t!=null?' · เสา '+fmtN(rec.pile_weight_t,2)+' ตัน':''):null)}
