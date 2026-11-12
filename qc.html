@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-09-24b';
+var APP_VERSION='2026-11-12a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -107,6 +107,7 @@ const FORMS = {
   post: {label:'ตรวจหลังผลิต', full:'ระบบตรวจสอบหลังผลิตเสาเข็ม ตาม มอก.396-2549', icon:'📏'},
   mat:  {label:'ตรวจสอบวัตถุดิบ', full:'ตรวจรับวัตถุดิบเข้าโรงงาน — ปูน ลวด เหล็ก น้ำยา', icon:'📦'},
   plan: {label:'ใบงานผลิตวันนี้', full:'ลงแพที่ผลิตวันนี้ และดูว่าแพไหนยังไม่ได้ตรวจ', icon:'📋'},
+  fail: {label:'ตรวจเสาเฟลหน้างาน', full:'ตรวจหาสาเหตุเสาแตกที่หน้างาน (กำลังอัด · Blow · ตุ้ม · ดิ่ง · รูป) แล้วส่งออก PDF', icon:'🚧'},
 };
 const todayISO = () => {
   const d=new Date();
@@ -148,12 +149,12 @@ const thaiDate = iso => {
 };
 
 // ย่อรูปก่อนอัป — มือถือถ่ายมา 3-5MB ถ้าอัปดิบจะช้าและเปลือง bandwidth
-function compressImage(file){
+function compressImage(file,maxSize){
   return new Promise(resolve=>{
     const img=new Image(), u=URL.createObjectURL(file);
     img.onload=()=>{
       URL.revokeObjectURL(u);
-      const MAX=900, scale=Math.min(1,MAX/Math.max(img.width,img.height));
+      const MAX=maxSize||900, scale=Math.min(1,MAX/Math.max(img.width,img.height));
       const c=document.createElement('canvas');
       c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
       c.getContext('2d').drawImage(img,0,0,c.width,c.height);
@@ -172,6 +173,509 @@ function judgeNum(v,min,max){
   if(min!=null && n<Number(min)) return false;
   if(max!=null && n>Number(max)) return false;
   return true;
+}
+
+// ===================== ตรวจสอบเสาเฟลหน้างาน =====================
+// ลำดับ: ข้อมูลเสา/หน้างาน (อายุเสานับจากวันที่ผลิต) → กำลังอัดคอนกรีตวันผลิต ±3 วัน → ชั้นดิน Blow 30 ฟุต
+//        → ตุ้ม (น้ำหนัก/ระยะยก เทียบ 0.7–2.5 เท่าของเสา) → ดิ่งเสา → รูปตอนเสาแตก → สรุป → ส่งออก PDF
+const TARGET_NORMAL = {1:350,3:415,5:435,7:450};   // ksc ตามอายุ (ตรงกับแดชบอร์ด)
+const TARGET_NP280  = {1:340,7:420};
+const PILE_SIZES = ['I18','I22','I26','I30','I35','I40','S18','S22','S26','S30','S35'];
+const HAMMER_MIN = 0.7, HAMMER_MAX = 2.5;
+const SOIL_LV = [
+  {t:'ดินอ่อน',e:'🟢',col:'#15803d',bg:'#dcfce7'},
+  {t:'เฝ้าระวัง 1',e:'🟡',col:'#a16207',bg:'#fef9c3'},
+  {t:'เฝ้าระวัง 2',e:'🟠',col:'#c2410c',bg:'#ffedd5'},
+  {t:'เฝ้าระวัง 3',e:'🔶',col:'#b91c1c',bg:'#fee2e2'},
+  {t:'ดินแข็ง',e:'🔴',col:'#991b1b',bg:'#fecaca'},
+];
+const soilIdx = n => n<=300?0 : n>=600?4 : n<=400?1 : n<=500?2 : 3;
+const isoAdd = (iso,n) => { const d=new Date(String(iso).slice(0,10)+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
+const isoDiff = (a,b) => Math.round((new Date(String(a).slice(0,10)+'T00:00:00Z')-new Date(String(b).slice(0,10)+'T00:00:00Z'))/864e5);
+const normF = s => String(s==null?'':s).replace(/[\s ]+/g,' ').trim().replace(/^([A-Za-z]{1,3})\s+(?=\d)/,'$1');
+const targetFor = (formula,age) => ((/^NP280$/i.test(formula||'')?TARGET_NP280:TARGET_NORMAL)[age])||null;
+const dm = d => { const p=String(d).slice(0,10).split('-'); return Number(p[2])+'/'+Number(p[1]); };
+const fmtN = (v,d=0) => v==null||!isFinite(v)?'–':Number(v).toFixed(d);
+const mean = a => a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
+
+// รวมผลกำลังอัดวันผลิต ±3 วัน เป็นตาราง วัน × อายุ  (rows = [{d,a,k}] ผลรายชุด)
+function buildStrength(rows,prod){
+  const dates=prod?[-3,-2,-1,0,1,2,3].map(n=>isoAdd(prod,n)):[];
+  const ages=[...new Set((rows||[]).map(r=>r.a))].filter(a=>[1,3,5,7,28].includes(a)).sort((a,b)=>a-b);
+  const cell=(d,a)=>{const v=(rows||[]).filter(r=>String(r.d).slice(0,10)===d&&r.a===a).map(r=>r.k);return v.length?{avg:mean(v),n:v.length}:null;};
+  return {dates,ages,cell};
+}
+// สรุปต่ออายุ: ผลวันผลิต เทียบเกณฑ์ และเทียบค่าเฉลี่ยวันข้างเคียง
+function strengthSummary(rows,prod,formula){
+  const S=buildStrength(rows,prod);
+  return S.ages.map(a=>{
+    const p=S.cell(prod,a);
+    const nb=mean(S.dates.filter(d=>d!==prod).map(d=>S.cell(d,a)).filter(Boolean).map(c=>c.avg));
+    const tg=targetFor(formula,a);
+    return {age:a,prod:p?p.avg:null,n:p?p.n:0,nb,target:tg,ok:p&&tg?p.avg>=tg:null,delta:p&&nb!=null?p.avg-nb:null};
+  });
+}
+
+// ข้อสังเกตอัตโนมัติจากข้อมูลที่กรอก (บอกเป็นแนวโน้ม ไม่ใช่ข้อสรุปตายตัว)
+function observations(r){
+  const out=[];
+  const sum=strengthSummary(r.strength_rows||[],r.prod_date,r.strength_formula);
+  const key=sum.find(s=>s.age===7&&s.prod!=null)||sum.find(s=>s.age===3&&s.prod!=null)||sum.find(s=>s.prod!=null);
+  if(!(r.strength_rows||[]).length) out.push({t:'info',x:'ยังไม่มีผลกำลังอัดของวันผลิตในระบบ (ไม่ได้เทียบ)'});
+  else if(!key) out.push({t:'info',x:'ไม่มีผลกำลังอัดเฉพาะวันผลิต มีเฉพาะวันข้างเคียง'});
+  else{
+    if(key.ok===false) out.push({t:'bad',x:'กำลังอัด '+key.age+' วันของวันผลิตได้ '+fmtN(key.prod)+' ksc ต่ำกว่าเกณฑ์ '+key.target+' ksc'});
+    else if(key.ok===true) out.push({t:'ok',x:'กำลังอัด '+key.age+' วันของวันผลิตได้ '+fmtN(key.prod)+' ksc ผ่านเกณฑ์ '+key.target+' ksc'});
+    if(key.delta!=null&&key.delta<=-25) out.push({t:'warn',x:'วันผลิตต่ำกว่าค่าเฉลี่ยวันข้างเคียง ±3 วัน อยู่ '+fmtN(-key.delta)+' ksc (ผลวันนั้นแย่กว่าปกติ)'});
+  }
+  if(r.blow_count!=null&&r.blow_count!==''){
+    const L=SOIL_LV[soilIdx(Number(r.blow_count))];
+    if(soilIdx(Number(r.blow_count))===4) out.push({t:'warn',x:'ดินแข็ง (Blow '+r.blow_count+' ครั้ง/30 ฟุต) ต้องเพิ่มสเต็งคอนกรีตช่วย และเสี่ยงเสาแตกตอนตอกลึก'});
+    else if(soilIdx(Number(r.blow_count))>=1) out.push({t:'info',x:'ชั้นดิน'+L.t+' (Blow '+r.blow_count+' ครั้ง/30 ฟุต) ควรเฝ้าระวังเรื่องตุ้มและระยะยก'});
+    else out.push({t:'ok',x:'ดินอ่อน (Blow '+r.blow_count+' ครั้ง/30 ฟุต)'});
+  }
+  if(r.hammer_ratio!=null&&isFinite(r.hammer_ratio)){
+    if(r.hammer_ratio<HAMMER_MIN) out.push({t:'bad',x:'ตุ้มเบาเกินไป ('+fmtN(r.hammer_ratio,2)+' เท่าของน้ำหนักเสา ต่ำกว่า '+HAMMER_MIN+') เสาอาจตอกไม่เข้า ตอกซ้ำหลายครั้งจนแตก'});
+    else if(r.hammer_ratio>HAMMER_MAX) out.push({t:'bad',x:'ตุ้มหนักเกินไป ('+fmtN(r.hammer_ratio,2)+' เท่าของน้ำหนักเสา เกิน '+HAMMER_MAX+') เสี่ยงหัวเสาแตก/ร้าว'});
+    else out.push({t:'ok',x:'น้ำหนักตุ้ม '+fmtN(r.hammer_ratio,2)+' เท่าของน้ำหนักเสา อยู่ในเกณฑ์ ('+HAMMER_MIN+'–'+HAMMER_MAX+' เท่า)'});
+  }
+  if(r.vertical_result==='bad') out.push({t:'bad',x:'เสาไม่ดิ่ง'+(r.vertical_note?' ('+r.vertical_note+')':'')+' อาจทำให้รับแรงเยื้องศูนย์จนแตก'});
+  else if(r.vertical_result==='ok') out.push({t:'ok',x:'เช็คดิ่งเสาแล้ว ผ่าน'});
+  return out;
+}
+
+// ย่อรูปสำหรับรายงาน (ใหญ่กว่ารูปในใบตรวจอื่นเล็กน้อย)
+async function loadAsDataUrl(url){
+  try{
+    const r=await fetch(url,{mode:'cors',cache:'force-cache'}); if(!r.ok) return null;
+    const b=await r.blob();
+    return await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>res(null);fr.readAsDataURL(b);});
+  }catch(e){return null;}
+}
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    if(document.querySelector('script[data-src="'+src+'"]')) return res();
+    const s=document.createElement('script'); s.src=src; s.dataset.src=src; s.onload=res; s.onerror=()=>rej(new Error('โหลดไลบรารีไม่ได้: '+src)); document.head.appendChild(s);
+  });
+}
+
+// ---------- ใบรายงาน (ใช้ทั้งแสดงบนจอและแปลงเป็น PDF) ----------
+function FailReport({rec,logo,photos}){
+  const sum=strengthSummary(rec.strength_rows||[],rec.prod_date,rec.strength_formula);
+  const S=buildStrength(rec.strength_rows||[],rec.prod_date);
+  const obs=observations(rec);
+  const L=rec.blow_count!=null&&rec.blow_count!==''?SOIL_LV[soilIdx(Number(rec.blow_count))]:null;
+  const th={border:'1px solid #cbd5e1',padding:'5px 8px',background:'#f1f5f9',fontSize:12.5,textAlign:'center',fontWeight:700};
+  const td={border:'1px solid #cbd5e1',padding:'5px 8px',fontSize:13,textAlign:'center'};
+  const kv=(k,v)=><tr><td style={{...td,textAlign:'left',background:'#f8fafc',width:'34%',fontWeight:600}}>{k}</td><td style={{...td,textAlign:'left'}}>{v==null||v===''?'–':v}</td></tr>;
+  const H=t=><div style={{fontSize:15,fontWeight:800,color:'#0f766e',borderBottom:'2px solid #0f766e',paddingBottom:3,marginBottom:6}}>{t}</div>;
+  const blk={marginBottom:14};
+  const col={ok:'#15803d',bad:'#b91c1c',warn:'#b45309',info:'#475569'},ic={ok:'✔',bad:'✘',warn:'⚠',info:'ℹ'};
+  const pairs=[];for(let i=0;i<(photos||[]).length;i+=2)pairs.push(photos.slice(i,i+2));
+  return <div style={{width:794,padding:'28px 34px',background:'#fff',color:'#1f2733',fontFamily:"'Noto Sans Thai',system-ui,sans-serif",boxSizing:'border-box'}}>
+    <div data-block="1" style={{...blk,display:'flex',alignItems:'center',gap:14,borderBottom:'3px solid #0f766e',paddingBottom:10}}>
+      {logo&&<img src={logo} alt="" style={{height:54}}/>}
+      <div style={{flex:1}}>
+        <div style={{fontSize:13,color:'#475569'}}>บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด</div>
+        <div style={{fontSize:21,fontWeight:800,color:'#0f766e'}}>รายงานตรวจสอบเสาเข็มเฟลหน้างาน</div>
+      </div>
+      <div style={{fontSize:12.5,textAlign:'right',color:'#475569',lineHeight:1.6}}>
+        เลขที่ใบตรวจ {rec.id?('#'+rec.id):'–'}<br/>วันที่ตรวจ {thaiDate(rec.inspect_date)}<br/>ผู้ตรวจ {rec.inspector||'–'}
+      </div>
+    </div>
+    <div data-block="2" style={blk}>{H('1. ข้อมูลเสาและหน้างาน')}
+      <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
+        {kv('ลูกค้า / หน้างาน',[rec.customer,rec.site].filter(Boolean).join(' · '))}
+        {kv('ขนาดเสา × ความยาว',(rec.pile_size||'–')+' × '+(rec.pile_length_m!=null&&rec.pile_length_m!==''?fmtN(rec.pile_length_m,2)+' ม.':'–'))}
+        {kv('วันที่ผลิต (ใช้นับอายุเสา)',thaiDate(rec.prod_date))}
+        {kv('วันที่ตอก',thaiDate(rec.drive_date))}
+        {kv('วันที่หน้าเสา (อ้างอิง)',rec.face_date)}
+        {kv('อายุเสาตอนตอก',rec.age_days!=null?rec.age_days+' วัน (นับจากวันที่ผลิต)':'–')}
+      </tbody></table>
+    </div>
+    <div data-block="3" style={blk}>{H('2. กำลังอัดคอนกรีต วันผลิต ± 3 วัน (ksc)'+(rec.strength_formula?' · สูตร '+rec.strength_formula:' · ทุกสูตร'))}
+      {S.ages.length===0?<div style={{fontSize:13,color:'#64748b'}}>ไม่พบผลกำลังอัดช่วงวันผลิตในระบบ</div>:<>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr><th style={th}>อายุ</th>{S.dates.map(d=><th key={d} style={{...th,background:d===rec.prod_date?'#fde68a':th.background}}>{dm(d)}{d===rec.prod_date?' ★':''}</th>)}<th style={th}>เกณฑ์</th></tr></thead>
+          <tbody>{S.ages.map(a=>{const tg=targetFor(rec.strength_formula,a);return <tr key={a}>
+            <td style={{...td,fontWeight:700}}>{a} วัน</td>
+            {S.dates.map(d=>{const c=S.cell(d,a);const low=c&&tg&&c.avg<tg;return <td key={d} style={{...td,background:d===rec.prod_date?'#fffbeb':undefined,color:low?'#b91c1c':undefined,fontWeight:d===rec.prod_date?800:400}}>{c?fmtN(c.avg):'–'}</td>;})}
+            <td style={td}>{tg||'–'}</td></tr>;})}</tbody>
+        </table>
+        <div style={{fontSize:12,color:'#64748b',marginTop:4}}>★ = วันที่ผลิต · ตัวแดง = ต่ำกว่าเกณฑ์ · แต่ละช่องคือค่าเฉลี่ยของชุดทดสอบวันนั้น</div>
+        <div style={{marginTop:6,fontSize:13,lineHeight:1.7}}>{sum.map(s=><div key={s.age}>• {s.age} วัน: วันผลิต <b>{fmtN(s.prod)}</b>{s.nb!=null?' · เฉลี่ยวันข้างเคียง '+fmtN(s.nb)+(s.delta!=null?' ('+(s.delta>=0?'+':'')+fmtN(s.delta)+')':''):''}{s.target?' · เกณฑ์ '+s.target:''} {s.ok===true?'✔':s.ok===false?'✘ ต่ำกว่าเกณฑ์':''}</div>)}</div>
+      </>}
+    </div>
+    <div data-block="4" style={blk}>{H('3. ชั้นดิน — นับ Blow '+(rec.blow_feet||30)+' ฟุต')}
+      <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
+        {kv('หน่วยงานที่นับ',rec.blow_site)}
+        {kv('จำนวน Blow',rec.blow_count!=null&&rec.blow_count!==''?rec.blow_count+' ครั้ง / '+(rec.blow_feet||30)+' ฟุต':'')}
+        {kv('ระดับชั้นดิน',L?<span style={{background:L.bg,color:L.col,fontWeight:800,padding:'1px 10px',borderRadius:999}}>{L.e} {L.t}</span>:'')}
+      </tbody></table>
+      <div style={{fontSize:12,color:'#64748b',marginTop:3}}>เกณฑ์: ≤300 ดินอ่อน · 301–599 เฝ้าระวัง 1–3 · ≥600 ดินแข็ง</div>
+    </div>
+    <div data-block="5" style={blk}>{H('4. การตอก — ตุ้มและระยะยก')}
+      <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
+        {kv('น้ำหนักตุ้ม',rec.hammer_weight_t!=null&&rec.hammer_weight_t!==''?fmtN(rec.hammer_weight_t,2)+' ตัน':'')}
+        {kv('ระยะยกตุ้ม',rec.hammer_drop_m!=null&&rec.hammer_drop_m!==''?fmtN(rec.hammer_drop_m,2)+' ม.':'')}
+        {kv('น้ำหนักเสาเข็ม (คำนวณ)',rec.pile_weight_t!=null?fmtN(rec.pile_weight_t,2)+' ตัน'+(rec.pile_kg_per_m?'  ('+fmtN(rec.pile_kg_per_m)+' กก./ม. × '+fmtN(rec.pile_length_m,2)+' ม.)':''):'')}
+        {kv('ตุ้ม ÷ เสา',rec.hammer_ratio!=null&&isFinite(rec.hammer_ratio)?<span style={{fontWeight:800,color:rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'#15803d':'#b91c1c'}}>{fmtN(rec.hammer_ratio,2)} เท่า {rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'✔ อยู่ในเกณฑ์':'✘ นอกเกณฑ์'} (เกณฑ์ {HAMMER_MIN}–{HAMMER_MAX} เท่า)</span>:'')}
+        {kv('พลังงานตุ้มต่อครั้ง',rec.hammer_weight_t>0&&rec.hammer_drop_m>0?fmtN(rec.hammer_weight_t*rec.hammer_drop_m,2)+' ตัน·ม.':'')}
+        {kv('ดิ่งเสา',rec.vertical_result==='ok'?'✔ ผ่าน':rec.vertical_result==='bad'?'✘ ไม่ผ่าน':rec.vertical_result==='na'?'ไม่ได้วัด':'')}
+        {kv('ค่าที่วัดได้ (ดิ่ง)',rec.vertical_note)}
+      </tbody></table>
+    </div>
+    <div data-block="6" style={blk}>{H('5. ข้อสังเกตจากข้อมูล')}
+      <div style={{fontSize:13.5,lineHeight:1.8}}>{obs.length?obs.map((o,i)=><div key={i} style={{color:col[o.t]}}>{ic[o.t]} {o.x}</div>):'–'}</div>
+      {rec.cause_note&&<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>สาเหตุที่น่าจะเป็น (ผู้ตรวจ):</b> {rec.cause_note}</div>}
+      {rec.action_note&&<div style={{marginTop:6,fontSize:13.5,lineHeight:1.7}}><b>มาตรการ/สิ่งที่ต้องแก้ไข:</b> {rec.action_note}</div>}
+    </div>
+    {pairs.length>0&&<div data-block="7" style={{...blk,marginBottom:6}}>{H('6. รูปถ่ายตอนเสาเข็มแตก ('+photos.length+' รูป)')}</div>}
+    {pairs.map((pr,i)=><div key={i} data-block={'p'+i} style={{display:'flex',gap:10,marginBottom:10}}>
+      {pr.map((u,j)=><img key={j} src={u} alt="" style={{width:'calc(50% - 5px)',maxHeight:330,objectFit:'contain',border:'1px solid #e2e8f0',borderRadius:6,background:'#f8fafc'}}/>)}
+    </div>)}
+    <div data-block="9" style={{display:'flex',gap:20,marginTop:26}}>
+      {['ผู้ตรวจ (QC)','ผู้จัดการ/หัวหน้า QC'].map(t=><div key={t} style={{flex:1,textAlign:'center',fontSize:13,color:'#475569'}}><div style={{borderBottom:'1px solid #94a3b8',height:38,marginBottom:4}}/>{t}<br/>วันที่ ........ / ........ / ........</div>)}
+    </div>
+  </div>;
+}
+
+// แปลงใบรายงานเป็น PDF (A4) โดยวางทีละบล็อก ไม่ตัดกลางบล็อก
+async function makeFailPdf(rec,onStep){
+  onStep&&onStep('กำลังโหลดเครื่องมือสร้าง PDF…');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  onStep&&onStep('กำลังเตรียมรูป…');
+  const logo=await loadAsDataUrl('logo.png');
+  const photos=(await Promise.all((rec.photos||[]).map(loadAsDataUrl))).filter(Boolean);
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-10000px;top:0;background:#fff';
+  document.body.appendChild(host);
+  const root=ReactDOM.createRoot(host);
+  root.render(<FailReport rec={rec} logo={logo} photos={photos}/>);
+  try{
+    await new Promise(r=>setTimeout(r,400));
+    try{ await document.fonts.ready; }catch(e){}
+    await Promise.all([...host.querySelectorAll('img')].map(im=>im.complete?1:new Promise(r=>{im.onload=r;im.onerror=r;})));
+    onStep&&onStep('กำลังสร้าง PDF…');
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    const PW=210,PH=297,M=8,W=PW-2*M,maxY=PH-M;
+    let y=M;
+    const wrap=host.firstChild;
+    const padX=34,padTop=28;
+    const blocks=[...wrap.querySelectorAll('[data-block]')];
+    for(const b of blocks){
+      const cv=await window.html2canvas(b,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+      const w=W-2*((padX/794)*W), h=cv.height/cv.width*w;
+      if(y+h>maxY&&y>M+1){pdf.addPage();y=M;}
+      pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',M+(padX/794)*W,y,w,h);
+      y+=h+2.5;
+    }
+    return pdf.output('blob');
+  } finally { root.unmount(); host.remove(); }
+}
+
+// ---------- หน้าหลักของเมนูตรวจเสาเฟล ----------
+function FailInspectView({me,onBack}){
+  const [view,setView]=useState('list');          // list | form | view
+  const [list,setList]=useState(null);
+  const [noTable,setNoTable]=useState(false);
+  const [rec,setRec]=useState(null);              // ใบที่เปิดดู/แก้
+  const loadList=()=>DB.from('pile_fail_inspections').select('*').order('created_at',{ascending:false}).limit(60)
+    .then(({data,error})=>{if(error){setNoTable(true);setList([]);return;}setNoTable(false);setList(data||[]);}).catch(()=>{setNoTable(true);setList([]);});
+  useEffect(()=>{loadList();},[]);
+  if(view==='form') return <FailForm me={me} init={rec} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={r=>{setRec(r);loadList();setView('view');}}/>;
+  if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>setView('form')}/>;
+  const badge=(ok,txt)=>ok==null?null:<span className="pill" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b',marginRight:5,fontSize:12}}>{txt}</span>;
+  return <>
+    <div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
+      <div><div className="who">ตรวจเสาเฟลหน้างาน</div><div className="sub">{me.name} · ตรวจสาเหตุเสาแตกที่หน้างาน แล้วส่งออก PDF</div></div></div>
+    <div className="wrap">
+      {noTable&&<div className="card" style={{color:'#92400e',background:'#fffbeb',borderColor:'#fde68a',lineHeight:1.9}}>⚠️ ยังไม่ได้สร้างตารางในฐานข้อมูล — ให้แอดมินรัน SQL <b>supabase-pile-fail-inspect.sql</b> หนึ่งครั้ง แล้วรีเฟรชหน้านี้</div>}
+      <div style={{marginTop:14}}><button className="bigbtn" disabled={noTable} onClick={()=>{setRec(null);setView('form');}}>＋ ตรวจเสาเฟลใหม่</button></div>
+      <div className="sec">ใบตรวจล่าสุด</div>
+      {list===null&&<div className="hint">กำลังโหลด…</div>}
+      {list&&!list.length&&!noTable&&<div className="hint">ยังไม่มีใบตรวจ</div>}
+      {(list||[]).map(r=>{
+        const sum=strengthSummary(r.strength_rows||[],r.prod_date,r.strength_formula);const key=sum.find(s=>s.age===7&&s.ok!=null)||sum.find(s=>s.ok!=null);
+        return <button key={r.id} className="card" style={{width:'100%',textAlign:'left',cursor:'pointer'}} onClick={()=>{setRec(r);setView('view');}}>
+          <div style={{fontWeight:800,color:'var(--brand)'}}>{[r.customer,r.site].filter(Boolean).join(' · ')||'(ไม่ระบุหน้างาน)'}</div>
+          <div className="hint">{r.pile_size||'–'}×{r.pile_length_m||'–'} ม. · ผลิต {thaiDate(r.prod_date)} · ตอก {thaiDate(r.drive_date)} · อายุ {r.age_days!=null?r.age_days+' วัน':'–'}</div>
+          <div style={{marginTop:6}}>
+            {key&&badge(key.ok,'กำลังอัด '+key.age+'ว. '+fmtN(key.prod))}
+            {r.blow_count!=null&&<span className="pill" style={{background:SOIL_LV[soilIdx(r.blow_count)].bg,color:SOIL_LV[soilIdx(r.blow_count)].col,marginRight:5,fontSize:12}}>Blow {r.blow_count}</span>}
+            {r.hammer_ratio!=null&&badge(r.hammer_ratio>=HAMMER_MIN&&r.hammer_ratio<=HAMMER_MAX,'ตุ้ม '+fmtN(r.hammer_ratio,2)+'×')}
+            {r.vertical_result&&r.vertical_result!=='na'&&badge(r.vertical_result==='ok','ดิ่ง'+(r.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'))}
+          </div>
+          <div className="hint" style={{marginTop:4}}>ตรวจ {thaiDate(r.inspect_date)} โดย {r.inspector||'–'}</div>
+        </button>;})}
+    </div>
+  </>;
+}
+
+function FailDetail({rec,onBack,onEdit}){
+  const [busy,setBusy]=useState('');
+  const [pdf,setPdf]=useState(null);   // {url,file}
+  const [err,setErr]=useState('');
+  const gen=async()=>{
+    setBusy('เริ่ม…');setErr('');
+    try{
+      const blob=await makeFailPdf(rec,setBusy);
+      const name='ตรวจเสาเฟล-'+(rec.pile_size||'')+'-'+String(rec.drive_date||rec.inspect_date||'').slice(0,10)+(rec.id?'-'+rec.id:'')+'.pdf';
+      setPdf({url:URL.createObjectURL(blob),file:new File([blob],name,{type:'application/pdf'}),name});
+    }catch(e){setErr('สร้าง PDF ไม่สำเร็จ: '+(e.message||e));}
+    setBusy('');
+  };
+  const canShare=pdf&&navigator.canShare&&navigator.canShare({files:[pdf.file]});
+  return <>
+    <div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
+      <div><div className="who">ใบตรวจเสาเฟล #{rec.id}</div><div className="sub">{[rec.customer,rec.site].filter(Boolean).join(' · ')}</div></div></div>
+    <div className="wrap">
+      <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
+        <button className="bigbtn" style={{flex:'1 1 200px'}} disabled={!!busy} onClick={gen}>{busy?busy:'📄 สร้าง PDF รายงาน'}</button>
+        <button className="ghost" style={{flex:'0 0 auto',width:'auto',padding:'13px 20px'}} onClick={onEdit}>✎ แก้ไข</button>
+      </div>
+      {err&&<div className="card" style={{color:'#c0392b'}}>{err}</div>}
+      {pdf&&<div className="card" style={{background:'#ecfdf5',borderColor:'#a7e3d4'}}>
+        <div style={{fontWeight:800,color:'var(--brand)',marginBottom:8}}>✅ สร้าง PDF เสร็จแล้ว</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <a href={pdf.url} download={pdf.name} className="ghost" style={{textDecoration:'none',textAlign:'center',flex:'1 1 140px'}}>⬇ ดาวน์โหลด</a>
+          <a href={pdf.url} target="_blank" rel="noopener" className="ghost" style={{textDecoration:'none',textAlign:'center',flex:'1 1 140px'}}>👁 เปิดดู</a>
+          {canShare&&<button className="ghost" style={{flex:'1 1 140px'}} onClick={()=>navigator.share({files:[pdf.file],title:pdf.name}).catch(()=>{})}>📤 แชร์ (LINE/Telegram)</button>}
+        </div>
+      </div>}
+      <div className="card" style={{padding:0,overflowX:'auto'}}>
+        <div style={{zoom:0.4}}><FailReport rec={rec} logo="logo.png" photos={rec.photos||[]}/></div>
+      </div>
+    </div>
+  </>;
+}
+
+function FailForm({me,init,onCancel,onSaved}){
+  const today=todayISO();
+  const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_length_m:'',prod_date:'',face_date:'',drive_date:today,foreman_report_id:null,
+    strength_formula:'',strength_rows:[],blow_id:null,blow_site:'',blow_count:'',blow_feet:30,
+    hammer_weight_t:'',hammer_drop_m:'',pile_weight_t:null,pile_kg_per_m:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:''};
+  const [f,setF]=useState(()=>init?{...blank,...Object.fromEntries(Object.entries(init).map(([k,v])=>[k,v==null?(blank[k]!==undefined?blank[k]:''):v]))}:blank);
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const [files,setFiles]=useState([]);                    // รูปใหม่ {file,preview}
+  const [oldPhotos,setOldPhotos]=useState(init?.photos||[]);
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState('');
+  const [reports,setReports]=useState([]);               // รายงานโฟร์แมน
+  const [blows,setBlows]=useState([]);                    // Blow count
+  const [weights,setWeights]=useState({});               // ขนาด → {kg_per_m,confirmed}
+  const [cr,setCr]=useState(null);                        // ผลกำลังอัดดิบช่วง ±3 วัน
+  const [wEdit,setWEdit]=useState(false);
+  const [wVal,setWVal]=useState('');
+
+  useEffect(()=>{
+    const since=isoAdd(today,-120);
+    DB.from('foreman_reports').select('id,drive_date,size,length_m,customer,site,cast_dates,foreman').gte('drive_date',since).order('drive_date',{ascending:false}).limit(120)
+      .then(({data})=>setReports(data||[])).catch(()=>{});
+    DB.from('blow_counts').select('id,site,pile,blows,feet,count_date').order('count_date',{ascending:false}).limit(80)
+      .then(({data})=>setBlows(data||[])).catch(()=>{});
+    DB.from('qc_pile_weights').select('*').then(({data,error})=>{if(error)return;const m={};(data||[]).forEach(r=>m[r.size]={kg:Number(r.kg_per_m),confirmed:r.confirmed});setWeights(m);}).catch(()=>{});
+  },[]);
+
+  // ผลกำลังอัดวันผลิต ±3 วัน
+  useEffect(()=>{
+    if(!f.prod_date){setCr(null);return;}
+    const a=isoAdd(f.prod_date,-3),b=isoAdd(f.prod_date,3);
+    let off=false;
+    DB.from('concrete_results').select('sample_date,formula_name,age_days,avg_ksc').gte('sample_date',a).lte('sample_date',b).limit(3000)
+      .then(({data,error})=>{if(off)return;setCr(error?[]:(data||[]).map(r=>({d:String(r.sample_date).slice(0,10),f:normF(r.formula_name),a:Number(r.age_days),k:Number(r.avg_ksc)})).filter(r=>r.k>0&&!/\(/.test(r.f)));})
+      .catch(()=>{if(!off)setCr([]);});
+    return ()=>{off=true;};
+  },[f.prod_date]);
+
+  const formulas=cr?Object.entries(cr.reduce((m,r)=>{m[r.f]=(m[r.f]||0)+1;return m;},{})).sort((a,b)=>b[1]-a[1]).map(x=>x[0]):[];
+  const rowsFor=cr?cr.filter(r=>f.strength_formula?r.f===f.strength_formula:!/^NP280$/i.test(r.f)).map(r=>({d:r.d,a:r.a,k:r.k})):[];
+  // เก็บผลที่ใช้ตอนตรวจไว้ในใบ (ย้อนดูภายหลังได้ แม้ผลจะถูกแก้)
+  useEffect(()=>{ if(cr) setF(o=>({...o,strength_rows:rowsFor})); },[cr,f.strength_formula]);   // eslint-disable-line
+
+  const age=f.prod_date&&f.drive_date?isoDiff(f.drive_date,f.prod_date):null;
+  const kgm=weights[f.pile_size]?weights[f.pile_size].kg:null;
+  const len=Number(f.pile_length_m)||0;
+  const pileW=kgm&&len?kgm*len/1000:null;
+  const hw=Number(f.hammer_weight_t)||0;
+  const ratio=pileW&&hw?hw/pileW:null;
+  const L=f.blow_count!==''&&f.blow_count!=null?SOIL_LV[soilIdx(Number(f.blow_count))]:null;
+  const S=buildStrength(rowsFor,f.prod_date);
+  const sum=strengthSummary(rowsFor,f.prod_date,f.strength_formula);
+
+  const pickReport=id=>{
+    const r=reports.find(x=>String(x.id)===String(id));
+    if(!r){set('foreman_report_id',null);return;}
+    setF(o=>({...o,foreman_report_id:r.id,customer:r.customer||o.customer,site:r.site||o.site,pile_size:PILE_SIZES.includes(String(r.size||'').toUpperCase())?String(r.size).toUpperCase():(r.size||o.pile_size),
+      pile_length_m:r.length_m!=null?String(r.length_m):o.pile_length_m,drive_date:String(r.drive_date||'').slice(0,10)||o.drive_date,face_date:r.cast_dates||o.face_date}));
+  };
+  const pickBlow=id=>{
+    const b=blows.find(x=>String(x.id)===String(id));
+    if(!b){setF(o=>({...o,blow_id:null}));return;}
+    setF(o=>({...o,blow_id:b.id,blow_site:b.site||'',blow_count:b.blows!=null?String(b.blows):'',blow_feet:b.feet||30}));
+  };
+  const saveWeight=async()=>{
+    const v=Number(wVal);if(!(v>0)||!f.pile_size){return;}
+    const {error}=await DB.from('qc_pile_weights').upsert({size:f.pile_size,kg_per_m:v,confirmed:true,updated_at:new Date().toISOString()},{onConflict:'size'});
+    if(error){alert('บันทึกไม่สำเร็จ: '+error.message);return;}
+    setWeights(w=>({...w,[f.pile_size]:{kg:v,confirmed:true}}));setWEdit(false);
+  };
+  const addFiles=e=>{
+    const arr=[...e.target.files].map(file=>({file,preview:URL.createObjectURL(file)}));
+    setFiles(o=>[...o,...arr]);e.target.value='';
+  };
+
+  const save=async()=>{
+    if(!f.prod_date){setErr('กรุณาใส่วันที่ผลิต (ใช้นับอายุเสา)');return;}
+    if(!f.pile_size||!f.pile_length_m){setErr('กรุณาใส่ขนาดและความยาวเสา');return;}
+    setSaving(true);setErr('');
+    try{
+      const num=v=>v===''||v==null?null:Number(v);
+      const row={inspector:me.name,inspect_date:f.inspect_date||today,foreman_report_id:f.foreman_report_id||null,customer:f.customer||null,site:f.site||null,
+        pile_size:f.pile_size,pile_length_m:num(f.pile_length_m),prod_date:f.prod_date,face_date:f.face_date||null,drive_date:f.drive_date||null,age_days:age,
+        strength_formula:f.strength_formula||'',strength_rows:rowsFor,
+        blow_id:f.blow_id||null,blow_site:f.blow_site||null,blow_count:num(f.blow_count),blow_feet:num(f.blow_feet)||30,
+        vertical_result:f.vertical_result||null,vertical_note:f.vertical_note||null,
+        hammer_weight_t:num(f.hammer_weight_t),hammer_drop_m:num(f.hammer_drop_m),pile_weight_t:pileW,pile_kg_per_m:kgm,hammer_ratio:ratio,
+        cause_note:f.cause_note||null,action_note:f.action_note||null,updated_at:new Date().toISOString()};
+      let id=init&&init.id;
+      if(id){const {error}=await DB.from('pile_fail_inspections').update(row).eq('id',id);if(error)throw error;}
+      else{const {data,error}=await DB.from('pile_fail_inspections').insert([row]).select().single();if(error)throw error;id=data.id;}
+      const urls=[...oldPhotos];
+      for(const p of files){
+        const blob=await compressImage(p.file,1280);if(!blob)continue;
+        const path='pilefail/'+id+'/'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.jpg';
+        const {error:upErr}=await DB.storage.from('quality-images').upload(path,blob,{contentType:'image/jpeg',cacheControl:'31536000'});
+        if(upErr) continue;
+        urls.push(DB.storage.from('quality-images').getPublicUrl(path).data.publicUrl);
+      }
+      const {data:fin,error:e2}=await DB.from('pile_fail_inspections').update({photos:urls}).eq('id',id).select().single();
+      if(e2)throw e2;
+      onSaved(fin);
+    }catch(e){setErr('บันทึกไม่สำเร็จ: '+(e.message||e));}
+    setSaving(false);
+  };
+
+  const inp=(k,label,props)=><div className="field"><label>{label}</label><input value={f[k]==null?'':f[k]} onChange={e=>set(k,e.target.value)} {...(props||{})}/></div>;
+  const secH=t=><div className="sec" style={{fontSize:15}}>{t}</div>;
+  const chip=(ok,txt)=><span className="verdict" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b'}}>{txt}</span>;
+  return <>
+    <div className="topbar"><button onClick={onCancel} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
+      <div><div className="who">{init&&init.id?'แก้ใบตรวจ #'+init.id:'ตรวจเสาเฟลหน้างาน'}</div><div className="sub">{me.name}</div></div></div>
+    <div className="wrap">
+
+      {secH('① ข้อมูลเสาและหน้างาน')}
+      <div className="card" style={{marginTop:0}}>
+        <div className="field"><label>เลือกจากรายงานโฟร์แมน (ไม่บังคับ — ใส่ข้อมูลให้เอง)</label>
+          <select value={f.foreman_report_id||''} onChange={e=>pickReport(e.target.value)}>
+            <option value="">— ไม่เลือก / กรอกเอง —</option>
+            {reports.map(r=><option key={r.id} value={r.id}>{thaiDate(String(r.drive_date).slice(0,10))} · {r.size}×{r.length_m||'?'} · {(r.customer||r.site||'').slice(0,34)}</option>)}
+          </select></div>
+        {inp('customer','ลูกค้า')}
+        {inp('site','หน้างาน')}
+        <div style={{display:'flex',gap:8}}>
+          <div className="field" style={{flex:1}}><label>ขนาดเสา</label>
+            <select value={f.pile_size} onChange={e=>set('pile_size',e.target.value)}><option value="">— เลือก —</option>
+              {[...new Set([...PILE_SIZES,f.pile_size].filter(Boolean))].map(s=><option key={s}>{s}</option>)}</select></div>
+          <div className="field" style={{flex:1}}><label>ยาว (ม.)</label>
+            <input type="number" inputMode="decimal" step="0.5" value={f.pile_length_m} onChange={e=>set('pile_length_m',e.target.value)}/></div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <div className="field" style={{flex:1}}><label>วันที่ผลิต ★ (ใช้นับอายุเสา)</label><input type="date" value={f.prod_date} onChange={e=>set('prod_date',e.target.value)}/></div>
+          <div className="field" style={{flex:1}}><label>วันที่ตอก</label><input type="date" value={f.drive_date} onChange={e=>set('drive_date',e.target.value)}/></div>
+        </div>
+        {inp('face_date','วันที่หน้าเสา (อ้างอิงเท่านั้น — อาจย้อนวัน ไม่ตรงวันผลิต)',{placeholder:'เช่น 7/10/69'})}
+        <div style={{padding:'10px 12px',borderRadius:10,background:'#f0fdfa',border:'1px solid #99f6e4',fontWeight:800,color:'var(--brand)'}}>
+          อายุเสาตอนตอก: {age!=null?(age+' วัน'):'— (ใส่วันที่ผลิต)'} <span className="hint" style={{fontWeight:400}}>นับจากวันที่ผลิต</span></div>
+      </div>
+
+      {secH('② กำลังอัดคอนกรีต วันผลิต ± 3 วัน')}
+      <div className="card" style={{marginTop:0}}>
+        {!f.prod_date&&<div className="hint">ใส่วันที่ผลิตก่อน ระบบจะดึงผลกำลังอัดวันนั้นกับก่อน/หลัง 3 วันมาเทียบให้</div>}
+        {f.prod_date&&cr===null&&<div className="hint">กำลังดึงผล…</div>}
+        {f.prod_date&&cr&&!cr.length&&<div className="hint" style={{color:'#b45309'}}>ไม่พบผลกำลังอัดช่วง {thaiDate(isoAdd(f.prod_date,-3))} – {thaiDate(isoAdd(f.prod_date,3))} ในระบบ</div>}
+        {cr&&cr.length>0&&<>
+          <div className="field"><label>สูตรคอนกรีต</label>
+            <select value={f.strength_formula} onChange={e=>set('strength_formula',e.target.value)}>
+              <option value="">ทุกสูตร (ไม่รวม NP280)</option>{formulas.map(x=><option key={x}>{x}</option>)}</select></div>
+          <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:430,fontSize:13.5}}>
+            <thead><tr><th style={{padding:'5px 6px',textAlign:'left'}}>อายุ</th>{S.dates.map(d=><th key={d} style={{padding:'5px 3px',background:d===f.prod_date?'#fde68a':'transparent',borderRadius:6,fontSize:12}}>{dm(d)}{d===f.prod_date?'★':''}</th>)}<th style={{padding:'5px 6px',fontSize:12}}>เกณฑ์</th></tr></thead>
+            <tbody>{S.ages.map(a=>{const tg=targetFor(f.strength_formula,a);return <tr key={a} style={{borderTop:'1px solid var(--line)'}}>
+              <td style={{padding:'6px',fontWeight:700}}>{a}ว.</td>
+              {S.dates.map(d=>{const c=S.cell(d,a);const low=c&&tg&&c.avg<tg;return <td key={d} style={{textAlign:'center',padding:'6px 3px',background:d===f.prod_date?'#fffbeb':'transparent',color:low?'#c0392b':'inherit',fontWeight:d===f.prod_date?800:500}}>{c?fmtN(c.avg):'–'}</td>;})}
+              <td style={{textAlign:'center',color:'var(--muted)'}}>{tg||'–'}</td></tr>;})}</tbody></table></div>
+          <div style={{marginTop:8,lineHeight:1.9}}>{sum.map(s=><div key={s.age} style={{fontSize:14}}>
+            <b>{s.age} วัน:</b> วันผลิต {fmtN(s.prod)} {s.nb!=null&&<span className="hint">· เฉลี่ยวันข้างเคียง {fmtN(s.nb)} ({s.delta>=0?'+':''}{fmtN(s.delta)})</span>} {s.ok!=null&&chip(s.ok,s.ok?'ผ่านเกณฑ์ '+s.target:'ต่ำกว่า '+s.target)}</div>)}</div>
+        </>}
+      </div>
+
+      {secH('③ ชั้นดิน — นับ Blow 30 ฟุตสุดท้าย')}
+      <div className="card" style={{marginTop:0}}>
+        <div className="field"><label>เลือกรายการ Blow ที่โฟร์แมนส่งเข้ากลุ่ม (ถ้ามี)</label>
+          <select value={f.blow_id||''} onChange={e=>pickBlow(e.target.value)}>
+            <option value="">— กรอกเอง —</option>
+            {blows.map(b=><option key={b.id} value={b.id}>{thaiDate(String(b.count_date).slice(0,10))} · {(b.site||'').slice(0,26)} · {b.blows} ครั้ง</option>)}
+          </select></div>
+        {inp('blow_site','หน่วยงานที่นับ (ถ้าต่างจากหน้างาน)')}
+        <div className="field"><label>จำนวน Blow (ครั้ง / {f.blow_feet||30} ฟุต)</label>
+          <input type="number" inputMode="numeric" value={f.blow_count} onChange={e=>set('blow_count',e.target.value)} placeholder="เช่น 358"/></div>
+        {L?<div><span className="verdict" style={{background:L.bg,color:L.col}}>{L.e} {L.t}</span> <span className="hint">≤300 ดินอ่อน · 301–599 เฝ้าระวัง 1–3 · ≥600 ดินแข็ง</span></div>:<div className="hint">ใส่ค่า Blow แล้วระบบบอกระดับดินให้</div>}
+      </div>
+
+      {secH('④ ตุ้มและการตอก')}
+      <div className="card" style={{marginTop:0}}>
+        <div style={{display:'flex',gap:8}}>
+          <div className="field" style={{flex:1}}><label>น้ำหนักตุ้ม (ตัน)</label><input type="number" inputMode="decimal" step="0.1" value={f.hammer_weight_t} onChange={e=>set('hammer_weight_t',e.target.value)}/></div>
+          <div className="field" style={{flex:1}}><label>ระยะยกตุ้ม (ม.)</label><input type="number" inputMode="decimal" step="0.1" value={f.hammer_drop_m} onChange={e=>set('hammer_drop_m',e.target.value)}/></div>
+        </div>
+        <div style={{padding:'10px 12px',borderRadius:10,background:'#f8fafc',border:'1px solid var(--line)',lineHeight:1.8,fontSize:14}}>
+          {!f.pile_size||!len?<span className="hint">เลือกขนาดและความยาวเสาก่อน ระบบจะคำนวณน้ำหนักเสาให้</span>:
+            kgm==null?<span style={{color:'#b45309'}}>ยังไม่มีน้ำหนักต่อเมตรของ {f.pile_size} — กด "แก้ค่า" เพื่อใส่ (กก./เมตร)</span>:
+            <>น้ำหนักเสา = {fmtN(kgm)} กก./ม. × {fmtN(len,2)} ม. = <b>{fmtN(pileW,2)} ตัน</b>
+              {weights[f.pile_size]&&!weights[f.pile_size].confirmed&&<span style={{color:'#b45309'}}> (ค่าประมาณจากตาราง ยังไม่ยืนยัน)</span>}</>}
+          {f.pile_size&&<> <button onClick={()=>{setWEdit(v=>!v);setWVal(kgm?String(kgm):'');}} style={{border:'none',background:'none',color:'#0369a1',textDecoration:'underline',fontSize:13,cursor:'pointer'}}>แก้ค่า</button></>}
+          {wEdit&&<div className="numrow" style={{marginTop:6}}><input type="number" value={wVal} onChange={e=>setWVal(e.target.value)} placeholder="กก./เมตร"/><span className="unit">กก./ม.</span>
+            <button className="ghost" style={{width:'auto',padding:'9px 14px'}} onClick={saveWeight}>บันทึก</button></div>}
+        </div>
+        {ratio!=null&&<div style={{marginTop:10,lineHeight:1.9}}>ตุ้ม ÷ เสา = <b>{fmtN(ratio,2)} เท่า</b> {chip(ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX,ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX?'อยู่ในเกณฑ์ '+HAMMER_MIN+'–'+HAMMER_MAX:ratio<HAMMER_MIN?'เบาเกินไป (<'+HAMMER_MIN+')':'หนักเกินไป (>'+HAMMER_MAX+')')}
+          {Number(f.hammer_drop_m)>0&&<div className="hint">พลังงานต่อครั้ง ≈ {fmtN(hw*Number(f.hammer_drop_m),2)} ตัน·ม.</div>}</div>}
+        <div className="field" style={{marginTop:12}}><label>เช็คดิ่งเสา</label>
+          <div className="seg">
+            <button className={f.vertical_result==='ok'?'on-pass':''} onClick={()=>set('vertical_result','ok')}>ผ่าน</button>
+            <button className={f.vertical_result==='bad'?'on-fail':''} onClick={()=>set('vertical_result','bad')}>ไม่ผ่าน</button>
+            <button className={f.vertical_result==='na'?'on-na':''} onClick={()=>set('vertical_result','na')}>ไม่ได้วัด</button></div></div>
+        {inp('vertical_note','ค่าที่วัดได้ (ถ้ามี)',{placeholder:'เช่น เอียง 2 ซม. ที่ความสูง 1 ม.'})}
+      </div>
+
+      {secH('⑤ รูปถ่ายตอนเสาเข็มแตก')}
+      <div className="card" style={{marginTop:0}}>
+        <label className="ghost" style={{display:'block',textAlign:'center',cursor:'pointer'}}>📷 ถ่าย/เลือกรูป
+          <input type="file" accept="image/*" multiple capture="environment" style={{display:'none'}} onChange={addFiles}/></label>
+        <div className="thumbs">
+          {oldPhotos.map((u,i)=><div className="thumb" key={'o'+i}><img src={u} alt=""/><button onClick={()=>setOldPhotos(o=>o.filter((_,j)=>j!==i))}>×</button></div>)}
+          {files.map((p,i)=><div className="thumb" key={'n'+i}><img src={p.preview} alt=""/><button onClick={()=>setFiles(o=>o.filter((_,j)=>j!==i))}>×</button></div>)}
+        </div>
+        <div className="hint" style={{marginTop:6}}>แนะนำถ่าย: รอยแตกใกล้ ๆ · ทั้งต้นเสา · หัวเสา/ปลายเสา · หน้างานรวม</div>
+      </div>
+
+      {secH('⑥ สรุป')}
+      <div className="card" style={{marginTop:0}}>
+        <div className="hint" style={{marginBottom:6}}>ข้อสังเกตอัตโนมัติจากข้อมูลที่กรอก (ใช้เป็นแนวทาง ไม่ใช่ข้อสรุป):</div>
+        {observations({...f,strength_rows:rowsFor,hammer_ratio:ratio}).map((o,i)=><div key={i} style={{fontSize:14,lineHeight:1.8,color:{ok:'#15803d',bad:'#c0392b',warn:'#b45309',info:'#475569'}[o.t]}}>{{ok:'✔',bad:'✘',warn:'⚠',info:'ℹ'}[o.t]} {o.x}</div>)}
+        <div className="field" style={{marginTop:10}}><label>สาเหตุที่น่าจะเป็น (ความเห็นผู้ตรวจ)</label>
+          <textarea className="note" rows={3} value={f.cause_note} onChange={e=>set('cause_note',e.target.value)} style={{marginTop:0}}/></div>
+        <div className="field"><label>มาตรการ / สิ่งที่ต้องแก้ไข</label>
+          <textarea className="note" rows={3} value={f.action_note} onChange={e=>set('action_note',e.target.value)} style={{marginTop:0}}/></div>
+      </div>
+      {err&&<div className="card" style={{color:'#c0392b',borderColor:'#f3b8b0',background:'#fdecea'}}>{err}</div>}
+    </div>
+    <div className="bottom"><div className="inner">
+      <button className="ghost" style={{flex:'0 0 30%'}} onClick={onCancel}>ยกเลิก</button>
+      <button className="bigbtn" disabled={saving} onClick={save}>{saving?'กำลังบันทึก…':'💾 บันทึกใบตรวจ'}</button>
+    </div></div>
+  </>;
 }
 
 function App(){
@@ -213,6 +717,7 @@ function App(){
   const me=inspectors.find(x=>x.code===code);
   if(!me) return <PickUser inspectors={inspectors}/>;
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
+  if(formType==='fail') return <FailInspectView me={me} onBack={()=>setFormType(null)}/>;
   if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
                                   onInspect={(n,day,spec,isChecked)=>{setPreset({raft:String(n),day,spec,isChecked});setFormType('pre');}}/>;
   if((formType==='pre'||formType==='post')&&!preset) return <PreListView me={me} rafts={rafts} formType={formType} initialDay={preListDay||undefined}
