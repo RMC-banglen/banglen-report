@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12o';
+var APP_VERSION='2026-11-13a';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13579,7 +13579,6 @@ window.__dataReady.then(data => {
               {r.drive_log&&Object.keys(r.drive_log).length>0&&row('บันทึกการตอกจริง',(()=>{const l=r.drive_log,bl=(l.blows||[]).map(Number),mx=Math.max(1,...bl);return <span>
                 {l.total!=null&&<div>Blow {bl.length} ฟุต รวม <b>{l.total}</b> ครั้ง{l.last10_avg!=null&&<> · 10 ฟุตสุดท้ายเฉลี่ย <b style={{color:Number(l.last10_avg)>=20?'#991b1b':undefined}}>{Number(l.last10_avg).toFixed(1)}</b> ครั้ง/ฟุต{Number(l.last10_avg)>=20?' (ระดับดินแข็ง)':''}</>}</div>}
                 {l.set!=null&&<div>set จริง <b>{Number(l.set).toFixed(3)}</b> ซม./ครั้ง ≈ {Number(l.per10).toFixed(1)} ครั้ง/10 ซม.{l.qa_act!=null&&<> → Qa จริง ≈ <b style={{color:r.qa_ton!=null&&Number(l.qa_act)<Number(r.qa_ton)?'#b91c1c':'#15803d'}}>{Number(l.qa_act).toFixed(1)}</b> ตัน (แบบ {r.qa_ton!=null?Number(r.qa_ton):'–'})</>}</div>}
-                {(l.top!=null||l.tip!=null)&&<div>ระดับหัว/ปลายเสาจริง {l.top!=null?l.top:'–'} / {l.tip!=null?l.tip:'–'} ม.{l.spec_tip!=null&&<> (แบบ {l.spec_tip}{l.shortfall>0.05?<b style={{color:'#b45309'}}> · ตื้นกว่า {l.shortfall} ม.</b>:' · ถึงตามแบบ'})</>}</div>}
                 {l.dev_mag!=null&&<div>หัวเสาเบี้ยว {Number(l.dev_mag).toFixed(1)} ซม.</div>}
                 {bl.length>0&&<div style={{display:'flex',alignItems:'flex-end',gap:2,height:44,marginTop:4}}>{bl.map((v,i)=><div key={i} title={'ฟุตที่ '+(i+1)+': '+v} style={{flex:1,minWidth:3,maxWidth:14,background:i>=bl.length-3?'#c0392b':'#0f766e',height:Math.max(3,v/mx*40),borderRadius:2}}/>)}</div>}</span>;})())}
               {row('ดิ่งเสา',r.vertical_result==='ok'?'✔ ผ่าน':r.vertical_result==='bad'?'✘ ไม่ผ่าน':r.vertical_result==='na'?'ไม่ได้วัด':'')}
