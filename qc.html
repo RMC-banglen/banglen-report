@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13l';
+var APP_VERSION='2026-11-13m';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -1074,7 +1074,6 @@ function FailForm({me,init,onCancel,onSaved}){
             <option value="">— กรอกเอง —</option>
             {blows.map(b=><option key={b.id} value={b.id}>{thaiDate(String(b.count_date).slice(0,10))} · {(b.site||'').slice(0,26)} · {b.blows} ครั้ง</option>)}
           </select></div>
-        {inp('blow_site','หน่วยงานที่นับ (ถ้าต่างจากหน้างาน)')}
         <div className="field"><label>จำนวน Blow (ครั้ง / {f.blow_feet||30} ฟุต)</label>
           <input type="number" inputMode="numeric" value={f.blow_count} onChange={e=>set('blow_count',e.target.value)} placeholder="เช่น 358"/></div>
         {L?<div><span className="verdict" style={{background:L.bg,color:L.col}}>{L.e} {L.t}</span> <span className="hint">≤300 ดินอ่อน · 301–599 เฝ้าระวัง 1–3 · ≥600 ดินแข็ง</span></div>:<div className="hint">ใส่ค่า Blow แล้วระบบบอกระดับดินให้</div>}
