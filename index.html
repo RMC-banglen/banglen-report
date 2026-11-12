@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12k';
+var APP_VERSION='2026-11-12l';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13454,7 +13454,7 @@ window.__dataReady.then(data => {
     const MF=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
     const SL=[{e:'🟢',t:'ดินอ่อน',col:'#15803d',bg:'#dcfce7'},{e:'🟡',t:'เฝ้าระวัง 1',col:'#a16207',bg:'#fef9c3'},{e:'🟠',t:'เฝ้าระวัง 2',col:'#c2410c',bg:'#ffedd5'},{e:'🔶',t:'เฝ้าระวัง 3',col:'#b91c1c',bg:'#fee2e2'},{e:'🔴',t:'ดินแข็ง',col:'#991b1b',bg:'#fecaca'}];
     const sIdx=n=>n<=300?0:n>=600?4:n<=400?1:n<=500?2:3;
-    const TG={1:350,3:415,5:435,7:450},TG280={1:340,7:420};
+    const TG={1:450,3:450,5:450,7:450},TG280={1:450,7:450};   // เกณฑ์ที่เอาไปตอกได้จริง = 450 ขึ้นไป
     // กำลังอัดวันผลิตต่ออายุ (เทียบเกณฑ์) จากผลที่เก็บไว้ในใบตรวจ
     const pcsOf=r=>{const a=(Array.isArray(r.prod_dates)&&r.prod_dates.length)?r.prod_dates:(r.prod_date?[{date:r.prod_date}]:[]);const list=a.filter(p=>p&&p.date),n=list.length,single=a.length===1;const lab=i=>n<=1?'เสาต้นนี้':i===0?'ท่อนล่าง':i===n-1?'ท่อนบน':'ท่อนกลาง'+(n>3?' '+i:'');return list.map((p,i)=>({...p,date:String(p.date).slice(0,10),len:p.len,face:p.face!=null&&p.face!==''?String(p.face):(single?String(r.face_date||''):''),label:lab(i)}));};
     const strListAt=(r,prod)=>{return [7].map(a=>{const v=(r.strength_rows||[]).filter(x=>String(x.d).slice(0,10)===prod&&Number(x.a)===a).map(x=>Number(x.k)).filter(x=>x>0);if(!v.length)return null;const avg=v.reduce((t,x)=>t+x,0)/v.length;const tg=(/^NP280$/i.test(r.strength_formula||'')?TG280:TG)[a]||null;return{a,avg,tg,ok:tg?avg>=tg:null};}).filter(Boolean);};

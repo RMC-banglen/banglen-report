@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12l';
+var APP_VERSION='2026-11-12m';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -178,8 +178,8 @@ function judgeNum(v,min,max){
 // ===================== ตรวจสอบเสาเฟลหน้างาน =====================
 // ลำดับ: ข้อมูลเสา/หน้างาน (อายุเสานับจากวันที่ผลิต) → กำลังอัดคอนกรีตวันผลิต ±3 วัน → ชั้นดิน Blow 30 ฟุต
 //        → ตุ้ม (น้ำหนัก/ระยะยก เทียบ 0.7–2.5 เท่าของเสา) → ดิ่งเสา → รูปตอนเสาแตก → สรุป → ส่งออก PDF
-const TARGET_NORMAL = {1:350,3:415,5:435,7:450};   // ksc ตามอายุ (ตรงกับแดชบอร์ด)
-const TARGET_NP280  = {1:340,7:420};
+const TARGET_NORMAL = {1:450,3:450,5:450,7:450};   // ksc — เกณฑ์ที่เอาไปตอกได้จริง = 450 ขึ้นไป ทุกสูตร/ทุกอายุตอนตอก
+const TARGET_NP280  = {1:450,7:450};
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ตามแอปแบบเสาเข็ม — T = I มอก. · F = I โรงงาน · S = สี่เหลี่ยม มอก. · Q = สี่เหลี่ยมโรงงาน
 const PILE_AP = {T18:[275,89],T22:[386,105],T26:[489,126],T30:[660,145],T35:[880,180],T40:[1240,197.5],
   F15:[140,74.9],F18:[216,89.3],F22:[344,107.5],F26:[460,129.9],F30:[585,148.9],F35:[805,176.0],
@@ -325,7 +325,7 @@ function observations(r){
     if(!ev) out.push({t:'info',x:preS+'ไม่มีผลกำลังอัดเฉพาะวันผลิต (ไม่ได้เทียบ)'});
     else{
       const how=ev.usedAges.length>1?'แทรกค่าจากผล '+ev.usedAges[0]+' และ '+ev.usedAges[1]+' วัน':'ใช้ผล '+ev.usedAges[0]+' วัน';
-      out.push({t:ev.ok===false?'bad':ev.ok===true?'ok':'info',x:preS+'อายุตอนตอก '+ev.age+' วัน → กำลังอัด ≈ '+fmtN(ev.strength)+' ksc ('+how+') เทียบเกณฑ์อายุนั้น '+fmtN(ev.target)+' ksc'+(ev.ok===false?' → ต่ำกว่าเกณฑ์':ev.ok===true?' → ผ่าน':'')});
+      out.push({t:ev.ok===false?'bad':ev.ok===true?'ok':'info',x:preS+'อายุตอนตอก '+ev.age+' วัน → กำลังอัด ≈ '+fmtN(ev.strength)+' ksc ('+how+') เทียบเกณฑ์ตอกได้ '+fmtN(ev.target)+' ksc'+(ev.ok===false?' → ต่ำกว่าเกณฑ์':ev.ok===true?' → ผ่าน':'')});
     }
     const k7=keyOfSum(strengthSummary(pieceRows(r,p),p.date,A.formula).filter(s=>s.age===7));
     if(k7&&k7.delta!=null&&k7.delta<=-25) out.push({t:'warn',x:preS+'ผล 7 วันของวันผลิตต่ำกว่าค่าเฉลี่ยวันข้างเคียง ±3 วัน อยู่ '+fmtN(-k7.delta)+' ksc'});
@@ -444,7 +444,7 @@ function FailReport({rec,logo,photos}){
         </table>
         <div style={{fontSize:12,color:'#64748b',marginTop:4}}>★ = วันที่ผลิต · ตัวแดง = ต่ำกว่าเกณฑ์ · แต่ละช่องคือค่าเฉลี่ยของชุดทดสอบวันนั้น</div>
         <div style={{marginTop:6,fontSize:13,lineHeight:1.7}}>{sum.map(s=><div key={s.age}>• {s.age} วัน: วันผลิต <b>{fmtN(s.prod)}</b>{s.nb!=null?' · เฉลี่ยวันข้างเคียง '+fmtN(s.nb)+(s.delta!=null?' ('+(s.delta>=0?'+':'')+fmtN(s.delta)+')':''):''}{s.target?' · เกณฑ์ '+s.target:''} {s.ok===true?'✔':s.ok===false?'✘ ต่ำกว่าเกณฑ์':''}</div>)}</div>
-        {A.ev&&<div style={{marginTop:6,fontSize:13.5,fontWeight:800,color:A.ev.ok===false?'#b91c1c':'#15803d'}}>→ อายุตอนตอก {A.ev.age} วัน กำลังอัด ≈ {fmtN(A.ev.strength)} ksc (แทรกค่าจากผล {A.ev.usedAges.join(' และ ')} วัน) เกณฑ์อายุนั้น {fmtN(A.ev.target)} ksc {A.ev.ok===false?'✘ ต่ำกว่าเกณฑ์':'✔ ผ่าน'}</div>}
+        {A.ev&&<div style={{marginTop:6,fontSize:13.5,fontWeight:800,color:A.ev.ok===false?'#b91c1c':'#15803d'}}>→ อายุตอนตอก {A.ev.age} วัน กำลังอัด ≈ {fmtN(A.ev.strength)} ksc (แทรกค่าจากผล {A.ev.usedAges.join(' และ ')} วัน) เกณฑ์ตอกได้ {fmtN(A.ev.target)} ksc {A.ev.ok===false?'✘ ต่ำกว่าเกณฑ์':'✔ ผ่าน'}</div>}
       </>}
     </div>;})}
     <div data-block="4" style={blk}>{H('3. ชั้นดิน — นับ Blow '+(rec.blow_feet||30)+' ฟุต')}
