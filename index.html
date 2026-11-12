@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13g';
+var APP_VERSION='2026-11-13h';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13440,8 +13440,8 @@ window.__dataReady.then(data => {
     const [fFlag,setFFlag]=useState('');     // '' ทั้งหมด · str · hammer · vert · hard
     const [q,setQ]=useState('');
     const [view,setView]=useState(null);
-    const [rpt,setRpt]=useState(false);   // เปิดรายงานแบบ PDF ในหน้าต่างรายละเอียด
-    useEffect(()=>{setRpt(false);},[view&&view.id]);
+    const [rpt,setRpt]=useState(true);   // เปิดรายงานแบบ PDF ในหน้าต่างรายละเอียด
+    useEffect(()=>{setRpt(true);},[view&&view.id]);
     const load=()=>{db.from('pile_fail_inspections').select('*').order('inspect_date',{ascending:false}).order('id',{ascending:false}).limit(3000)
       .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
     useEffect(load,[]);
@@ -13523,7 +13523,7 @@ window.__dataReady.then(data => {
                 <div style={{fontSize:12.5,color:'#64748b'}}>ตรวจ {fmtD(r.inspect_date)} โดย {r.inspector||'–'}</div></div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 {canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1'} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>✎ แก้ไขใบตรวจ</a>}
-                <button style={btnP} onClick={()=>setRpt(v=>!v)}>{rpt?'⬅ กลับรายละเอียด':'📄 ดูรายงาน (PDF)'}</button>
+                <button style={btnP} onClick={()=>setRpt(v=>!v)}>{rpt?'ดูแบบตาราง':'📄 ดูแบบรายงาน (PDF)'}</button>
                 <a href={'qc.html?fail='+r.id} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>↗ เปิดในแอป QC</a>
                 {canEdit&&<button style={{...btn,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button>}
                 <button style={btn} onClick={()=>setView(null)}>ปิด</button></div></div>
