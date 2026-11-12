@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12j';
+var APP_VERSION='2026-11-12k';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -512,7 +512,7 @@ async function makeFailImage(rec,onStep){
 }
 
 // ---------- หน้าหลักของเมนูตรวจเสาเฟล ----------
-function FailInspectView({me,onBack,openId}){
+function FailInspectView({me,onBack,openId,openEdit}){
   const [view,setView]=useState('list');          // list | form | view
   const [list,setList]=useState(null);
   const [noTable,setNoTable]=useState(false);
@@ -524,7 +524,7 @@ function FailInspectView({me,onBack,openId}){
   const loadList=()=>DB.from('pile_fail_inspections').select('*').order('created_at',{ascending:false}).limit(60)
     .then(({data,error})=>{if(error){setNoTable(true);setList([]);return;}setNoTable(false);setList(data||[]);}).catch(()=>{setNoTable(true);setList([]);});
   useEffect(()=>{loadList();},[]);
-  useEffect(()=>{ if(!openId) return; if(openId==='new'){setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setRec(data);setView('view');} }); },[openId]);
+  useEffect(()=>{ if(!openId) return; if(openId==='new'){setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setRec(data);setView(openEdit?'form':'view');} }); },[openId]);
   if(view==='form') return <FailForm key={formKey} me={me} init={rec} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={(r,opt)=>{loadList();if(opt&&opt.next){addNext(r);}else{setRec(r);setView('view');}}}/>;
   if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>{setFormKey(k=>k+1);setView('form');}} onAddNext={()=>addNext(rec)}/>;
   const badge=(ok,txt)=>ok==null?null:<span className="pill" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b',marginRight:5,fontSize:12}}>{txt}</span>;
@@ -992,7 +992,7 @@ function App(){
   const me=inspectors.find(x=>x.code===code);
   if(!me) return <PickUser inspectors={inspectors}/>;
   if(!formType) return <PickForm me={me} onPick={t=>{setFormType(t);setMaterial(null);}}/>;
-  if(formType==='fail') return <FailInspectView me={me} openId={failId} onBack={()=>{setFormType(null);if(failId)history.replaceState(null,'',location.pathname+'?u='+(code||''));}}/>;
+  if(formType==='fail') return <FailInspectView me={me} openId={failId} openEdit={params.get('edit')==='1'} onBack={()=>{setFormType(null);if(failId)history.replaceState(null,'',location.pathname+'?u='+(code||''));}}/>;
   if(formType==='plan') return <PlanView me={me} rafts={rafts} onBack={()=>setFormType(null)}
                                   onInspect={(n,day,spec,isChecked)=>{setPreset({raft:String(n),day,spec,isChecked});setFormType('pre');}}/>;
   if((formType==='pre'||formType==='post')&&!preset) return <PreListView me={me} rafts={rafts} formType={formType} initialDay={preListDay||undefined}

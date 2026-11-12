@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-12i';
+var APP_VERSION='2026-11-12j';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13525,9 +13525,9 @@ window.__dataReady.then(data => {
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ค้นหา ลูกค้า / หน้างาน / ขนาดเสา / ผู้ตรวจ" style={{padding:'7px 10px',borderRadius:8,border:'1px solid #d6d8e0',fontSize:14,fontFamily:'inherit',width:'100%',boxSizing:'border-box',marginBottom:10}}/>
         <div className="table-wrap" style={{margin:0,maxHeight:'70vh',overflow:'auto',border:'1px solid #eef0f4',borderRadius:8}}>
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:1100}}>
-            <thead><tr>{['วันที่ตรวจ','ลูกค้า / หน้างาน','ขนาด × ยาว','วันผลิต','วันตอก','อายุ (วัน)','กำลังอัดวันผลิต','Blow 30 ฟุต / ดิน','ตุ้ม ÷ เสา','ดิ่ง','รูป','ผู้ตรวจ'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{['วันที่ตรวจ','ลูกค้า / หน้างาน','ขนาด × ยาว','วันผลิต','วันตอก','อายุ (วัน)','กำลังอัดวันผลิต','Blow 30 ฟุต / ดิน','ตุ้ม ÷ เสา','ดิ่ง','รูป','ผู้ตรวจ',''].map((h,hi)=><th key={hi} style={th}>{h}</th>)}</tr></thead>
             <tbody>{list.map((r,i)=>{const dd=String(r.drive_date||'').slice(0,10),headDay=i===0||dd!==String(list[i-1].drive_date||'').slice(0,10),st=strKey(r),h=hr(r),L=r.blow_count!=null?SL[sIdx(Number(r.blow_count))]:null;
-              return <React.Fragment key={r.id}>{headDay&&<tr><td colSpan={12} style={{padding:'7px 11px',background:'#eef4ff',fontWeight:800,color:'#1e3a8a',fontSize:13.5}}>ตอกเฟลวันที่ {fmtD(dd)} · {list.filter(x=>String(x.drive_date||'').slice(0,10)===dd).length} ต้น</td></tr>}<tr className="fm-row" title="คลิกเพื่อดูใบตรวจ" style={{background:i%2?'#fafbfd':'#fff',cursor:'pointer'}} onClick={()=>setView(r)}>
+              return <React.Fragment key={r.id}>{headDay&&<tr><td colSpan={13} style={{padding:'7px 11px',background:'#eef4ff',fontWeight:800,color:'#1e3a8a',fontSize:13.5}}>ตอกเฟลวันที่ {fmtD(dd)} · {list.filter(x=>String(x.drive_date||'').slice(0,10)===dd).length} ต้น</td></tr>}<tr className="fm-row" title="คลิกเพื่อดูใบตรวจ" style={{background:i%2?'#fafbfd':'#fff',cursor:'pointer'}} onClick={()=>setView(r)}>
                 <td style={{...td,whiteSpace:'nowrap'}}>{fmtD(r.inspect_date)}</td>
                 <td style={{...td,minWidth:210}}>{[r.customer,r.site].filter(Boolean).join(' · ')||'–'}</td>
                 <td style={{...td,whiteSpace:'nowrap',fontWeight:700}}>{r.pile_size||'–'}{r.pile_std?(r.pile_std==='fac'?' รง.':' มอก.'):''} × {r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2):'–'}</td>
@@ -13540,8 +13540,9 @@ window.__dataReady.then(data => {
                 <td style={td}>{r.vertical_result&&r.vertical_result!=='na'?chip(r.vertical_result==='ok',r.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'):<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={{...td,textAlign:'center'}}>{(r.photos||[]).length?'📷 '+r.photos.length:<span style={{color:'#cbd5e1'}}>–</span>}</td>
                 <td style={{...td,whiteSpace:'nowrap'}}>{r.inspector||'–'}</td>
+                <td style={{...td,whiteSpace:'nowrap'}}>{canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1'} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} title="แก้ไขใบตรวจ (เปิดฟอร์มแก้ไขในแอป QC แท็บใหม่ บันทึกแล้วกลับมารีเฟรชหน้านี้)" style={{...btn,padding:'2px 10px',fontSize:12.5,textDecoration:'none',display:'inline-block'}}>✎ แก้ไข</a>}</td>
               </tr></React.Fragment>;})}
-              {!list.length&&<tr><td colSpan={12} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{rows.length?'ไม่มีใบตรวจตามตัวกรอง':'ยังไม่มีใบตรวจ — ให้ QC บันทึกจากแอป QC เมนู "ตรวจเสาเฟลหน้างาน"'}</td></tr>}</tbody>
+              {!list.length&&<tr><td colSpan={13} style={{...td,textAlign:'center',color:'#94a3b8',padding:24}}>{rows.length?'ไม่มีใบตรวจตามตัวกรอง':'ยังไม่มีใบตรวจ — ให้ QC บันทึกจากแอป QC เมนู "ตรวจเสาเฟลหน้างาน"'}</td></tr>}</tbody>
           </table>
         </div>
       </ChartCard>
@@ -13554,6 +13555,7 @@ window.__dataReady.then(data => {
               <div><div style={{fontSize:17,fontWeight:800,color:'#1a2540'}}>ใบตรวจเสาเฟล #{r.id}</div>
                 <div style={{fontSize:12.5,color:'#64748b'}}>ตรวจ {fmtD(r.inspect_date)} โดย {r.inspector||'–'}</div></div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1'} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>✎ แก้ไขใบตรวจ</a>}
                 <a href={'qc.html?fail='+r.id} target="_blank" rel="noopener" style={{...btnP,textDecoration:'none',display:'inline-block'}}>📄 เปิด/สร้าง PDF ในแอป QC</a>
                 {canEdit&&<button style={{...btn,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button>}
                 <button style={btn} onClick={()=>setView(null)}>ปิด</button></div></div>
