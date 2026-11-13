@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13l';
+var APP_VERSION='2026-11-13m';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4812,58 +4812,114 @@ window.__dataReady.then(data => {
     if(em&&Math.abs(em-mp)/mp<=0.05&&Math.abs((Number(r.avg_ksc)||0)-em*10.197)/(em*10.197)<=0.03)return r;
     return {...r,avg_mpa:Math.round(mp*100)/100,avg_ksc:Math.round(mp*10.197),_fixed:true};
   };
-   // กำลังอัดรายเดือน: เลือกปี (ดรอปดาวน์) + เดือน (ปุ่ม) + สูตร → กราฟค่าเฉลี่ยรายวัน 2 ช่วง (1–15 บน · 16–สิ้นเดือน ล่าง) — แยกจากกราฟทุก 10 วันเดิม
-   function ConcreteMonthHalves({rows,sd,fm,ag,ks,isNP280}){
-    const all7=useMemo(()=>rows.filter(r=>ag(r)===7&&sd(r)&&ks(r)>0),[rows]);
-    const formulas=useMemo(()=>[...new Set(all7.map(fm))].filter(Boolean).sort(),[all7]);
-    const [selF,setSelF]=useState([]);   // ว่าง = ทุกสูตร ยกเว้น NP280
-    const base=useMemo(()=>selF.length?all7.filter(r=>selF.includes(fm(r))):all7.filter(r=>!isNP280(fm(r))),[all7,selF]);
-    const years=useMemo(()=>[...new Set(base.map(r=>+sd(r).slice(0,4)))].sort((a,b)=>b-a),[base]);
-    const last=useMemo(()=>base.reduce((m,r)=>sd(r)>m?sd(r):m,''),[base]);
+   // กำลังอัด 2 โหมด (แทนกราฟค่าเฉลี่ยทุก 10 วันเดิม) — ใช้ตัวกรองสูตร/อายุร่วมกัน · หน้าตาเดียวกับกราฟ "กำลังอัดคอนกรีตตามวันเก็บตัวอย่าง"
+   //  • รายเดือน (ครึ่งเดือน): เลือกปี (ดรอปดาวน์) + เดือน (ปุ่ม) → 1–15 ด้านบน · 16–สิ้นเดือน ด้านล่าง แยกเส้นตามสูตร
+   //  • ภาพรวมระยะยาว: ทุกปี/ปีเดียว × ทุก 10 วัน/รายเดือน — ไม่เลือกสูตร = รวมทุกสูตร (ยกเว้น NP280) เป็นเส้นเดียวเหมือนกราฟเดิม
+   function ConcreteStrengthPanel({rows,sd,fm,ag,ks,isNP280,styleFor,allFormulas,allAges}){
+    const [mode,setMode]=useState('month');
+    const [selF,setSelF]=useState([]);        // ว่าง = ทุกสูตร ยกเว้น NP280
+    const [selA,setSelA]=useState([7]);
     const [yy,setYy]=useState(null),[mm,setMm]=useState(null);
-    if(!all7.length) return null;
+    const [lYear,setLYear]=useState('all'),[gran,setGran]=useState('10');
+    const ages=selA.length?selA:allAges;
+    const base=useMemo(()=>rows.filter(r=>sd(r)&&ks(r)>0&&ages.includes(ag(r))&&(selF.length?selF.includes(fm(r)):!isNP280(fm(r)))),[rows,selF,selA]);
+    const years=useMemo(()=>[...new Set(base.map(r=>+sd(r).slice(0,4)))].sort((x,y)=>y-x),[base]);
+    const last=useMemo(()=>base.reduce((m,r)=>sd(r)>m?sd(r):m,''),[base]);
+    const TN={1:350,3:415,5:435,7:450},T280={1:340,7:420};
+    const avgOf=v=>v.reduce((x,y)=>x+y,0)/v.length;
+    const r1=v=>Math.round(v*10)/10;
+    // เส้น = สูตร × อายุ (split=false → รวมทุกสูตรเป็นเส้นเดียว) · สี/รูปแจกจากเส้นที่วาดจริง เหมือนกราฟตามวันเก็บตัวอย่าง
+    const build=(data,cats,keyOf,split)=>{
+      const fs=split?allFormulas.filter(f=>data.some(r=>fm(r)===f)):[null];
+      const defs=[];fs.forEach(f=>ages.forEach(a=>{if(data.some(r=>(f==null||fm(r)===f)&&ag(r)===a))defs.push({f,a,key:(f||'ทุกสูตร')+'|'+a});}));
+      const st=styleFor(defs.map(d=>d.key)),multiAge=new Set(defs.map(d=>d.a)).size>1;
+      const series=defs.map(d=>{const idx={};data.forEach(r=>{if((d.f==null||fm(r)===d.f)&&ag(r)===d.a){const k=keyOf(r);(idx[k]=idx[k]||[]).push(ks(r));}});
+        return {label:(d.f||(selF.length?'สูตรที่เลือก':'ทุกสูตร (ยกเว้น NP280)'))+(multiAge?' Day'+d.a:''),color:st[d.key].color,shape:st[d.key].shape,
+          danger:((d.f&&isNP280(d.f))?T280:TN)[d.a]??null,data:cats.map(c=>idx[c]?r1(avgOf(idx[c])):null)};});
+      const crit=[],seen=new Set();
+      defs.forEach(d=>{const n280=!!(d.f&&isNP280(d.f)),tv=(n280?T280:TN)[d.a];if(!tv)return;const k=d.a+'-'+n280;if(seen.has(k))return;seen.add(k);crit.push({value:tv,label:'เกณฑ์ Day'+d.a+(n280?' NP280':''),color:'#e74c3c'});});
+      return {series,crit};
+    };
+    const statOf=series=>{const v=series.flatMap(x=>x.data.filter(y=>y!=null));const low=series.reduce((n,x)=>n+x.data.filter(y=>y!=null&&x.danger!=null&&y<x.danger).length,0);return {n:v.length,avg:v.length?avgOf(v):null,low};};
+    const legend=series=><div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:6}}>{series.map(x=><span key={x.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
+      <svg width="14" height="14" style={{flexShrink:0}}>
+        {x.shape==='square'&&<rect x="1" y="1" width="12" height="12" fill="#fff" stroke={x.color} strokeWidth="2"/>}
+        {x.shape==='triangle'&&<polygon points="7,1 13,13 1,13" fill="#fff" stroke={x.color} strokeWidth="2"/>}
+        {x.shape==='diamond'&&<polygon points="7,1 13,7 7,13 1,7" fill="#fff" stroke={x.color} strokeWidth="2"/>}
+        {x.shape==='star'&&<polygon points="7,1 8.5,5.5 13,5.5 9.5,8.5 11,13 7,10 3,13 4.5,8.5 1,5.5 5.5,5.5" fill={x.color} stroke={x.color} strokeWidth="1"/>}
+        {(!x.shape||x.shape==='circle')&&<circle cx="7" cy="7" r="5" fill="#fff" stroke={x.color} strokeWidth="2"/>}
+      </svg>{x.label}</span>)}</div>;
+    const chart=(cats,series,crit,opt)=>{const st=statOf(series);const targets=[...crit,...(st.avg!=null?[{value:r1(st.avg),label:'เฉลี่ย',color:'#059669'}]:[])];
+      const dz=crit.length?Math.min(...crit.map(t=>t.value)):null;
+      return <LineChart categories={cats} unit="KSC" decimals={0} showValues={opt.values!==false} boxedLabels={opt.values!==false} series={series} targets={targets} dangerBelow={dz} height={opt.height||300} yMin={opt.yMin??null} yMax={opt.yMax??null}/>;};
     const sel={border:'1px solid #ccd',borderRadius:5,padding:'4px 8px',fontSize:14,background:'#fff'};
-    const head=Y=><div className="card__head">
-        <div><h3 className="card__title">กำลังอัดรายเดือน (แบ่งครึ่งเดือน)</h3>
-          <p className="card__sub">หน่วย: ksc • ค่าเฉลี่ยรายวันตามวันเก็บตัวอย่าง • เฉพาะอายุ 7 วัน • {selF.length?'สูตร '+selF.join(', '):'ทุกสูตร ยกเว้น NP280'} • เส้นประแดง = ขั้นต่ำ 450</p></div>
-        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <MultiSelect label="สูตร" options={formulas} value={selF} onChange={v=>{setSelF(v);setMm(null);}}/>
-          {Y!=null&&<label style={{fontSize:13,color:'#555'}}>ปี <select value={Y} onChange={e=>{setYy(+e.target.value);setMm(null);}} style={sel}>{years.map(y=><option key={y} value={y}>{y}</option>)}</select></label>}
-          {selF.length>0&&<button onClick={()=>{setSelF([]);setMm(null);}} style={{padding:'4px 10px',borderRadius:5,border:'1px solid #ccd',background:'#f5f6fa',cursor:'pointer',fontSize:13,color:'#c00'}}>ล้าง</button>}
-        </div>
-      </div>;
-    if(!base.length||!last) return <div className="card" style={{marginBottom:24,overflow:'visible'}}>{head(null)}<div className="card__body"><div style={{textAlign:'center',color:'#aaa',padding:32}}>ไม่มีผลอายุ 7 วันของสูตรที่เลือก</div></div></div>;
-    const Y=(yy!=null&&years.includes(yy))?yy:+last.slice(0,4);
-    const monthsWith=new Set(base.filter(r=>+sd(r).slice(0,4)===Y).map(r=>+sd(r).slice(5,7)));
-    const MO=(mm!=null&&monthsWith.has(mm))?mm:(monthsWith.has(+last.slice(5,7))&&Y===+last.slice(0,4)?+last.slice(5,7):Math.max(...monthsWith));
-    const pre=Y+'-'+String(MO).padStart(2,'0')+'-';
-    const dayMap={};
-    base.filter(r=>sd(r).startsWith(pre)).forEach(r=>{const d=+sd(r).slice(8,10);(dayMap[d]=dayMap[d]||[]).push(ks(r));});
-    const nDays=new Date(Y,MO,0).getDate();
-    const avgOf=a=>a.reduce((x,y)=>x+y,0)/a.length;
-    const mk=(a,b)=>{const days=[];for(let d=a;d<=b;d++)days.push(d);
-      const vals=days.map(d=>dayMap[d]?Math.round(avgOf(dayMap[d])*10)/10:null);
-      const ok=vals.filter(v=>v!=null);
-      return {days,vals,avg:ok.length?avgOf(ok):null,low:ok.filter(v=>v<450).length,n:ok.length};};
-    const h1=mk(1,15),h2=mk(16,nDays);
-    const all=[...h1.vals,...h2.vals].filter(v=>v!=null);
-    const yMin=Math.floor((Math.min(450,...all)-10)/10)*10, yMax=Math.ceil((Math.max(450,...all)+10)/10)*10;
-    const half=(h,title)=><div style={{marginBottom:18}}>
-      <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:2}}>
-        <span style={{fontWeight:700,fontSize:14,color:'#1a2540'}}>{title}</span>
-        <span style={{fontSize:12.5,color:'#64748b'}}>{h.avg!=null?<>เฉลี่ย <b style={{color:'#1a2540'}}>{h.avg.toFixed(1)}</b> · ต่ำกว่า 450 จำนวน <b style={{color:h.low?'#c0392b':'#1a2540'}}>{h.low}</b> วัน · มีผล {h.n} วัน</>:'ไม่มีผลในช่วงนี้'}</span></div>
-      {h.n>0?<LineChart categories={h.days.map(String)} series={[{label:'Strength',color:'#2f5fd0',data:h.vals}]} targets={[{value:450,label:'ขั้นต่ำ',color:'#e74c3c'}]} dangerBelow={450} showValues height={230} unit="ksc" decimals={0} yMin={yMin} yMax={yMax}/>
-        :<div style={{textAlign:'center',color:'#aaa',padding:28}}>ไม่มีผลในช่วงนี้</div>}
-    </div>;
-    return <div className="card" style={{marginBottom:24,overflow:'visible'}}>
-      {head(Y)}
-      <div className="card__body" style={{overflow:'visible'}}>
+    const btnS={padding:'4px 10px',borderRadius:5,border:'1px solid #ccd',background:'#f5f6fa',cursor:'pointer',fontSize:13,color:'#c00'};
+    const empty=t=><div style={{textAlign:'center',color:'#aaa',padding:32}}>{t}</div>;
+    const filtered=selF.length>0||!(selA.length===1&&selA[0]===7);
+
+    let body=null,extra=null;
+    if(!base.length||!last) body=empty('ไม่มีผลของสูตร/อายุที่เลือก');
+    else if(mode==='month'){
+      const Y=(yy!=null&&years.includes(yy))?yy:+last.slice(0,4);
+      const monthsWith=new Set(base.filter(r=>+sd(r).slice(0,4)===Y).map(r=>+sd(r).slice(5,7)));
+      const MO=(mm!=null&&monthsWith.has(mm))?mm:((Y===+last.slice(0,4)&&monthsWith.has(+last.slice(5,7)))?+last.slice(5,7):Math.max(...monthsWith));
+      const pre=Y+'-'+String(MO).padStart(2,'0')+'-',nDays=new Date(Y,MO,0).getDate();
+      const days=[];for(let d=1;d<=nDays;d++)days.push(d);
+      const B=build(base.filter(r=>sd(r).startsWith(pre)),days,r=>+sd(r).slice(8,10),true);
+      const allV=B.series.flatMap(x=>x.data.filter(v=>v!=null)).concat(B.crit.map(t=>t.value));
+      const yMin=allV.length?Math.floor((Math.min(...allV)-10)/10)*10:null,yMax=allV.length?Math.ceil((Math.max(...allV)+10)/10)*10:null;
+      const half=(i0,i1,title)=>{const ser=B.series.map(x=>({...x,data:x.data.slice(i0,i1)})).filter(x=>x.data.some(v=>v!=null));const st=statOf(ser);
+        return <div style={{marginBottom:18}}>
+          <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:4}}>
+            <span style={{fontWeight:700,fontSize:14,color:'#1a2540'}}>{title}</span>
+            <span style={{fontSize:12.5,color:'#64748b'}}>{st.n?<>เฉลี่ย <b style={{color:'#1a2540'}}>{st.avg.toFixed(1)}</b> · ต่ำกว่าเกณฑ์ <b style={{color:st.low?'#c0392b':'#1a2540'}}>{st.low}</b> จุด · มีผล {st.n} จุด</>:'ไม่มีผลในช่วงนี้'}</span></div>
+          {st.n?<>{legend(ser)}{chart(days.slice(i0,i1).map(d=>d+' '+M[MO-1]),ser,B.crit,{height:300,yMin,yMax})}</>:empty('ไม่มีผลในช่วงนี้')}
+        </div>;};
+      extra=<label style={{fontSize:13,color:'#555'}}>ปี <select value={Y} onChange={e=>{setYy(+e.target.value);}} style={sel}>{years.map(y=><option key={y} value={y}>{y}</option>)}</select></label>;
+      body=<>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(54px,1fr))',gap:6,marginBottom:14}}>
           {M.map((n,i)=>{const m=i+1,has=monthsWith.has(m),on=m===MO;return <button key={m} disabled={!has} onClick={()=>setMm(m)} style={{padding:'7px 0',borderRadius:6,border:'1px solid '+(on?'#2f5fd0':'#ccd'),background:on?'#e8efff':'#fff',color:on?'#2f5fd0':has?'#333':'#bbb',fontWeight:on?700:500,fontSize:13.5,cursor:has?'pointer':'default'}}>{n}</button>;})}
         </div>
-        {half(h1,'วันที่ 1–15 '+M[MO-1]+' '+Y)}
-        {half(h2,'วันที่ 16–'+nDays+' '+M[MO-1]+' '+Y)}
+        {half(0,15,'วันที่ 1–15 '+M[MO-1]+' '+Y)}
+        {half(15,nDays,'วันที่ 16–'+nDays+' '+M[MO-1]+' '+Y)}
+      </>;
+    }else{
+      const LY=(lYear!=='all'&&years.includes(+lYear))?+lYear:'all';
+      const data=LY==='all'?base:base.filter(r=>+sd(r).slice(0,4)===LY);
+      const keyOf=gran==='month'?(r=>sd(r).slice(0,7)):(r=>{const d=+sd(r).slice(8,10);return sd(r).slice(0,7)+'-'+(d<=10?1:d<=20?2:3);});
+      const cats=[...new Set(data.map(keyOf))].sort();
+      const multiY=new Set(cats.map(k=>k.slice(0,4))).size>1;
+      const yr2=k=>multiY?' '+String(+k.slice(0,4)+543).slice(2):'';
+      const labels=cats.map(k=>{const yr=+k.slice(0,4),mo=+k.slice(5,7);if(gran==='month')return M[mo-1]+yr2(k);const bk=+k.slice(8),lastD=new Date(yr,mo,0).getDate();return (bk===1?'1–10':bk===2?'11–20':'21–'+lastD)+' '+M[mo-1]+yr2(k);});
+      const B=build(data,cats,keyOf,selF.length>0);
+      const ser=B.series.filter(x=>x.data.some(v=>v!=null)),st=statOf(ser);
+      extra=<>
+        <label style={{fontSize:13,color:'#555'}}>ช่วง <select value={LY} onChange={e=>setLYear(e.target.value)} style={sel}><option value="all">ทุกปี</option>{years.map(y=><option key={y} value={y}>{y}</option>)}</select></label>
+        <label style={{fontSize:13,color:'#555'}}>ความละเอียด <select value={gran} onChange={e=>setGran(e.target.value)} style={sel}><option value="10">ทุก 10 วัน</option><option value="month">รายเดือน</option></select></label></>;
+      body=!cats.length?empty('ไม่มีผลในช่วงที่เลือก'):<>
+        <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:4}}>
+          <span style={{fontWeight:700,fontSize:14,color:'#1a2540'}}>{gran==='month'?'ค่าเฉลี่ยรายเดือน':'ค่าเฉลี่ยทุก 10 วัน'} · {LY==='all'?(years.length>1?'ปี '+years[years.length-1]+'–'+years[0]:'ปี '+years[0]):'ปี '+LY}</span>
+          <span style={{fontSize:12.5,color:'#64748b'}}>เฉลี่ย <b style={{color:'#1a2540'}}>{st.avg!=null?st.avg.toFixed(1):'–'}</b> · ต่ำกว่าเกณฑ์ <b style={{color:st.low?'#c0392b':'#1a2540'}}>{st.low}</b> ช่วง · {cats.length} ช่วง</span></div>
+        {legend(ser)}
+        {chart(labels,ser,B.crit,{height:320,values:cats.length<=45})}
+        {cats.length>45&&<div style={{fontSize:12,color:'#94a3b8',marginTop:4}}>จุดเยอะเกิน 45 ช่วง จึงซ่อนตัวเลขบนกราฟ (ชี้ที่จุดเพื่อดูค่า) — เลือกปีเดียวหรือความละเอียดรายเดือนเพื่อให้เห็นตัวเลข</div>}
+      </>;
+    }
+    return <div className="card" style={{marginBottom:24,overflow:'visible'}}>
+      <div className="card__head" style={{flexWrap:'wrap',gap:10}}>
+        <div><h3 className="card__title">กำลังอัดคอนกรีต — {mode==='month'?'รายเดือน (ครึ่งเดือน)':'ภาพรวมระยะยาว'}</h3>
+          <p className="card__sub">หน่วย: ksc • ค่าเฉลี่ยตามวันเก็บตัวอย่าง • อายุ {ages.length>3?'ทุกอายุ':ages.join(', ')} วัน • {selF.length?'สูตร '+selF.join(', '):'ทุกสูตร ยกเว้น NP280'}</p></div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div className="seg" style={{margin:0}}>
+            <button className={'seg__btn'+(mode==='month'?' is-active':'')} onClick={()=>setMode('month')}>รายเดือน</button>
+            <button className={'seg__btn'+(mode==='long'?' is-active':'')} onClick={()=>setMode('long')}>ภาพรวมระยะยาว</button></div>
+          {extra}
+          <MultiSelect label="สูตร" options={allFormulas} value={selF} onChange={v=>{setSelF(v);}}/>
+          <MultiSelect label="อายุ(วัน)" options={allAges.map(String)} value={selA.map(String)} onChange={v=>{setSelA(v.map(Number));}}/>
+          {filtered&&<button onClick={()=>{setSelF([]);setSelA([7]);}} style={btnS}>ล้าง</button>}
+        </div>
       </div>
+      <div className="card__body" style={{overflow:'visible'}}>{body}</div>
     </div>;
    }
 
@@ -5195,33 +5251,8 @@ window.__dataReady.then(data => {
         </div>)}
       </div>
 
-      {/* 10-day chart */}
-      {dKeys.length>0&&<div className="card" style={{marginBottom:24,overflow:'visible'}}>
-        <div className="card__head">
-          <div><h3 className="card__title">ค่าเฉลี่ย Strength ทุก 10 วัน</h3>
-          <p className="card__sub">หน่วย: ksc • เฉพาะอายุ 7 วัน • ยกเว้นสูตร NP280 • {dYearLabel}</p></div>
-          <div style={{display:'flex',gap:16,alignItems:'center',flexWrap:'wrap'}}>
-            <span style={{fontSize:12,display:'flex',alignItems:'center',gap:5,fontWeight:600}}><span style={{width:14,height:3,background:'#2f5fd0',display:'inline-block',borderRadius:2}}></span>Strength</span>
-            <span style={{fontSize:12,display:'flex',alignItems:'center',gap:5,fontWeight:600,color:'#e74c3c'}}><span style={{width:14,height:0,borderTop:'2px dashed #e74c3c',display:'inline-block'}}></span>ขั้นต่ำ 450</span>
-            <span style={{fontSize:12,display:'flex',alignItems:'center',gap:5,fontWeight:600,color:'#5a8f3c'}}><span style={{width:14,height:0,borderTop:'2px dashed #5a8f3c',display:'inline-block'}}></span>ค่าเฉลี่ย {dAvg!=null?fmt(dAvg,1):'–'}</span>
-          </div>
-        </div>
-        <div className="card__body" style={{overflow:'visible'}}>
-          <LineChart
-            categories={dLabels}
-            series={[{label:'Strength',color:'#2f5fd0',data:dVals}]}
-            targets={[{value:450,label:'ขั้นต่ำ',color:'#e74c3c'},...(dAvg!=null?[{value:dAvg,label:'ค่าเฉลี่ย',color:'#5a8f3c'}]:[])]}
-
-            dangerBelow={450}
-            showValues
-            height={300}
-            unit="ksc"
-            decimals={0}
-          />
-        </div>
-      </div>}
-
-      <ConcreteMonthHalves rows={rows} sd={sd} fm={fm} ag={ag} ks={ks} isNP280={isNP280}/>
+      {/* กำลังอัดรายเดือน / ภาพรวมระยะยาว (แทนกราฟค่าเฉลี่ยทุก 10 วันเดิม) */}
+      <ConcreteStrengthPanel rows={rows} sd={sd} fm={fm} ag={ag} ks={ks} isNP280={isNP280} styleFor={styleFor} allFormulas={allFormulas} allAges={allAges}/>
 
       {/* Chart 1 */}
       <div className="chart-card" style={{marginBottom:24}}>
