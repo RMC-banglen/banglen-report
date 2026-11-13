@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13q';
+var APP_VERSION='2026-11-13u';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -814,7 +814,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
     <svg width={W} height={H} overflow="visible">
       {ticks.map((t,i)=><g key={i}><line x1={pad.l} x2={W-pad.r} y1={y(t)} y2={y(t)} stroke={PALETTE.grid}/><text x={pad.l-8} y={y(t)+4} textAnchor="end" className="ax-lbl">{fmt(t,decimals)}</text></g>)}
       {(()=>{
-        const tSorted=[...targets].map((t,i)=>({...t,oy:y(t.value)-5,ly:y(t.value)-5}));
+        const tSorted=[...targets].map((t,i)=>({...t,oy:y(t.value)-5,ly:y(t.value)-5})).sort((a,b)=>a.oy-b.oy);
         const TGAP=14;
         for(let iter=0;iter<30;iter++){
           let ok=true;
@@ -827,7 +827,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
           if(ok)break;
         }
         return tSorted.map((t,i)=><g key={'t'+i}>
-          <line x1={pad.l} x2={W-pad.r} y1={y(t.value)} y2={y(t.value)} stroke={t.color} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.8"/>
+          {!t.noLine&&<line x1={pad.l} x2={W-pad.r} y1={y(t.value)} y2={y(t.value)} stroke={t.color} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.8"/>}
           {t.label&&<text x={W-pad.r+6} y={t.ly} textAnchor="start" className="target-lbl" fill={t.color}>{t.label} {fmt(t.value,decimals)}</text>}
         </g>);
       })()}
@@ -4813,7 +4813,7 @@ window.__dataReady.then(data => {
     return {...r,avg_mpa:Math.round(mp*100)/100,avg_ksc:Math.round(mp*10.197),_fixed:true};
   };
    // ผลรายก้อน (KSC ทีละลูก) + น้ำหนักลูกปูน — ย้ายมาอยู่ใต้กราฟรายเดือน ใช้เดือน/สูตร/อายุเดียวกับกราฟ · เปิด/ปิดได้ (ปิดไว้ก่อน)
-   function ConcreteCubeTable({data,rows,rangeLabel,filterText,open,onToggle,onJump,sd,fm,ag,isNP280,shortDate,tgFor}){
+   function ConcreteCubeTable({data,rows,rangeLabel,filterText,open,onToggle,onJump,sd,fm,ag,isNP280,shortDate,tgFor,ampNode}){
     const btnStyle={padding:'4px 10px',borderRadius:5,border:'1px solid #ccd',background:'#f5f6fa',cursor:'pointer',fontSize:13,color:'#444'};
     const side=r=>{const m=String(r.cube_size||'').match(/(\d+)\s*[xX×]/);return m?Number(m[1])*10:150;};   // 15x15 = 150 มม.
     const toKsc=(kn,r)=>kn>0?kn*1000/(side(r)*side(r))*10.197:null;   // ไม่ปัดตรงนี้ ปัดตอนแสดง ค่าเฉลี่ยจะตรงกับกราฟ
@@ -4858,14 +4858,15 @@ window.__dataReady.then(data => {
     const cell=(v,low)=>({textAlign:'right',padding:'5px 8px',whiteSpace:'nowrap',color:low?'#c0392b':'#1f2937',fontWeight:low?700:400});
     return <div style={{marginTop:6,borderTop:'1px solid #e2e8f0',paddingTop:12}}>
       <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:open?6:0}}>
-        <button onClick={onToggle} style={{...btnStyle,fontWeight:700,color:'#1a2540'}}>{open?'▾ ซ่อนผลรายก้อน':'▸ ดูผลรายก้อน (KSC ทีละลูก)'}</button>
+        <button onClick={onToggle} style={{...btnStyle,fontWeight:700,color:'#1a2540'}}>{open?'▾ ซ่อนผลรายก้อนและค่าแอมป์':'▸ ดูผลรายก้อน (KSC ทีละลูก) และค่าแอมป์'}</button>
         <span style={{fontSize:12.5,color:'#64748b'}}>{rangeLabel} · {list.length} ชุด · ใช้ตัวกรองเดียวกับกราฟด้านบน</span>
         <span style={{flex:1}}/>
         {open&&<><button onClick={exportXlsx} disabled={!list.length} style={{...btnStyle,color:'#15803d',borderColor:'#86efac'}}>⬇ Excel</button>
         <button onClick={exportPdf} disabled={!list.length} style={{...btnStyle,color:'#b91c1c',borderColor:'#fca5a5'}}>⬇ PDF</button></>}
       </div>
       {open&&<>
-        <div style={{fontSize:12,color:'#64748b',marginBottom:10}}>ตัวเลขแดง = ต่ำกว่าเกณฑ์ · พื้นส้ม = 3 ลูกต่างกันเกิน 8% (ASTM C39)</div>
+        {ampNode}
+        <div style={{fontSize:12,color:'#64748b',margin:'10px 0'}}>ตัวเลขแดง = ต่ำกว่าเกณฑ์ · พื้นส้ม = 3 ลูกต่างกันเกิน 8% (ASTM C39)</div>
         {!hasW&&(()=>{
           // เดือนที่เลือกไม่มีน้ำหนัก → บอกวันที่ที่มีน้ำหนัก กดแล้วเลื่อนไปเดือนนั้นได้เลย
           const wDates=[...new Set(rows.filter(r=>[r.weight1_kg,r.weight2_kg,r.weight3_kg].some(v=>Number(v)>0)).map(sd))].sort().reverse().slice(0,8);
@@ -4929,16 +4930,16 @@ window.__dataReady.then(data => {
       return {series,crit};
     };
     const statOf=series=>{const v=series.flatMap(x=>x.data.filter(y=>y!=null));const low=series.reduce((n,x)=>n+x.data.filter(y=>y!=null&&x.danger!=null&&y<x.danger).length,0);return {n:v.length,avg:v.length?avgOf(v):null,low};};
-    const legend=series=><div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:6}}>{series.map(x=><span key={x.label} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600}}>
+    const legend=series=><div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:6}}>{series.map(x=>{const on=!!x.f&&selF.length===1&&selF[0]===x.f;return <span key={x.label} onClick={x.f?()=>setSelF(on?[]:[x.f]):undefined} title={x.f?(on?'คลิกอีกครั้งเพื่อกลับไปดูทุกสูตร':'คลิกเพื่อดูเฉพาะสูตร '+x.f):''} style={{fontSize:12,display:'flex',alignItems:'center',gap:5,color:'#111',fontWeight:600,cursor:x.f?'pointer':'default',padding:'2px 8px',borderRadius:999,border:'1px solid '+(on?'#2f5fd0':x.f?'#e2e8f0':'transparent'),background:on?'#e8efff':'transparent'}}>
       <svg width="14" height="14" style={{flexShrink:0}}>
         {x.shape==='square'&&<rect x="1" y="1" width="12" height="12" fill="#fff" stroke={x.color} strokeWidth="2"/>}
         {x.shape==='triangle'&&<polygon points="7,1 13,13 1,13" fill="#fff" stroke={x.color} strokeWidth="2"/>}
         {x.shape==='diamond'&&<polygon points="7,1 13,7 7,13 1,7" fill="#fff" stroke={x.color} strokeWidth="2"/>}
         {x.shape==='star'&&<polygon points="7,1 8.5,5.5 13,5.5 9.5,8.5 11,13 7,10 3,13 4.5,8.5 1,5.5 5.5,5.5" fill={x.color} stroke={x.color} strokeWidth="1"/>}
         {(!x.shape||x.shape==='circle')&&<circle cx="7" cy="7" r="5" fill="#fff" stroke={x.color} strokeWidth="2"/>}
-      </svg>{x.label}</span>)}</div>;
+      </svg>{x.label}</span>;})}</div>;
     const nm=x=>x.label.replace(' (ยกเว้น NP280)','');
-    const tgOf=(series,crit)=>{const one=series.length===1?series[0]:null,v=one?one.data.filter(y=>y!=null):[];return [...crit,...(v.length?[{value:r1(avgOf(v)),label:'เฉลี่ย '+nm(one),color:'#059669'}]:[])];};
+    const tgOf=(series,crit)=>[...crit,...series.map(x=>{const v=x.data.filter(y=>y!=null);return v.length?{value:r1(avgOf(v)),label:'เฉลี่ย '+nm(x),color:x.color,noLine:true}:null;}).filter(Boolean)];
     // หัวกราฟ: ค่าเฉลี่ยแยกตามสูตร (เส้น) เช่น เฉลี่ย NP325 466.3 · NP345 480.1
     const avgJsx=ser=>{const it=ser.map(x=>{const v=x.data.filter(y=>y!=null);return v.length?{l:nm(x),a:avgOf(v)}:null;}).filter(Boolean);return <>เฉลี่ย {it.map((x,i)=><span key={i}>{i>0&&' · '}{x.l} <b style={{color:'#1a2540'}}>{x.a.toFixed(1)}</b></span>)}</>;};
     const chart=(cats,series,crit,opt)=>{const targets=tgOf(series,crit);
@@ -4977,7 +4978,7 @@ window.__dataReady.then(data => {
           <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:4}}>
             <span style={{fontWeight:700,fontSize:14,color:'#1a2540'}}>{title}</span>
             <span style={{fontSize:12.5,color:'#64748b'}}>{st.n?<>{avgJsx(ser)} · ต่ำกว่าเกณฑ์ <b style={{color:st.low?'#c0392b':'#1a2540'}}>{st.low}</b> จุด · มีผล {st.n} จุด</>:'ไม่มีผลในช่วงนี้'}</span></div>
-          {st.n?<>{legend(ser)}{chart(days.slice(i0,i1).map(d=>d+' '+M[MO-1]),ser,B.crit,{height:300,yMin,yMax})}{ampOf(ser,i0,i1)}</>:empty('ไม่มีผลในช่วงนี้')}
+          {st.n?<>{legend(ser)}{chart(days.slice(i0,i1).map(d=>d+' '+M[MO-1]),ser,B.crit,{height:300,yMin,yMax})}</>:empty('ไม่มีผลในช่วงนี้')}
         </div>;};
       extra=<label style={{fontSize:13,color:'#555'}}>ปี <select value={Y} onChange={e=>{setYy(+e.target.value);}} style={sel}>{years.map(y=><option key={y} value={y}>{y}</option>)}</select></label>;
       body=<>
@@ -4986,8 +4987,7 @@ window.__dataReady.then(data => {
         </div>
         {half(0,15,'วันที่ 1–15 '+M[MO-1]+' '+Y)}
         {half(15,nDays,'วันที่ 16–'+nDays+' '+M[MO-1]+' '+Y)}
-        {!(ampOf(serHalf(0,15),0,15)||ampOf(serHalf(15,nDays),15,nDays))&&<div style={{fontSize:12.5,color:'#94a3b8',marginBottom:8}}>⚡ ยังไม่มีค่าแอมป์รอบเก็บก้อนในเดือน/สูตรที่เลือก — ให้คนแพล้นท์ติ๊ก "🧱 รอบนี้ QC เก็บก้อนลูกปูน" ตอนถ่ายมิเตอร์ในรอบที่ QC มาเก็บก้อน (หรือ QC ติ๊กย้อนหลังในตารางแอมป์)</div>}
-        <ConcreteCubeTable data={base.filter(r=>sd(r).startsWith(pre))} rows={rows} rangeLabel={M[MO-1]+' '+Y} filterText={'สูตร: '+(selF.length?selF.join(', '):'ทุกสูตร ยกเว้น NP280')+' · อายุ: '+(ages.length>3?'ทุกอายุ':ages.join(', ')+' วัน')} open={showCube} onToggle={()=>setShowCube(v=>!v)} onJump={d=>{setYy(+d.slice(0,4));setMm(+d.slice(5,7));}} sd={sd} fm={fm} ag={ag} isNP280={isNP280} shortDate={shortDate} tgFor={tgFor}/>
+        <ConcreteCubeTable ampNode={(()=>{const a1=ampOf(serHalf(0,15),0,15),a2=ampOf(serHalf(15,nDays),15,nDays);return (a1||a2)?<>{a1}{a2}</>:<div style={{fontSize:12.5,color:'#94a3b8',marginTop:6}}>⚡ ยังไม่มีค่าแอมป์รอบเก็บก้อนในเดือน/สูตรที่เลือก — ให้คนแพล้นท์ติ๊ก "🧱 รอบนี้ QC เก็บก้อนลูกปูน" ตอนถ่ายมิเตอร์ในรอบที่ QC มาเก็บก้อน (หรือ QC ติ๊กย้อนหลังในตารางแอมป์)</div>;})()} data={base.filter(r=>sd(r).startsWith(pre))} rows={rows} rangeLabel={M[MO-1]+' '+Y} filterText={'สูตร: '+(selF.length?selF.join(', '):'ทุกสูตร ยกเว้น NP280')+' · อายุ: '+(ages.length>3?'ทุกอายุ':ages.join(', ')+' วัน')} open={showCube} onToggle={()=>setShowCube(v=>!v)} onJump={d=>{setYy(+d.slice(0,4));setMm(+d.slice(5,7));}} sd={sd} fm={fm} ag={ag} isNP280={isNP280} shortDate={shortDate} tgFor={tgFor}/>
       </>;
     }else{
       const LY=(lYear!=='all'&&years.includes(+lYear))?+lYear:'all';
@@ -5244,9 +5244,10 @@ window.__dataReady.then(data => {
     // chart 1 — horizontal target lines + average
     const c1Targets=[];
     const seenT=new Set();
-    activeForms.forEach(f=>{
+    c1Forms.forEach(f=>{
       const spec=isNP280(f)?TARGET_NP280:TARGET_NORMAL;
       activeAges.forEach(a=>{
+        if(!filt.some(r=>fm(r)===f&&ag(r)===a)) return;
         const tv=spec[a]; if(!tv) return;
         const key=`${a}-${isNP280(f)}`;
         if(seenT.has(key)) return; seenT.add(key);
