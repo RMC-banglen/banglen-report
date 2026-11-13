@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13w';
+var APP_VERSION='2026-11-13x';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -787,7 +787,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       return <g key={'bl'+idx}>
         <rect x={rx} y={l.cy-14} width={tw} height={17} rx="3" fill={l.danger?'#fff3f3':l.pass?'#f0fae8':'white'} stroke={l.color} strokeWidth="1.8"/>
         <text x={tx} y={l.cy} textAnchor="middle" fill={l.danger?PALETTE.cancel:l.pass?'#4f8a32':'#111'} style={{fontSize:'10px',fontWeight:700,fontFamily:'var(--num)'}}>{l.text}</text>
-        {l.amp!=null&&<text x={tx} y={l.cy>l.py?l.cy+14:l.cy-17} textAnchor="middle" fill="#0f766e" style={{fontSize:'9.5px',fontWeight:700,fontFamily:'var(--num)'}}>⚡{fmt(l.amp,1)}</text>}
+        {l.amp!=null&&(()=>{const ay=l.cy>l.py?l.cy+14:l.cy-17,at=fmt(l.amp,1);return <g><text x={tx} y={ay} textAnchor="middle" fill="#0f766e" style={{fontSize:'9.5px',fontWeight:700,fontFamily:'var(--num)'}}>{at}</text><text x={tx-at.length*2.9-2} y={ay} textAnchor="end" style={{fontSize:'9.5px'}}>⚡</text></g>;})()}
       </g>;
     });
   }
