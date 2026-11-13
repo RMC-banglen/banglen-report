@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13x';
+var APP_VERSION='2026-11-13y';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4942,7 +4942,7 @@ window.__dataReady.then(data => {
     // full = ชุดข้อมูลทั้งเดือน (โหมดรายเดือน): ป้ายข้างกราฟเป็นค่าเฉลี่ยทั้งเดือน ค่าเดียวกันทั้งสองกราฟ · ค่าเฉลี่ยครึ่งเดือนอยู่ที่หัวกราฟ
     const tgOf=(series,crit,full)=>full===false?[...crit]:[...crit,...series.map(x=>{const src=(full&&full.find(y=>y.label===x.label))||x;const v=src.data.filter(y=>y!=null);return v.length?{value:r1(avgOf(v)),label:(full?'เฉลี่ยเดือน ':'เฉลี่ย ')+nm(x),color:x.color,noLine:true}:null;}).filter(Boolean)];
     // หัวกราฟ: ค่าเฉลี่ยแยกตามสูตร (เส้น) เช่น เฉลี่ย NP325 466.3 · NP345 480.1
-    const avgJsx=ser=>{const it=ser.map(x=>{const v=x.data.filter(y=>y!=null);return v.length?{l:nm(x),a:avgOf(v)}:null;}).filter(Boolean);return <>เฉลี่ย {it.map((x,i)=><span key={i}>{i>0&&' · '}{x.l} <b style={{color:'#1a2540'}}>{x.a.toFixed(1)}</b></span>)}</>;};
+    const avgJsx=ser=>{const it=ser.map(x=>{const v=x.data.filter(y=>y!=null);return v.length?{l:nm(x),a:avgOf(v)}:null;}).filter(Boolean);return <>เฉลี่ย {it.map((x,i)=><span key={i}>{i>0&&' · '}{x.l} <b style={{color:'#1a2540'}}>{Math.round(x.a)}</b></span>)}</>;};
     const chart=(cats,series,crit,opt)=>{const targets=tgOf(series,crit,opt.full);
       const dz=crit.length?Math.min(...crit.map(t=>t.value)):null;
       return <LineChart keepColor categories={cats} unit="KSC" decimals={0} showValues={opt.values!==false} boxedLabels={opt.values!==false} series={series} targets={targets} dangerBelow={dz} height={opt.height||300} yMin={opt.yMin??null} yMax={opt.yMax??null}/>;};
