@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13v';
+var APP_VERSION='2026-11-13w';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -4939,10 +4939,11 @@ window.__dataReady.then(data => {
         {(!x.shape||x.shape==='circle')&&<circle cx="7" cy="7" r="5" fill="#fff" stroke={x.color} strokeWidth="2"/>}
       </svg>{x.label}</span>;})}</div>;
     const nm=x=>x.label.replace(' (ยกเว้น NP280)','');
-    const tgOf=(series,crit)=>[...crit,...series.map(x=>{const v=x.data.filter(y=>y!=null);return v.length?{value:r1(avgOf(v)),label:'เฉลี่ย '+nm(x),color:x.color,noLine:true}:null;}).filter(Boolean)];
+    // full = ชุดข้อมูลทั้งเดือน (โหมดรายเดือน): ป้ายข้างกราฟเป็นค่าเฉลี่ยทั้งเดือน ค่าเดียวกันทั้งสองกราฟ · ค่าเฉลี่ยครึ่งเดือนอยู่ที่หัวกราฟ
+    const tgOf=(series,crit,full)=>full===false?[...crit]:[...crit,...series.map(x=>{const src=(full&&full.find(y=>y.label===x.label))||x;const v=src.data.filter(y=>y!=null);return v.length?{value:r1(avgOf(v)),label:(full?'เฉลี่ยเดือน ':'เฉลี่ย ')+nm(x),color:x.color,noLine:true}:null;}).filter(Boolean)];
     // หัวกราฟ: ค่าเฉลี่ยแยกตามสูตร (เส้น) เช่น เฉลี่ย NP325 466.3 · NP345 480.1
     const avgJsx=ser=>{const it=ser.map(x=>{const v=x.data.filter(y=>y!=null);return v.length?{l:nm(x),a:avgOf(v)}:null;}).filter(Boolean);return <>เฉลี่ย {it.map((x,i)=><span key={i}>{i>0&&' · '}{x.l} <b style={{color:'#1a2540'}}>{x.a.toFixed(1)}</b></span>)}</>;};
-    const chart=(cats,series,crit,opt)=>{const targets=tgOf(series,crit);
+    const chart=(cats,series,crit,opt)=>{const targets=tgOf(series,crit,opt.full);
       const dz=crit.length?Math.min(...crit.map(t=>t.value)):null;
       return <LineChart keepColor categories={cats} unit="KSC" decimals={0} showValues={opt.values!==false} boxedLabels={opt.values!==false} series={series} targets={targets} dangerBelow={dz} height={opt.height||300} yMin={opt.yMin??null} yMax={opt.yMax??null}/>;};
     const sel={border:'1px solid #ccd',borderRadius:5,padding:'4px 8px',fontSize:14,background:'#fff'};
@@ -4965,20 +4966,21 @@ window.__dataReady.then(data => {
       B.series.forEach(x=>{ if(x.f) x.amps=days.map(d=>{const key=pre+String(d).padStart(2,'0');const v=(cubeAmp||[]).filter(a=>String(a.d).slice(0,10)===key&&nf(a.formula)===nf(x.f)).map(a=>Number(a.amp)).filter(y=>y>0);return v.length?r1(avgOf(v)):null;}); });
       const serHalf=(i0,i1)=>B.series.map(x=>({...x,data:x.data.slice(i0,i1),amps:x.amps?x.amps.slice(i0,i1):null})).filter(x=>x.data.some(v=>v!=null));
       const ampNote=ser=>ser.some(x=>x.amps&&x.amps.some(v=>v!=null))?<div style={{fontSize:12,color:'#0f766e',margin:'0 0 4px'}}>⚡ = ค่าแอมป์ (A) ของรอบที่ QC เก็บก้อนลูกปูนวันนั้น</div>:null;
-      const half=(i0,i1,title)=>{const ser=serHalf(i0,i1);const st=statOf(ser);
+      const hasH2=serHalf(15,nDays).length>0;   // ป้ายเฉลี่ยทั้งเดือนขึ้นที่กราฟล่าง ถ้าครึ่งหลังยังไม่มีผลให้ขึ้นที่กราฟบน
+      const half=(i0,i1,title,own)=>{const ser=serHalf(i0,i1);const st=statOf(ser);
         return <div style={{marginBottom:18}}>
           <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:4}}>
             <span style={{fontWeight:700,fontSize:14,color:'#1a2540'}}>{title}</span>
             <span style={{fontSize:12.5,color:'#64748b'}}>{st.n?<>{avgJsx(ser)} · ต่ำกว่าเกณฑ์ <b style={{color:st.low?'#c0392b':'#1a2540'}}>{st.low}</b> จุด · มีผล {st.n} จุด</>:'ไม่มีผลในช่วงนี้'}</span></div>
-          {st.n?<>{legend(ser)}{ampNote(ser)}{chart(days.slice(i0,i1).map(d=>d+' '+M[MO-1]),ser,B.crit,{height:300,yMin,yMax})}</>:empty('ไม่มีผลในช่วงนี้')}
+          {st.n?<>{legend(ser)}{ampNote(ser)}{chart(days.slice(i0,i1).map(d=>d+' '+M[MO-1]),ser,B.crit,{height:300,yMin,yMax,full:own?B.series:false})}</>:empty('ไม่มีผลในช่วงนี้')}
         </div>;};
       extra=<label style={{fontSize:13,color:'#555'}}>ปี <select value={Y} onChange={e=>{setYy(+e.target.value);}} style={sel}>{years.map(y=><option key={y} value={y}>{y}</option>)}</select></label>;
       body=<>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(54px,1fr))',gap:6,marginBottom:14}}>
           {M.map((n,i)=>{const m=i+1,has=monthsWith.has(m),on=m===MO;return <button key={m} disabled={!has} onClick={()=>setMm(m)} style={{padding:'7px 0',borderRadius:6,border:'1px solid '+(on?'#2f5fd0':'#ccd'),background:on?'#e8efff':'#fff',color:on?'#2f5fd0':has?'#333':'#bbb',fontWeight:on?700:500,fontSize:13.5,cursor:has?'pointer':'default'}}>{n}</button>;})}
         </div>
-        {half(0,15,'วันที่ 1–15 '+M[MO-1]+' '+Y)}
-        {half(15,nDays,'วันที่ 16–'+nDays+' '+M[MO-1]+' '+Y)}
+        {half(0,15,'วันที่ 1–15 '+M[MO-1]+' '+Y,!hasH2)}
+        {half(15,nDays,'วันที่ 16–'+nDays+' '+M[MO-1]+' '+Y,hasH2)}
         <ConcreteCubeTable data={base.filter(r=>sd(r).startsWith(pre))} rows={rows} rangeLabel={M[MO-1]+' '+Y} filterText={'สูตร: '+(selF.length?selF.join(', '):'ทุกสูตร ยกเว้น NP280')+' · อายุ: '+(ages.length>3?'ทุกอายุ':ages.join(', ')+' วัน')} open={showCube} onToggle={()=>setShowCube(v=>!v)} onJump={d=>{setYy(+d.slice(0,4));setMm(+d.slice(5,7));}} sd={sd} fm={fm} ag={ag} isNP280={isNP280} shortDate={shortDate} tgFor={tgFor}/>
       </>;
     }else{
