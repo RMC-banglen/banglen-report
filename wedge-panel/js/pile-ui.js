@@ -1,15 +1,15 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261116025723";
-import { pileSheet } from "./pile-draw.js?v=20261116025723";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261116025723";
-import { download } from "./pdf.js?v=20261116025723";
-import { esc } from "./draw2d.js?v=20261116025723";
-import { getSession, canEdit } from "./auth.js?v=20261116025723";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261116025723";
-import { db } from "./db.js?v=20261116025723";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261116025723";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261116025723";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261116030118";
+import { pileSheet } from "./pile-draw.js?v=20261116030118";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261116030118";
+import { download } from "./pdf.js?v=20261116030118";
+import { esc } from "./draw2d.js?v=20261116030118";
+import { getSession, canEdit } from "./auth.js?v=20261116030118";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261116030118";
+import { db } from "./db.js?v=20261116030118";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf, exTxt } from "./pile-struct.js?v=20261116030118";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261116030118";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -407,9 +407,8 @@ function fileTag(inp) {
   let t = "";
   const lens = inp.pieces > 1 ? pieceLensOf(inp) : [], micro = lens.length > 1 && lens.every((v) => Math.abs(v - 1.5) < 1e-9);
   if (micro) t += " ไมโครไพล์ " + lens.length + "ท่อน";
-  else if (inp.pieces > 1) t += " " + inp.pieces + "ท่อน(" + lens.map((v) => m2(v)).join("+") + ")";
-  const ex = (inp.extras || []).filter((e) => +e.d > 0 && +e.n > 0);
-  if (ex.length && !PILE_SECTIONS[inp.section].fac) t += " เหล็กเสริม " + ex.map((e) => e.n + "-DB" + e.d).join(" ");
+  // เสาต่อเชื่อมธรรมดา (2-3 ท่อน) ไม่ใส่ในชื่อไฟล์ มีเฉพาะไมโครไพล์ • เหล็กเสริมบอกความยาวด้วย เช่น "เหล็กเสริม 4-DB16x11.00ม"
+  if (!PILE_SECTIONS[inp.section].fac) t += exTxt(inp).split("m.").join("ม");
   if (inp.shoulder > 0) t += " บ่า" + m2(inp.shoulder) + "ม";
   return t;
 }
