@@ -2,8 +2,8 @@
 // ส่งออก PDF / ใบสรุป HTML — สร้างในเครื่องผู้ใช้ตอนกดดาวน์โหลด ไม่เก็บไฟล์ลง Storage
 // โครงตามต้นแบบ: หน้า 1 สรุปโครงการ • 1 หน้าต่อ c/c (3D + รูปขยายรอยต่อ) • 1 หน้าต่อรหัส (รูปตัด 2 + รูปด้าน 2)
 // ชิ้นเนื้อหาที่ยาวเกินหน้าจะถูกย่อให้พอดี ไม่ตัดกลางชิ้น
-import { fmt, f2, f3 } from "./calc.js?v=20261116030118";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261116030118";
+import { fmt, f2, f3 } from "./calc.js?v=20261116041756";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261116041756";
 
 export const PRINT = {"--bg":"#FFFFFF","--surface":"#FFFFFF","--surface-2":"#F5F6F4","--ink":"#1D2725","--muted":"#5B6964","--faint":"#8A9691","--line":"#CDD3CF","--accent":"#0F6E56","--accent-soft":"#E1F2EB","--rebar":"#C2522B","--rebar-2":"#B07316","--pipe":"#1E5FA0","--warn":"#9A5B05","--warn-soft":"#FBF0DC","--danger":"#A32D2D","--danger-soft":"#FBE8E8","--concrete":"rgba(93,202,165,.20)"};
 export const unvar = (s) => s.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => PRINT[k] || "#1D2725");
@@ -53,11 +53,11 @@ export async function makePdf({ st, d, $, views, onStatus, customer = false }) {
       pg.innerHTML = unvar(spec[i].h);
       pg.querySelectorAll("svg").forEach((s) => { s.style.minWidth = "0"; s.style.width = "100%"; s.style.height = "auto"; s.style.display = "block"; });
       box.appendChild(pg);
-      const cv = await window.html2canvas(pg, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      const cv = await window.html2canvas(pg, { scale: 3, backgroundColor: "#ffffff", useCORS: true });
       let w = pw, h = (cv.height * pw) / cv.width;
       if (h > avail) { w = (w * avail) / h; h = avail; } // ย่อให้พอดีหน้า ไม่ตัดกลาง
       if (i > 0) pdf.addPage();
-      pdf.addImage(cv.toDataURL("image/jpeg", 0.92), "JPEG", (pw - w) / 2, M, w, h);
+      pdf.addImage(cv.toDataURL("image/jpeg", 0.95), "JPEG", (pw - w) / 2, M, w, h);
       pg.remove();
     }
     download(`แผ่นกันดิน-${safeName(d.pj, "โครงการ")}${customer ? "-ส่งลูกค้า" : ""}.pdf`, pdf.output("blob"));

@@ -1,15 +1,15 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261116030118";
-import { pileSheet } from "./pile-draw.js?v=20261116030118";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261116030118";
-import { download } from "./pdf.js?v=20261116030118";
-import { esc } from "./draw2d.js?v=20261116030118";
-import { getSession, canEdit } from "./auth.js?v=20261116030118";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261116030118";
-import { db } from "./db.js?v=20261116030118";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf, exTxt } from "./pile-struct.js?v=20261116030118";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261116030118";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261116041756";
+import { pileSheet } from "./pile-draw.js?v=20261116041756";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261116041756";
+import { download } from "./pdf.js?v=20261116041756";
+import { esc } from "./draw2d.js?v=20261116041756";
+import { getSession, canEdit } from "./auth.js?v=20261116041756";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261116041756";
+import { db } from "./db.js?v=20261116041756";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf, exTxt } from "./pile-struct.js?v=20261116041756";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261116041756";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -141,12 +141,12 @@ async function addPage(doc, html, first, portrait, rotate) {
   const host = document.createElement("div");
   host.style.cssText = "position:absolute;left:-12000px;top:0;background:#fff;" + (portrait ? "width:794px;height:1123px" : "width:1188px;height:840px");
   host.innerHTML = html; document.body.appendChild(host);
-  let cv = await window.html2canvas(host, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+  let cv = await window.html2canvas(host, { scale: 3, backgroundColor: "#ffffff", useCORS: true });
   host.remove();
   if (rotate) { const rc = document.createElement("canvas"); rc.width = cv.height; rc.height = cv.width; const cx = rc.getContext("2d"); cx.translate(0, rc.height); cx.rotate(-Math.PI / 2); cx.drawImage(cv, 0, 0); cv = rc; } // แบบแนวนอนหมุนทวนเข็ม 90° ให้เต็มหน้า A4 แนวตั้ง
   const por = portrait || rotate;
   if (!first) doc.addPage("a4", por ? "portrait" : "landscape");
-  doc.addImage(cv.toDataURL("image/jpeg", 0.93), "JPEG", 0, 0, por ? 595.28 : 841.89, por ? 841.89 : 595.28);
+  doc.addImage(cv.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, por ? 595.28 : 841.89, por ? 841.89 : 595.28);
 }
 const secName = (k) => { const s = PILE_SECTIONS[k]; return (s.menu || s.label) + (s.fac ? " โรงงาน" : " มอก."); };
 const blowItem = (inp) => ({ section: inp.section, L: inp.L, W: inp.blow.W, Qa: inp.blow.Qa, H: inp.blow.H });
