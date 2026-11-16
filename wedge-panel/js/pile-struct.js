@@ -1,9 +1,9 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // รายการคำนวณเสาเข็มคอนกรีตอัดแรง (สูตรจากไฟล์ Excel บริษัท "691107-01 ... I-0.35_TIS.xlsx" ชีต I-35มอก) + หน้าปก/หน้าคั่น
 // ใช้ได้ทุกหน้าตัด: เปลี่ยนค่าตามหน้าตัด (พื้นที่/โมเมนต์) ลวด PC เหล็กเดือย และเกลียว จากข้อมูลหน้าตัดใน pile-data.js
-import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261111100406";
-import { ruleFor, autoSplit } from "./pile-calc.js?v=20261111100406";
-import { esc } from "./draw2d.js?v=20261111100406";
+import { PILE_SECTIONS, TITLE_BLOCK } from "./pile-data.js?v=20261116024942";
+import { ruleFor, autoSplit, planPile } from "./pile-calc.js?v=20261116024942";
+import { esc } from "./draw2d.js?v=20261116024942";
 
 export const FC = 350, FCI = 250, RH = 75, ES_MOD = 2000000; // ksc
 const AREA_RB = { 6: 0.283, 9: 0.636, 12: 1.131 }; // เหล็กเส้นกลม RB (SR24, fy 2400) ตร.ซม.
@@ -92,6 +92,15 @@ export function structCalc({ secKey, pieceLens, Qa, wires, opts = {} }) {
 // ---- ข้อความชื่อรายการ ----
 const m2 = (v) => (Math.round(v * 100) / 100).toFixed(2);
 const pcsTxt = (lens) => (lens.length > 1 && new Set(lens).size === 1 && Math.abs(lens[0] - 1.5) < 1e-9 ? `( Micropile ${m2(lens[0])} m. ${lens.length} ท่อนต่อเชื่อม )` : lens.length > 1 ? `( ${lens.length} ท่อนต่อเชื่อม ${lens.map((v) => (Number.isInteger(v) ? v : m2(v)) + "m.").join("+")} )` : "( ท่อนเดี่ยว )");
+// เหล็กเสริมพิเศษที่ผู้ใช้ใส่ (DB) แสดงต่อท้ายชื่อเสาในหน้าปก/หน้าคั่น/หัวใบคำนวณ เช่น " เหล็กเสริม 4-DB16x11.00m."
+export function exTxt(p) {
+  if (!p.extras || !p.extras.length) return "";
+  try {
+    const plan = planPile({ section: p.section, L: p.L, pieces: p.pieces, split: p.split, extras: p.extras, joint: p.pieces > 1, wires: p.wires });
+    if (!plan.extras.length) return "";
+    return " เหล็กเสริม " + plan.extras.map((e) => { const ls = [...new Set(plan.pieces.filter((q) => q.extras.includes(e)).map((q) => q.len))]; return e.n + "-DB" + e.d + "x" + (e.len ? [e.len] : ls).map(m2).join("/") + "m."; }).join(" ");
+  } catch (err) { return ""; }
+}
 export function pileTitle(p, lens) {
   const sec = PILE_SECTIONS[p.section], k = (+p.section.slice(1) / 100).toFixed(2);
   return sec.geo.sq ? `S-${k} x ${k} x ${m2(p.L)}m. ${pcsTxt(lens)}` : `I-${k} x ${k} x ${m2(p.L)}m. ${pcsTxt(lens)}`;
@@ -154,14 +163,14 @@ const CSS = `<style>
 const logo = (src) => `<img src="${src}" alt="">`;
 const head = (project, title, logoSrc) => `<div class="cqhd"><div class="cqlg">${logo(logoSrc)}<div style="font-weight:700;font-size:11px;margin-top:3px">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:9.5px">299 หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div>
 <div class="cqti"><b>รายการคำนวณเสาเข็มคอนกรีตอัดแรง ขนาด ${esc(title.line1)}</b><br>${esc(title.line2)} ${title.std}
-<div class="cqpj"><span>โครงการ</span><span>:</span><span>${esc(project.pj || "")}</span>${project.ow ? `<span>เจ้าของโครงการ</span><span>:</span><span>${esc(project.ow)}</span>` : ""}<span>สถานที่</span><span>:</span><span>${esc(project.lo || "")}</span></div></div></div>`;
+${project.pj || project.ow || project.lo ? `<div class="cqpj">${project.pj ? `<span>โครงการ</span><span>:</span><span>${esc(project.pj)}</span>` : ""}${project.ow ? `<span>เจ้าของโครงการ</span><span>:</span><span>${esc(project.ow)}</span>` : ""}${project.lo ? `<span>สถานที่</span><span>:</span><span>${esc(project.lo)}</span>` : ""}</div>` : ""}</div></div>`;
 
 const row = (l, s, v, u, o = {}) => `<div class="cqr"><span>${l}</span><span>${s || ""}</span><span class="cqe">${o.eq === false ? "" : "="}</span><span class="cqv ${o.cls || ""}">${v}</span><span>${u || ""}</span></div>`;
 const rowSub = (t) => `<div class="cqsub">${t}</div>`;
 
 function titleParts(p, lens) {
   const sec = PILE_SECTIONS[p.section], k = (+p.section.slice(1) / 100).toFixed(2), sq = sec.geo.sq;
-  return { kindTh: sq ? "หน้าตัดสี่เหลี่ยม" : "หน้าตัดตัว I", line1: `${sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m.`, line2: pcsTxt(lens), std: sec.fac ? "มาตรฐานโรงงาน" : "มาตรฐาน มอก.396-2549" };
+  return { kindTh: sq ? "หน้าตัดสี่เหลี่ยม" : "หน้าตัดตัว I", line1: `${sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m.`, line2: pcsTxt(lens) + exTxt(p), std: sec.fac ? "มาตรฐานโรงงาน" : "มาตรฐาน มอก.396-2549" };
 }
 
 // หน้า 1: คุณสมบัติหน้าตัด • ตรวจแรงยกเสา • การสูญเสียแรงอัด • วัสดุ • ตรวจหน่วยแรง • กำลังรับน้ำหนัก
@@ -250,7 +259,7 @@ ${row("Use Develop Length", "", f(j.useLd, 0), "cm.")}
 // หน้าคั่นก่อนรายการคำนวณของเสาแต่ละต้น
 export function dividerPage(p) {
   const lens = pieceLensOf(p), sec = PILE_SECTIONS[p.section], k = (+p.section.slice(1) / 100).toFixed(2);
-  return `${CSS}<div class="cqsp"><div style="position:absolute;left:0;right:0;top:210px;text-align:center;font-size:18px;font-weight:700;line-height:2">รายการคำนวณเสาเข็มคอนกรีตอัดแรง${lens.length > 1 && lens.every((v) => Math.abs(v - 1.5) < 1e-9) ? " Micropile" : ""}<br>ขนาด ${sec.geo.sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m.<br>${esc(pcsTxt(lens))}<br>${sec.fac ? "มาตรฐานโรงงาน" : "มาตรฐาน มอก.396-2549"}</div></div>`;
+  return `${CSS}<div class="cqsp"><div style="position:absolute;left:0;right:0;top:210px;text-align:center;font-size:18px;font-weight:700;line-height:2">รายการคำนวณเสาเข็มคอนกรีตอัดแรง${lens.length > 1 && lens.every((v) => Math.abs(v - 1.5) < 1e-9) ? " Micropile" : ""}<br>ขนาด ${sec.geo.sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m.<br>${esc(pcsTxt(lens) + exTxt(p))}<br>${sec.fac ? "มาตรฐานโรงงาน" : "มาตรฐาน มอก.396-2549"}</div></div>`;
 }
 
 // ปก: รายการเสาทุกต้น เรียงตามขนาดแล้วตามความยาว
@@ -259,11 +268,11 @@ const famOf = (sec) => (PILE_SECTIONS[sec] && PILE_SECTIONS[sec].geo.sq ? 1 : 0)
 export const sortPiles = (piles) => piles.slice().sort((a, b) => famOf(a.section) - famOf(b.section) || +a.section.slice(1) - +b.section.slice(1) || !!PILE_SECTIONS[a.section].fac - !!PILE_SECTIONS[b.section].fac || a.L - b.L);
 export function coverPage(piles, project, logoSrc = "assets/logo.png") {
   const nFac = piles.filter((p) => PILE_SECTIONS[p.section].fac).length, mixed = nFac > 0 && nFac < piles.length, stdLine = nFac === piles.length ? "มาตรฐานโรงงาน" : "มาตรฐาน มอก. 396-2549";
-  const list = sortPiles(piles).map((p) => { const k = (+p.section.slice(1) / 100).toFixed(2), sq = PILE_SECTIONS[p.section].geo.sq; return `<div style="margin:3px 0">${sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m. ${esc(pcsTxt(pieceLensOf(p)))}${mixed ? " " + (PILE_SECTIONS[p.section].fac ? "มาตรฐานโรงงาน" : "มอก.396-2549") : ""}</div>`; }).join("");
+  const list = sortPiles(piles).map((p) => { const k = (+p.section.slice(1) / 100).toFixed(2), sq = PILE_SECTIONS[p.section].geo.sq; return `<div style="margin:3px 0">${sq ? "S" : "I"}-${k} x ${k} x ${m2(p.L)}m. ${esc(pcsTxt(pieceLensOf(p)) + exTxt(p))}${mixed ? " " + (PILE_SECTIONS[p.section].fac ? "มาตรฐานโรงงาน" : "มอก.396-2549") : ""}</div>`; }).join("");
   return `${CSS}<div class="cqsp" style="text-align:center;font-size:14px"><div style="position:absolute;left:0;right:0;top:80px"><img src="${logoSrc}" style="width:190px" alt="">
 <div style="font-weight:700;font-size:16px;margin-top:12px">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:13px">299 หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div>
 <div style="font-weight:700;margin-top:26px;font-size:16px">รายการคำนวณเสาเข็มคอนกรีตอัดแรง</div>${mixed ? "" : `<div style="margin-top:8px;font-weight:600">${stdLine}</div>`}
 <div style="margin-top:14px;font-weight:600">${list}</div>
-<div style="margin-top:80px;line-height:1.9"><div>โครงการ : &nbsp;${esc(project.pj || "")}</div>${project.ow ? `<div>เจ้าของโครงการ : &nbsp;${esc(project.ow)}</div>` : ""}<div>สถานที่ : &nbsp;${esc(project.lo || "")}</div></div>
+${project.pj || project.ow || project.lo ? `<div style="margin-top:80px;line-height:1.9">${project.pj ? `<div>โครงการ : &nbsp;${esc(project.pj)}</div>` : ""}${project.ow ? `<div>เจ้าของโครงการ : &nbsp;${esc(project.ow)}</div>` : ""}${project.lo ? `<div>สถานที่ : &nbsp;${esc(project.lo)}</div>` : ""}</div>` : ""}
 <div style="margin:150px 80px 0 auto;width:280px;font-size:13px;line-height:1.7"><div style="height:60px;border-bottom:1.2px solid #000"></div><div>( ${esc(TITLE_BLOCK.approveByTh)} )</div><div>วิศวกร &nbsp; ${esc(TITLE_BLOCK.licence)}</div></div></div></div>`;
 }
