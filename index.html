@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13z';
+var APP_VERSION='2026-11-16a';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -14047,6 +14047,65 @@ window.__dataReady.then(data => {
 
   function WedgePanelRedirect(){React.useEffect(()=>{location.href='wedge-panel/';},[]);return <div style={{padding:24}}>กำลังเปิดหน้าออกแบบและเขียนแบบ…</div>;}
 
+  // ---------- สำรองข้อมูลลงเครื่อง (เฉพาะผู้ดูแลระบบ) ----------
+  // กดปุ่ม → ดึงข้อมูลทุกตารางสำคัญ (อ่านอย่างเดียว) → ดาวน์โหลดเป็นไฟล์ .json ลงเครื่องที่กด · จำวันที่สำรองล่าสุดไว้ในเครื่องนี้ แล้วเตือนว่าไม่ได้สำรองมากี่วัน
+  // (รูปถ่ายไม่รวมในไฟล์ — ไฟล์เก็บรายการ URL รูปไว้ · รูปสำรองด้วยสคริปต์ tools/backup-supabase.cjs)
+  const BACKUP_TABLES=["accident_reports","blow_counts","calibration_items","cancel_causes","capacity_config","cement_addition_log","cement_config","cement_usage","concrete_mix_design","concrete_results","concrete_unit_weight_tests","damage_items","damage_sales","foreman_reports","materials_daily","mix_targets","monthly_input","pending_work","pile_fail_inspections","pile_materials_state","pile_output","plant_amp_readings","plant_amp_spec","plate_usage","pour_daily","production_monthly","qc_check_images","qc_check_items","qc_checklist","qc_checks","qc_elongation_spec","qc_inspectors","qc_production_day","quality_decade","quality_report_images","quality_reports","repair_assets","repair_causes","repair_events","repair_expense_details","repair_line_items","repair_requests","repair_staff","sand_fm_tests","sand_moisture_tests","sand_organic_tests","sand_silt_spec","sand_silt_tests","stone_gradation_tests","transport_assignments","transport_day_notes","transport_drivers","transport_trips","transport_vehicles","transport_workdays","worktrack_raft_info","worktrack_raft_parts","worktrack_tasks","worktrack_users"];
+  const BACKUP_KEY='rmc_last_backup';
+  function BackupBar({currentUser}){
+    const [last,setLast]=React.useState(()=>{try{return localStorage.getItem(BACKUP_KEY)||'';}catch(e){return '';}});
+    const [busy,setBusy]=React.useState('');
+    const [msg,setMsg]=React.useState(null);   // {ok,text}
+    const lastDate=last?new Date(last):null;
+    const days=lastDate&&!isNaN(lastDate)?Math.floor((Date.now()-lastDate.getTime())/864e5):null;
+    const level=days==null||days>=14?'red':days>=7?'amber':'ok';
+    const th={red:{bg:'#fef2f2',bd:'#fecaca',fg:'#b91c1c',ic:'⚠️'},amber:{bg:'#fffbeb',bd:'#fde68a',fg:'#92400e',ic:'⚠️'},ok:{bg:'#f8fafc',bd:'#e2e8f0',fg:'#475569',ic:'💾'}}[level];
+    const fmtD=d=>d.getDate()+'/'+(d.getMonth()+1)+'/'+(d.getFullYear()+543)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    const text=days==null?'ยังไม่เคยสำรองข้อมูลจากเครื่องนี้':days===0?'สำรองข้อมูลล่าสุดวันนี้ ('+fmtD(lastDate)+')':'ไม่ได้สำรองข้อมูลมา '+days+' วันแล้ว (ล่าสุด '+fmtD(lastDate)+')';
+    const run=async()=>{
+      if(busy) return;
+      setMsg(null);setBusy('เริ่ม…');
+      const out={},counts={},errors={},photos=new Set();
+      try{
+        for(let i=0;i<BACKUP_TABLES.length;i++){
+          const t=BACKUP_TABLES[i];setBusy('กำลังสำรอง '+(i+1)+'/'+BACKUP_TABLES.length+' · '+t);
+          try{
+            const rows=[];let useOrder=true;
+            for(let from=0;;from+=1000){
+              let r=useOrder?await DB.from(t).select('*').order('id',{ascending:true}).range(from,from+999):await DB.from(t).select('*').range(from,from+999);
+              if(r.error&&useOrder){useOrder=false;r=await DB.from(t).select('*').range(from,from+999);}   // ตารางที่ไม่มีคอลัมน์ id
+              if(r.error)throw r.error;
+              rows.push(...r.data);
+              if(r.data.length<1000)break;
+            }
+            out[t]=rows;counts[t]=rows.length;
+            JSON.stringify(rows).replace(/https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/[a-z0-9_-]+\/[^"'\s\\]+/g,m=>{photos.add(m);return m;});
+          }catch(e){errors[t]=String((e&&e.message)||e);}
+        }
+        const now=new Date(),p=n=>String(n).padStart(2,'0');
+        const stamp=now.getFullYear()+'-'+p(now.getMonth()+1)+'-'+p(now.getDate())+'_'+p(now.getHours())+p(now.getMinutes());
+        const meta={app:'RMC-banglen',created:now.toISOString(),by:currentUser&&currentUser.name,counts,errors,photoCount:photos.size};
+        setBusy('กำลังสร้างไฟล์…');
+        const blob=new Blob([JSON.stringify({meta,photos:[...photos],data:out})],{type:'application/json'});
+        const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='RMC-banglen-backup_'+stamp+'.json';
+        document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),120000);
+        const nTab=Object.keys(counts).length,nRow=Object.values(counts).reduce((x,y)=>x+y,0),nErr=Object.keys(errors).length;
+        try{localStorage.setItem(BACKUP_KEY,now.toISOString());}catch(e){}
+        setLast(now.toISOString());
+        setMsg({ok:!nErr,text:'ดาวน์โหลดแล้ว: '+nTab+' ตาราง · '+nRow.toLocaleString('th-TH')+' แถว · ขนาด '+(blob.size/1048576).toFixed(1)+' MB (ไฟล์อยู่ในโฟลเดอร์ดาวน์โหลดของเครื่อง)'+(nErr?' · สำรองไม่ได้ '+nErr+' ตาราง: '+Object.keys(errors).join(', '):'')});
+      }catch(e){setMsg({ok:false,text:'สำรองไม่สำเร็จ: '+((e&&e.message)||e)});}
+      setBusy('');
+    };
+    return <div style={{margin:'10px 16px 0',padding:'8px 14px',borderRadius:10,border:'1px solid '+th.bd,background:th.bg,color:th.fg,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',fontSize:13.5}}>
+      <span>{th.ic}</span>
+      <span style={{fontWeight:level==='ok'?500:700}}>{text}</span>
+      <button onClick={run} disabled={!!busy} style={{padding:'5px 14px',borderRadius:8,border:'1px solid '+th.bd,background:'#fff',color:th.fg,fontWeight:700,fontSize:13,cursor:busy?'wait':'pointer'}}>{busy?'⏳ กำลังสำรอง…':'💾 สำรองข้อมูลตอนนี้'}</button>
+      {busy&&<span style={{fontSize:12.5}}>{busy}</span>}
+      {msg&&<span style={{fontSize:12.5,color:msg.ok?'#15803d':'#b91c1c',fontWeight:600}}>{msg.ok?'✔ ':'✘ '}{msg.text}</span>}
+      {!busy&&!msg&&<span style={{fontSize:12,color:'#94a3b8'}}>ไฟล์มี PIN ผู้ใช้และข้อมูลลูกค้า — เก็บในเครื่องที่ปลอดภัย</span>}
+    </div>;
+  }
+
   function App(){
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const getFirstTab=(user)=>{
@@ -14092,6 +14151,7 @@ window.__dataReady.then(data => {
         </div>
       </header>
       <TabNav tabs={tabs} tab={tab} setTab={setTab}/>
+      {isAdmin&&<BackupBar currentUser={currentUser}/>}
       <main>
         {tab==='meeting'&&<HeadOfficeMeetingTab currentUser={currentUser}/>}
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
