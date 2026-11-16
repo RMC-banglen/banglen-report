@@ -1,15 +1,15 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261116025603";
-import { pileSheet } from "./pile-draw.js?v=20261116025603";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261116025603";
-import { download } from "./pdf.js?v=20261116025603";
-import { esc } from "./draw2d.js?v=20261116025603";
-import { getSession, canEdit } from "./auth.js?v=20261116025603";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261116025603";
-import { db } from "./db.js?v=20261116025603";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261116025603";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261116025603";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261116025723";
+import { pileSheet } from "./pile-draw.js?v=20261116025723";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261116025723";
+import { download } from "./pdf.js?v=20261116025723";
+import { esc } from "./draw2d.js?v=20261116025723";
+import { getSession, canEdit } from "./auth.js?v=20261116025723";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261116025723";
+import { db } from "./db.js?v=20261116025723";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf } from "./pile-struct.js?v=20261116025723";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261116025723";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
@@ -402,6 +402,18 @@ async function pdfAll(withBlow = true) {
   b.disabled = false;
 }
 
+// ชื่อไฟล์ครอบคลุมแบบพิเศษ: ไมโครไพล์ / ต่อเชื่อม / เหล็กเสริม / บ่า
+function fileTag(inp) {
+  let t = "";
+  const lens = inp.pieces > 1 ? pieceLensOf(inp) : [], micro = lens.length > 1 && lens.every((v) => Math.abs(v - 1.5) < 1e-9);
+  if (micro) t += " ไมโครไพล์ " + lens.length + "ท่อน";
+  else if (inp.pieces > 1) t += " " + inp.pieces + "ท่อน(" + lens.map((v) => m2(v)).join("+") + ")";
+  const ex = (inp.extras || []).filter((e) => +e.d > 0 && +e.n > 0);
+  if (ex.length && !PILE_SECTIONS[inp.section].fac) t += " เหล็กเสริม " + ex.map((e) => e.n + "-DB" + e.d).join(" ");
+  if (inp.shoulder > 0) t += " บ่า" + m2(inp.shoulder) + "ม";
+  return t;
+}
+
 async function pdf(withBlow = true) {
   const inp = read(), plan = planPile(inp), b = $("bPilePdf"), msg = $("pileMsg");
   b.disabled = true; msg.textContent = "กำลังสร้าง PDF…";
@@ -411,7 +423,7 @@ async function pdf(withBlow = true) {
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
     await addPage(doc, pileSheet(plan, await logoData()).replace('width="100%"', 'width="1188" height="840"'), true);
     if (withBlow && inp.blow.W && inp.blow.Qa && inp.blow.H && !inp.full) await addPage(doc, blowSheet(blowItem(inp), secName(inp.section), inp.project, plan.pieces.map((q) => q.len)), false, true);
-    const name = `${curCode ? curCode + " " : ""}${jobLabel(inp.project) ? jobLabel(inp.project) + " " : ""}แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม"}`.replace(/[\\/:*?"<>|]/g, "");
+    const name = `${curCode ? curCode + " " : ""}${jobLabel(inp.project) ? jobLabel(inp.project) + " " : ""}แบบเสาเข็ม ${(PILE_SECTIONS[inp.section].menu || PILE_SECTIONS[inp.section].label)}${PILE_SECTIONS[inp.section].fac ? " โรงงาน" : ""} ${inp.full ? "แบบเต็ม" : m2(inp.L) + "ม" + fileTag(inp)}`.replace(/[\\/:*?"<>|]/g, "");
     download(name + ".pdf", doc.output("blob"));
     msg.textContent = "ดาวน์โหลดแล้ว";
   } catch (e) { msg.textContent = "สร้าง PDF ไม่สำเร็จ: " + e.message; }
