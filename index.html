@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-16a';
+var APP_VERSION='2026-11-16b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -14106,6 +14106,18 @@ window.__dataReady.then(data => {
     </div>;
   }
 
+  function BackupWarn({onGo}){
+    let last='';try{last=localStorage.getItem(BACKUP_KEY)||'';}catch(e){}
+    const d=last?new Date(last):null,days=d&&!isNaN(d)?Math.floor((Date.now()-d.getTime())/864e5):null;
+    if(days!=null&&days<7) return null;
+    const red=days==null||days>=14;
+    return <div style={{margin:'8px 16px 0',padding:'6px 14px',borderRadius:10,border:'1px solid '+(red?'#fecaca':'#fde68a'),background:red?'#fef2f2':'#fffbeb',color:red?'#b91c1c':'#92400e',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',fontSize:13}}>
+      <span>⚠️</span>
+      <span style={{fontWeight:700}}>{days==null?'ยังไม่เคยสำรองข้อมูลจากเครื่องนี้':'ไม่ได้สำรองข้อมูลมา '+days+' วันแล้ว'}</span>
+      <button onClick={onGo} style={{padding:'3px 12px',borderRadius:8,border:'1px solid '+(red?'#fecaca':'#fde68a'),background:'#fff',color:'inherit',fontWeight:700,fontSize:12.5,cursor:'pointer'}}>ไปหน้าสำรองข้อมูล</button>
+    </div>;
+  }
+
   function App(){
     const [currentUser,setCurrentUser]=React.useState(()=>{try{return JSON.parse(sessionStorage.getItem('wt_user')||'null');}catch{return null;}});
     const getFirstTab=(user)=>{
@@ -14151,7 +14163,7 @@ window.__dataReady.then(data => {
         </div>
       </header>
       <TabNav tabs={tabs} tab={tab} setTab={setTab}/>
-      {isAdmin&&<BackupBar currentUser={currentUser}/>}
+      {isAdmin&&tab!=='users'&&<BackupWarn onGo={()=>setTab('users')}/>}
       <main>
         {tab==='meeting'&&<HeadOfficeMeetingTab currentUser={currentUser}/>}
         {tab==='quality'&&<QualityReportTab currentUser={currentUser}/>}
@@ -14171,7 +14183,7 @@ window.__dataReady.then(data => {
         {tab==='wedgepanel'&&<WedgePanelRedirect/>}
         {tab==='foreman'&&<ForemanReportTab canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).foreman)}/>}
         {tab==='pileMaterials'&&<div style={{padding:'16px 0'}}><PileMaterialsFrame canEdit={currentUser.role==='admin'||(currentUser.role==='editor'&&(currentUser.permissions||{}).pileMaterials)} formulaAdmin={!!(currentUser.permissions||{}).materialFormula}/></div>}
-        {tab==='users'&&isAdmin&&<UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/>}
+        {tab==='users'&&isAdmin&&<><BackupBar currentUser={currentUser}/><UserManagementTab currentUser={currentUser} onUpdateSession={u=>{const next={...currentUser,...u};sessionStorage.setItem('wt_user',JSON.stringify(next));setCurrentUser(next);}}/></>}
       </main>
       <footer className="foot">หน่วยปริมาณ = m³ ของคอนกรีต • Strength = ksc • วัตถุดิบ = kg/m³ &nbsp;·&nbsp; ข้อมูลการผลิต 2569 (ม.ค.–เม.ย.)</footer>
     </div>;
