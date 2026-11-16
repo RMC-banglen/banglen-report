@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-13n';
+var APP_VERSION='2026-11-16c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -381,7 +381,7 @@ function observations(r){
 
 // ข้อความสั้นสำหรับแสดงในรายงาน/การ์ดสรุป (ข้อความเต็ม o.x ยังเก็บไว้)
 const SHORT_RULES = [
-  [/ปลายเสา \(10 ฟุตสุดท้าย\) เฉลี่ย ([\d.]+) ครั้ง\/ฟุต.*ชั้นแข็ง/, m=>'ปลายเสาเข้าชั้นดินแข็ง (เฉลี่ย '+m[1]+' ครั้ง/ฟุต)'],
+  [/ช่วง 10 ฟุตสุดท้ายที่ตอกได้ เฉลี่ย ([\d.]+) ครั้ง\/ฟุต.*ชั้นแข็ง/, m=>'ช่วงท้ายอยู่ในชั้นดินแข็ง (เฉลี่ย '+m[1]+' ครั้ง/ฟุต)'],
   [/รีบเปลี่ยนสูตร/, ()=>'ดินแข็ง: กำลังอัดไม่ถึง '+DRIVE_MIN_HARD+' → รีบเปลี่ยนสูตร'],
   [/กำลังอัด ≈ (\d+) ksc.*≥ (\d+) ksc.*ไม่พร้อมตอก/, m=>'กำลังอัดไม่ถึงเกณฑ์พร้อมตอก ('+m[1]+' < '+m[2]+')'],
   [/ไม่พร้อมตอก/, ()=>'กำลังอัดไม่ถึงเกณฑ์พร้อมตอก'],
@@ -412,24 +412,26 @@ function analyze(r){
   if(r.blow_s_cm!=null&&r.blow_s_cm!==''&&Number(r.blow_s_cm)<=0) extra.push({t:'bad',x:'คำนวณ Blow ไม่ได้ — พลังงานตุ้ม (น้ำหนัก × ระยะยก) น้อยกว่าที่ Qa ต้องการ ตุ้มเบา/ยกต่ำเกินไป ตอกไม่เข้า'});
   const ds=driveStats(r), qaT=Number(r.qa_ton), nPre=extra.length;
   if(ds.qaAct!=null&&qaT>0){
-    if(ds.qaRatio<1) extra.push({t:'bad',x:'ตอกยังไม่ถึง set ที่ต้องการ — set จริง '+fmtN(ds.set,3)+' ซม./ครั้ง ให้ Qa ≈ '+fmtN(ds.qaAct,1)+' ตัน ต่ำกว่า Qa ตามแบบ '+fmtN(qaT,1)+' ตัน'});
+    if(ds.qaRatio<1) extra.push({sr:true,t:'bad',x:'ตอกยังไม่ถึง set ที่ต้องการ — set จริง '+fmtN(ds.set,3)+' ซม./ครั้ง ให้ Qa ≈ '+fmtN(ds.qaAct,1)+' ตัน ต่ำกว่า Qa ตามแบบ '+fmtN(qaT,1)+' ตัน'});
     else extra.push({t:ds.qaRatio>=OVERDRIVE_RATIO?'warn':'ok',x:'set ถึงตามต้องการ — Qa ที่ตอกได้จริง ≈ '+fmtN(ds.qaAct,1)+' ตัน (แบบ '+fmtN(qaT,1)+' ตัน = '+fmtN(ds.qaRatio,2)+' เท่า)'+(ds.qaRatio>=OVERDRIVE_RATIO?' ตอกแน่นเกินที่ต้องการมาก ถ้ายังตอกต่อหลังถึง set หัวเสาเสี่ยงแตก':'')});
   }
   if(ds.shortfall!=null&&ds.shortfall>0.05){
     const reached=ds.qaRatio!=null&&ds.qaRatio>=1;
-    extra.push({t:reached?'warn':'bad',x:'ตอกไม่ถึงระดับปลายเสาที่กำหนด (ปลายเสาจริง '+fmtN(ds.tip,2)+' ม. · ตามแบบ '+fmtN(ds.spec,2)+' ม. ขาด '+fmtN(ds.shortfall,2)+' ม.)'+(reached?' แต่ถึง set แล้ว → น่าจะติดชั้นแข็ง':' และยังไม่ถึง set')});
+    extra.push({sr:true,t:reached?'warn':'bad',x:'ตอกไม่ถึงระดับปลายเสาที่กำหนด (ปลายเสาจริง '+fmtN(ds.tip,2)+' ม. · ตามแบบ '+fmtN(ds.spec,2)+' ม. ขาด '+fmtN(ds.shortfall,2)+' ม.)'+(reached?' แต่ถึง set แล้ว → น่าจะติดชั้นแข็ง':' และยังไม่ถึง set')});
   }
   if(ds.last10Avg!=null&&ds.n>=5){
     const allIdx=r.blow_count!=null&&r.blow_count!==''?soilIdx(Number(r.blow_count)):null;
-    if(ds.tipLevel===4) extra.push({t:'info',x:'ปลายเสา (10 ฟุตสุดท้าย) เฉลี่ย '+fmtN(ds.last10Avg,1)+' ครั้ง/ฟุต ≈ ระดับดินแข็ง (เทียบสเกลเกณฑ์ 30 ฟุต ≥600 = ≥20 ครั้ง/ฟุต)'+(allIdx!=null&&allIdx<4?' แม้ภาพรวม 30 ฟุตอยู่ระดับ '+SOIL_LV[allIdx].t:'')+' — ปลายเสาอยู่ในชั้นแข็ง'});
-    else if(ds.tipLevel>=1) extra.push({t:'info',x:'ปลายเสา (10 ฟุตสุดท้าย) เฉลี่ย '+fmtN(ds.last10Avg,1)+' ครั้ง/ฟุต ≈ ระดับ'+SOIL_LV[ds.tipLevel].t});
+    if(ds.tipLevel===4) extra.push({t:'info',x:'ช่วง 10 ฟุตสุดท้ายที่ตอกได้ เฉลี่ย '+fmtN(ds.last10Avg,1)+' ครั้ง/ฟุต ≈ ระดับดินแข็ง (เทียบสเกลเกณฑ์ 30 ฟุต ≥600 = ≥20 ครั้ง/ฟุต)'+(allIdx!=null&&allIdx<4?' แม้ภาพรวม 30 ฟุตอยู่ระดับ '+SOIL_LV[allIdx].t:'')+' — อยู่ในชั้นแข็ง'});
+    else if(ds.tipLevel>=1) extra.push({t:'info',x:'ช่วง 10 ฟุตสุดท้ายที่ตอกได้ เฉลี่ย '+fmtN(ds.last10Avg,1)+' ครั้ง/ฟุต ≈ ระดับ'+SOIL_LV[ds.tipLevel].t});
   }
   if(ds.jump!=null&&ds.jump>=JUMP_RATIO) extra.push({t:'warn',x:'ตอกยากขึ้นแบบกระชาก — ฟุตสุดท้าย '+ds.jumpLast+' ครั้ง เทียบ 3 ฟุตก่อนหน้าเฉลี่ย '+fmtN(ds.jumpPrev,1)+' ('+fmtN(ds.jump,1)+' เท่า) น่าจะชนชั้นแข็งหรือสิ่งกีดขวาง'});
   if(ds.ratio!=null&&ds.ratio>=2.5) extra.push({t:'warn',x:'ช่วงท้ายตอกยากขึ้นมาก — 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0)+' ครั้ง/ฟุต (สูงสุด '+ds.max+') เทียบเฉลี่ยทั้งช่วง '+fmtN(ds.avg,1)+' = '+fmtN(ds.ratio,1)+' เท่า หัวเสารับแรงกระแทกสูง/ติดชั้นแข็ง'});
   if(ds.lenGap!=null&&Math.abs(ds.lenGap)>0.05) extra.push({t:'info',x:'ระดับหัว/ปลายเสาจริงไม่ตรงกับความยาวเสา (ต่างกัน '+fmtN(Math.abs(ds.lenGap),2)+' ม.) — ตรวจตัวเลขในใบบันทึก'});
   if(ds.dev!=null&&ds.dev>0) extra.push({t:'info',x:'หัวเสาเบี้ยว '+fmtN(ds.dev,1)+' ซม. ทิศ '+(ds.devDir||'–')+(ds.tip!=null&&ds.top!=null&&Math.abs(ds.top-ds.tip)>0?' (≈ '+fmtN(ds.dev/(Math.abs(ds.top-ds.tip)),2)+' ซม./ม.)':'')});
   // ลูกค้าตอกเอง (ไม่ได้เลือกจากรายงานโฟร์แมน): ค่าการตอกเป็นของเสาที่ไปสังเกต ไม่ใช่ต้นที่เฟล → ไม่นับเป็นปัจจัยเสี่ยง
-  if(!r.foreman_report_id){ for(let i=nPre;i<extra.length;i++) extra[i]={...extra[i],t:'info',x:'(เสาที่ไปสังเกต) '+extra[i].x}; }
+  // ใบบันทึกการตอกเป็นของใคร: 'other' (ค่าเริ่มต้น) = เสาต้นอื่นที่ได้ Blow → ผลทั้งหมดเป็นข้อสังเกตอ้างอิง ไม่นับเป็นสาเหตุของเสาที่เฟล · 'self' = เสาต้นที่เฟลเอง ตอกถึงจุดที่เฟล → ไม่ใช้ตัดสินเรื่องถึง set/ถึงระดับปลายเสา (ยังตอกไม่เสร็จ)
+  if((r.drive_log&&r.drive_log.subject)==='self'){ for(let i=nPre;i<extra.length;i++) if(extra[i].sr) extra[i]={...extra[i],t:'info',x:'(เสาเฟลก่อนตอกเสร็จ ไม่ใช้ตัดสิน) '+extra[i].x}; }
+  else { for(let i=nPre;i<extra.length;i++) extra[i]={...extra[i],t:'info',x:'(เสาต้นอื่นที่ได้ Blow) '+extra[i].x}; }
   const all=[...obs,...extra];
   const sev={bad:0,warn:1,info:2,ok:3};
   const withS=a=>a.map(o=>({...o,s:shortOf(o)}));
@@ -437,7 +439,7 @@ function analyze(r){
   const oks=withS(all.filter(o=>o.t==='ok')), infos=withS(all.filter(o=>o.t==='info'));
   const has=re=>risks.some(o=>re.test(o.x));
   const checks=[];
-  const tipHard=has(/ปลายเสา (10 ฟุตสุดท้าย)/)&&has(/ชั้นแข็ง/);
+  const tipHard=has(/10 ฟุตสุดท้ายที่ตอกได้/)&&has(/ชั้นแข็ง/);
   if(has(/รีบเปลี่ยนสูตร/)) checks.push('ดินแข็งต้องสเต็ง ≥ '+DRIVE_MIN_HARD+' ksc แต่ไม่ถึง → รีบเปลี่ยนสูตรให้งานนี้ (เพิ่มสเต็ง) ก่อนส่งตอก');
   if(has(/ไม่พร้อมตอก|ต่ำกว่าค่าเฉลี่ยวันข้างเคียง|ต่ำกว่าเกณฑ์/)) checks.push('ตรวจรอบผลิตวันนั้น: ส่วนผสม การบ่ม ผลก้อน และเสาต้นอื่นวันเดียวกัน');
   if(has(/ย้อนวันเกินที่สูตร/)) checks.push('ตรวจว่าวันผลิตใช้สูตรตามที่ย้อนวันจริงหรือไม่');
@@ -500,7 +502,7 @@ function FailReport({rec,logo,photos}){
         {kv('ลูกค้า / หน้างาน',[rec.customer,rec.site].filter(Boolean).join(' · '))}
         {kv('ขนาดเสา × ความยาว',(rec.pile_size||'–')+(rec.pile_std?(rec.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(rec.pile_length_m!=null&&rec.pile_length_m!==''?fmtN(rec.pile_length_m,2)+' ม.':'–'))}
         {kv('วันที่ตอกเฟล',thaiDate(rec.drive_date))}
-        {kv('ผู้ตอก',rec.foreman_report_id?'บริษัทตอกเอง (ข้อมูลการตอกตรงกับเสาที่เฟล)':'ลูกค้าตอกเอง (ข้อมูลการตอกเป็นค่าที่ไปสังเกตหลังเฟล)')}
+        {kv('ผู้ตอก',rec.foreman_report_id?'บริษัทตอกเอง (เลือกจากรายงานโฟร์แมน)':'ลูกค้าตอกเอง')}
       </tbody></table>
       <table style={{width:'100%',borderCollapse:'collapse',marginTop:8}}>
         <thead><tr><th style={th}>ท่อน</th><th style={th}>ความยาว</th><th style={th}>วันที่หน้าเสา (อ้างอิง)</th><th style={th}>วันที่ผลิตจริง</th><th style={th}>สูตรที่ใช้</th><th style={th}>ย้อนวัน</th><th style={th}>อายุตามหน้าเสา</th><th style={th}>อายุจริงตอนตอก</th></tr></thead>
@@ -551,9 +553,9 @@ function FailReport({rec,logo,photos}){
       </tbody></table>
     </div>
     {rec.drive_log&&Object.keys(rec.drive_log).length>0&&(()=>{const ds=driveStats(rec),L=rec.drive_log||{};
-      return <div data-block="5b" style={blk}>{H(rec.foreman_report_id?'4.1 บันทึกการตอกจริง (Driving record)':'4.1 การตอกที่ไปสังเกตหน้างาน (เสาต้นอื่น ไม่ใช่ต้นที่เฟล — ดูวิธีตอกของลูกค้า)')}
+      return <div data-block="5b" style={blk}>{H((rec.drive_log&&rec.drive_log.subject)==='self'?'4.1 บันทึกการตอก (เสาต้นที่เฟล — ตอกถึงจุดที่เฟล)':'4.1 บันทึกการตอก (เสาต้นอื่นที่ได้ Blow — ใช้อ้างอิงดินและวิธีตอก ไม่ใช่ต้นที่เฟล)')}
         <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
-          {ds.last10Avg!=null&&ds.n>=5&&kv('10 ฟุตสุดท้าย (ปลายเสา)',<span style={{fontWeight:700}}>รวม {ds.last10Sum} ครั้ง ({fmtN(ds.last10Share*100,0)}% ของทั้งหมด) · เฉลี่ย {fmtN(ds.last10Avg,1)} ครั้ง/ฟุต ≈ {SOIL_LV[ds.tipLevel].e} {SOIL_LV[ds.tipLevel].t}</span>)}
+          {ds.last10Avg!=null&&ds.n>=5&&kv('10 ฟุตสุดท้ายที่ตอกได้',<span style={{fontWeight:700}}>รวม {ds.last10Sum} ครั้ง ({fmtN(ds.last10Share*100,0)}% ของทั้งหมด) · เฉลี่ย {fmtN(ds.last10Avg,1)} ครั้ง/ฟุต ≈ {SOIL_LV[ds.tipLevel].e} {SOIL_LV[ds.tipLevel].t}</span>)}
           {ds.total!=null&&kv('Blow ต่อฟุต (30 ซม.)',ds.n+' ฟุต · รวม '+ds.total+' ครั้ง · สูงสุด '+ds.max+' · 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0))}
           {ds.set!=null&&kv('set จริง (10 ครั้งสุดท้าย)',fmtN(ds.set,3)+' ซม./ครั้ง ≈ '+fmtN(ds.per10,1)+' ครั้ง/10 ซม. · penetration '+(L.l10||[]).join(' / ')+' ซม.')}
           {ds.qaAct!=null&&kv('Qa ที่ตอกได้จริง (Danish)',<span style={{fontWeight:800,color:ds.qaRatio==null||ds.qaRatio>=1?'#15803d':'#b91c1c'}}>{fmtN(ds.qaAct,1)} ตัน{ds.qaRatio!=null?' ('+fmtN(ds.qaRatio,2)+' เท่าของ Qa ตามแบบ '+fmtN(Number(rec.qa_ton),1)+' ตัน) '+(ds.qaRatio>=1?'✔ ถึง set':'✘ ยังไม่ถึง set'):''}</span>)}
@@ -846,12 +848,12 @@ function FailForm({me,init,onCancel,onSaved}){
   const today=todayISO();
   const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_std:'tis',pile_length_m:'',prod_dates:[{date:'',face:'',len:'',formula:''}],face_date:'',drive_date:today,foreman_report_id:null,
     strength_formula:'',strength_rows:[],blow_id:null,blow_site:'',blow_count:'',blow_feet:30,
-    hammer_weight_t:'',hammer_drop_cm:'',qa_ton:'',pile_weight_t:null,pile_area_cm2:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:'',site_obs:{tags:[],note:''},log:{blows:'',l10:['','',''],top:'',tip:'',spec:'',N:'',E:'',W:'',S:''}};
+    hammer_weight_t:'',hammer_drop_cm:'',qa_ton:'',pile_weight_t:null,pile_area_cm2:null,vertical_result:'',vertical_note:'',cause_note:'',action_note:'',site_obs:{tags:[],note:''},log:{subject:'other',blows:'',l10:['','',''],top:'',tip:'',spec:'',N:'',E:'',W:'',S:''}};
   const [f,setF]=useState(()=>{
     const o=init?{...blank,...Object.fromEntries(Object.entries(init).map(([k,v])=>[k,v==null?(blank[k]!==undefined?blank[k]:''):v]))}:blank;
     const pd=piecesOf(o).map(p=>({date:p.date,face:p.face||'',len:p.len===''?'':String(p.len),formula:p.formula||''}));
     const dl=(init&&init.drive_log&&Object.keys(init.drive_log).length)?init.drive_log:null, sv=v=>v==null?'':String(v);
-    const log=dl?{blows:(dl.blows||[]).join(' '),l10:[0,1,2].map(i=>sv((dl.l10||[])[i])),top:sv(dl.top),tip:sv(dl.tip),spec:sv(dl.spec_tip),N:sv((dl.dev||{}).N),E:sv((dl.dev||{}).E),W:sv((dl.dev||{}).W),S:sv((dl.dev||{}).S)}:blank.log;
+    const log=dl?{subject:dl.subject==='self'?'self':'other',blows:(dl.blows||[]).join(' '),l10:[0,1,2].map(i=>sv((dl.l10||[])[i])),top:sv(dl.top),tip:sv(dl.tip),spec:sv(dl.spec_tip),N:sv((dl.dev||{}).N),E:sv((dl.dev||{}).E),W:sv((dl.dev||{}).W),S:sv((dl.dev||{}).S)}:blank.log;
     return {...o,prod_dates:pd.length?pd:[{date:'',face:'',len:'',formula:''}],log};
   });
   const setPd=(i,patch)=>setF(o=>({...o,prod_dates:o.prod_dates.map((p,j)=>j===i?{...p,...patch}:p)}));
@@ -909,7 +911,7 @@ function FailForm({me,init,onCancel,onSaved}){
   const ratio=pileW&&hw?hw/pileW:null;
   const bc=blowCalc(pArea,len,hw,Number(f.hammer_drop_cm),Number(f.qa_ton));
   // ใบบันทึกการตอก → ข้อมูลจริง
-  const logObj={blows:parseBlows(f.log.blows),l10:f.log.l10.map(numOrNull).filter(x=>x!=null),top:numOrNull(f.log.top),tip:numOrNull(f.log.tip),spec_tip:numOrNull(f.log.spec),dev:{N:numOrNull(f.log.N),E:numOrNull(f.log.E),W:numOrNull(f.log.W),S:numOrNull(f.log.S)}};
+  const logObj={subject:f.log.subject==='self'?'self':'other',blows:parseBlows(f.log.blows),l10:f.log.l10.map(numOrNull).filter(x=>x!=null),top:numOrNull(f.log.top),tip:numOrNull(f.log.tip),spec_tip:numOrNull(f.log.spec),dev:{N:numOrNull(f.log.N),E:numOrNull(f.log.E),W:numOrNull(f.log.W),S:numOrNull(f.log.S)}};
   const dsF=driveStats({drive_log:logObj,pile_area_cm2:pArea,pile_length_m:len,hammer_weight_t:hw,hammer_drop_cm:Number(f.hammer_drop_cm),qa_ton:Number(f.qa_ton)});
   const hasLog=logObj.blows.length>0||logObj.l10.length>0||logObj.top!=null||logObj.tip!=null||logObj.spec_tip!=null||Object.values(logObj.dev).some(x=>x!=null);
   useEffect(()=>{ const t=logObj.blows.reduce((s,x)=>s+x,0); if(logObj.blows.length>10&&String(t)!==String(f.blow_count)) setF(o=>({...o,blow_count:String(t)})); },[f.log.blows]);   // รวม Blow จากใบ = ค่า Blow 30 ฟุต
@@ -1000,7 +1002,7 @@ function FailForm({me,init,onCancel,onSaved}){
               {reports.filter(r=>String(r.drive_date).slice(0,10)!==f.drive_date&&pickable(r)).map(r=><option key={r.id} value={r.id}>{doneIds.has(String(r.id))?'✔ ตรวจแล้ว · ':''}{thaiDate(String(r.drive_date).slice(0,10))} · {r.size}×{r.length_m||'?'} · {(r.customer||r.site||'').slice(0,28)}</option>)}
             </optgroup>
           </select>
-          <div className="hint" style={{marginTop:4,color:f.foreman_report_id?'#15803d':'#b45309'}}>{f.foreman_report_id?'✔ บริษัทตอกเอง — ค่าการตอกในใบบันทึกการตอก (ข้อ ⑤) ตรงกับเสาต้นที่เฟล':'ไม่ได้เลือก = ลูกค้าตอกเอง — ค่าการตอกในข้อ ⑤ เป็นค่าที่ไปสังเกตหลังเฟล ไม่ใช่เสาต้นที่เฟล (ใช้ดูวิธีตอกของลูกค้า)'}</div>
+          <div className="hint" style={{marginTop:4,color:f.foreman_report_id?'#15803d':'#b45309'}}>{f.foreman_report_id?'✔ เลือกจากรายงานโฟร์แมน — บริษัทตอกเอง':'ไม่ได้เลือก = ลูกค้าตอกเอง'}</div>
           {dayRows.length===0&&<div className="hint" style={{color:'#b45309'}}>ไม่พบรายงานโฟร์แมนของวันที่ตอกนี้ — เลือกจากวันอื่น หรือกรอกเอง</div>}
           {dayRows.length>0&&dayDone>=dayRows.length&&!showDone&&<div className="hint" style={{color:'#15803d'}}>✔ ตรวจครบทุกต้นของวันที่ตอกนี้แล้ว ({dayDone} ต้น)</div>}
           {doneIds.size>0&&<label className="hint" style={{display:'flex',gap:6,alignItems:'center',marginTop:4,cursor:'pointer'}}><input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)} style={{width:'auto'}}/>แสดงเสาที่ตรวจแล้วด้วย (ซ่อนไว้ {doneIds.size} ต้น)</label>}</div>
@@ -1105,10 +1107,14 @@ function FailForm({me,init,onCancel,onSaved}){
         {inp('vertical_note','ค่าที่วัดได้ (ถ้ามี)',{placeholder:'เช่น เอียง 2 ซม. ที่ความสูง 1 ม.'})}
       </div>
 
-      {secH(f.foreman_report_id?'⑤ ใบบันทึกการตอก (เสาต้นที่เฟล)':'⑤ การตอกที่ไปสังเกตหน้างาน (ไม่ใช่เสาต้นที่เฟล)')}
+      {secH(f.log.subject==='self'?'⑤ ใบบันทึกการตอก (เสาต้นที่เฟล — ตอกถึงจุดที่เฟล)':'⑤ ใบบันทึกการตอก (เสาต้นอื่นที่ได้ Blow)')}
       <div className="card" style={{marginTop:0}}>
-        <div className="hint" style={{marginBottom:6}}>{f.foreman_report_id?'คัดตัวเลขจากใบ "Driving record" ของเสาต้นนี้ — ยิ่งครบ ระบบยิ่งวิเคราะห์สาเหตุได้แม่น (ไม่บังคับ)':'ลูกค้าตอกเอง: ใส่ค่าที่ไปดูตอนลูกค้าตอกเสาต้นอื่นหลังเฟล เพื่อดูวิธีตอก — ระบบจะไม่นับเป็นสาเหตุของเสาต้นที่เฟลโดยตรง (ไม่บังคับ)'}</div>
-        <div className="field"><label>จำนวน Blow ต่อ 1 ฟุต (30 ซม.) — ใส่ <b>10 ฟุตสุดท้าย</b> (10 แถวสุดท้ายที่ตอกในใบ เรียงจากบนลงล่าง) · ใส่ทั้งใบได้ ระบบใช้ 10 ตัวท้ายวิเคราะห์ · พิมพ์/วางเว้นวรรคได้</label>
+        <div className="field" style={{marginBottom:8}}><label>ใบบันทึกการตอกนี้เป็นของ</label>
+          <div className="seg">
+            <button className={f.log.subject!=='self'?'on-pass':''} onClick={()=>setF(o=>({...o,log:{...o.log,subject:'other'}}))}>เสาต้นอื่นที่ได้ Blow</button>
+            <button className={f.log.subject==='self'?'on-pass':''} onClick={()=>setF(o=>({...o,log:{...o.log,subject:'self'}}))}>เสาต้นที่เฟลเอง</button></div></div>
+        <div className="hint" style={{marginBottom:6}}>{f.log.subject==='self'?'ค่า Blow ของเสาต้นที่เฟลเอง ตอกถึงจุดที่เฟล — ระบบไม่ใช้ตัดสินเรื่อง "ถึง set" / "ตอกถึงระดับปลายเสา" เพราะยังตอกไม่เสร็จ (ไม่บังคับ)':'ค่า Blow ของเสาต้นอื่นที่ตอกได้ ใช้อ้างอิงดินและวิธีตอก — ระบบไม่นับเป็นสาเหตุของเสาที่เฟลโดยตรง (ไม่บังคับ)'}</div>
+        <div className="field"><label>จำนวน Blow ต่อ 1 ฟุต (30 ซม.) — ใส่ <b>10 ฟุตสุดท้ายที่ตอกได้</b> (10 แถวสุดท้ายที่ตอกในใบ เรียงจากบนลงล่าง) · ใส่ทั้งใบได้ ระบบใช้ 10 ตัวท้ายวิเคราะห์ · พิมพ์/วางเว้นวรรคได้</label>
           <textarea className="note" rows={3} placeholder="เช่น 10 ฟุตสุดท้าย: 16 16 18 19 23 28 29 38 45 61" value={f.log.blows} onChange={e=>setF(o=>({...o,log:{...o.log,blows:e.target.value}}))} style={{marginTop:0}}/></div>
         {logObj.blows.length>0&&<div style={{marginBottom:10}}>
           <div style={{fontSize:14,fontWeight:700,color:'var(--brand)'}}>{logObj.blows.length} ฟุต · รวม {dsF.total} ครั้ง <span className="hint" style={{fontWeight:400}}>{logObj.blows.length>10?'(ใส่ทั้งใบ — ใช้เป็นค่า Blow 30 ฟุตให้อัตโนมัติ)':'(ใส่ 10 ฟุตสุดท้าย — ค่า Blow 30 ฟุตรวมให้กรอกที่ข้อ ③)'}</span></div>
@@ -1124,7 +1130,7 @@ function FailForm({me,init,onCancel,onSaved}){
           <div style={{display:'flex',gap:8}}>{['N','E','W','S'].map(k=><input key={k} type="number" inputMode="decimal" step="0.1" placeholder={k} value={f.log[k]} onChange={e=>setF(o=>({...o,log:{...o.log,[k]:e.target.value}}))} style={{flex:1,minWidth:0}}/>)}</div></div>
         {hasLog&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0f9ff',border:'1px solid #bae6fd',lineHeight:1.8,fontSize:14}}>
           {dsF.set!=null&&<div>set จริง (เฉลี่ย 10 ครั้งสุดท้าย) = <b>{fmtN(dsF.set,3)} ซม./ครั้ง</b> ≈ {fmtN(dsF.per10,1)} ครั้ง/10 ซม.{dsF.qaAct!=null&&<> → Qa ที่ตอกได้จริง ≈ <b>{fmtN(dsF.qaAct,1)} ตัน</b>{dsF.qaRatio!=null&&<span style={{color:dsF.qaRatio>=1?'#15803d':'#c0392b',fontWeight:700}}> ({fmtN(dsF.qaRatio,2)} เท่าของ Qa ตามแบบ)</span>}</>}</div>}
-          {dsF.last10Avg!=null&&dsF.n>=5&&<div>10 ฟุตสุดท้าย (ปลายเสา): รวม <b>{dsF.last10Sum}</b> ครั้ง ({fmtN(dsF.last10Share*100,0)}%) · เฉลี่ย <b>{fmtN(dsF.last10Avg,1)}</b> ครั้ง/ฟุต ≈ <b style={{color:SOIL_LV[dsF.tipLevel].col}}>{SOIL_LV[dsF.tipLevel].e} {SOIL_LV[dsF.tipLevel].t}</b> <span className="hint">(เทียบสเกล 30 ฟุต: ≤10 อ่อน · ≥20 ครั้ง/ฟุต แข็ง)</span></div>}
+          {dsF.last10Avg!=null&&dsF.n>=5&&<div>10 ฟุตสุดท้ายที่ตอกได้: รวม <b>{dsF.last10Sum}</b> ครั้ง ({fmtN(dsF.last10Share*100,0)}%) · เฉลี่ย <b>{fmtN(dsF.last10Avg,1)}</b> ครั้ง/ฟุต ≈ <b style={{color:SOIL_LV[dsF.tipLevel].col}}>{SOIL_LV[dsF.tipLevel].e} {SOIL_LV[dsF.tipLevel].t}</b> <span className="hint">(เทียบสเกล 30 ฟุต: ≤10 อ่อน · ≥20 ครั้ง/ฟุต แข็ง)</span></div>}
           {dsF.shortfall!=null&&<div>ปลายเสา {dsF.shortfall>0.05?<b style={{color:'#b45309'}}>ตื้นกว่าแบบ {fmtN(dsF.shortfall,2)} ม.</b>:'ถึงระดับตามแบบ'}</div>}
           {dsF.dev!=null&&<div>หัวเสาเบี้ยวรวม ≈ {fmtN(dsF.dev,1)} ซม. ทิศ {dsF.devDir||'–'}</div>}
           {dsF.set==null&&logObj.l10.length===0&&<div className="hint">ใส่ Last ten blow penetration เพื่อคำนวณ set จริงและ Qa ที่ตอกได้</div>}</div>}
