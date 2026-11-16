@@ -1,8 +1,8 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // วาดแบบเสาเข็มไอ (A4 แนวนอน) เป็น SVG สตริง — ตามรูปแบบแบบ RMC (NOT TRUE SCALE)
-import { pilePoly, esc } from "./draw2d.js?v=20261116024942";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261116024942";
-import { m2, wireLayout } from "./pile-calc.js?v=20261116024942";
+import { pilePoly, esc } from "./draw2d.js?v=20261116025603";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261116025603";
+import { m2, wireLayout } from "./pile-calc.js?v=20261116025603";
 
 const W = 1188, H = 840, INK = "#111";
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -199,7 +199,7 @@ export function dowelTxt(d) { return !d ? "-" : d.rows ? `${Math.floor(d.n / 2)}
 function dowelPts(dowel) {
   if (PILE22.sq) { // เสาสี่เหลี่ยม: เหล็กเดือยวางตามมุม/กึ่งกลางด้าน/กลางแผ่น ตามจำนวน (4 มุม • 5 +กลาง • 6 +กลางบนล่าง • 7 +กลาง • 8 รอบ • 9 +กลาง)
     const n = dowel ? dowel.n : 4, a = PILE22.B / 2 - (PILE22.dIn || 55), pts = [[-a, -a], [a, -a], [-a, a], [a, a]];
-    if (n === 5) pts.push([0, 0]);
+    if (n === 5) pts.push([0, a]); // เหล็กตัวที่ 5 อยู่แถวล่าง (แนวเดียวกับเหล็กมุมล่าง) ตรงกับภาพด้านข้างที่แถวล่างมี 3 เส้น
     if (n >= 6) pts.push([-a * 0.3, -a], [a * 0.3, a]); // เหล็กกลางแถวบน/ล่างเยื้องสลับกัน (ไวร์จี้ปูนต้องลงได้)
     if (n === 7) pts.push([0, 0]);
     if (n >= 8) pts.push([-a, 0], [a, 0]);
