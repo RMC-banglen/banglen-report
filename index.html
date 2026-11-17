@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-17a';
+var APP_VERSION='2026-11-17b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -740,6 +740,9 @@ function BarChart({categories,values,color=PALETTE.produced,target=null,targetLa
 
 function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,dangerAbove=null,boxedLabels=false,padRight=null,keepColor=false}){
   const [ref,W]=useMeasure(); const [hover,setHover]=useState(null);
+  // ป้ายเกณฑ์/เฉลี่ยข้างกราฟ: ชื่อชิดซ้าย ตัวเลขเรียงเป็นคอลัมน์เดียวกัน (วัดความกว้างชื่อจริงหลังวาด)
+  const [tcw,setTcw]=useState(null);
+  useLayoutEffect(()=>{const el=ref.current;if(!el)return;const ls=[...el.querySelectorAll('text[data-tl]')];if(!ls.length){if(tcw!==null)setTcw(null);return;}const mx=Math.max(...ls.map(t=>t.getComputedTextLength()));if(tcw==null||Math.abs(tcw-mx)>0.5)setTcw(mx);});
   // บางเรื่องผิดเกณฑ์เมื่อ "ต่ำกว่า" (เช่น กำลังอัด) บางเรื่องผิดเมื่อ "สูงกว่า" (เช่น ฝุ่นในทราย)
   const isBad=(v,s)=>{const lo=s&&s.danger!=null?s.danger:dangerBelow;
     return (lo!=null&&v<lo)||(dangerAbove!=null&&v>dangerAbove);};
@@ -829,7 +832,7 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
         }
         return tSorted.map((t,i)=><g key={'t'+i}>
           {!t.noLine&&<line x1={pad.l} x2={W-pad.r} y1={y(t.value)} y2={y(t.value)} stroke={t.color} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.8"/>}
-          {t.label&&<text x={W-pad.r+6} y={t.ly} textAnchor="start" className="target-lbl" fill={t.color}>{t.label} {fmt(t.value,decimals)}</text>}
+          {t.label&&<><text x={W-pad.r+6} y={t.ly} textAnchor="start" className="target-lbl" data-tl="1" fill={t.color}>{t.label}</text><text x={W-pad.r+6+(tcw!=null?tcw:t.label.length*6.4)+6} y={t.ly} textAnchor="start" className="target-lbl" fill={t.color}>{fmt(t.value,decimals)}</text></>}
         </g>);
       })()}
       {area&&series.length===1&&<path d={`${lp(series[0].data)} L${x(categories.length-1)},${pad.t+iH} L${x(0)},${pad.t+iH} Z`} fill={series[0].color} opacity="0.10"/>}
