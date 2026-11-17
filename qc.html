@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-16c';
+var APP_VERSION='2026-11-17a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -214,6 +214,7 @@ function driveStats(r){
     out.n=n;out.total=sum;out.max=Math.max(...blows);out.avg=sum/n;out.last3=l3.reduce((t,x)=>t+x,0)/l3.length;out.ratio=out.avg>0?out.last3/out.avg:null;}
   const l10=(L.l10||[]).map(Number).filter(x=>x>0);
   if(l10.length){out.set=(l10.reduce((t,x)=>t+x,0)/l10.length)/10;out.per10=out.set>0?10/out.set:null;}   // set = ซม./ครั้ง (penetration 10 ครั้ง ÷ 10)
+  if(!(out.set>0)&&blows.length&&blows[blows.length-1]>0){out.footBlows=blows[blows.length-1];out.set=30/out.footBlows;out.per10=10/out.set;out.setSrc='foot';}   // ประมาณจากนับฟุตสุดท้าย (ไม่มี Last ten blow penetration)
   const A=Number(r.pile_area_cm2),Ln=Number(r.pile_length_m),W=Number(r.hammer_weight_t),H=Number(r.hammer_drop_cm),Qa=Number(r.qa_ton);
   if(out.set>0&&A>0&&Ln>0&&W>0&&H>0){const a=BLOW_E*W*H,b=Ln*100/(A*BLOW_EC),Qu=a/(out.set+0.5*Math.sqrt(2*a*b));out.qaAct=Qu/BLOW_FS;if(Qa>0)out.qaRatio=out.qaAct/Qa;}
   const top=numOrNull(L.top),tip=numOrNull(L.tip),spec=numOrNull(L.spec_tip);
@@ -412,8 +413,8 @@ function analyze(r){
   if(r.blow_s_cm!=null&&r.blow_s_cm!==''&&Number(r.blow_s_cm)<=0) extra.push({t:'bad',x:'คำนวณ Blow ไม่ได้ — พลังงานตุ้ม (น้ำหนัก × ระยะยก) น้อยกว่าที่ Qa ต้องการ ตุ้มเบา/ยกต่ำเกินไป ตอกไม่เข้า'});
   const ds=driveStats(r), qaT=Number(r.qa_ton), nPre=extra.length;
   if(ds.qaAct!=null&&qaT>0){
-    if(ds.qaRatio<1) extra.push({sr:true,t:'bad',x:'ตอกยังไม่ถึง set ที่ต้องการ — set จริง '+fmtN(ds.set,3)+' ซม./ครั้ง ให้ Qa ≈ '+fmtN(ds.qaAct,1)+' ตัน ต่ำกว่า Qa ตามแบบ '+fmtN(qaT,1)+' ตัน'});
-    else extra.push({t:ds.qaRatio>=OVERDRIVE_RATIO?'warn':'ok',x:'set ถึงตามต้องการ — Qa ที่ตอกได้จริง ≈ '+fmtN(ds.qaAct,1)+' ตัน (แบบ '+fmtN(qaT,1)+' ตัน = '+fmtN(ds.qaRatio,2)+' เท่า)'+(ds.qaRatio>=OVERDRIVE_RATIO?' ตอกแน่นเกินที่ต้องการมาก ถ้ายังตอกต่อหลังถึง set หัวเสาเสี่ยงแตก':'')});
+    if(ds.qaRatio<1) extra.push({sr:true,t:'bad',x:'ตอกยังไม่ถึง set ที่ต้องการ — '+(ds.setSrc==='foot'?'set ประมาณจากฟุตสุดท้าย ':'set จริง ')+fmtN(ds.set,3)+' ซม./ครั้ง ให้ Qa ≈ '+fmtN(ds.qaAct,1)+' ตัน ต่ำกว่า Qa ตามแบบ '+fmtN(qaT,1)+' ตัน'});
+    else extra.push({t:ds.qaRatio>=OVERDRIVE_RATIO?'warn':'ok',x:'set ถึงตามต้องการ — Qa ที่ตอกได้'+(ds.setSrc==='foot'?' (ประมาณจากฟุตสุดท้าย)':'จริง')+' ≈ '+fmtN(ds.qaAct,1)+' ตัน (แบบ '+fmtN(qaT,1)+' ตัน = '+fmtN(ds.qaRatio,2)+' เท่า)'+(ds.qaRatio>=OVERDRIVE_RATIO?' ตอกแน่นเกินที่ต้องการมาก ถ้ายังตอกต่อหลังถึง set หัวเสาเสี่ยงแตก':'')});
   }
   if(ds.shortfall!=null&&ds.shortfall>0.05){
     const reached=ds.qaRatio!=null&&ds.qaRatio>=1;
@@ -548,7 +549,7 @@ function FailReport({rec,logo,photos}){
         {kv('ตุ้ม ÷ เสา',rec.hammer_ratio!=null&&isFinite(rec.hammer_ratio)?<span style={{fontWeight:800,color:rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'#15803d':'#b91c1c'}}>{fmtN(rec.hammer_ratio,2)} เท่า {rec.hammer_ratio>=HAMMER_MIN&&rec.hammer_ratio<=HAMMER_MAX?'✔ อยู่ในเกณฑ์':'✘ นอกเกณฑ์'} (เกณฑ์ {HAMMER_MIN}–{HAMMER_MAX} เท่า)</span>:'')}
         {kv('Qa ตามแบบ',rec.qa_ton!=null&&rec.qa_ton!==''?fmtN(rec.qa_ton,1)+' ตัน':'')}
         {kv('Blow ที่ต้องได้ (Danish)',rec.blow_s_cm!=null?(rec.blow_s_cm>0?'set ≤ '+fmtN(rec.blow_s_cm,3)+' ซม./ครั้ง · ≈ ≥'+fmtN(rec.blow_per10,1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้ (พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ)'):'')}
-        {(()=>{const ds0=driveStats(rec);return ds0.set!=null&&kv('Blow ตอกจริง (Last ten blow)',<span style={{fontWeight:700,color:rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?'#15803d':'#b91c1c'):undefined}}>set {fmtN(ds0.set,3)} ซม./ครั้ง · ≈ {fmtN(ds0.per10,1)} ครั้ง/10 ซม.{rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?' ✔ ถึง set':' ✘ ยังไม่ถึง set'):''}</span>);})()}
+        {(()=>{const ds0=driveStats(rec);return ds0.set!=null&&kv(ds0.setSrc==='foot'?'Blow ตอกจริง (ประมาณจากฟุตสุดท้าย)':'Blow ตอกจริง (Last ten blow)',<span style={{fontWeight:700,color:rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?'#15803d':'#b91c1c'):undefined}}>set {fmtN(ds0.set,3)} ซม./ครั้ง · ≈ {fmtN(ds0.per10,1)} ครั้ง/10 ซม.{rec.blow_s_cm>0?(ds0.set<=rec.blow_s_cm?' ✔ ถึง set':' ✘ ยังไม่ถึง set'):''}{ds0.qaAct!=null&&ds0.qaRatio!=null?' · Qa ≈ '+fmtN(ds0.qaAct,1)+' ตัน เทียบ Qa ตามแบบ '+fmtN(Number(rec.qa_ton),1)+' ตัน = '+fmtN(ds0.qaRatio,2)+' เท่า':''}</span>);})()}
         {kv('ดิ่งเสา',rec.vertical_result==='ok'?'✔ ผ่าน':rec.vertical_result==='bad'?'✘ ไม่ผ่าน':rec.vertical_result==='na'?'ไม่ได้วัด':'')}
       </tbody></table>
     </div>
@@ -557,8 +558,8 @@ function FailReport({rec,logo,photos}){
         <table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
           {ds.last10Avg!=null&&ds.n>=5&&kv('10 ฟุตสุดท้ายที่ตอกได้',<span style={{fontWeight:700}}>รวม {ds.last10Sum} ครั้ง ({fmtN(ds.last10Share*100,0)}% ของทั้งหมด) · เฉลี่ย {fmtN(ds.last10Avg,1)} ครั้ง/ฟุต ≈ {SOIL_LV[ds.tipLevel].e} {SOIL_LV[ds.tipLevel].t}</span>)}
           {ds.total!=null&&kv('Blow ต่อฟุต (30 ซม.)',ds.n+' ฟุต · รวม '+ds.total+' ครั้ง · สูงสุด '+ds.max+' · 3 ฟุตสุดท้ายเฉลี่ย '+fmtN(ds.last3,0))}
-          {ds.set!=null&&kv('set จริง (10 ครั้งสุดท้าย)',fmtN(ds.set,3)+' ซม./ครั้ง ≈ '+fmtN(ds.per10,1)+' ครั้ง/10 ซม. · penetration '+(L.l10||[]).join(' / ')+' ซม.')}
-          {ds.qaAct!=null&&kv('Qa ที่ตอกได้จริง (Danish)',<span style={{fontWeight:800,color:ds.qaRatio==null||ds.qaRatio>=1?'#15803d':'#b91c1c'}}>{fmtN(ds.qaAct,1)} ตัน{ds.qaRatio!=null?' ('+fmtN(ds.qaRatio,2)+' เท่าของ Qa ตามแบบ '+fmtN(Number(rec.qa_ton),1)+' ตัน) '+(ds.qaRatio>=1?'✔ ถึง set':'✘ ยังไม่ถึง set'):''}</span>)}
+          {ds.set!=null&&(ds.setSrc==='foot'?kv('set ประมาณจากฟุตสุดท้าย','ฟุตสุดท้ายตอก '+ds.footBlows+' ครั้ง/ฟุต (30 ซม.) → set = 30 ÷ '+ds.footBlows+' = '+fmtN(ds.set,3)+' ซม./ครั้ง ≈ '+fmtN(ds.per10,1)+' ครั้ง/10 ซม.'):kv('set จริง (10 ครั้งสุดท้าย)',fmtN(ds.set,3)+' ซม./ครั้ง ≈ '+fmtN(ds.per10,1)+' ครั้ง/10 ซม. · penetration '+(L.l10||[]).join(' / ')+' ซม.'))}
+          {ds.qaAct!=null&&kv(ds.setSrc==='foot'?'Qa ที่ตอกได้ (ประมาณจากฟุตสุดท้าย · Danish)':'Qa ที่ตอกได้จริง (Danish)',<span style={{fontWeight:800,color:ds.qaRatio==null||ds.qaRatio>=1?'#15803d':'#b91c1c'}}>{fmtN(ds.qaAct,1)} ตัน{ds.qaRatio!=null?' ('+fmtN(ds.qaRatio,2)+' เท่าของ Qa ตามแบบ '+fmtN(Number(rec.qa_ton),1)+' ตัน) '+(ds.qaRatio>=1?'✔ ถึง set':'✘ ยังไม่ถึง set'):''}</span>)}
         </tbody></table>
       </div>;})()}
     <div data-block="6" style={blk}>{H('5. วิเคราะห์สาเหตุเบื้องต้น')}
@@ -953,7 +954,7 @@ function FailForm({me,init,onCancel,onSaved}){
       const row={inspector:me.name,inspect_date:f.inspect_date||today,foreman_report_id:f.foreman_report_id||null,customer:f.customer||null,site:f.site||null,
         pile_size:f.pile_size,pile_std:f.pile_std||null,pile_length_m:num(f.pile_length_m)!=null?num(f.pile_length_m):(sumLen>0?sumLen:null),prod_date:pcs.map(p=>p.date).sort()[0],prod_dates:pcs.map(p=>{const A=pieceAnalysis({...f,strength_rows:rowsAll,pile_length_m:num(f.pile_length_m)!=null?num(f.pile_length_m):sumLen},{...p,drive:f.drive_date},pcs.length);return {date:p.date,face:p.face||'',len:p.len===''?null:Number(p.len),formula:p.formula||'',backdate:A.backdate,face_age:A.faceAge,age:A.age,str_age:A.ev?Math.round(A.ev.strength*10)/10:null,tgt_age:A.ev?Math.round(A.ev.target*10)/10:null,ok_age:A.ev?A.ev.ok:null,max_back:A.maxBack===Infinity?999:A.maxBack,policy_ok:A.policyOk};}),face_date:pcs.map(p=>p.face).filter(Boolean).join(' · ')||null,drive_date:f.drive_date||null,age_days:age,
         strength_formula:(pcs[0]&&pcs[0].formula)||'',strength_rows:rowsAll,
-        drive_log:hasLog?{...logObj,set:dsF.set??null,per10:dsF.per10??null,qa_act:dsF.qaAct??null,total:dsF.total??null,last10_sum:dsF.last10Sum??null,last10_avg:dsF.last10Avg??null,shortfall:dsF.shortfall??null,dev_mag:dsF.dev??null}:{},
+        drive_log:hasLog?{...logObj,set_src:dsF.setSrc||null,set:dsF.set??null,per10:dsF.per10??null,qa_act:dsF.qaAct??null,total:dsF.total??null,last10_sum:dsF.last10Sum??null,last10_avg:dsF.last10Avg??null,shortfall:dsF.shortfall??null,dev_mag:dsF.dev??null}:{},
         blow_id:f.blow_id||null,blow_site:f.blow_site||null,blow_count:num(f.blow_count),blow_feet:num(f.blow_feet)||30,
         vertical_result:f.vertical_result||null,vertical_note:f.vertical_note||null,
         hammer_weight_t:num(f.hammer_weight_t),hammer_drop_cm:num(f.hammer_drop_cm),qa_ton:num(f.qa_ton),pile_weight_t:pileW,pile_area_cm2:pArea,hammer_ratio:ratio,blow_s_cm:bc?bc.S:null,blow_per10:bc?bc.per10:null,
@@ -1097,7 +1098,7 @@ function FailForm({me,init,onCancel,onSaved}){
         {bc&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0f9ff',border:'1px solid #bae6fd',lineHeight:1.8,fontSize:14}}>
           <b>รายการคำนวณ Blow (Danish)</b><br/>
           {bc.S>0?<>ต้องได้: set ≤ <b>{fmtN(bc.S,3)} ซม./ครั้ง</b> · ≈ <b>≥{fmtN(bc.per10,1)} ครั้ง/10 ซม.</b> · {fmtN(bc.per30,1)} ครั้ง/30 ซม.<br/>
-            {dsF.set!=null&&<>ตอกจริง (Last ten blow): set <b>{fmtN(dsF.set,3)}</b> ซม./ครั้ง ≈ <b>{fmtN(dsF.per10,1)}</b> ครั้ง/10 ซม. <b style={{color:dsF.set<=bc.S?'#15803d':'#c0392b'}}>{dsF.set<=bc.S?'✔ ถึง set':'✘ ยังไม่ถึง set'}</b><br/></>}
+            {dsF.set!=null&&<>{dsF.setSrc==='foot'?'ตอกจริง (ประมาณจากฟุตสุดท้าย '+dsF.footBlows+' ครั้ง/ฟุต): ':'ตอกจริง (Last ten blow): '}set <b>{fmtN(dsF.set,3)}</b> ซม./ครั้ง ≈ <b>{fmtN(dsF.per10,1)}</b> ครั้ง/10 ซม. <b style={{color:dsF.set<=bc.S?'#15803d':'#c0392b'}}>{dsF.set<=bc.S?'✔ ถึง set':'✘ ยังไม่ถึง set'}</b><br/>{dsF.qaAct!=null&&dsF.qaRatio!=null&&<>Qa ที่ย้อนคำนวณได้ ≈ <b>{fmtN(dsF.qaAct,1)} ตัน</b> เทียบ Qa ตามแบบ <b>{fmtN(Number(f.qa_ton),1)} ตัน</b> = <b style={{color:dsF.qaRatio>=1?'#15803d':'#c0392b'}}>{fmtN(dsF.qaRatio,2)} เท่า</b><br/></>}</>}
             <span className="hint">E·W·H = {fmtN(bc.a,1)} · Qu = {fmtN(bc.Qu,1)} ตัน</span></>:<span style={{color:'#c0392b'}}>คำนวณไม่ได้ — พลังงานตุ้มน้อยกว่าที่ Qa ต้องการ</span>}</div>}
         <div className="field" style={{marginTop:12}}><label>เช็คดิ่งเสา</label>
           <div className="seg">
@@ -1129,11 +1130,11 @@ function FailForm({me,init,onCancel,onSaved}){
         <div className="field"><label>หัวเสาเบี้ยว Deviation (ซม.) — ทิศ N / E / W / S</label>
           <div style={{display:'flex',gap:8}}>{['N','E','W','S'].map(k=><input key={k} type="number" inputMode="decimal" step="0.1" placeholder={k} value={f.log[k]} onChange={e=>setF(o=>({...o,log:{...o.log,[k]:e.target.value}}))} style={{flex:1,minWidth:0}}/>)}</div></div>
         {hasLog&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0f9ff',border:'1px solid #bae6fd',lineHeight:1.8,fontSize:14}}>
-          {dsF.set!=null&&<div>set จริง (เฉลี่ย 10 ครั้งสุดท้าย) = <b>{fmtN(dsF.set,3)} ซม./ครั้ง</b> ≈ {fmtN(dsF.per10,1)} ครั้ง/10 ซม.{dsF.qaAct!=null&&<> → Qa ที่ตอกได้จริง ≈ <b>{fmtN(dsF.qaAct,1)} ตัน</b>{dsF.qaRatio!=null&&<span style={{color:dsF.qaRatio>=1?'#15803d':'#c0392b',fontWeight:700}}> ({fmtN(dsF.qaRatio,2)} เท่าของ Qa ตามแบบ)</span>}</>}</div>}
+          {dsF.set!=null&&<div>{dsF.setSrc==='foot'?'set ประมาณจากฟุตสุดท้าย ('+dsF.footBlows+' ครั้ง/ฟุต → 30÷'+dsF.footBlows+') = ':'set จริง (เฉลี่ย 10 ครั้งสุดท้าย) = '}<b>{fmtN(dsF.set,3)} ซม./ครั้ง</b> ≈ {fmtN(dsF.per10,1)} ครั้ง/10 ซม.{dsF.qaAct!=null&&<> → Qa ที่ตอกได้{dsF.setSrc==='foot'?' (ประมาณ)':'จริง'} ≈ <b>{fmtN(dsF.qaAct,1)} ตัน</b>{dsF.qaRatio!=null&&<span style={{color:dsF.qaRatio>=1?'#15803d':'#c0392b',fontWeight:700}}> ({fmtN(dsF.qaRatio,2)} เท่าของ Qa ตามแบบ)</span>}</>}</div>}
           {dsF.last10Avg!=null&&dsF.n>=5&&<div>10 ฟุตสุดท้ายที่ตอกได้: รวม <b>{dsF.last10Sum}</b> ครั้ง ({fmtN(dsF.last10Share*100,0)}%) · เฉลี่ย <b>{fmtN(dsF.last10Avg,1)}</b> ครั้ง/ฟุต ≈ <b style={{color:SOIL_LV[dsF.tipLevel].col}}>{SOIL_LV[dsF.tipLevel].e} {SOIL_LV[dsF.tipLevel].t}</b> <span className="hint">(เทียบสเกล 30 ฟุต: ≤10 อ่อน · ≥20 ครั้ง/ฟุต แข็ง)</span></div>}
           {dsF.shortfall!=null&&<div>ปลายเสา {dsF.shortfall>0.05?<b style={{color:'#b45309'}}>ตื้นกว่าแบบ {fmtN(dsF.shortfall,2)} ม.</b>:'ถึงระดับตามแบบ'}</div>}
           {dsF.dev!=null&&<div>หัวเสาเบี้ยวรวม ≈ {fmtN(dsF.dev,1)} ซม. ทิศ {dsF.devDir||'–'}</div>}
-          {dsF.set==null&&logObj.l10.length===0&&<div className="hint">ใส่ Last ten blow penetration เพื่อคำนวณ set จริงและ Qa ที่ตอกได้</div>}</div>}
+          {dsF.set==null&&logObj.l10.length===0&&<div className="hint">ใส่ Blow ต่อฟุต (ระบบประมาณ set/Qa จากฟุตสุดท้าย) หรือ Last ten blow penetration (แม่นกว่า) เพื่อคำนวณ set และ Qa ที่ตอกได้</div>}</div>}
       </div>
 
       {secH('⑥ รูปถ่ายตอนเสาเข็มแตก')}
