@@ -1,8 +1,8 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // อ่านข้อความคำขอรายการคำนวณเสาเข็ม (จากกลุ่มเทเลแกรม) + ใบคำนวณ blow count (สูตร Danish)
-import { autoSplit } from "./pile-calc.js?v=20261116041756";
-import { TITLE_BLOCK } from "./pile-data.js?v=20261116041756";
-import { esc } from "./draw2d.js?v=20261116041756";
+import { autoSplit } from "./pile-calc.js?v=20261118094031";
+import { TITLE_BLOCK } from "./pile-data.js?v=20261118094031";
+import { esc } from "./draw2d.js?v=20261118094031";
 
 // พื้นที่หน้าตัด A (ตร.ซม.) และเส้นรอบรูป P (ซม.) ของเสา มอก.
 export const AP = { T18: [275, 89], T22: [386, 105], T26: [489, 126], T30: [660, 145], T35: [880, 180], T40: [1240, 197.5],
@@ -166,7 +166,7 @@ export function blowSheet(p, secLabel, project, pieceLens, code) {
   return `${css}<div class="bs">
 <div style="display:flex;align-items:center;gap:14px;border-bottom:2px solid #000;padding-bottom:12px"><img src="assets/logo.png" style="width:128px;height:auto" alt=""><div style="font-family:'Sarabun','Noto Sans Thai',Tahoma,sans-serif"><div style="font-size:19px;font-weight:700">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:13px;margin-top:4px">299หมู่12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div></div>
 <div style="text-align:center;font-weight:700;font-size:19px;margin-top:22px">Pile Bearing Capacity Calculation by Gravity drop hammer</div>
-<div class="box"><div><span class="k">โครงการ</span>${esc(project.pj || "-")}</div><div><span class="k">เจ้าของ</span>${esc(project.ow || "-")}</div><div><span class="k">สถานที่</span>${esc(project.lo || "-")}</div><div><span class="k">เสาเข็ม</span>${pile} &nbsp; ${esc(pcs)} &nbsp; TIS.396-2549</div></div>
+<div class="box"><div><span class="k">โครงการ</span>${esc(project.pj || "-")}</div><div><span class="k">เจ้าของ</span>${esc(project.ow || "-")}</div><div><span class="k">สถานที่</span>${esc(project.lo || "-")}</div><div><span class="k">เสาเข็ม</span>${pile} &nbsp; ${esc(pcs)} &nbsp; TIS.396-2549</div>${p.ex ? `<div><span class="k">เหล็กเสริม</span>${esc(p.ex.replace(/^เหล็กเสริม\s*/, ""))}</div>` : ""}</div>
 ${row("PILE LENGTH :", "L =", f(p.L * 100), "CM.")}
 ${row("AREA", "A =", r ? f(r.A) : "-", "CM.<sup style='font-size:9px'>2</sup>")}
 ${row("PERIMETER", "P =", r ? f(r.P) : "-", "CM.")}
