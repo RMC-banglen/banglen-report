@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-18a';
+var APP_VERSION='2026-11-18b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -741,9 +741,9 @@ function FailInspectView({me,onBack,openId,openEdit}){
   const loadList=()=>DB.from('pile_fail_inspections').select('*').order('created_at',{ascending:false}).limit(60)
     .then(({data,error})=>{if(error){setNoTable(true);setList([]);return;}setNoTable(false);setList(data||[]);}).catch(()=>{setNoTable(true);setList([]);});
   useEffect(()=>{loadList();},[]);
-  useEffect(()=>{ if(!openId) return; if(openId==='new'){setStartMode('quick');setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setStartMode('full');setRec(data);setView(openEdit?'form':'view');} }); },[openId]);
+  useEffect(()=>{ if(!openId) return; if(openId==='new'){setStartMode('quick');setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setStartMode('quick');setRec(data);setView(openEdit?'form':'view');} }); },[openId]);
   if(view==='form') return <FailForm key={formKey} me={me} init={rec} startMode={startMode} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={(r,opt)=>{loadList();if(opt&&opt.next){setStartMode(opt.mode||'quick');addNext(r);}else{setRec(r);setView('view');}}}/>;
-  if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>{setStartMode('full');setFormKey(k=>k+1);setView('form');}} onAddNext={()=>addNext(rec)}/>;
+  if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>{setStartMode('quick');setFormKey(k=>k+1);setView('form');}} onAddNext={()=>addNext(rec)}/>;
   const badge=(ok,txt)=>ok==null?null:<span className="pill" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b',marginRight:5,fontSize:12}}>{txt}</span>;
   return <>
     <div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
@@ -821,6 +821,10 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
         {!embed&&<button className="ghost" style={{flex:'0 0 auto',width:'auto',padding:'13px 20px'}} onClick={onEdit}>✎ แก้ไข</button>}
         {!embed&&<button className="ghost" style={{flex:'1 1 100%'}} onClick={onAddNext}>＋ เพิ่มเสาเฟลอีกต้น (วันที่ตอกเดียวกัน)</button>}
       </div>
+      {!embed&&(()=>{const hv=failHave(rec,(rec.photos||[]).length),n=FAIL_ITEMS.filter(x=>hv[x.k]).length;return <div className="card" style={{marginTop:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}><b style={{color:'var(--brand)',fontSize:15}}>ข้อมูลที่ต้องมี เมื่อเสาเฟล</b><b style={{color:n===FAIL_ITEMS.length?'#0f766e':'#b45309'}}>{n}/{FAIL_ITEMS.length}</b></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px 10px'}}>{FAIL_ITEMS.map(it=>{const ok=hv[it.k];return <div key={it.k} style={{display:'flex',gap:8,alignItems:'center',minWidth:0}}><span style={{flex:'0 0 22px',height:22,borderRadius:'50%',background:ok?'#0f766e':'#e2e8f0',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:13}}>{ok?'✔':''}</span><span style={{fontWeight:ok?700:500,fontSize:13.5,lineHeight:1.25,color:ok?'#0f172a':'#64748b'}}>{it.s}</span></div>;})}</div>
+      </div>;})()}
       {err&&<div className="card" style={{color:'#c0392b'}}>{err}</div>}
       {pdf&&<div className="card" style={{background:'#ecfdf5',borderColor:'#a7e3d4'}}>
         <div style={{fontWeight:800,color:'var(--brand)',marginBottom:8}}>✅ สร้าง PDF เสร็จแล้ว</div>
