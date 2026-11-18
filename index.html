@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-17b';
+var APP_VERSION='2026-11-18a';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -13532,8 +13532,9 @@ window.__dataReady.then(data => {
     const [q,setQ]=useState('');
     const [view,setView]=useState(null);
     const [rpt,setRpt]=useState(true);
+    const [rptV,setRptV]=useState('check');   // check = สรุปเช็กลิสต์ · full = รายงานเต็ม
     const [rptKey,setRptKey]=useState(()=>Date.now());   // กันแอป QC ที่แคชไว้เป็นเวอร์ชันเก่า: ทุกครั้งที่เปิดดึงไฟล์ใหม่   // เปิดรายงานแบบ PDF ในหน้าต่างรายละเอียด
-    useEffect(()=>{setRpt(true);setRptKey(Date.now());},[view&&view.id]);
+    useEffect(()=>{setRpt(true);setRptV('check');setRptKey(Date.now());},[view&&view.id]);
     const load=()=>{db.from('pile_fail_inspections').select('*').order('inspect_date',{ascending:false}).order('id',{ascending:false}).limit(3000)
       .then(({data,error})=>{if(error){setNoTable(true);setRows([]);return;}setNoTable(false);setRows(data||[]);}).catch(()=>{setNoTable(true);setRows([]);});};
     useEffect(load,[]);
@@ -13615,11 +13616,12 @@ window.__dataReady.then(data => {
                 <div style={{fontSize:12.5,color:'#64748b'}}>ตรวจ {fmtD(r.inspect_date)} โดย {r.inspector||'–'}</div></div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 {canEdit&&<a href={'qc.html?fail='+r.id+'&edit=1&_t='+rptKey} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>✎ แก้ไขใบตรวจ</a>}
+                {rpt&&<span style={{display:'inline-flex',gap:0}}><button style={{...(rptV==='check'?btnP:btn),borderRadius:'8px 0 0 8px'}} onClick={()=>setRptV('check')}>สรุปเช็กลิสต์</button><button style={{...(rptV==='full'?btnP:btn),borderRadius:'0 8px 8px 0'}} onClick={()=>setRptV('full')}>รายงานเต็ม</button></span>}
                 <button style={btnP} onClick={()=>setRpt(v=>!v)}>{rpt?'ดูแบบตาราง':'📄 ดูแบบรายงาน (PDF)'}</button>
                 <a href={'qc.html?fail='+r.id+'&_t='+rptKey} target="_blank" rel="noopener" style={{...btn,textDecoration:'none',display:'inline-block'}}>↗ เปิดในแอป QC</a>
                 {canEdit&&<button style={{...btn,color:'#dc2626'}} onClick={()=>del(r)}>ลบ</button>}
                 <button style={btn} onClick={()=>setView(null)}>ปิด</button></div></div>
-            {rpt&&<iframe key={rptKey} title="รายงานตรวจเสาเฟล" src={'qc.html?fail='+r.id+'&embed=1&_t='+rptKey} style={{width:'100%',height:'78vh',border:'1px solid #e2e8f0',borderRadius:8}}/>}
+            {rpt&&<iframe key={rptKey+rptV} title="รายงานตรวจเสาเฟล" src={'qc.html?fail='+r.id+'&embed=1'+(rptV==='check'?'&view=check':'')+'&_t='+rptKey} style={{width:'100%',height:'78vh',border:'1px solid #e2e8f0',borderRadius:8}}/>}
             {!rpt&&<table style={{width:'100%',borderCollapse:'collapse',border:'1px solid #eef0f4'}}><tbody>
               {row('ลูกค้า / หน้างาน',[r.customer,r.site].filter(Boolean).join(' · '))}
               {row('ขนาด × ความยาว',(r.pile_size||'–')+(r.pile_std?(r.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(r.pile_length_m!=null?Number(r.pile_length_m).toFixed(2)+' ม.':'–'))}
