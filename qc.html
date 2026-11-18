@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-17a';
+var APP_VERSION='2026-11-18a';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -334,6 +334,14 @@ function strengthKeyAll(r){
   const pcs=piecesOf(r),n=pcs.length;
   const keys=pcs.map(p=>{const a=pieceAnalysis(r,p,n);return a.ev?{p,k:{age:a.ev.age,prod:a.ev.strength,ok:a.ev.ok,target:a.ev.target}}:null;}).filter(Boolean);
   return keys.find(x=>x.k.ok===false)||keys[0]||null;
+}
+
+// รายการข้อมูลที่ต้องเก็บเมื่อเสาเฟล (ตามกระดานประชุม) — ติ๊ก ✔ = มีข้อมูลแล้ว
+const FAIL_ITEMS=[{k:'str',t:'ค่ากำลังอัด',s:'ค่ากำลังอัด'},{k:'age',t:'อายุเสา (หน้าเสา)',s:'อายุเสา'},{k:'soil',t:'ชั้นดิน 30 ฟุต',s:'ชั้นดิน 30 ฟุต'},{k:'vert',t:'เช็คดิ่งเสา',s:'เช็คดิ่งเสา'},{k:'drop',t:'ระยะยกตุ้ม',s:'ระยะยกตุ้ม'},{k:'hw',t:'น้ำหนักตุ้ม',s:'น้ำหนักตุ้ม'},{k:'blow',t:'รายการคำนวณ Blow',s:'คำนวณ Blow'},{k:'photo',t:'รูปเสาแตก',s:'รูปเสาแตก'}];
+function failHave(r,photoN){
+  const pcs=piecesOf(r),n=pcs.length;
+  const bc=blowCalc(Number(r.pile_area_cm2),Number(r.pile_length_m),Number(r.hammer_weight_t),Number(r.hammer_drop_cm),Number(r.qa_ton));
+  return {str:!!strengthKeyAll(r),age:pcs.some(p=>pieceAnalysis(r,p,n).faceAge!=null),soil:Number(r.blow_count)>0,vert:r.vertical_result==='ok'||r.vertical_result==='bad',drop:Number(r.hammer_drop_cm)>0,hw:Number(r.hammer_weight_t)>0,blow:!!bc||r.blow_s_cm!=null,photo:photoN>0};
 }
 
 // ข้อสังเกตอัตโนมัติจากข้อมูลที่กรอก (บอกเป็นแนวโน้ม ไม่ใช่ข้อสรุปตายตัว)
@@ -726,22 +734,23 @@ function FailInspectView({me,onBack,openId,openEdit}){
   const [noTable,setNoTable]=useState(false);
   const [rec,setRec]=useState(null);              // ใบที่เปิดดู/แก้
   const [formKey,setFormKey]=useState(0);
+  const [startMode,setStartMode]=useState('quick');   // quick = แบบง่าย (ติ๊กรายการ) · full = แบบละเอียด (เดิม)
   // เสาเฟลอีกต้นวันเดียวกัน: เอาข้อมูลร่วมของหน้างานไปให้ (วันที่ตอก ลูกค้า/หน้างาน Blow ตุ้ม Qa) — ขนาด/ท่อน/ดิ่ง/รูปกรอกใหม่
   const carryOf=r=>({inspect_date:r.inspect_date,drive_date:String(r.drive_date||'').slice(0,10),customer:r.customer,site:r.site,pile_std:r.pile_std,blow_id:r.blow_id,blow_site:r.blow_site,blow_count:r.blow_count,blow_feet:r.blow_feet,hammer_weight_t:r.hammer_weight_t,hammer_drop_cm:r.hammer_drop_cm,qa_ton:r.qa_ton});
   const addNext=r=>{setRec(carryOf(r));setFormKey(k=>k+1);setView('form');};
   const loadList=()=>DB.from('pile_fail_inspections').select('*').order('created_at',{ascending:false}).limit(60)
     .then(({data,error})=>{if(error){setNoTable(true);setList([]);return;}setNoTable(false);setList(data||[]);}).catch(()=>{setNoTable(true);setList([]);});
   useEffect(()=>{loadList();},[]);
-  useEffect(()=>{ if(!openId) return; if(openId==='new'){setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setRec(data);setView(openEdit?'form':'view');} }); },[openId]);
-  if(view==='form') return <FailForm key={formKey} me={me} init={rec} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={(r,opt)=>{loadList();if(opt&&opt.next){addNext(r);}else{setRec(r);setView('view');}}}/>;
-  if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>{setFormKey(k=>k+1);setView('form');}} onAddNext={()=>addNext(rec)}/>;
+  useEffect(()=>{ if(!openId) return; if(openId==='new'){setStartMode('quick');setRec(null);setView('form');return;} DB.from('pile_fail_inspections').select('*').eq('id',openId).single().then(({data})=>{ if(data){setStartMode('full');setRec(data);setView(openEdit?'form':'view');} }); },[openId]);
+  if(view==='form') return <FailForm key={formKey} me={me} init={rec} startMode={startMode} onCancel={()=>{setView(rec&&rec.id?'view':'list');}} onSaved={(r,opt)=>{loadList();if(opt&&opt.next){setStartMode(opt.mode||'quick');addNext(r);}else{setRec(r);setView('view');}}}/>;
+  if(view==='view'&&rec) return <FailDetail rec={rec} onBack={()=>{setView('list');setRec(null);}} onEdit={()=>{setStartMode('full');setFormKey(k=>k+1);setView('form');}} onAddNext={()=>addNext(rec)}/>;
   const badge=(ok,txt)=>ok==null?null:<span className="pill" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b',marginRight:5,fontSize:12}}>{txt}</span>;
   return <>
     <div className="topbar"><button onClick={onBack} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
       <div><div className="who">ตรวจเสาเฟลหน้างาน</div><div className="sub">{me.name} · ตรวจสาเหตุเสาแตกที่หน้างาน แล้วส่งออก PDF</div></div></div>
     <div className="wrap">
       {noTable&&<div className="card" style={{color:'#92400e',background:'#fffbeb',borderColor:'#fde68a',lineHeight:1.9}}>⚠️ ยังไม่ได้สร้างตารางในฐานข้อมูล — ให้แอดมินรัน SQL <b>supabase-pile-fail-inspect.sql</b> หนึ่งครั้ง แล้วรีเฟรชหน้านี้</div>}
-      <div style={{marginTop:14}}><button className="bigbtn" disabled={noTable} onClick={()=>{setRec(null);setView('form');}}>＋ ตรวจเสาเฟลใหม่</button></div>
+      <div style={{marginTop:14,display:'flex',gap:8}}><button className="bigbtn" style={{flex:1}} disabled={noTable} onClick={()=>{setStartMode('quick');setRec(null);setFormKey(k=>k+1);setView('form');}}>⚡ ตรวจเสาเฟล แบบง่าย</button><button className="ghost" style={{flex:1}} disabled={noTable} onClick={()=>{setStartMode('full');setRec(null);setFormKey(k=>k+1);setView('form');}}>📋 แบบละเอียด (เดิม)</button></div>
       <div className="sec">ใบตรวจล่าสุด</div>
       {list===null&&<div className="hint">กำลังโหลด…</div>}
       {list&&!list.length&&!noTable&&<div className="hint">ยังไม่มีใบตรวจ</div>}
@@ -759,6 +768,7 @@ function FailInspectView({me,onBack,openId,openEdit}){
             {r.hammer_ratio!=null&&badge(r.hammer_ratio>=HAMMER_MIN&&r.hammer_ratio<=HAMMER_MAX,'ตุ้ม '+fmtN(r.hammer_ratio,2)+'×')}
             {r.vertical_result&&r.vertical_result!=='na'&&badge(r.vertical_result==='ok','ดิ่ง'+(r.vertical_result==='ok'?'ผ่าน':'ไม่ผ่าน'))}
           </div>
+          {(()=>{const hv=failHave(r,(r.photos||[]).length),n=FAIL_ITEMS.filter(x=>hv[x.k]).length,miss=FAIL_ITEMS.filter(x=>!hv[x.k]);return <div className="hint" style={{marginTop:4}}><b style={{color:n===FAIL_ITEMS.length?'#0f766e':'#b45309'}}>{n===FAIL_ITEMS.length?'✔':'☑'} ข้อมูล {n}/{FAIL_ITEMS.length}</b>{miss.length>0&&<> · ยังไม่มี: {miss.map(x=>x.s).join(' · ')}</>}</div>;})()}
           <div className="hint" style={{marginTop:4}}>ตรวจ {thaiDate(r.inspect_date)} โดย {r.inspector||'–'}</div>
         </button>;})}
         </div>;});})()}
@@ -845,7 +855,7 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
   </>;
 }
 
-function FailForm({me,init,onCancel,onSaved}){
+function FailForm({me,init,onCancel,onSaved,startMode}){
   const today=todayISO();
   const blank={inspect_date:today,customer:'',site:'',pile_size:'',pile_std:'tis',pile_length_m:'',prod_dates:[{date:'',face:'',len:'',formula:''}],face_date:'',drive_date:today,foreman_report_id:null,
     strength_formula:'',strength_rows:[],blow_id:null,blow_site:'',blow_count:'',blow_feet:30,
@@ -864,6 +874,7 @@ function FailForm({me,init,onCancel,onSaved}){
   const [files,setFiles]=useState([]);                    // รูปใหม่ {file,preview}
   const [oldPhotos,setOldPhotos]=useState(init?.photos||[]);
   const [saving,setSaving]=useState(false);
+  const [mode,setMode]=useState(startMode==='full'?'full':'quick');   // quick = แบบง่าย · full = แบบละเอียด (ข้อมูลชุดเดียวกัน สลับได้ไม่หาย)
   const [err,setErr]=useState('');
   const [reports,setReports]=useState([]);               // รายงานโฟร์แมน
   const [doneIns,setDoneIns]=useState([]);                // ใบตรวจที่บันทึกแล้ว (ไว้ซ่อนเสาที่ตรวจแล้ว)
@@ -976,18 +987,45 @@ function FailForm({me,init,onCancel,onSaved}){
       }
       const {data:fin,error:e2}=await DB.from('pile_fail_inspections').update({photos:urls}).eq('id',id).select().single();
       if(e2)throw e2;
-      onSaved(fin,next?{next:true}:null);
+      onSaved(fin,next?{next:true,mode}:null);
     }catch(e){setErr('บันทึกไม่สำเร็จ: '+(e.message||e)+(/prod_dates|column/i.test(String(e.message||e))?' — ให้แอดมินรัน SQL ล่าสุด (supabase-pile-fail-inspect.sql) ใน Supabase ก่อน':''));}
     setSaving(false);
   };
 
   const inp=(k,label,props)=><div className="field"><label>{label}</label><input value={f[k]==null?'':f[k]} onChange={e=>set(k,e.target.value)} {...(props||{})}/></div>;
-  const secH=t=><div className="sec" style={{fontSize:15}}>{t}</div>;
+  const secH=t=><div className="sec" style={{fontSize:15}}>{mode==='quick'?t.replace(/^[①-⑧]\s*/,''):t}</div>;
   const chip=(ok,txt)=><span className="verdict" style={{background:ok?'#ecfdf5':'#fdecea',color:ok?'#0f766e':'#c0392b'}}>{txt}</span>;
+  const chkRec={...f,strength_rows:rowsAll,pile_area_cm2:pArea,pile_length_m:len||f.pile_length_m};
+  const nPhoto=oldPhotos.length+files.length;
+  const hv=failHave(chkRec,nPhoto);
+  const chkN=FAIL_ITEMS.filter(x=>hv[x.k]).length;
+  const chkDetail=(()=>{const pc=piecesOf(chkRec),AA=pc.map(p=>pieceAnalysis(chkRec,p,pc.length)),sk=strengthKeyAll(chkRec),fa=AA.find(a=>a.faceAge!=null);
+    return {
+      str:sk?(pc.length>1?sk.p.label+' · ':'')+'อายุ '+sk.k.age+' วัน = '+fmtN(sk.k.prod)+' ksc '+(sk.k.ok?'✔ ถึงเกณฑ์':'✘ ต่ำกว่า '+sk.k.target):(pcs.length?(cr===null?'กำลังดึงผล…':'ไม่พบผลก้อนปูนในระบบ'):'ใส่วันที่ผลิต'),
+      age:fa?'หน้าเสา '+fa.faceAge+' วัน · ผลิตจริง '+fa.age+' วัน':'ใส่วันที่หน้าเสา',
+      soil:Number(f.blow_count)>0?f.blow_count+' ครั้ง/'+(f.blow_feet||30)+' ฟุต'+(L?' · '+L.t:''):'ใส่ค่า Blow',
+      vert:f.vertical_result==='ok'?'ผ่าน':f.vertical_result==='bad'?'ไม่ผ่าน':f.vertical_result==='na'?'ไม่ได้วัด':'ยังไม่ได้เช็ค',
+      drop:Number(f.hammer_drop_cm)>0?f.hammer_drop_cm+' ซม.':'ใส่ระยะยก',
+      hw:hw>0?hw+' ตัน'+(ratio!=null?' · ตุ้ม÷เสา '+fmtN(ratio,2)+' เท่า '+(ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX?'✔ ในเกณฑ์':'✘ นอกเกณฑ์')+' ('+HAMMER_MIN+'–'+HAMMER_MAX+')':' (ใส่ขนาด/ความยาวเสาเพื่อเทียบเกณฑ์ '+HAMMER_MIN+'–'+HAMMER_MAX+')'):'ใส่น้ำหนักตุ้ม',
+      blow:bc?(bc.S>0?'ต้องได้ ≥ '+fmtN(bc.per10,1)+' ครั้ง/10 ซม. (set ≤ '+fmtN(bc.S,3)+' ซม.)':'คำนวณไม่ได้ (พลังงานตุ้มน้อยกว่า Qa ต้องการ)'):'ใส่ Qa ตามแบบ + ตุ้ม + ระยะยก + ขนาด/ความยาวเสา',
+      photo:nPhoto>0?nPhoto+' รูป':'ยังไม่มีรูป'};})();
   return <>
     <div className="topbar"><button onClick={onCancel} style={{background:'none',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>‹</button>
-      <div><div className="who">{init&&init.id?'แก้ใบตรวจ #'+init.id:'ตรวจเสาเฟลหน้างาน'}</div><div className="sub">{me.name}</div></div></div>
+      <div><div className="who">{init&&init.id?'แก้ใบตรวจ #'+init.id:'ตรวจเสาเฟลหน้างาน'}</div><div className="sub">{me.name} · {mode==='quick'?'แบบง่าย':'แบบละเอียด'}</div></div></div>
     <div className="wrap">
+      <div className="seg" style={{marginTop:12}}>
+        <button className={mode==='quick'?'on-pass':''} onClick={()=>setMode('quick')}>⚡ แบบง่าย</button>
+        <button className={mode==='full'?'on-pass':''} onClick={()=>setMode('full')}>📋 แบบละเอียด</button></div>
+      {mode==='quick'&&<div className="card" style={{marginTop:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}><b style={{color:'var(--brand)',fontSize:15}}>ข้อมูลที่ต้องมี เมื่อเสาเฟล</b><b style={{color:chkN===FAIL_ITEMS.length?'#0f766e':'#b45309'}}>{chkN}/{FAIL_ITEMS.length}</b></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px 10px'}}>
+        {FAIL_ITEMS.map(it=>{const ok=hv[it.k];return <div key={it.k} title={chkDetail[it.k]} style={{display:'flex',gap:8,alignItems:'center',minWidth:0}}>
+          <span style={{flex:'0 0 22px',height:22,borderRadius:'50%',background:ok?'#0f766e':'#e2e8f0',color:ok?'#fff':'#94a3b8',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:13}}>{ok?'✔':''}</span>
+          <span style={{fontWeight:ok?700:500,fontSize:13.5,lineHeight:1.25,color:ok?'#0f172a':'#64748b'}}>{it.s}</span></div>;})}
+        </div>
+        {FAIL_ITEMS.some(it=>hv[it.k])&&<div style={{marginTop:8,fontSize:12.5,lineHeight:1.7,color:'#475569',borderTop:'1px solid var(--line)',paddingTop:6}}>{FAIL_ITEMS.filter(it=>hv[it.k]).map(it=><div key={it.k}><b>{it.s}</b>: {chkDetail[it.k]}</div>)}</div>}
+        <div className="hint" style={{marginTop:6}}>กรอกด้านล่าง ติ๊กขึ้นเองเมื่อมีข้อมูล · อยากกรอกละเอียดกว่านี้ (ใบบันทึกการตอก วิเคราะห์ ฯลฯ) กด "แบบละเอียด" ข้อมูลที่กรอกไว้ไม่หาย</div>
+      </div>}
 
       {secH('① ข้อมูลเสาและหน้างาน')}
       <div className="card" style={{marginTop:0}}>
@@ -1030,7 +1068,7 @@ function FailForm({me,init,onCancel,onSaved}){
             <div style={{marginTop:8,fontWeight:800,color:'var(--brand)',fontSize:14.5}}>อายุจริงตอนตอก: {p.date&&f.drive_date?isoDiff(f.drive_date,p.date)+' วัน':'—'} <span className="hint" style={{fontWeight:400}}>ผลิตจริง → ตอกเฟล</span></div>
             {p.date&&(()=>{const A=pieceAnalysis({...f,strength_rows:rowsAll,pile_length_m:f.pile_length_m||sumLen},{...p,drive:f.drive_date},f.prod_dates.length);
               return <div style={{fontSize:13,lineHeight:1.7,color:'#475569'}}>
-                {A.backdate!=null?<>หน้าเสาย้อนวัน <b>{A.backdate} วัน</b> · อายุตามหน้าเสา <b>{A.faceAge!=null?A.faceAge+' วัน':'–'}</b> (นับ 8 วัน){A.policyOk===false?<span style={{color:'#c0392b',fontWeight:700}}> · ย้อนเกินที่สูตร {A.formula} รองรับ (ไม่เกิน {A.maxBack} วัน)</span>:A.policyOk===true?<span style={{color:'#15803d'}}> · อยู่ในนโยบาย ✔</span>:null}</>:<span className="hint">ใส่วันที่หน้าเสา (เช่น 7/10/69) เพื่อดูว่าย้อนกี่วัน</span>}</div>;})()}
+                {A.backdate!=null?<>หน้าเสาย้อนวัน <b>{A.backdate} วัน</b> · อายุตามหน้าเสา <b>{A.faceAge!=null?A.faceAge+' วัน':'–'}</b> (นับ 8 วัน){A.policyOk===false?<span style={{color:'#c0392b',fontWeight:700}}> · ย้อนเกินที่สูตร {A.formula} รองรับ (ไม่เกิน {A.maxBack} วัน)</span>:A.policyOk===true?<span style={{color:'#15803d'}}> · อยู่ในนโยบาย ✔</span>:null}</>:<span className="hint">ใส่วันที่หน้าเสา (เช่น 7/10/69) เพื่อดูว่าย้อนกี่วัน</span>}{mode==='quick'&&<div>{A.ev?<>กำลังอัดที่อายุ {A.age} วัน ≈ <b>{fmtN(A.ev.strength)} ksc</b> (เกณฑ์ ≥ {A.ev.target}) <b style={{color:A.ev.ok?'#15803d':'#c0392b'}}>{A.ev.ok?'✔ ถึงเกณฑ์':'✘ ต่ำกว่าเกณฑ์'}</b></>:<span className="hint">{cr===null?'กำลังดึงผลกำลังอัด…':'ไม่พบผลก้อนปูนของวันผลิตนี้ในระบบ'}</span>}</div>}</div>;})()}
           </div>)}
           <div style={{display:'flex',gap:8}}>
             <button className="ghost" style={{padding:'9px',flex:1}} onClick={addPd}>＋ เพิ่มท่อน (ท่อนต่อ)</button>
@@ -1039,7 +1077,7 @@ function FailForm({me,init,onCancel,onSaved}){
         {pcs.length>1&&<div style={{padding:'10px 12px',borderRadius:10,background:'#f0fdfa',border:'1px solid #99f6e4',fontWeight:800,color:'var(--brand)'}}>ท่อนที่อ่อนที่สุด: {age!=null?age+' วัน':'—'} <span className="hint" style={{fontWeight:400}}>(ใช้เป็นอายุหลักของเสา)</span></div>}
       </div>
 
-      {secH('② กำลังอัดคอนกรีต — เทียบที่อายุจริงตอนตอก')}
+      {mode==='full'&&<>{secH('② กำลังอัดคอนกรีต — เทียบที่อายุจริงตอนตอก')}
       <div className="card" style={{marginTop:0}}>
         {!pcs.length&&<div className="hint">ใส่วันที่ผลิตก่อน ระบบจะดึงผลก้อนปูนของวันผลิตนั้นมาเทียบให้ (หลายท่อนจะเทียบทุกท่อน)</div>}
         {pcs.length>0&&cr===null&&<div className="hint">กำลังดึงผล…</div>}
@@ -1068,7 +1106,7 @@ function FailForm({me,init,onCancel,onSaved}){
                 <div className="hint">★ = วันผลิตจริง · "–" = ไม่มีผลสูตรนี้ในวันนั้น · สีแดง = ต่ำกว่า {A.min||DRIVE_MIN}</div></div>;})()}
           </div>;})}
         </>}
-      </div>
+      </div></>}
 
       {secH('③ ชั้นดิน — นับ Blow 30 ฟุตสุดท้าย')}
       <div className="card" style={{marginTop:0}}>
@@ -1108,7 +1146,7 @@ function FailForm({me,init,onCancel,onSaved}){
         {inp('vertical_note','ค่าที่วัดได้ (ถ้ามี)',{placeholder:'เช่น เอียง 2 ซม. ที่ความสูง 1 ม.'})}
       </div>
 
-      {secH(f.log.subject==='self'?'⑤ ใบบันทึกการตอก (เสาต้นที่เฟล — ตอกถึงจุดที่เฟล)':'⑤ ใบบันทึกการตอก (เสาต้นอื่นที่ได้ Blow)')}
+      {mode==='full'&&<>{secH(f.log.subject==='self'?'⑤ ใบบันทึกการตอก (เสาต้นที่เฟล — ตอกถึงจุดที่เฟล)':'⑤ ใบบันทึกการตอก (เสาต้นอื่นที่ได้ Blow)')}
       <div className="card" style={{marginTop:0}}>
         <div className="field" style={{marginBottom:8}}><label>ใบบันทึกการตอกนี้เป็นของ</label>
           <div className="seg">
@@ -1135,7 +1173,7 @@ function FailForm({me,init,onCancel,onSaved}){
           {dsF.shortfall!=null&&<div>ปลายเสา {dsF.shortfall>0.05?<b style={{color:'#b45309'}}>ตื้นกว่าแบบ {fmtN(dsF.shortfall,2)} ม.</b>:'ถึงระดับตามแบบ'}</div>}
           {dsF.dev!=null&&<div>หัวเสาเบี้ยวรวม ≈ {fmtN(dsF.dev,1)} ซม. ทิศ {dsF.devDir||'–'}</div>}
           {dsF.set==null&&logObj.l10.length===0&&<div className="hint">ใส่ Blow ต่อฟุต (ระบบประมาณ set/Qa จากฟุตสุดท้าย) หรือ Last ten blow penetration (แม่นกว่า) เพื่อคำนวณ set และ Qa ที่ตอกได้</div>}</div>}
-      </div>
+      </div></>}
 
       {secH('⑥ รูปถ่ายตอนเสาเข็มแตก')}
       <div className="card" style={{marginTop:0}}>
@@ -1155,7 +1193,7 @@ function FailForm({me,init,onCancel,onSaved}){
           <textarea className="note" rows={4} placeholder="เช่น แตกที่หัวเสา · ดินแน่นมีคอนกรีตเก่าใต้ดิน · หมวกรองหัวเสาเสื่อม · รถปั้นจั่นวางไม่ได้ระดับ" value={soOf(f).note} onChange={e=>setF(o=>({...o,site_obs:{...soOf(o),note:e.target.value}}))} style={{marginTop:0}}/></div>
       </div>
 
-      {secH('⑧ สรุป')}
+      {mode==='full'&&<>{secH('⑧ สรุป')}
       <div className="card" style={{marginTop:0}}>
         {(()=>{const an=analyze({...f,strength_rows:rowsFor,hammer_ratio:ratio,blow_s_cm:bc?bc.S:null,drive_log:logObj,pile_area_cm2:pArea,pile_length_m:len});const cl={ok:'#15803d',bad:'#c0392b',warn:'#b45309',info:'#475569'},ic2={ok:'✔',bad:'✘',warn:'⚠',info:'ℹ'};
           return <div>
@@ -1168,7 +1206,7 @@ function FailForm({me,init,onCancel,onSaved}){
           <textarea className="note" rows={3} value={f.cause_note} onChange={e=>set('cause_note',e.target.value)} style={{marginTop:0}}/></div>
         <div className="field"><label>มาตรการ / สิ่งที่ต้องแก้ไข</label>
           <textarea className="note" rows={3} value={f.action_note} onChange={e=>set('action_note',e.target.value)} style={{marginTop:0}}/></div>
-      </div>
+      </div></>}
       {err&&<div className="card" style={{color:'#c0392b',borderColor:'#f3b8b0',background:'#fdecea'}}>{err}</div>}
     </div>
     <div className="bottom"><div className="inner">
