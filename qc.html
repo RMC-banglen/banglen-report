@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-19e';
+var APP_VERSION='2026-11-19f';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -340,7 +340,7 @@ function strengthKeyAll(r){
 const FAIL_ITEMS=[{k:'str',t:'ค่ากำลังอัด',s:'ค่ากำลังอัด'},{k:'age',t:'อายุเสา (หน้าเสา)',s:'อายุเสา'},{k:'soil',t:'ชั้นดิน 30 ฟุต',s:'ชั้นดิน 30 ฟุต'},{k:'vert',t:'เช็คดิ่งเสา',s:'เช็คดิ่งเสา'},{k:'drop',t:'ระยะยกตุ้ม',s:'ระยะยกตุ้ม'},{k:'hw',t:'น้ำหนักตุ้ม',s:'น้ำหนักตุ้ม'},{k:'photo',t:'รูปเสาแตก',s:'รูปเสาแตก'}];
 function failHave(r,photoN){
   const pcs=piecesOf(r),n=pcs.length;
-  return {str:!!strengthKeyAll(r),age:pcs.some(p=>pieceAnalysis(r,p,n).faceAge!=null),soil:Number(r.blow_count)>0,vert:r.vertical_result==='ok'||r.vertical_result==='bad',drop:Number(r.hammer_drop_cm)>0,hw:Number(r.hammer_weight_t)>0,photo:photoN>0};
+  return {str:!!strengthKeyAll(r),age:pcs.some(p=>pieceAnalysis(r,p,n).age!=null),soil:Number(r.blow_count)>0,vert:r.vertical_result==='ok'||r.vertical_result==='bad',drop:Number(r.hammer_drop_cm)>0,hw:Number(r.hammer_weight_t)>0,photo:photoN>0};
 }
 
 // จำนวนเสาที่เฟล จากรายงานโฟร์แมน (ช่อง fail_of เช่น "2/103" = เฟล 2 ต้น จากทั้งหมด 103 ต้น)
@@ -356,12 +356,12 @@ function useFailOf(rec){
 // รายละเอียดสั้นๆ ต่อท้ายแต่ละรายการ (x.ratio = ตุ้ม÷เสา ถ้ามีค่าอยู่แล้ว · x.loading = กำลังดึงผลกำลังอัด)
 function failDetailOf(r,photoN,x){
   x=x||{};
-  const pc=piecesOf(r),n=pc.length,AA=pc.map(p=>pieceAnalysis(r,p,n)),sk=strengthKeyAll(r),fa=AA.find(a=>a.faceAge!=null);
+  const pc=piecesOf(r),n=pc.length,AA=pc.map(p=>pieceAnalysis(r,p,n)),sk=strengthKeyAll(r),fi=AA.findIndex(a=>a.age!=null),fa=fi>=0?AA[fi]:null;
   const bn=Number(r.blow_count),L=bn>0?SOIL_LV[soilIdx(bn)]:null,hw=Number(r.hammer_weight_t)||0;
   const ratio=x.ratio!=null?x.ratio:(r.hammer_ratio!=null&&r.hammer_ratio!==''?Number(r.hammer_ratio):null);
   return {
     str:sk?(n>1?sk.p.label+' ':'')+sk.k.age+' วัน · '+fmtN(sk.k.prod)+' ksc '+(sk.k.ok?'✔ ถึง '+sk.k.target:'✘ ต่ำกว่า '+sk.k.target):(n?(x.loading?'กำลังดึงผล…':'ไม่พบผลก้อนปูนในระบบ'):'ใส่วันที่ผลิตท่อน'),
-    age:fa?'หน้าเสา '+fa.faceAge+' วัน · ผลิตจริง '+fa.age+' วัน'+(fa.policyOk===false?' ✘ ย้อนวันเกินที่สูตรรองรับ':''):'ใส่วันที่หน้าเสา',
+    age:fa?'ผลิตจริง '+dm(pc[fi].date)+' · อายุ '+fa.age+' วัน':'ใส่วันที่ผลิตจริง',
     soil:bn>0?bn+' ครั้ง/'+(r.blow_feet||30)+' ฟุต'+(L?' · '+L.t:''):'ใส่ค่า Blow',
     vert:r.vertical_result==='ok'?'ผ่าน ✔':r.vertical_result==='bad'?'ไม่ผ่าน ✘':r.vertical_result==='na'?'ไม่ได้วัด':'ยังไม่ได้เช็ค',
     drop:Number(r.hammer_drop_cm)>0?r.hammer_drop_cm+' ซม.':'ใส่ระยะยก',
@@ -383,7 +383,7 @@ function FailChecklist({rec,photoN,x,fs}){
 function FailAgeRows({r}){
   const pcs=piecesOf(r),n=pcs.length;
   return <div>{pcs.map((p,i)=>{const A=pieceAnalysis(r,p,n);
-    return <div key={i} style={{marginTop:i?2:0,color:A.policyOk===false?'#b91c1c':'#475569',fontWeight:600}}><span style={{color:'#0f172a',fontWeight:800}}>{n>1?p.label:'เสาต้นนี้'}</span>{p.len!==''&&p.len!=null?' '+fmtN(Number(p.len),0)+' ม.':''} · หน้าเสา {p.face||'–'}{A.faceAge!=null?' · อายุ '+A.faceAge+' วัน':''} · ผลิตจริง {dm(p.date)}{A.age!=null?' · อายุ '+A.age+' วัน':''}{A.policyOk===false?' ✘ ย้อนวันเกินที่สูตรรองรับ':''}</div>;})}
+    return <div key={i} style={{marginTop:i?2:0,color:'#475569',fontWeight:600}}><span style={{color:'#0f172a',fontWeight:800}}>{n>1?p.label:'เสาต้นนี้'}</span>{p.len!==''&&p.len!=null?' '+fmtN(Number(p.len),0)+' ม.':''} · ผลิตจริง {dm(p.date)}{A.age!=null?' · อายุ '+A.age+' วัน':''}</div>;})}
     {r.drive_date&&<div style={{fontSize:12,color:'#64748b',fontWeight:400,marginTop:3}}>อายุนับถึงวันที่ตอกเฟล {thaiDate(r.drive_date)}</div>}</div>;
 }
 // ค่ากำลังอัดแยกตามท่อน (บน/กลาง/ล่าง) — กำลังอัดที่อายุตอนตอก + ผลวันผลิต ±3 วัน (ท่อนที่ผลิตวันเดียวกัน/สูตรเดียวกันรวมเป็นกลุ่มเดียว)
