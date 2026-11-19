@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-19g';
+var APP_VERSION='2026-11-19h';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -373,9 +373,9 @@ function FailChecklist({rec,photoN,x,fs}){
   const hv=failHave(rec,photoN),dt=failDetailOf(rec,photoN,x),n=FAIL_ITEMS.filter(i=>hv[i.k]).length,f=fs||14.5;
   return <div>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}><b style={{color:'#0f766e',fontSize:f+1}}>ข้อมูลที่ต้องมี เมื่อเสาเฟล</b></div>
-    {FAIL_ITEMS.map((it,i)=>{const ok=hv[it.k],t=dt[it.k],c=!ok?'#94a3b8':t.includes('✘')?'#b91c1c':t.includes('✔')?'#15803d':'#475569';
+    {FAIL_ITEMS.map((it,i)=>{const ok=hv[it.k],t=dt[it.k],bad=ok&&t.includes('✘'),c=!ok?'#94a3b8':bad?'#b91c1c':t.includes('✔')?'#15803d':'#475569';
       return <div key={it.k} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'6px 0',borderTop:i?'1px solid #e2e8f0':'none'}}>
-        <span style={{flex:'0 0 '+(f+9)+'px',height:f+9,borderRadius:'50%',background:ok?'#0f766e':'#e2e8f0',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:f-1}}>{ok?'✔':''}</span>
+        <span style={{flex:'0 0 '+(f+9)+'px',height:f+9,borderRadius:'50%',background:ok?(bad?'#b91c1c':'#0f766e'):'#e2e8f0',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:f-1}}>{ok?(bad?'✘':'✔'):''}</span>
         <div style={{flex:1,minWidth:0,fontSize:f,lineHeight:1.5,paddingTop:1}}><b style={{color:ok?'#0f172a':'#64748b'}}>{it.s}</b>{it.k==='str'&&ok?<FailStrGroups r={rec} f={f}/>:it.k==='age'&&ok?<FailAgeRows r={rec}/>:<span style={{color:c,marginLeft:8,fontWeight:ok?600:400}}>{t}</span>}</div></div>;})}
   </div>;
 }
