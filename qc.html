@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-19c';
+var APP_VERSION='2026-11-19d';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -391,7 +391,7 @@ function FailStrGroups({r,f}){
   return <div>
     {groupPieces(r,pcs).map((g,gi)=>{const p=g.ps[0],A=pieceAnalysis(r,p,n),N=neighborDays(pieceRows(r,p),p.date,A.formula,A.age,A.min),lbl=n>1?g.ps.map(x=>x.label).join(' + '):'เสาต้นนี้';
       return <div key={gi} style={{marginTop:gi?6:2}}>
-        <div style={{fontWeight:600,color:A.ev?(A.ev.ok?'#15803d':'#b91c1c'):'#94a3b8'}}><span style={{color:'#0f172a',fontWeight:800}}>{lbl}</span> · ผลิต {dm(p.date)}{A.formula?' ('+A.formula+')':''} · อายุ {A.age} วัน · {A.ev?fmtN(A.ev.strength)+' ksc '+(A.ev.ok?'✔ ถึง ':'✘ ต่ำกว่า ')+fmtN(A.ev.target):'ไม่พบผลในระบบ'}</div>
+        <div style={{fontWeight:800,color:'#0f172a'}}>{lbl}{!A.ev&&<span style={{fontWeight:600,color:'#94a3b8'}}> · ไม่พบผลในระบบ</span>}</div>
         {N.some(x=>x.v!=null)&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:3}}>{N.map(x=><span key={x.d} style={{minWidth:46,textAlign:'center',border:'1px solid #e2e8f0',borderRadius:6,padding:'1px 4px',fontSize:f-2.5,lineHeight:1.35,background:x.isProd?'#fef3c7':'#f8fafc',color:x.v==null?'#94a3b8':x.ok===false?'#b91c1c':'#334155',fontWeight:x.isProd?800:500}}><span style={{display:'block',fontSize:f-4.5,color:'#64748b',fontWeight:400}}>{dm(x.d)}{x.isProd?' ★':''}</span>{x.v==null?'–':fmtN(x.v)}</span>)}</div>}
       </div>;})}
     <div style={{fontSize:f-3,color:'#64748b',marginTop:3}}>ตัวเลขในกรอบ = กำลังอัดที่อายุเท่ากัน ของวันผลิต ±3 วัน (ksc) · ★ = วันผลิตจริง · สีแดง = ต่ำกว่าเกณฑ์</div>
