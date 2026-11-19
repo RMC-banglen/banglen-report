@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-19d';
+var APP_VERSION='2026-11-19e';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -383,7 +383,8 @@ function FailChecklist({rec,photoN,x,fs}){
 function FailAgeRows({r}){
   const pcs=piecesOf(r),n=pcs.length;
   return <div>{pcs.map((p,i)=>{const A=pieceAnalysis(r,p,n);
-    return <div key={i} style={{marginTop:i?2:0,color:A.policyOk===false?'#b91c1c':'#475569',fontWeight:600}}><span style={{color:'#0f172a',fontWeight:800}}>{n>1?p.label:'เสาต้นนี้'}</span>{p.len!==''&&p.len!=null?' '+fmtN(Number(p.len),0)+' ม.':''} · หน้าเสา {p.face||'–'}{A.faceAge!=null?' → '+A.faceAge+' วัน':''} · ผลิตจริง {dm(p.date)}{A.age!=null?' → '+A.age+' วัน':''}{A.policyOk===false?' ✘ ย้อนวันเกินที่สูตรรองรับ':''}</div>;})}</div>;
+    return <div key={i} style={{marginTop:i?2:0,color:A.policyOk===false?'#b91c1c':'#475569',fontWeight:600}}><span style={{color:'#0f172a',fontWeight:800}}>{n>1?p.label:'เสาต้นนี้'}</span>{p.len!==''&&p.len!=null?' '+fmtN(Number(p.len),0)+' ม.':''} · หน้าเสา {p.face||'–'}{A.faceAge!=null?' · อายุ '+A.faceAge+' วัน':''} · ผลิตจริง {dm(p.date)}{A.age!=null?' · อายุ '+A.age+' วัน':''}{A.policyOk===false?' ✘ ย้อนวันเกินที่สูตรรองรับ':''}</div>;})}
+    {r.drive_date&&<div style={{fontSize:12,color:'#64748b',fontWeight:400,marginTop:3}}>อายุนับถึงวันที่ตอกเฟล {thaiDate(r.drive_date)}</div>}</div>;
 }
 // ค่ากำลังอัดแยกตามท่อน (บน/กลาง/ล่าง) — กำลังอัดที่อายุตอนตอก + ผลวันผลิต ±3 วัน (ท่อนที่ผลิตวันเดียวกัน/สูตรเดียวกันรวมเป็นกลุ่มเดียว)
 function FailStrGroups({r,f}){
