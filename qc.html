@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-18c';
+var APP_VERSION='2026-11-19c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -337,11 +337,20 @@ function strengthKeyAll(r){
 }
 
 // รายการข้อมูลที่ต้องเก็บเมื่อเสาเฟล (ตามกระดานประชุม) — ติ๊ก ✔ = มีข้อมูลแล้ว
-const FAIL_ITEMS=[{k:'str',t:'ค่ากำลังอัด',s:'ค่ากำลังอัด'},{k:'age',t:'อายุเสา (หน้าเสา)',s:'อายุเสา'},{k:'soil',t:'ชั้นดิน 30 ฟุต',s:'ชั้นดิน 30 ฟุต'},{k:'vert',t:'เช็คดิ่งเสา',s:'เช็คดิ่งเสา'},{k:'drop',t:'ระยะยกตุ้ม',s:'ระยะยกตุ้ม'},{k:'hw',t:'น้ำหนักตุ้ม',s:'น้ำหนักตุ้ม'},{k:'blow',t:'รายการคำนวณ Blow',s:'คำนวณ Blow'},{k:'photo',t:'รูปเสาแตก',s:'รูปเสาแตก'}];
+const FAIL_ITEMS=[{k:'str',t:'ค่ากำลังอัด',s:'ค่ากำลังอัด'},{k:'age',t:'อายุเสา (หน้าเสา)',s:'อายุเสา'},{k:'soil',t:'ชั้นดิน 30 ฟุต',s:'ชั้นดิน 30 ฟุต'},{k:'vert',t:'เช็คดิ่งเสา',s:'เช็คดิ่งเสา'},{k:'drop',t:'ระยะยกตุ้ม',s:'ระยะยกตุ้ม'},{k:'hw',t:'น้ำหนักตุ้ม',s:'น้ำหนักตุ้ม'},{k:'photo',t:'รูปเสาแตก',s:'รูปเสาแตก'}];
 function failHave(r,photoN){
   const pcs=piecesOf(r),n=pcs.length;
-  const bc=blowCalc(Number(r.pile_area_cm2),Number(r.pile_length_m),Number(r.hammer_weight_t),Number(r.hammer_drop_cm),Number(r.qa_ton));
-  return {str:!!strengthKeyAll(r),age:pcs.some(p=>pieceAnalysis(r,p,n).faceAge!=null),soil:Number(r.blow_count)>0,vert:r.vertical_result==='ok'||r.vertical_result==='bad',drop:Number(r.hammer_drop_cm)>0,hw:Number(r.hammer_weight_t)>0,blow:!!bc||r.blow_s_cm!=null,photo:photoN>0};
+  return {str:!!strengthKeyAll(r),age:pcs.some(p=>pieceAnalysis(r,p,n).faceAge!=null),soil:Number(r.blow_count)>0,vert:r.vertical_result==='ok'||r.vertical_result==='bad',drop:Number(r.hammer_drop_cm)>0,hw:Number(r.hammer_weight_t)>0,photo:photoN>0};
+}
+
+// จำนวนเสาที่เฟล จากรายงานโฟร์แมน (ช่อง fail_of เช่น "2/103" = เฟล 2 ต้น จากทั้งหมด 103 ต้น)
+const failOfText=fo=>{ if(!fo) return ''; const m=String(fo).match(/(\d+)\s*\/\s*(\d+)/); return m?m[1]+' ต้น จากทั้งหมด '+m[2]+' ต้น':String(fo); };
+function useFailOf(rec){
+  const [fo,setFo]=useState(null);
+  useEffect(()=>{ if(!rec||!rec.foreman_report_id){setFo(null);return;} let off=false;
+    DB.from('foreman_reports').select('fail_of').eq('id',rec.foreman_report_id).single().then(({data})=>{ if(!off) setFo((data&&data.fail_of)||null); }).catch(()=>{});
+    return ()=>{off=true;}; },[rec&&rec.foreman_report_id]);
+  return fo;
 }
 
 // รายละเอียดสั้นๆ ต่อท้ายแต่ละรายการ (x.ratio = ตุ้ม÷เสา ถ้ามีค่าอยู่แล้ว · x.loading = กำลังดึงผลกำลังอัด)
@@ -350,7 +359,6 @@ function failDetailOf(r,photoN,x){
   const pc=piecesOf(r),n=pc.length,AA=pc.map(p=>pieceAnalysis(r,p,n)),sk=strengthKeyAll(r),fa=AA.find(a=>a.faceAge!=null);
   const bn=Number(r.blow_count),L=bn>0?SOIL_LV[soilIdx(bn)]:null,hw=Number(r.hammer_weight_t)||0;
   const ratio=x.ratio!=null?x.ratio:(r.hammer_ratio!=null&&r.hammer_ratio!==''?Number(r.hammer_ratio):null);
-  const bc=blowCalc(Number(r.pile_area_cm2),Number(r.pile_length_m),hw,Number(r.hammer_drop_cm),Number(r.qa_ton)),ds=driveStats(r);
   return {
     str:sk?(n>1?sk.p.label+' ':'')+sk.k.age+' วัน · '+fmtN(sk.k.prod)+' ksc '+(sk.k.ok?'✔ ถึง '+sk.k.target:'✘ ต่ำกว่า '+sk.k.target):(n?(x.loading?'กำลังดึงผล…':'ไม่พบผลก้อนปูนในระบบ'):'ใส่วันที่ผลิตท่อน'),
     age:fa?'หน้าเสา '+fa.faceAge+' วัน · ผลิตจริง '+fa.age+' วัน'+(fa.policyOk===false?' ✘ ย้อนวันเกินที่สูตรรองรับ':''):'ใส่วันที่หน้าเสา',
@@ -358,7 +366,6 @@ function failDetailOf(r,photoN,x){
     vert:r.vertical_result==='ok'?'ผ่าน ✔':r.vertical_result==='bad'?'ไม่ผ่าน ✘':r.vertical_result==='na'?'ไม่ได้วัด':'ยังไม่ได้เช็ค',
     drop:Number(r.hammer_drop_cm)>0?r.hammer_drop_cm+' ซม.':'ใส่ระยะยก',
     hw:hw>0?hw+' ตัน'+(ratio!=null?' · ตุ้ม÷เสา '+fmtN(ratio,2)+' เท่า '+(ratio>=HAMMER_MIN&&ratio<=HAMMER_MAX?'✔':'✘ นอกเกณฑ์ '+HAMMER_MIN+'–'+HAMMER_MAX):' (ใส่ขนาด/ความยาวเสาเพื่อเทียบเกณฑ์ '+HAMMER_MIN+'–'+HAMMER_MAX+')'):'ใส่น้ำหนักตุ้ม',
-    blow:bc?(bc.S>0?'ต้องได้ ≥ '+fmtN(bc.per10,1)+' ครั้ง/10 ซม.':'คำนวณไม่ได้ (พลังงานตุ้มไม่พอ)')+(ds.qaRatio!=null?' · ตอกได้จริง Qa ≈ '+fmtN(ds.qaAct,1)+' ตัน '+(ds.qaRatio>=1?'✔':'✘'):''):'ใส่ Qa ตามแบบ + ตุ้ม + ระยะยก + ขนาด/ความยาวเสา',
     photo:photoN>0?photoN+' รูป':'ยังไม่มีรูป'};
 }
 // เช็กลิสต์ 8 ข้อ: วงกลม ✔ + ชื่อรายการ + รายละเอียดสั้นๆ ต่อท้าย (fs = ขนาดตัวอักษร)
@@ -369,7 +376,25 @@ function FailChecklist({rec,photoN,x,fs}){
     {FAIL_ITEMS.map((it,i)=>{const ok=hv[it.k],t=dt[it.k],c=!ok?'#94a3b8':t.includes('✘')?'#b91c1c':t.includes('✔')?'#15803d':'#475569';
       return <div key={it.k} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'6px 0',borderTop:i?'1px solid #e2e8f0':'none'}}>
         <span style={{flex:'0 0 '+(f+9)+'px',height:f+9,borderRadius:'50%',background:ok?'#0f766e':'#e2e8f0',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:f-1}}>{ok?'✔':''}</span>
-        <div style={{flex:1,minWidth:0,fontSize:f,lineHeight:1.5,paddingTop:1}}><b style={{color:ok?'#0f172a':'#64748b'}}>{it.s}</b><span style={{color:c,marginLeft:8,fontWeight:ok?600:400}}>{t}</span></div></div>;})}
+        <div style={{flex:1,minWidth:0,fontSize:f,lineHeight:1.5,paddingTop:1}}><b style={{color:ok?'#0f172a':'#64748b'}}>{it.s}</b>{it.k==='str'&&ok?<FailStrGroups r={rec} f={f}/>:it.k==='age'&&ok?<FailAgeRows r={rec}/>:<span style={{color:c,marginLeft:8,fontWeight:ok?600:400}}>{t}</span>}</div></div>;})}
+  </div>;
+}
+// อายุเสาแยกตามท่อน — วันที่หน้าเสาของแต่ละท่อน (จากรายงานโฟร์แมน) และวันที่ผลิตจริง พร้อมอายุตอนตอก
+function FailAgeRows({r}){
+  const pcs=piecesOf(r),n=pcs.length;
+  return <div>{pcs.map((p,i)=>{const A=pieceAnalysis(r,p,n);
+    return <div key={i} style={{marginTop:i?2:0,color:A.policyOk===false?'#b91c1c':'#475569',fontWeight:600}}><span style={{color:'#0f172a',fontWeight:800}}>{n>1?p.label:'เสาต้นนี้'}</span>{p.len!==''&&p.len!=null?' '+fmtN(Number(p.len),0)+' ม.':''} · หน้าเสา {p.face||'–'}{A.faceAge!=null?' → '+A.faceAge+' วัน':''} · ผลิตจริง {dm(p.date)}{A.age!=null?' → '+A.age+' วัน':''}{A.policyOk===false?' ✘ ย้อนวันเกินที่สูตรรองรับ':''}</div>;})}</div>;
+}
+// ค่ากำลังอัดแยกตามท่อน (บน/กลาง/ล่าง) — กำลังอัดที่อายุตอนตอก + ผลวันผลิต ±3 วัน (ท่อนที่ผลิตวันเดียวกัน/สูตรเดียวกันรวมเป็นกลุ่มเดียว)
+function FailStrGroups({r,f}){
+  const pcs=piecesOf(r),n=pcs.length;
+  return <div>
+    {groupPieces(r,pcs).map((g,gi)=>{const p=g.ps[0],A=pieceAnalysis(r,p,n),N=neighborDays(pieceRows(r,p),p.date,A.formula,A.age,A.min),lbl=n>1?g.ps.map(x=>x.label).join(' + '):'เสาต้นนี้';
+      return <div key={gi} style={{marginTop:gi?6:2}}>
+        <div style={{fontWeight:600,color:A.ev?(A.ev.ok?'#15803d':'#b91c1c'):'#94a3b8'}}><span style={{color:'#0f172a',fontWeight:800}}>{lbl}</span> · ผลิต {dm(p.date)}{A.formula?' ('+A.formula+')':''} · อายุ {A.age} วัน · {A.ev?fmtN(A.ev.strength)+' ksc '+(A.ev.ok?'✔ ถึง ':'✘ ต่ำกว่า ')+fmtN(A.ev.target):'ไม่พบผลในระบบ'}</div>
+        {N.some(x=>x.v!=null)&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:3}}>{N.map(x=><span key={x.d} style={{minWidth:46,textAlign:'center',border:'1px solid #e2e8f0',borderRadius:6,padding:'1px 4px',fontSize:f-2.5,lineHeight:1.35,background:x.isProd?'#fef3c7':'#f8fafc',color:x.v==null?'#94a3b8':x.ok===false?'#b91c1c':'#334155',fontWeight:x.isProd?800:500}}><span style={{display:'block',fontSize:f-4.5,color:'#64748b',fontWeight:400}}>{dm(x.d)}{x.isProd?' ★':''}</span>{x.v==null?'–':fmtN(x.v)}</span>)}</div>}
+      </div>;})}
+    <div style={{fontSize:f-3,color:'#64748b',marginTop:3}}>ตัวเลขในกรอบ = กำลังอัดที่อายุเท่ากัน ของวันผลิต ±3 วัน (ksc) · ★ = วันผลิตจริง · สีแดง = ต่ำกว่าเกณฑ์</div>
   </div>;
 }
 
@@ -540,6 +565,7 @@ function FailReport({rec,logo,photos}){
         {kv('ลูกค้า / หน้างาน',[rec.customer,rec.site].filter(Boolean).join(' · '))}
         {kv('ขนาดเสา × ความยาว',(rec.pile_size||'–')+(rec.pile_std?(rec.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(rec.pile_length_m!=null&&rec.pile_length_m!==''?fmtN(rec.pile_length_m,2)+' ม.':'–'))}
         {kv('วันที่ตอกเฟล',thaiDate(rec.drive_date))}
+        {rec._fail_of&&kv('เสาเฟล / ทั้งหมด',failOfText(rec._fail_of)+' (ตามรายงานโฟร์แมน)')}
         {kv('ผู้ตอก',rec.foreman_report_id?'บริษัทตอกเอง (เลือกจากรายงานโฟร์แมน)':'ลูกค้าตอกเอง')}
       </tbody></table>
       <table style={{width:'100%',borderCollapse:'collapse',marginTop:8}}>
@@ -619,7 +645,7 @@ function FailReport({rec,logo,photos}){
 
 // หน้าสรุปเช็กลิสต์ (ให้เจ้านายดู) — ใช้เป็น PDF และแสดงในแดชบอร์ด (fluid)
 function FailChecklistReport({rec,logo,photos,fluid}){
-  const an=analyze(rec),ph=photos||[],shown=ph.slice(0,6);
+  const ph=photos||[],shown=ph.slice(0,6);
   const td={border:'1px solid #cbd5e1',padding:'5px 8px',fontSize:13,textAlign:'left'};
   const kv=(k,v)=><tr><td style={{...td,background:'#f8fafc',width:'30%',fontWeight:600}}>{k}</td><td style={td}>{v==null||v===''?'–':v}</td></tr>;
   const H=t=><div style={{fontSize:15,fontWeight:800,color:'#0f766e',borderBottom:'2px solid #0f766e',paddingBottom:3,marginBottom:6}}>{t}</div>;
@@ -637,24 +663,26 @@ function FailChecklistReport({rec,logo,photos,fluid}){
     <div data-block="2" style={blk}><table style={{width:'100%',borderCollapse:'collapse'}}><tbody>
       {kv('ลูกค้า / หน้างาน',[rec.customer,rec.site].filter(Boolean).join(' · '))}
       {kv('ขนาดเสา × ความยาว',(rec.pile_size||'–')+(rec.pile_std?(rec.pile_std==='fac'?' (โรงงาน)':' (มอก.)'):'')+' × '+(rec.pile_length_m!=null&&rec.pile_length_m!==''?fmtN(rec.pile_length_m,2)+' ม.':'–'))}
+      {rec._fail_of&&kv('เสาเฟล',<b style={{color:'#b91c1c'}}>{failOfText(rec._fail_of)}</b>)}
       {kv('วันที่ตอกเฟล · ผู้ตอก',thaiDate(rec.drive_date)+' · '+(rec.foreman_report_id?'บริษัทตอกเอง':'ลูกค้าตอกเอง'))}
     </tbody></table></div>
     <div data-block="3" style={blk}><FailChecklist rec={rec} photoN={ph.length} fs={15}/></div>
-    <div data-block="4" style={blk}>{H('วิเคราะห์เบื้องต้น')}
-      <div style={{fontSize:14,fontWeight:800,lineHeight:1.7,color:an.nRisk?'#b91c1c':'#15803d',marginBottom:6}}>{an.summary}</div>
-      <div style={{display:'flex',flexWrap:'wrap',gap:6,margin:'4px 0 8px'}}>{[...an.risks,...an.oks].map((o,i)=>{const bad=o.t==='bad',wn=o.t==='warn';return <span key={i} style={{fontSize:13,fontWeight:(bad||wn)?800:600,padding:'3px 10px',borderRadius:999,border:'1px solid '+(bad?'#fca5a5':wn?'#fcd34d':'#86efac'),background:bad?'#fef2f2':wn?'#fffbeb':'#f0fdf4',color:bad?'#991b1b':wn?'#92400e':'#166534'}}>{bad?'✘':wn?'⚠':'✔'} {o.s}</span>;})}</div>
-      <div style={{fontSize:13.5,lineHeight:1.8}}><b>ควรทำ</b>{an.checks.slice(0,3).map((c,i)=><div key={i}>→ {c}</div>)}</div>
-      {so.note.trim()&&<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>ข้อสังเกตหน้างาน:</b> {so.note}</div>}
-      {rec.cause_note&&<div style={{marginTop:8,fontSize:13.5,lineHeight:1.7}}><b>สาเหตุที่น่าจะเป็น (ผู้ตรวจ):</b> {rec.cause_note}</div>}
+    {(so.note.trim()||rec.cause_note||rec.action_note)&&<div data-block="4" style={blk}>{H('หมายเหตุผู้ตรวจ')}
+      {so.note.trim()&&<div style={{fontSize:13.5,lineHeight:1.7}}><b>ข้อสังเกตหน้างาน:</b> {so.note}</div>}
+      {rec.cause_note&&<div style={{marginTop:6,fontSize:13.5,lineHeight:1.7}}><b>สาเหตุที่น่าจะเป็น (ผู้ตรวจ):</b> {rec.cause_note}</div>}
       {rec.action_note&&<div style={{marginTop:6,fontSize:13.5,lineHeight:1.7}}><b>มาตรการ/สิ่งที่ต้องแก้ไข:</b> {rec.action_note}</div>}
-    </div>
+    </div>}
     {shown.length>0&&<div data-block="5" style={blk}>{H('รูปเสาแตก ('+ph.length+' รูป)')}
       <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{shown.map((u,i)=><img key={i} src={u} alt="" style={{width:'calc(33.33% - 6px)',height:150,objectFit:'cover',border:'1px solid #e2e8f0',borderRadius:6,background:'#f8fafc'}}/>)}</div>
       {ph.length>shown.length&&<div style={{fontSize:12.5,color:'#64748b',marginTop:4}}>และอีก {ph.length-shown.length} รูป — ดูในรายงานเต็ม</div>}</div>}
-    <div data-block="9" style={{display:'flex',gap:20,marginTop:22}}>
-      {['ผู้ตรวจ (QC)','ผู้จัดการ/หัวหน้า QC'].map(t=><div key={t} style={{flex:1,textAlign:'center',fontSize:13,color:'#475569'}}><div style={{borderBottom:'1px solid #94a3b8',height:38,marginBottom:4}}/>{t}<br/>วันที่ ........ / ........ / ........</div>)}
-    </div>
   </div>;
+}
+// รูปสรุปเช็กลิสต์ (รูปเดียว) — ส่งออกเป็นภาพ JPEG
+async function makeFailCheckImage(rec,onStep){
+  onStep&&onStep('กำลังสร้างรูป…');
+  const logo=await loadAsDataUrl('logo.png');
+  const photos=(await Promise.all((rec.photos||[]).slice(0,6).map(loadAsDataUrl))).filter(Boolean);
+  return renderBlob(<FailChecklistReport rec={rec} logo={logo} photos={photos}/>,2);
 }
 
 // แปลงใบรายงานเป็น PDF (A4) โดยวางทีละบล็อก ไม่ตัดกลางบล็อก (variant 'check' = สรุปเช็กลิสต์)
@@ -788,11 +816,15 @@ async function makeFailPageImages(rec,onStep){
 
 // ---------- หน้าหลักของเมนูตรวจเสาเฟล ----------
 // หน้าฝังรายงาน (ให้แดชบอร์ดเปิดดูในหน้าเดียว) — อ่านอย่างเดียว ไม่ต้องเลือกชื่อผู้ตรวจ
-function FailCheckEmbed({rec}){
+function FailCheckEmbed({rec:rec0}){
+  const rec=useFullRec(rec0);
   const [busy,setBusy]=useState(''),[err,setErr]=useState('');
   const dl=async()=>{ setBusy('กำลังสร้าง PDF…');setErr(''); try{ const blob=await makeFailPdf(rec,setBusy,'check'); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='สรุปเช็กลิสต์เสาเฟล-'+(rec.pile_size||'')+'-'+String(rec.drive_date||'').slice(0,10)+'-'+rec.id+'.pdf'; document.body.appendChild(a); a.click(); a.remove(); }catch(e){ setErr('สร้าง PDF ไม่สำเร็จ: '+(e.message||e)); } setBusy(''); };
+  const dlImg=async()=>{ setBusy('กำลังสร้างรูป…');setErr(''); try{ const blob=await makeFailCheckImage(rec,setBusy); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='สรุปเช็กลิสต์เสาเฟล-'+(rec.pile_size||'')+'-'+String(rec.drive_date||'').slice(0,10)+'-'+rec.id+'.jpg'; document.body.appendChild(a); a.click(); a.remove(); }catch(e){ setErr('สร้างรูปไม่สำเร็จ: '+(e.message||e)); } setBusy(''); };
   return <div className="wrap" style={{paddingTop:10}}>
-    <button className="bigbtn" disabled={!!busy} onClick={dl}>{busy||'⬇ ดาวน์โหลด PDF สรุปเช็กลิสต์'}</button>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+      <button className="bigbtn" style={{flex:'1 1 200px'}} disabled={!!busy} onClick={dl}>{busy||'⬇ ดาวน์โหลด PDF สรุปเช็กลิสต์'}</button>
+      <button className="ghost" style={{flex:'1 1 200px'}} disabled={!!busy} onClick={dlImg}>🖼️ ดาวน์โหลดเป็นรูปภาพ</button></div>
     {err&&<div className="card" style={{color:'#c0392b'}}>{err}</div>}
     <div style={{border:'1px solid #e2e8f0',borderRadius:8,overflow:'hidden',marginTop:10}}><FailChecklistReport rec={rec} logo="logo.png" photos={rec.photos||[]} fluid/></div>
   </div>;
@@ -855,8 +887,8 @@ function FailInspectView({me,onBack,openId,openEdit}){
   </>;
 }
 
-function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
-  // ใบที่บันทึกไว้ก่อนมีตาราง ±3 วัน เก็บผลเฉพาะวันผลิต → ดึงผลวันข้างเคียงมาเติมให้ตอนเปิดดู (วันที่ใบเก็บไว้แล้วใช้ค่าเดิม)
+// ใบที่บันทึกไว้ก่อนมีตาราง ±3 วัน เก็บผลเฉพาะวันผลิต → ดึงผลวันข้างเคียงมาเติมให้ตอนเปิดดู (วันที่ใบเก็บไว้แล้วใช้ค่าเดิม) + จำนวนเสาเฟลจากรายงานโฟร์แมน
+function useFullRec(recIn){
   const [extra,setExtra]=useState([]);
   useEffect(()=>{
     const ds=piecesOf(recIn).map(p=>p.date).filter(Boolean).sort(); if(!ds.length) return;
@@ -867,7 +899,11 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
       .catch(()=>{});
     return ()=>{off=true;};
   },[recIn.id]);   // eslint-disable-line
-  const rec=useMemo(()=>extra.length?{...recIn,strength_rows:[...(recIn.strength_rows||[]),...extra]}:recIn,[recIn,extra]);
+  const fo=useFailOf(recIn);
+  return useMemo(()=>{ const b=extra.length?{...recIn,strength_rows:[...(recIn.strength_rows||[]),...extra]}:recIn; return fo?{...b,_fail_of:fo}:b; },[recIn,extra,fo]);
+}
+function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
+  const rec=useFullRec(recIn);
   const [busy,setBusy]=useState('');
   const [pdf,setPdf]=useState(null);   // {url,file}
   const [err,setErr]=useState('');
@@ -887,6 +923,9 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
   const mkItem=(blob,name)=>({blob,url:URL.createObjectURL(blob),file:new File([blob],name,{type:'image/jpeg'}),name});
   const getSum=async()=>{ if(sumImg) return sumImg.blob; const blob=await makeFailSummary(rec,setBusy2); setSumImg(mkItem(blob,baseName+'-สรุป.jpg')); return blob; };
   const genSum=async()=>{ setBusy2('เริ่ม…');setErr(''); try{ await getSum(); }catch(e){ setErr('สร้างรูปสรุปไม่สำเร็จ: '+(e.message||e)); } setBusy2(''); };
+  const [chkImg,setChkImg]=useState(null),[busyC,setBusyC]=useState('');   // รูปสรุปเช็กลิสต์
+  const genChk=async()=>{ setBusyC('กำลังสร้างรูป…');setErr(''); try{ const blob=await makeFailCheckImage(rec,setBusyC); setChkImg(mkItem(blob,'สรุปเช็กลิสต์เสาเฟล-'+baseName.replace('ตรวจเสาเฟล-','')+'.jpg')); }catch(e){ setErr('สร้างรูปสรุปเช็กลิสต์ไม่สำเร็จ: '+(e.message||e)); } setBusyC(''); };
+  const canShareChk=chkImg&&navigator.canShare&&navigator.canShare({files:[chkImg.file]});
   const genPages=async()=>{ setBusy2('เริ่ม…');setErr(''); try{ const bl=await makeFailPageImages(rec,setBusy2); setPageImgs(bl.map((b,i)=>mkItem(b,baseName+'-หน้า'+(i+1)+'.jpg'))); }catch(e){ setErr('สร้างรูปรายงานไม่สำเร็จ: '+(e.message||e)); } setBusy2(''); };
   const canShare=pdf&&navigator.canShare&&navigator.canShare({files:[pdf.file]});
   const canShareSum=sumImg&&navigator.canShare&&navigator.canShare({files:[sumImg.file]});
@@ -901,7 +940,7 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
         {!embed&&<button className="ghost" style={{flex:'0 0 auto',width:'auto',padding:'13px 20px'}} onClick={onEdit}>✎ แก้ไข</button>}
         {!embed&&<button className="ghost" style={{flex:'1 1 100%'}} onClick={onAddNext}>＋ เพิ่มเสาเฟลอีกต้น (วันที่ตอกเดียวกัน)</button>}
       </div>
-      {!embed&&<div className="card" style={{marginTop:10}}><FailChecklist rec={rec} photoN={(rec.photos||[]).length}/></div>}
+      {!embed&&<div className="card" style={{marginTop:10}}>{rec._fail_of&&<div style={{fontWeight:800,color:'#b91c1c',marginBottom:6}}>เสาเฟล {failOfText(rec._fail_of)} <span style={{fontWeight:400,color:'#64748b',fontSize:12.5}}>(ตามรายงานโฟร์แมน)</span></div>}<FailChecklist rec={rec} photoN={(rec.photos||[]).length}/></div>}
       {err&&<div className="card" style={{color:'#c0392b'}}>{err}</div>}
       {pdf&&<div className="card" style={{background:'#ecfdf5',borderColor:'#a7e3d4'}}>
         <div style={{fontWeight:800,color:'var(--brand)',marginBottom:8}}>✅ สร้าง PDF เสร็จแล้ว</div>
@@ -914,9 +953,16 @@ function FailDetail({rec:recIn,onBack,onEdit,onAddNext,embed}){
       <div className="card">
         <div style={{fontWeight:800,color:'var(--brand)',marginBottom:8}}>ส่งออกเป็นรูปภาพ</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button className="bigbtn" style={{flex:'1 1 100%'}} disabled={!!busyC} onClick={genChk}>{busyC||'🖼️ รูปสรุปเช็กลิสต์ (ให้เจ้านาย)'}</button>
           <button className="ghost" style={{flex:'1 1 170px'}} disabled={!!busy2} onClick={genSum}>{busy2&&!/ส่ง|หน้า/.test(busy2)?busy2:'🖼️ รูปสรุป (รูปเดียว ตัวใหญ่)'}</button>
           <button className="ghost" style={{flex:'1 1 170px'}} disabled={!!busy2} onClick={genPages}>{/หน้า|โหลด|เตรียม/.test(busy2)?busy2:'🖼️ รูปรายงานเต็ม (แบ่งหน้า)'}</button>
           </div>
+        {chkImg&&<div style={{marginTop:10,padding:'8px 10px',border:'1px solid var(--line)',borderRadius:10}}>
+          <div style={{fontWeight:700,marginBottom:6}}>รูปสรุปเช็กลิสต์</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <a href={chkImg.url} download={chkImg.name} className="ghost" style={{textDecoration:'none',textAlign:'center',flex:'1 1 110px'}}>⬇ ดาวน์โหลด</a>
+            <a href={chkImg.url} target="_blank" rel="noopener" className="ghost" style={{textDecoration:'none',textAlign:'center',flex:'1 1 110px'}}>👁 เปิดดู</a>
+            {canShareChk&&<button className="ghost" style={{flex:'1 1 110px'}} onClick={()=>navigator.share({files:[chkImg.file],title:chkImg.name}).catch(()=>{})}>📤 แชร์</button>}</div></div>}
         {sumImg&&<div style={{marginTop:10,padding:'8px 10px',border:'1px solid var(--line)',borderRadius:10}}>
           <div style={{fontWeight:700,marginBottom:6}}>รูปสรุป</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -1104,7 +1150,7 @@ function FailForm({me,init,onCancel,onSaved,startMode}){
               {reports.filter(r=>String(r.drive_date).slice(0,10)!==f.drive_date&&pickable(r)).map(r=><option key={r.id} value={r.id}>{doneIds.has(String(r.id))?'✔ ตรวจแล้ว · ':''}{thaiDate(String(r.drive_date).slice(0,10))} · {r.size}×{r.length_m||'?'} · {(r.customer||r.site||'').slice(0,28)}</option>)}
             </optgroup>
           </select>
-          <div className="hint" style={{marginTop:4,color:f.foreman_report_id?'#15803d':'#b45309'}}>{f.foreman_report_id?'✔ เลือกจากรายงานโฟร์แมน — บริษัทตอกเอง':'ไม่ได้เลือก = ลูกค้าตอกเอง'}</div>
+          <div className="hint" style={{marginTop:4,color:f.foreman_report_id?'#15803d':'#b45309'}}>{f.foreman_report_id?'✔ เลือกจากรายงานโฟร์แมน — บริษัทตอกเอง'+(()=>{const fr=reports.find(x=>String(x.id)===String(f.foreman_report_id));return fr&&fr.fail_of?' · เฟล '+failOfText(fr.fail_of):'';})():'ไม่ได้เลือก = ลูกค้าตอกเอง'}</div>
           {dayRows.length===0&&<div className="hint" style={{color:'#b45309'}}>ไม่พบรายงานโฟร์แมนของวันที่ตอกนี้ — เลือกจากวันอื่น หรือกรอกเอง</div>}
           {dayRows.length>0&&dayDone>=dayRows.length&&!showDone&&<div className="hint" style={{color:'#15803d'}}>✔ ตรวจครบทุกต้นของวันที่ตอกนี้แล้ว ({dayDone} ต้น)</div>}
           {doneIds.size>0&&<label className="hint" style={{display:'flex',gap:6,alignItems:'center',marginTop:4,cursor:'pointer'}}><input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)} style={{width:'auto'}}/>แสดงเสาที่ตรวจแล้วด้วย (ซ่อนไว้ {doneIds.size} ต้น)</label>}</div>
