@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261120091128";
+} from "./standards.js?v=20261120093801";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -150,10 +150,10 @@ export function panelCalc(G, WT, H, S) {
   const T = G.T, TP = G.TP, W = WT - 2 * TP, cv = S.cv, oh = S.oh;
   const x0 = -TP + cv, x1 = WT - TP - cv, lv = H - 2 * cv, lh = WT - 2 * cv;
   const vs = x0 + oh, ve = x1 - oh;
-  const nm = Math.max(2, Math.ceil((ve - vs) / S.sv) + 1), am = (ve - vs) / (nm - 1), vx = [];
+  const nm = S.nvc > 0 ? Math.max(2, Math.floor(S.nvc)) : Math.max(2, Math.ceil((ve - vs) / S.sv) + 1), am = (ve - vs) / (nm - 1), vx = [];
   for (let i = 0; i < nm; i++) vx.push(vs + i * am);
   const hs = cv + oh, he = H - cv - oh;
-  const nh = Math.max(2, Math.ceil((he - hs) / S.sh) + 1), ah = (he - hs) / (nh - 1), hy = [];
+  const nh = S.nhc > 0 ? Math.max(2, Math.floor(S.nhc)) : Math.max(2, Math.ceil((he - hs) / S.sh) + 1), ah = (he - hs) / (nh - 1), hy = [];
   for (let j = 0; j < nh; j++) hy.push(hs + j * ah);
   const rows = S.pd ? (S.pr || (H <= 500 ? 1 : 2)) : 0;
   const cols = S.pd ? (S.pc || Math.max(1, Math.floor(WT / 600))) : 0;
@@ -251,6 +251,7 @@ function getItem(items, G, S, WT, H, al) {
     it = { code, name: mkName(WT, H, G.T, S, P), H, WT, P, qty: 0, cc: new Set() };
     items.set(key, it);
     if (P.pipe.warn) al.push(["w", `${code}: ${P.pipe.warn}`]);
+    if (S.sp && (S.nvc > 0 || S.nhc > 0)) [[S.nvc > 0, P.am, "แกนตั้ง"], [S.nhc > 0, P.ah, "แกนนอน"]].forEach(([on, s, nm]) => { if (on && (s < 75 || s > 300)) al.push(["w", `แผ่น ${f2(WT)} × ${f2(H)} ม.: เหล็ก${nm} จัดระยะได้ @${f3(s)} ม. ${s < 75 ? "ชิดเกินไป" : "ห่างเกินไป"}`]); });
     if (P.cb && P.cb.clamped) al.push(["w", P.cb.n ? `${code}: ขาเหล็กมุมยาวเกินแผ่น ปรับเป็นขาละ ${f2(P.cb.leg)} ม.` : `${code}: แผ่นเล็กเกินไป ใส่เหล็กกันแตกมุมไม่ได้`]);
     it.tf = tableFit(G, P.W, H);
     if (it.tf.n < 1 || it.tf.R < 1) al.push(["d", `${code}: แผ่นใหญ่เกินโต๊ะหล่อ (ตัวแผ่นยาวได้ไม่เกิน ${f2(it.tf.span)} ม.)`]);

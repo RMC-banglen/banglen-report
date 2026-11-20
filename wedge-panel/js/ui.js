@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261120091128";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261120093801";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, stackCountTxt, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261120091128";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120091128";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120091128";
-import { createViews } from "./view3d.js?v=20261120091128";
-import { initPile } from "./pile-ui.js?v=20261120091128";
-import { makePdf } from "./pdf.js?v=20261120091128";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120091128";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120091128";
+} from "./calc.js?v=20261120093801";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120093801";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120093801";
+import { createViews } from "./view3d.js?v=20261120093801";
+import { initPile } from "./pile-ui.js?v=20261120093801";
+import { makePdf } from "./pdf.js?v=20261120093801";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120093801";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120093801";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -114,7 +114,7 @@ function renderStack() {
 const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
 function spec() {
   if (radio("md") !== "sp") return standardSpec();
-  return { sp: true, dv: +$("dv").value, sv: Math.round(+$("sv").value * 1000), dh: +$("dh").value, sh: Math.round(+$("sh").value * 1000), cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, cbd: +$("cbd").value || 0, cbl: Math.round((+$("cbl").value || 0) * 1000), note: $("nt").value.trim() };
+  return { sp: true, dv: +$("dv").value, sv: $("svm").value === "n" ? 200 : Math.round(+$("sv").value * 1000), nvc: $("svm").value === "n" ? Math.floor(+$("sv").value) || 0 : 0, dh: +$("dh").value, sh: $("shm").value === "n" ? 200 : Math.round(+$("sh").value * 1000), nhc: $("shm").value === "n" ? Math.floor(+$("sh").value) || 0 : 0, cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, cbd: +$("cbd").value || 0, cbl: Math.round((+$("cbl").value || 0) * 1000), note: $("nt").value.trim() };
 }
 function currentSpans(al) {
   if (radio("sm") !== "len") return spans.filter((s) => s.cc && s.n); // แถวที่ยังกรอกไม่ครบไม่นำไปคำนวณ (ไม่ขึ้นเตือนแดง)
@@ -132,7 +132,15 @@ function currentSpans(al) {
 }
 
 // ---------------- คำนวณและแสดงผล ----------------
+function syncBarMode() {
+  [["sv", "แนวตั้ง"], ["sh", "แนวนอน"]].forEach(([id, nm]) => {
+    const n = $(id + "m").value === "n", el = $(id);
+    $(id + "l").textContent = n ? "จำนวนเส้น (" + nm + ")" : "@ " + nm + " (ม.)";
+    el.step = n ? "1" : "0.010"; el.min = n ? "2" : "0.075";
+  });
+}
 function run() {
+  syncBarMode();
   const direct = radio("om") === "direct";
   applyModeUi(direct);
   syncShoulder();
@@ -272,7 +280,7 @@ document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => {
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (PANES.includes(h)) show(h); else if (/^p-[a-z0-9]+$/.test(h)) loadProject(h); });
 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
-const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "cbd", "cbl", "nt", "tn", "tk", "lm", "cmx", "lmt"];
+const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "svm", "dh", "sh", "shm", "pd", "pr", "pc", "cbd", "cbl", "nt", "tn", "tk", "lm", "cmx", "lmt"];
 function collect() {
   const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
@@ -452,6 +460,7 @@ function wire() {
   $("sel3").onchange = () => { drawJoint(); views.buildWall(+$("sel3").value || 0); };
   $("selD").onchange = drawPanel;
   ["shOn", "shMode", "shDrop"].forEach((id) => { $(id).addEventListener("input", sched); $(id).addEventListener("change", sched); });
+  ["sv", "sh"].forEach((id) => $(id + "m").addEventListener("change", () => { $(id).value = $(id + "m").value === "n" ? "8" : "0.200"; })); // เปลี่ยนโหมด: ตั้งค่าเริ่มต้นใหม่ (8 เส้น / @0.200)
   FIELDS.forEach((id) => { $(id).addEventListener("input", sched); $(id).addEventListener("change", sched); });
   document.querySelectorAll('input[name="md"],input[name="sm"],input[name="om"]').forEach((x) => x.addEventListener("change", run));
 }
