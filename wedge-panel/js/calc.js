@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261120090956";
+} from "./standards.js?v=20261120091033";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
