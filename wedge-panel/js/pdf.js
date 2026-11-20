@@ -2,8 +2,8 @@
 // ส่งออก PDF / ใบสรุป HTML — สร้างในเครื่องผู้ใช้ตอนกดดาวน์โหลด ไม่เก็บไฟล์ลง Storage
 // โครงตามต้นแบบ: หน้า 1 สรุปโครงการ • 1 หน้าต่อ c/c (3D + รูปขยายรอยต่อ) • 1 หน้าต่อรหัส (รูปตัด 2 + รูปด้าน 2)
 // ชิ้นเนื้อหาที่ยาวเกินหน้าจะถูกย่อให้พอดี ไม่ตัดกลางชิ้น
-import { fmt, f2, f3 } from "./calc.js?v=20261120082935";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120082935";
+import { fmt, f2, f3 } from "./calc.js?v=20261120083216";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120083216";
 
 export const PRINT = {"--bg":"#FFFFFF","--surface":"#FFFFFF","--surface-2":"#F5F6F4","--ink":"#1D2725","--muted":"#5B6964","--faint":"#8A9691","--line":"#CDD3CF","--accent":"#0F6E56","--accent-soft":"#E1F2EB","--rebar":"#C2522B","--rebar-2":"#B07316","--pipe":"#1E5FA0","--warn":"#9A5B05","--warn-soft":"#FBF0DC","--danger":"#A32D2D","--danger-soft":"#FBE8E8","--concrete":"rgba(93,202,165,.20)"};
 export const unvar = (s) => s.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => PRINT[k] || "#1D2725");
@@ -21,13 +21,16 @@ const stackTxt = (st) => st.stk.map((h) => (h / 1000).toFixed(2)).join(" + ");
 // หน้าปก: โลโก้ ชื่อโครงการ ลูกค้า/ผู้ขาย วันที่ เสาเข็ม และรายการแผ่นทุกแบบ (ไม่มีน้ำหนัก/วัสดุ/การผลิต ใช้ได้ทั้งฉบับภายในและฉบับลูกค้า)
 function pdfCover(st, d) {
   const row = (k, v) => (v ? `<tr><th style="width:130px;text-align:left;color:#5B6964;font-weight:500;padding:6px 0">${k}</th><td style="padding:6px 0;font-size:15px">${esc(v)}</td></tr>` : "");
+  const byH = new Map(); st.list.forEach((i) => byH.set(i.H, (byH.get(i.H) || 0) + i.qty));
+  const hs = `<p style="font-weight:700;margin:22px 0 6px">สรุปจำนวนแผ่นตามความสูง</p><table class="tbl" style="width:60%"><tr><th style="text-align:left">ความสูงแผ่น (ม.)</th><th>จำนวน (แผ่น)</th></tr>${[...byH.entries()].sort((x, y) => y[0] - x[0]).map(([h, q]) => `<tr><td style="text-align:left">${f2(h)}</td><td>${fmt(q)}</td></tr>`).join("")}<tr><td style="text-align:left"><b>รวม</b></td><td><b>${fmt(st.totQ)}</b></td></tr></table>`;
   const items = st.list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.WT)}</td><td>${f2(i.H)}</td><td>${f2(st.G.T)}</td><td>${fmt(i.qty)}</td></tr>`).join("");
   return `<div style="height:960px;position:relative;font-family:inherit">
 <div style="display:flex;align-items:center;gap:16px;border-bottom:2px solid #1D2725;padding-bottom:14px"><img src="assets/logo.png" style="width:120px;height:auto" alt=""><div><div style="font-size:20px;font-weight:700">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:13px;color:#5B6964;margin-top:4px">299 หมู่ 12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div></div>
 <div style="text-align:center;margin:90px 0 56px"><div style="font-size:30px;font-weight:700;line-height:1.5">แบบแผ่นกันดินหัวลิ่ม</div><div style="font-size:17px;color:#5B6964;margin-top:6px">${st.p.n} • หัวลิ่มแบบ ${st.p.ty} • ${st.S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</div></div>
 <table style="width:100%;border-collapse:collapse;border-top:1px solid #CDD3CF;border-bottom:1px solid #CDD3CF;margin-bottom:34px">${row("โครงการ", d.pj)}${row("ลูกค้า", d.cu)}${row("ผู้ขาย", d.sa)}${row("อ้างอิง", st.direct ? d.rf : "")}${row("วันที่", new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" }))}</table>
-<p style="font-weight:700;margin:0 0 6px">รายการแผ่นกันดิน (${st.list.length} แบบ รวม ${fmt(st.totQ)} แผ่น)</p>
+<p style="font-weight:700;margin:0 0 6px">รายการแผ่นกันดิน (${st.list.length} แบบ)</p>
 <table class="tbl" style="width:100%"><tr><th>รหัส</th><th style="text-align:left">รายการ</th><th>กว้างรวม (ม.)</th><th>สูง (ม.)</th><th>หนา (ม.)</th><th>จำนวน (แผ่น)</th></tr>${items}</table>
+${hs}
 </div>`;
 }
 
