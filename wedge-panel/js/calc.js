@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261120081025";
+} from "./standards.js?v=20261120081606";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -159,8 +159,15 @@ export function panelCalc(G, WT, H, S) {
   const cols = S.pd ? (S.pc || Math.max(1, Math.floor(WT / 600))) : 0;
   const pipe = placePipes(vx, hy, S.dv, S.dh, S.pd, rows, cols, WT, TP, H);
   const kv = (nm * lv / 1000) * KG[S.dv], kh = (nh * lh / 1000) * KG[S.dh];
+  // เหล็กกันแตกมุมแผ่น (สั่งพิเศษ): ดัดเป็นตัว V ปลายมน 4 มุม ขาละ cbl มม. (ขาเอียง 30° และ 60°) ยาวต่อตัว = 2 ขา
+  let cb = null;
+  if (S.sp && S.cbd > 0 && KG[S.cbd]) {
+    const want = Math.round(S.cbl) || 0, maxLeg = Math.floor(Math.min(x1 - x0, H - 2 * cv) / 2 / 0.866 / 10) * 10, leg = Math.min(want, maxLeg);
+    if (leg >= 50) cb = { d: S.cbd, n: 4, leg, want, clamped: leg < want, each: 2 * leg, kg: (4 * 2 * leg / 1000) * KG[S.cbd] };
+    else cb = { d: S.cbd, n: 0, leg: 0, want, clamped: true, each: 0, kg: 0 };
+  }
   const vol = ((W * T + 2 * G.tipA) * H) / 1e9 - (pipe.P.length * Math.PI * (S.pd / 2) ** 2 * T) / 1e9;
-  return { W, WT, H, T, TP, vx, hy, am, ah, lv, lh, nv: nm, nh, kv, kh, kg: kv + kh, vol, wt: vol * CONCRETE_DENSITY, pipe, ties: nm * nh, x0, x1 };
+  return { W, WT, H, T, TP, vx, hy, am, ah, lv, lh, nv: nm, nh, kv, kh, cb, kg: kv + kh + (cb ? cb.kg : 0), vol, wt: vol * CONCRETE_DENSITY, pipe, ties: nm * nh, x0, x1 };
 }
 
 // ตัวกั้นหัวคู่: ใช้เหล็กรางน้ำ 2 นิ้วทั้งหมด (TCc ระยะสั้นลง ไม่มีแผ่นตัดพลาสม่า — ผู้ใช้สั่ง 7 พ.ย. 2569) • div = "std" ใช้แบบมาตรฐานเดิม (TC) เฉพาะในเทสต์/เทียบ
@@ -189,6 +196,7 @@ export function mkCode(WT, H, T, S, P) {
 
 export function mkName(WT, H, T, S, P) {
   let n = `แผ่นกันดิน ${(WT / 1000).toFixed(2)} x ${H % 10 ? (H / 1000).toFixed(3) : (H / 1000).toFixed(2)} x ${(T / 1000).toFixed(2)} ม.`;
+  if (S.sp && S.cbd > 0) n += ` เหล็กกันแตกมุม ${barName(S.cbd)}`;
   if (S.sp) n += ` เสริมเหล็ก ${P.nv}+${P.nh}${S.dv === S.dh ? barName(S.dv) : barName(S.dv) + "/" + barName(S.dh)} มม.`;
   return n;
 }
@@ -242,6 +250,7 @@ function getItem(items, G, S, WT, H, al) {
     it = { code, name: mkName(WT, H, G.T, S, P), H, WT, P, qty: 0, cc: new Set() };
     items.set(key, it);
     if (P.pipe.warn) al.push(["w", `${code}: ${P.pipe.warn}`]);
+    if (P.cb && P.cb.clamped) al.push(["w", P.cb.n ? `${code}: ขาเหล็กมุมยาวเกินแผ่น ปรับเป็นขาละ ${f2(P.cb.leg)} ม.` : `${code}: แผ่นเล็กเกินไป ใส่เหล็กกันแตกมุมไม่ได้`]);
     it.tf = tableFit(G, P.W, H);
     if (it.tf.n < 1 || it.tf.R < 1) al.push(["d", `${code}: แผ่นใหญ่เกินโต๊ะหล่อ (ตัวแผ่นยาวได้ไม่เกิน ${f2(it.tf.span)} ม.)`]);
   }
@@ -259,6 +268,7 @@ function totals(items, truckKg, S) {
   const bars = new Map();
   const addBar = (d, n, len, kg) => { const b = bars.get(d) || { d, n: 0, len: 0, kg: 0 }; b.n += n; b.len += len; b.kg += kg; bars.set(d, b); };
   list.forEach((i) => {
+    if (i.P.cb && i.P.cb.n) addBar(i.P.cb.d, i.qty * 4, (i.qty * i.P.cb.n * i.P.cb.each) / 1000, i.qty * i.P.cb.kg);
     addBar(S.dv, i.qty * i.P.nv, (i.qty * i.P.nv * i.P.lv) / 1000, i.qty * i.P.kv);
     addBar(S.dh, i.qty * i.P.nh, (i.qty * i.P.nh * i.P.lh) / 1000, i.qty * i.P.kh);
   });
@@ -266,11 +276,11 @@ function totals(items, truckKg, S) {
   const pipeLen = S.pd ? list.reduce((s, i) => s + (i.qty * i.P.pipe.P.length * i.P.T) / 1000, 0) : 0;
   // แตกตามขนาดเหล็ก + ความยาวต่อเส้น (มม.) เช่น RB6 ยาว 0.95 ม. กี่เส้น (ความยาวต่อเส้นต่างกันตามความสูงแผ่น)
   const lines = new Map();
-  const addLine = (d, each, n) => {
-    const key = d + "|" + each, l = lines.get(key) || { d, each, n: 0, len: 0, kg: 0 };
+  const addLine = (d, each, n, cb) => {
+    const key = d + "|" + each + (cb ? "|cb" : ""), l = lines.get(key) || { d, each, n: 0, len: 0, kg: 0, cb: !!cb };
     l.n += n; l.len += (n * each) / 1000; l.kg += ((n * each) / 1000) * KG[d]; lines.set(key, l);
   };
-  list.forEach((i) => { addLine(S.dv, i.P.lv, i.qty * i.P.nv); addLine(S.dh, i.P.lh, i.qty * i.P.nh); });
+  list.forEach((i) => { if (i.P.cb && i.P.cb.n) addLine(i.P.cb.d, i.P.cb.each, i.qty * i.P.cb.n, true); addLine(S.dv, i.P.lv, i.qty * i.P.nv); addLine(S.dh, i.P.lh, i.qty * i.P.nh); });
   const mat = {
     bars: [...bars.values()].sort((a, b) => a.d - b.d),
     lines: [...lines.values()].sort((a, b) => a.d - b.d || b.each - a.each),

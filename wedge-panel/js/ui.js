@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261120081025";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261120081606";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261120081025";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120081025";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120081025";
-import { createViews } from "./view3d.js?v=20261120081025";
-import { initPile } from "./pile-ui.js?v=20261120081025";
-import { makePdf } from "./pdf.js?v=20261120081025";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120081025";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120081025";
+} from "./calc.js?v=20261120081606";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120081606";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120081606";
+import { createViews } from "./view3d.js?v=20261120081606";
+import { initPile } from "./pile-ui.js?v=20261120081606";
+import { makePdf } from "./pdf.js?v=20261120081606";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120081606";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120081606";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -114,7 +114,7 @@ function renderStack() {
 const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
 function spec() {
   if (radio("md") !== "sp") return standardSpec();
-  return { sp: true, dv: +$("dv").value, sv: Math.round(+$("sv").value * 1000), dh: +$("dh").value, sh: Math.round(+$("sh").value * 1000), cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, note: $("nt").value.trim() };
+  return { sp: true, dv: +$("dv").value, sv: Math.round(+$("sv").value * 1000), dh: +$("dh").value, sh: Math.round(+$("sh").value * 1000), cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, cbd: +$("cbd").value || 0, cbl: Math.round((+$("cbl").value || 0) * 1000), note: $("nt").value.trim() };
 }
 function currentSpans(al) {
   if (radio("sm") !== "len") return spans.filter((s) => s.cc && s.n); // แถวที่ยังกรอกไม่ครบไม่นำไปคำนวณ (ไม่ขึ้นเตือนแดง)
@@ -218,14 +218,14 @@ function renderProd() {
   $("bAuto").onclick = () => { tableAlloc = null; renderProd(); saveDraft(); };
   $("mat").querySelector("tbody").innerHTML = st.list.map((i) => {
     const P = i.P, S = st.S;
-    return `<tr><td class="code">${i.code}</td><td>${P.nv}-${NM(S.dv)} ยาว ${f2(P.lv)}</td><td>${P.kv.toFixed(2)}</td><td>${P.nh}-${NM(S.dh)} ยาว ${f2(P.lh)}</td><td>${P.kh.toFixed(2)}</td><td>${P.kg.toFixed(2)}</td><td>${P.vol.toFixed(3)}</td><td>${S.pd && P.pipe.P.length ? P.pipe.P.length + " ท่อน Ø" + PN[S.pd] + " ยาว " + f2(P.T) : "-"}</td></tr>`;
+    return `<tr><td class="code">${i.code}</td><td>${P.nv}-${NM(S.dv)} ยาว ${f2(P.lv)}</td><td>${P.kv.toFixed(2)}</td><td>${P.nh}-${NM(S.dh)} ยาว ${f2(P.lh)}</td><td>${P.kh.toFixed(2)}</td><td>${P.kg.toFixed(2)}</td><td>${P.vol.toFixed(3)}</td><td>${S.pd && P.pipe.P.length ? P.pipe.P.length + " ท่อน Ø" + PN[S.pd] + " ยาว " + f2(P.T) : "-"}${P.cb && P.cb.n ? `<br>เหล็กมุม ${P.cb.n}-${NM(P.cb.d)} ขาละ ${f2(P.cb.leg)} (${P.cb.kg.toFixed(2)} กก.)` : ""}</td></tr>`;
   }).join("");
   // สรุปวัสดุทั้งโครงการ แยกชนิดเหล็ก (ใช้ภายใน คิดราคา)
   const m = st.mat, S2 = st.S;
   const rows = [];
   m.bars.forEach((b) => {
     const ls = m.lines.filter((l) => l.d === b.d);
-    ls.forEach((l) => rows.push(`<tr><td style="text-align:left">เหล็ก ${NM(l.d)}</td><td>${f2(l.each)}</td><td>${fmt(l.n)} เส้น</td><td>${nf(l.len, 2)}</td><td>${nf(l.kg, 1)} กก.</td></tr>`));
+    ls.forEach((l) => rows.push(`<tr><td style="text-align:left">${l.cb ? "เหล็กกันแตกมุม" : "เหล็ก"} ${NM(l.d)}</td><td>${f2(l.each)}</td><td>${fmt(l.n)} เส้น</td><td>${nf(l.len, 2)}</td><td>${nf(l.kg, 1)} กก.</td></tr>`));
     if (ls.length > 1) rows.push(`<tr><td style="text-align:left"><i>รวมเหล็ก ${NM(b.d)}</i></td><td>-</td><td><i>${fmt(b.n)} เส้น</i></td><td><i>${nf(b.len, 2)}</i></td><td><i>${nf(b.kg, 1)} กก.</i></td></tr>`);
   });
   rows.push(`<tr><td style="text-align:left"><b>เหล็กรวม</b></td><td>-</td><td>-</td><td>-</td><td><b>${nf(st.totS, 1)} กก.</b></td></tr>`);
@@ -268,7 +268,7 @@ document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => {
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (PANES.includes(h)) show(h); else if (/^p-[a-z0-9]+$/.test(h)) loadProject(h); });
 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
-const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "nt", "tn", "tk", "lm", "cmx", "lmt"];
+const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "dh", "sh", "pd", "pr", "pc", "cbd", "cbl", "nt", "tn", "tk", "lm", "cmx", "lmt"];
 function collect() {
   const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });

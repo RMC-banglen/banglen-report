@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="RMC Design">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="app-version" content="20261120081025">
+<meta name="app-version" content="20261120081606">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -45,7 +45,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261120081025">
+<link rel="stylesheet" href="css/app.css?v=20261120081606">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -107,6 +107,8 @@
 <div class="row2"><div><label for="dh">เหล็กแนวนอน</label><select id="dh"><option value="6">RB6</option><option value="9" selected>RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="sh">@ แนวนอน (ม.)</label><input id="sh" type="number" value="0.200" step="0.010" min="0.075"></div></div>
 <div class="row3"><div><label for="pd">ท่อ PVC</label><select id="pd"><option value="0">ไม่มี</option><option value="34">1"</option><option value="48" selected>1½"</option><option value="60">2"</option><option value="76">2½"</option><option value="89">3"</option></select></div><div><label for="pr">แถว</label><input id="pr" type="number" value="2" min="1" max="6"></div><div><label for="pc">คอลัมน์</label><input id="pc" type="number" value="0" min="0" max="10"></div></div>
 <p class="hint">คอลัมน์ 0 = คิดตามความกว้างอัตโนมัติ</p>
+<div class="row2"><div><label for="cbd">เหล็กกันแตกมุมแผ่น (4 มุม)</label><select id="cbd"><option value="0" selected>ไม่มี</option><option value="9">RB9</option><option value="10">DB10</option><option value="12">DB12</option><option value="16">DB16</option></select></div><div><label for="cbl">ความยาวขาละ (ม.)</label><input id="cbl" type="number" value="0.30" step="0.05" min="0.1"></div></div>
+<p class="hint">ดัดเป็นตัว V ปลายมน วางทแยงที่มุมแผ่นทั้ง 4 มุม ความยาวต่อตัว = 2 ขา</p>
 <label for="nt">รายละเอียดที่สั่งพิเศษ</label><textarea id="nt" placeholder="เสริมเหล็กขอบบน 2-DB12 ตามแบบผู้ออกแบบ"></textarea>
 </div>
 </fieldset>
@@ -191,6 +193,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261120081025"></script>
+<script type="module" src="js/ui.js?v=20261120081606"></script>
 </body>
 </html>
