@@ -5,11 +5,12 @@
 // ร่องเสาเข็มไอ: B กว้าง, f ปีก, c ก้นร่อง, dg ลึกร่อง, tw เอว, ty แบบหัวลิ่ม
 // หน้าตัดเสาเข็มไอ ดึงจากแท็บเขียนแบบเสาเข็ม (pile-data.js) เฉพาะ I-18 ขึ้นไป ไม่รวมเสาสี่เหลี่ยม
 // ty = แบบหัวลิ่ม: B (ลิ่ม 85 ปลาย 50) ใช้กับร่องแคบ I-18 โรงงาน/I-18/I-22 มอก. • นอกนั้น A (ลิ่ม 65 ปลาย 70)
-import { PILE_SECTIONS } from "./pile-data.js?v=20261120093935";
-const WEDGE_B = ["F18", "T18", "T22"];
+import { PILE_SECTIONS } from "./pile-data.js?v=20261120094010";
+const WEDGE_B = ["F18", "T22"];
+const NO_WEDGE = ["T18"]; // I-18 มอก.: ก้นร่อง 30 มม. แคบกว่าปลายลิ่มทุกแบบ ใช้กับแผ่นกันดินไม่ได้
 export const PILES = Object.fromEntries(
   Object.entries(PILE_SECTIONS)
-    .filter(([, s]) => s.geo && !s.geo.sq && s.geo.B >= 180)
+    .filter(([k, s]) => s.geo && !s.geo.sq && s.geo.B >= 180 && !NO_WEDGE.includes(k))
     .sort(([, x], [, y]) => (y.fac ? 1 : 0) - (x.fac ? 1 : 0) || x.geo.B - y.geo.B)
     .map(([k, s]) => [k, { n: "I-" + s.geo.B / 10 + (s.fac ? " โรงงาน" : " มอก."), fac: !!s.fac, B: s.geo.B, f: s.geo.f, c: s.geo.c, dg: s.geo.dg, tw: s.geo.tw, ty: WEDGE_B.includes(k) ? "B" : "A" }]),
 );
