@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261120095428";
+} from "./standards.js?v=20261120095554";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -238,7 +238,6 @@ export function calcProject(input) {
       it.cc.add(gr.cc);
     });
   });
-  if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
   return { p, G, g, S, stk, groups, nSpan, nPile, wLen, ...totals(items, input.truckKg, S), al };
 }
 
@@ -330,7 +329,6 @@ export function calcDirect(input) {
     const gr = groups.get(key) || { cc, n: 0, F, stk, WT: WTr };
     gr.n += qty * (stack ? stack.length : 1); groups.set(key, gr);
   });
-  if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
   return { p, G, g, S, stk: [], groups: [...groups.values()].sort((x, y) => x.stk.reduce((s, v) => s + v, 0) - y.stk.reduce((s, v) => s + v, 0) || x.WT - y.WT || x.cc - y.cc), rowInfo, nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg, S), al };
 }
 
