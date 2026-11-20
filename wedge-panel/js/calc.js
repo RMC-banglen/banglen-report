@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261120083216";
+} from "./standards.js?v=20261120083809";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -287,6 +287,14 @@ function totals(items, truckKg, S) {
     pipeCount, pipeLen, pipeEach: list.length ? list[0].P.T : 0, // ท่อยาวเท่าความหนาแผ่น (มม.)
   };
   return { list, totQ, totW, totV, totS, truck, trips: Math.ceil(totW / truck), mat };
+}
+
+// ข้อความจำนวนของกลุ่มที่ซ้อนหลายแผ่น (โหมดสั่งตามจำนวนแผ่น): "31 ช่วง = สูง 1.00 ม. 31 แผ่น + สูง 0.50 ม. 62 แผ่น (รวม 93 แผ่น)"
+export function stackCountTxt(gr) {
+  const k = gr.stk.length, spans = gr.n / k, m = new Map();
+  gr.stk.forEach((h) => m.set(h, (m.get(h) || 0) + spans));
+  const parts = [...m.entries()].map(([h, q]) => `สูง ${f2(h)} ม. ${fmt(q)} แผ่น`);
+  return k < 2 ? `${fmt(gr.n)} แผ่น` : `${fmt(spans)} ช่วง = ${parts.join(" + ")}${parts.length > 1 ? ` (รวม ${fmt(gr.n)} แผ่น)` : ""}`;
 }
 
 // ---------- สั่งตามจำนวนแผ่น (ลูกค้ากำหนดความกว้างและจำนวนมาเอง / สั่งเพิ่ม) ----------
