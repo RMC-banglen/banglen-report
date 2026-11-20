@@ -1,15 +1,15 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอแท็บ "แบบเสาเข็ม": ฟอร์ม → พรีวิวแบบ → ส่งออก PDF A4 (ไม่เก็บลงฐานข้อมูล จำร่างในเครื่อง)
-import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261120082757";
-import { pileSheet } from "./pile-draw.js?v=20261120082757";
-import { PILE_SECTIONS } from "./pile-data.js?v=20261120082757";
-import { download } from "./pdf.js?v=20261120082757";
-import { esc } from "./draw2d.js?v=20261120082757";
-import { getSession, canEdit } from "./auth.js?v=20261120082757";
-import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261120082757";
-import { db } from "./db.js?v=20261120082757";
-import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf, exTxt } from "./pile-struct.js?v=20261120082757";
-import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261120082757";
+import { planPile, autoSplit, m2 } from "./pile-calc.js?v=20261120082935";
+import { pileSheet } from "./pile-draw.js?v=20261120082935";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261120082935";
+import { download } from "./pdf.js?v=20261120082935";
+import { esc } from "./draw2d.js?v=20261120082935";
+import { getSession, canEdit } from "./auth.js?v=20261120082935";
+import { nextPileCode, savePileJob, listPileJobs, deleteProject, getProject } from "./db.js?v=20261120082935";
+import { db } from "./db.js?v=20261120082935";
+import { structCalc, calcPage1, calcPage2, dividerPage, coverPage, sortPiles, pieceLensOf, exTxt } from "./pile-struct.js?v=20261120082935";
+import { askList, parseRequest, TEMPLATE, blowSheet, jobLabel } from "./pile-req.js?v=20261120082935";
 
 const $ = (id) => document.getElementById(id);
 const DKEY = "wp-pile-draft", MKEY = "wp-mode";
