@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="RMC Design">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="app-version" content="20261120093801">
+<meta name="app-version" content="20261120093935">
 <script>
 // หน้านี้ถูกเบราว์เซอร์เก็บแคชได้ถึง 10 นาที: เช็กเลขเวอร์ชันจากเซิร์ฟเวอร์ ถ้าไม่ตรงให้โหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน)
 (function(){
@@ -45,7 +45,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261120093801">
+<link rel="stylesheet" href="css/app.css?v=20261120093935">
 </head>
 <body>
 <div id="login" hidden></div>
@@ -71,7 +71,7 @@
 <fieldset>
 <legend id="lgPile">เสาเข็มและความสูงกำแพง</legend>
 <label for="pt">หน้าตัดเสาเข็มไอ</label>
-<select id="pt"><option value="">— เลือกหน้าตัดเสาเข็ม —</option><optgroup label="มาตรฐานโรงงาน"><option value="F18">I-18 โรงงาน</option><option value="F22">I-22 โรงงาน</option><option value="F26">I-26 โรงงาน</option></optgroup><optgroup label="มอก."><option value="T22">I-22 มอก.</option><option value="T26">I-26 มอก.</option><option value="T30">I-30 มอก.</option></optgroup></select>
+<select id="pt"><option value="">— เลือกหน้าตัดเสาเข็ม —</option></select>
 <div id="wallBox"><div class="hstd" role="img" aria-label="ความสูงแผ่นมาตรฐานบริษัท 0.50 0.75 1.00 และ 1.20 เมตร"><div class="t">ความสูงแผ่นมาตรฐานบริษัท มี 4 ขนาด</div><div class="hbars"><div><span style="height:20px"></span><b>0.50</b></div><div><span style="height:30px"></span><b>0.75</b></div><div><span style="height:40px"></span><b>1.00</b></div><div><span style="height:48px"></span><b>1.20</b></div><div class="stv" id="stkVis" aria-live="polite"></div></div></div>
 <label for="wh">ความสูงกำแพง (ม.)</label><input id="wh" type="number" value="" placeholder="เช่น 1.00" step="0.05" min="0.5" max="4.8">
 <div class="err" id="whE"></div><div id="whSug"></div>
@@ -193,6 +193,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module" src="js/ui.js?v=20261120093801"></script>
+<script type="module" src="js/ui.js?v=20261120093935"></script>
 </body>
 </html>

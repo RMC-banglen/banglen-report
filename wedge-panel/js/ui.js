@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261120093801";
+import { STD, HS, MAX_STACK, PILES } from "./standards.js?v=20261120093935";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, stackCountTxt, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261120093801";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120093801";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120093801";
-import { createViews } from "./view3d.js?v=20261120093801";
-import { initPile } from "./pile-ui.js?v=20261120093801";
-import { makePdf } from "./pdf.js?v=20261120093801";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120093801";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120093801";
+} from "./calc.js?v=20261120093935";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120093935";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120093935";
+import { createViews } from "./view3d.js?v=20261120093935";
+import { initPile } from "./pile-ui.js?v=20261120093935";
+import { makePdf } from "./pdf.js?v=20261120093935";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120093935";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120093935";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -18,6 +18,15 @@ const toInt = (v) => Math.floor(Number(String(v).replace(/,/g, "")) || 0);
 document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input.thou")) t.value = t.value.replace(/,/g, ""); });
 document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches("input.thou") && t.value !== "") t.value = toInt(t.value).toLocaleString("th-TH"); });
 let STATE = null, spans = [{ cc: 0, n: 0 }], stackSel = 0, curId = null, user = null, editable = false;
+// รายการหน้าตัดเสาเข็มไอ ดึงจาก PILES (ซึ่งดึงจากแท็บเขียนแบบเสาเข็ม)
+(function fillPileSelect() {
+  const sel = document.getElementById("pt"); if (!sel) return;
+  [["มาตรฐานโรงงาน", true], ["มอก.", false]].forEach(([lb, fac]) => {
+    const g = document.createElement("optgroup"); g.label = lb;
+    Object.entries(PILES).filter(([, p]) => p.fac === fac).forEach(([k, p]) => { const o = document.createElement("option"); o.value = k; o.textContent = p.n; g.appendChild(o); });
+    sel.appendChild(g);
+  });
+})();
 let orderRows = [{ WT: 0, wall: 0, ss: 0, qty: 0 }];
 let listRows = []; // รายการโครงการที่โหลดมา
 let orderAllowance = 20; // มม. ค่าเผื่อทำงานข้างละ (มาตรฐาน 20) ไม่มีช่องให้แก้ ใช้คำนวณระยะกลาง/กลางเสาในหมายเหตุ
