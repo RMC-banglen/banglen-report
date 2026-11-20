@@ -2,8 +2,8 @@
 // ส่งออก PDF / ใบสรุป HTML — สร้างในเครื่องผู้ใช้ตอนกดดาวน์โหลด ไม่เก็บไฟล์ลง Storage
 // โครงตามต้นแบบ: หน้า 1 สรุปโครงการ • 1 หน้าต่อ c/c (3D + รูปขยายรอยต่อ) • 1 หน้าต่อรหัส (รูปตัด 2 + รูปด้าน 2)
 // ชิ้นเนื้อหาที่ยาวเกินหน้าจะถูกย่อให้พอดี ไม่ตัดกลางชิ้น
-import { fmt, f2, f3, stackCountTxt } from "./calc.js?v=20261120084826";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120084826";
+import { fmt, f2, f3, stackCountTxt } from "./calc.js?v=20261120085347";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120085347";
 
 export const PRINT = {"--bg":"#FFFFFF","--surface":"#FFFFFF","--surface-2":"#F5F6F4","--ink":"#1D2725","--muted":"#5B6964","--faint":"#8A9691","--line":"#CDD3CF","--accent":"#0F6E56","--accent-soft":"#E1F2EB","--rebar":"#C2522B","--rebar-2":"#B07316","--pipe":"#1E5FA0","--warn":"#9A5B05","--warn-soft":"#FBF0DC","--danger":"#A32D2D","--danger-soft":"#FBE8E8","--concrete":"rgba(93,202,165,.20)"};
 export const unvar = (s) => s.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => PRINT[k] || "#1D2725");
@@ -22,12 +22,12 @@ const stackTxt = (st) => st.stk.map((h) => (h / 1000).toFixed(2)).join(" + ");
 function pdfCover(st, d) {
   const row = (k, v) => (v ? `<tr><th style="width:130px;text-align:left;color:#5B6964;font-weight:500;padding:6px 0">${k}</th><td style="padding:6px 0;font-size:15px">${esc(v)}</td></tr>` : "");
   // ตามความสูงกำแพงที่ลูกค้าต้องการ: สูงรวมเท่าไร กว้างเท่าไร แบ่งเป็นแผ่นสูงอะไรกี่แผ่น รวมกี่แผ่น
-  const wl = st.groups.map((gr) => { const stk = gr.stk || st.stk || [], k = stk.length || 1, spans = gr.stk ? gr.n / k : gr.n, m = new Map(); stk.forEach((h) => m.set(h, (m.get(h) || 0) + spans)); return { tot: stk.reduce((a, b) => a + b, 0), WT: gr.F.WT, k, spans, m }; }).sort((a, b) => b.WT - a.WT || b.tot - a.tot);
+  const wl = st.groups.map((gr) => { const stk = gr.stk || st.stk || [], k = stk.length || 1, spans = gr.stk ? gr.n / k : gr.n, m = new Map(); stk.forEach((h) => m.set(h, (m.get(h) || 0) + spans)); return { tot: stk.reduce((a, b) => a + b, 0), WT: gr.F.WT, k, spans, m }; });
   const walls = wl.map((w) => `<tr><td><b>${f2(w.WT)}</b></td><td>${f2(w.tot)}</td><td style="text-align:left">${[...w.m.entries()].map(([h, q]) => `แผ่นสูง ${f2(h)} ม. × ${fmt(q)} แผ่น`).join("<br>")}</td><td>${fmt(w.spans)}</td><td>${fmt(w.spans * w.k)}</td></tr>`).join("");
   const wallTbl = `<p style="font-weight:700;margin:0 0 6px">ความสูงกำแพงที่ต้องการ และการแบ่งแผ่น</p><table class="tbl" style="width:100%"><tr><th>กว้างแผ่น (ม.)</th><th>สูงรวม (ม.)</th><th style="text-align:left">แบ่งเป็นแผ่นสูง × จำนวน</th><th>จำนวนช่วง</th><th>รวม (แผ่น)</th></tr>${walls}</table>`;
   const byH = new Map(); st.list.forEach((i) => byH.set(i.H, (byH.get(i.H) || 0) + i.qty));
-  const hs = `<p style="font-weight:700;margin:22px 0 6px">สรุปจำนวนแผ่นตามความสูงแผ่น</p><table class="tbl" style="width:60%"><tr><th style="text-align:left">ความสูงแผ่น (ม.)</th><th>จำนวน (แผ่น)</th></tr>${[...byH.entries()].sort((x, y) => y[0] - x[0]).map(([h, q]) => `<tr><td style="text-align:left">${f2(h)}</td><td>${fmt(q)}</td></tr>`).join("")}<tr><td style="text-align:left"><b>รวม</b></td><td><b>${fmt(st.totQ)}</b></td></tr></table>`;
-  const items = st.list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name.replace(/\d+-(?:RB|DB)\d+/g, (m) => `<span style="white-space:nowrap">${m}</span>`)}</td><td>${f2(i.WT)}</td><td>${f2(i.H)}</td><td>${f2(st.G.T)}</td><td>${fmt(i.qty)}</td></tr>`).join("");
+  const hs = `<p style="font-weight:700;margin:22px 0 6px">สรุปจำนวนแผ่นตามความสูงแผ่น</p><table class="tbl" style="width:60%"><tr><th style="text-align:left">ความสูงแผ่น (ม.)</th><th>จำนวน (แผ่น)</th></tr>${[...byH.entries()].sort((x, y) => x[0] - y[0]).map(([h, q]) => `<tr><td style="text-align:left">${f2(h)}</td><td>${fmt(q)}</td></tr>`).join("")}<tr><td style="text-align:left"><b>รวม</b></td><td><b>${fmt(st.totQ)}</b></td></tr></table>`;
+  const items = [...st.list].sort((x, y) => x.H - y.H || x.WT - y.WT).map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name.replace(/\d+-(?:RB|DB)\d+/g, (m) => `<span style="white-space:nowrap">${m}</span>`)}</td><td>${f2(i.WT)}</td><td>${f2(i.H)}</td><td>${f2(st.G.T)}</td><td>${fmt(i.qty)}</td></tr>`).join("");
   return `<div style="min-height:960px;position:relative;font-family:inherit">
 <div style="display:flex;align-items:center;gap:16px;border-bottom:2px solid #1D2725;padding-bottom:14px"><img src="assets/logo.png" style="width:120px;height:auto" alt=""><div><div style="font-size:20px;font-weight:700">บริษัท ร่วมมิตรคอนกรีต (บางเลน) จำกัด</div><div style="font-size:13px;color:#5B6964;margin-top:4px">299 หมู่ 12 ต.บางภาษี อ.บางเลน จ.นครปฐม 73130</div></div></div>
 <div style="text-align:center;margin:90px 0 56px"><div style="font-size:30px;font-weight:700;line-height:1.5">แบบแผ่นกันดินหัวลิ่ม</div><div style="font-size:17px;color:#5B6964;margin-top:6px">${st.p.n} • หัวลิ่มแบบ ${st.p.ty} • ${st.S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</div></div>
