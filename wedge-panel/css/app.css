@@ -144,8 +144,9 @@ header.top{align-items:center;padding:14px 22px}
 .orow{display:grid;grid-template-columns:1.1fr 1fr .8fr auto;gap:6px;align-items:end;margin-bottom:6px}
 .orow label{margin-top:0}
 .oitem{margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
-.orow2{display:grid;grid-template-columns:1fr 80px;gap:8px;align-items:center;margin-top:2px}
+.orow2{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-top:2px}
 .orow2 label{margin-top:0;font-size:12px}
+.orow2 select{width:100%;min-width:0}
 .oinfo{font-size:12px;color:var(--muted);line-height:1.5}
 .oinfo.bad{color:var(--danger)}
 .oinfo button{min-height:26px;padding:2px 8px;font-size:12px;margin-left:4px}

@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261120081606";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261120081803";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261120081606";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120081606";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120081606";
-import { createViews } from "./view3d.js?v=20261120081606";
-import { initPile } from "./pile-ui.js?v=20261120081606";
-import { makePdf } from "./pdf.js?v=20261120081606";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120081606";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120081606";
+} from "./calc.js?v=20261120081803";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120081803";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120081803";
+import { createViews } from "./view3d.js?v=20261120081803";
+import { initPile } from "./pile-ui.js?v=20261120081803";
+import { makePdf } from "./pdf.js?v=20261120081803";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120081803";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120081803";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -47,7 +47,7 @@ function renderRows() {
   orderRows.forEach((r, i) => {
     const d = document.createElement("div"); d.className = "oitem";
     const op = r.wall ? stackOptions(r.wall) : [], sk = stackOfRow(r), multi = !!sk && sk.length > 1;
-    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>ความสูงกำแพง (ม.)</label><select><option value="" ${r.wall ? "" : "selected"}>เลือก</option>${WALLH.map((h) => `<option value="${h}" ${h === r.wall ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>${multi ? "จำนวน (ช่วง)" : "จำนวน (แผ่น)"}</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>${sk ? `<div class="orow2"><label>แบ่งแผ่น${multi ? "ซ้อน" : ""}</label>${op.length > 1 ? `<select class="ss">${op.map((o, k) => `<option value="${k}" ${o === sk ? "selected" : ""}>${o.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม. (${o.length} แผ่น/ช่วง)</option>`).join("")}</select>` : `<b>${sk.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม.</b>`}</div>` : ""}<p class="hint osum" style="margin:2px 0 0">${rowSum(r)}</p>`;
+    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูงกำแพง (ม.)</label><select><option value="" ${r.wall ? "" : "selected"}>เลือก</option>${WALLH.map((h) => `<option value="${h}" ${h === r.wall ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>${multi ? "จำนวน (ช่วง)" : "จำนวน (แผ่น)"}</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>${sk ? `<div class="orow2"><label>แบ่งแผ่น${multi ? "ซ้อน" : ""}</label>${op.length > 1 ? `<select class="ss">${op.map((o, k) => `<option value="${k}" ${o === sk ? "selected" : ""}>${o.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม. (${o.length} แผ่น/ช่วง)</option>`).join("")}</select>` : `<b>${sk.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม.</b>`}</div>` : ""}<p class="hint osum" style="margin:2px 0 0">${rowSum(r)}</p>`;
     const [w, q] = d.querySelectorAll("input"), h = d.querySelector(".orow select"), ss = d.querySelector("select.ss");
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
     h.onchange = () => { r.wall = +h.value || 0; r.ss = 0; renderRows(); run(); };
