@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName, PIPE_NAME,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261120100100";
+} from "./standards.js?v=20261120100132";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -136,7 +136,7 @@ function placePipes(vx, hy, dv, dh, pd, nr, nc, WT, TP, H) {
   };
   const xsT = ax(vx.map((x) => x + TP), nc, WT, TP, WT - TP, dv);
   const ys = ax(hy, nr, H, 0, H, dh);
-  if (!xsT || !ys) return { P: [], xs: [], ys: [], warn: `เหล็กถี่เกินไป วางท่อ PVC ${PIPE_NAME[pd] || pd + " มม."} ไม่ได้ (ท่อต้องห่างเหล็กอย่างน้อย 10 มม.) แผ่นนี้จึงไม่มีท่อ` };
+  if (!xsT || !ys) return { P: [], xs: [], ys: [], warn: `เหล็กถี่เกินไป วางท่อ PVC ${PIPE_NAME[pd] || pd + " มม."} ไม่ได้ แผ่นนี้จึงไม่มีท่อ` };
   const xs = xsT.map((x) => x - TP), P = [];
   ys.forEach((y) => xs.forEach((x) => P.push([x, y])));
   let gap = 1e9;
