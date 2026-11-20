@@ -5,7 +5,7 @@
 // ร่องเสาเข็มไอ: B กว้าง, f ปีก, c ก้นร่อง, dg ลึกร่อง, tw เอว, ty แบบหัวลิ่ม
 // หน้าตัดเสาเข็มไอ ดึงจากแท็บเขียนแบบเสาเข็ม (pile-data.js) เฉพาะ I-18 ขึ้นไป ไม่รวมเสาสี่เหลี่ยม
 // ty = แบบหัวลิ่ม: B (ลิ่ม 85 ปลาย 50) ใช้กับร่องแคบ I-18 โรงงาน/I-18/I-22 มอก. • นอกนั้น A (ลิ่ม 65 ปลาย 70)
-import { PILE_SECTIONS } from "./pile-data.js?v=20261120095554";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261120095714";
 const WEDGE_B = ["F18", "T22"];
 const NO_WEDGE = ["T18"]; // I-18 มอก. เอาออกตามสั่ง (ก้นร่อง 30 มม. แคบกว่าปลายลิ่มทุกแบบ)
 export const PILES = Object.fromEntries(
@@ -56,7 +56,7 @@ export const TABLE = { TL: 6096, TW: 1524, LF: 6000, CS: 55, MG: 221, TDV: 60 };
 export const CONCRETE_DENSITY = 2400; // กก./ลบ.ม.
 export const DEFAULT_ALLOWANCE = 20; // ค่าเผื่อ มม./ข้าง
 export const DEFAULT_TRUCK_KG = 16000;
-export const SPECIAL_ORDER_WARNING = "งานสั่งพิเศษ: ต้องให้ฝ่ายวิศวกรรมตรวจแบบก่อนผลิต";
+export const SPECIAL_ORDER_WARNING = "งานสั่งพิเศษ: เหล็กหรือท่อไม่ตรงมาตรฐานบริษัท ตรวจแบบก่อนผลิต";
 
 // บ่ารองรับแผ่น (มม.): ก้อนเต็มร่อง flat สูง 200 หน้าบนแบนรับแผ่น + ส่วนเรียว taper 100 ด้านล่าง
 export const SHOULDER = { flat: 200, taper: 100 };
