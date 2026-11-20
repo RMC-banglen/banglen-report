@@ -1,8 +1,8 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261120085347";
-import { fmt, f2, f3 } from "./calc.js?v=20261120085347";
+import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261120085609";
+import { fmt, f2, f3 } from "./calc.js?v=20261120085609";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -13,7 +13,7 @@ function chainH(pts,y,t){pts.forEach(([x,yr])=>{const sd=yr>y?1:-1;L(x,yr-sd*2,x
 function chainV(pts,x,t){const sd=x>pts[0][0]?1:-1;pts.forEach(([xr,y])=>L(xr+sd*3,y,x+sd*3,y));L(x,pts[0][1],x,pts[pts.length-1][1]);pts.forEach(([,y])=>tick(x,y));for(let i=0;i<pts.length-1;i++){const h=Math.abs(pts[i+1][1]-pts[i][1]),ym=(pts[i][1]+pts[i+1][1])/2;if(h>=40)TX(x+(sd>0?18:-10),ym,t[i],"middle",true);else TX(x+sd*12,ym+4,t[i],sd>0?"start":"end")}}
 const poly=(pts,X,Y,st,fl,w)=>A(`<polygon points="${pts.map(q=>X(q[0]).toFixed(1)+","+Y(q[1]).toFixed(1)).join(" ")}" style="fill:${fl||"none"};stroke:${st||"var(--ink)"};stroke-width:${w||1.1}"/>`);
 export function pilePoly(p){const b=p.B/2,m=b-p.f,h=p.c/2,w=p.tw/2,ch=10;return[[-b+ch,-b],[b-ch,-b],[b,-b+ch],[b,-m],[w,-h],[w,h],[b,m],[b,b-ch],[b-ch,b],[-b+ch,b],[-b,b-ch],[-b,m],[-w,h],[-w,-h],[-b,-m],[-b,-b+ch]]}
-export function planTip(G){return G===WG.A?x=>[[x,-55],[x,-49.8],[x+65,-35],[x+65,35],[x,49.8],[x,55]]:x=>[[x,-50],[x+85,-25],[x+85,25],[x,50]]}
+export function planTip(G){return G.T===WG.A.T?x=>[[x,-55],[x,-49.8],[x+65,-35],[x+65,35],[x,49.8],[x,55]]:x=>[[x,-50],[x+85,-25],[x+85,25],[x,50]]}
 export function planPoly(G,Wb){const tr=planTip(G),R=tr(Wb/2),Lf=tr(0).map(q=>[-Wb/2-q[0],q[1]]);return [[-Wb/2,-G.T/2],...R,...Lf.slice().reverse()].filter(Boolean)}
 
 
@@ -33,7 +33,7 @@ const yb=Y(b)+22;chainH([[X(pf),Y(b)],[X(wf),Y(p.c/2)+4],[X(cx+p.tw/2),Y(p.c/2)+
 const svg=`<svg viewBox="0 0 680 ${Math.ceil(yb+12)}" role="img" aria-label="รูปขยายรอยต่อเสากับแผ่น">${o}</svg>`;
 const note=`${p.n} • กลาง/กลางเสา ${f2(gr.cc)} ม. → กว้างแผ่น ${f2(F.WT)} ม. (คำนวณได้ ${f2(F.raw)} ปัดลงทุก 0.01 ม.) ${gr.stk ? `• เผื่อค่าการทำงานแล้วข้างละ ${f3(Math.round(F.gr))} ม. ` : ""}• เสียบร่องข้างละ ${f3(Math.round(F.ze))} ม. • ช่องว่างปากร่อง ${f3(Math.round(F.cm))} ม./ข้าง • ปลายลิ่ม ${f3(Math.round(F.ct))} ม./ข้าง`;return{svg,note}}
 
-function sec(G,W){return G===WG.A?[[0,0],[W,0],[W,5.2],[W+65,20],[W+65,90],[W,104.8],[W,110],[0,110],[0,104.8],[-65,90],[-65,20],[0,5.2]]:[[0,0],[W,0],[W+85,25],[W+85,75],[W,100],[0,100],[-85,75],[-85,25]]}
+function sec(G,W){return G.T===WG.A.T?[[0,0],[W,0],[W,5.2],[W+65,20],[W+65,90],[W,104.8],[W,110],[0,110],[0,104.8],[-65,90],[-65,20],[0,5.2]]:[[0,0],[W,0],[W+85,25],[W+85,75],[W,100],[0,100],[-85,75],[-85,25]]}
 const near=(arr,v)=>arr.reduce((b,x,i)=>Math.abs(x-v)<Math.abs(arr[b]-v)?i:b,0);
 export function svgSection(G,P,S,R){o="";const W=P.W,WT=P.WT,T=G.T,TP=G.TP,s=Math.min(430/WT,400/P.H),X=v=>95+(v+TP)*s,sy=Math.max(s,.6),Y=v=>80+(T-v)*sy;
 poly(sec(G,W),X,Y,"var(--ink)","none",1.2);const yt=Y(T),yb=Y(0);
