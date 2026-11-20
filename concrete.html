@@ -386,6 +386,7 @@ function ConcreteForm({prefill,onDone,onBack}){
 function PhotoScanner({onExtracted,onManual,onBack}){
   const[imgSrc,setImgSrc]=useState(null);
   const[loading,setLoading]=useState(false);
+  const[note,setNote]=useState('');   // สถานะตอน Gemini คนใช้เยอะ กำลังลองใหม่
   const[err,setErr]=useState('');
   const fileRef=useRef();
   // แยกช่องกล้องออกมาอีกตัว — ช่องที่ไม่มี capture บน iOS จะขึ้นเมนูให้เลือกถ่าย/คลังรูป
@@ -426,8 +427,8 @@ function PhotoScanner({onExtracted,onManual,onBack}){
       let geminiKey=await getGeminiKey();
       if(!geminiKey)throw new Error('ยังไม่ได้ตั้งค่า Gemini API key (กดไอคอน ⚙ มุมบน)');
       const base64=await resizeBase64(imgSrc,1600);
-      const ask=key=>fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`,
+      const ask=(key,model='gemini-3.6-flash')=>fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
         {
           method:'POST',
           headers:{'Content-Type':'application/json'},
@@ -459,6 +460,22 @@ function PhotoScanner({onExtracted,onManual,onBack}){
         if(fresh&&fresh!==geminiKey){geminiKey=fresh;resp=await ask(fresh);}
         else localStorage.setItem('gemini_key',geminiKey);
       }
+      // Gemini บางช่วงคนใช้เยอะ (503/429/500...) เป็นเรื่องชั่วคราวฝั่ง Google — ลองซ้ำพร้อมรอ แล้วสลับไปโมเดลสำรอง
+      const busy=st=>st===503||st===429||st===500||st===502||st===504;
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      let tries=0;
+      while(busy(resp.status)&&tries<3){
+        tries++;setNote('Gemini คนใช้เยอะอยู่ กำลังลองใหม่ ('+tries+'/3)…');
+        await sleep(2500*tries);
+        resp=await ask(geminiKey);
+      }
+      if(busy(resp.status)){
+        for(const m of ['gemini-flash-latest','gemini-2.5-flash']){
+          setNote('กำลังลองโมเดลสำรอง…');
+          try{const r2=await ask(geminiKey,m);if(r2.ok){resp=r2;break;}}catch(_){}
+        }
+      }
+      if(busy(resp.status))throw new Error('Gemini คนใช้เยอะอยู่ (เป็นฝั่ง Google ไม่ใช่รูปหรือแอปเสีย) — รอสักครู่แล้วกด "ให้ Gemini อ่านข้อมูล" ใหม่ได้เลย ไม่ต้องถ่ายใหม่');
       const j=await resp.json();
       if(!resp.ok)throw new Error(j.error?.message||`Gemini error ${resp.status}`);
       const text=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -471,14 +488,14 @@ function PhotoScanner({onExtracted,onManual,onBack}){
       onExtracted(slips);
     }catch(e){
       setErr('อ่านรูปไม่สำเร็จ: '+e.message);
-    }finally{setLoading(false);}
+    }finally{setLoading(false);setNote('');}
   };
 
   if(loading)return(
     <div className="card loading">
       <div className="spinner"/>
       <div style={{fontWeight:700,fontSize:15}}>Gemini กำลังอ่านใบปริ้น…</div>
-      <div style={{fontSize:13,color:'#8b91a1',marginTop:6}}>ใช้เวลาประมาณ 5–10 วินาที</div>
+      <div style={{fontSize:13,color:note?'#b45309':'#8b91a1',marginTop:6}}>{note||'ใช้เวลาประมาณ 5–10 วินาที'}</div>
     </div>
   );
 
