@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261120084452";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261120084601";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, stackCountTxt, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261120084452";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120084452";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120084452";
-import { createViews } from "./view3d.js?v=20261120084452";
-import { initPile } from "./pile-ui.js?v=20261120084452";
-import { makePdf } from "./pdf.js?v=20261120084452";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120084452";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120084452";
+} from "./calc.js?v=20261120084601";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120084601";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120084601";
+import { createViews } from "./view3d.js?v=20261120084601";
+import { initPile } from "./pile-ui.js?v=20261120084601";
+import { makePdf } from "./pdf.js?v=20261120084601";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120084601";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120084601";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -163,7 +163,7 @@ ${direct ? `<div class="card"><div class="k">วิธีสั่ง</div><div 
 <div class="card"><div class="k">แผ่นทั้งโครงการ</div><div class="v">${fmt(totQ)} แผ่น</div><div class="s">${list.length} รหัส • <span class="stamp ${S.sp ? "sp" : "std"}">${S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</span></div></div>
 <div class="card"><div class="k">น้ำหนักขนส่ง</div><div class="v">${nf(totW / 1000, 1)} ตัน</div><div class="s">รถ ${fmt(truck)} กก. ≈ ${trips} เที่ยว</div></div>`;
   $("alerts").innerHTML = r.al.map((a) => `<div class="al ${a[0]}">${esc(a[1])}</div>`).join("");
-  $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ") || "-"}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
+  $("sched").querySelector("tbody").innerHTML = list.map((i) => `<tr><td class="code">${i.code}</td><td style="text-align:left">${i.name.replace(/d+-(?:RB|DB)d+/g, (m) => `<span style="white-space:nowrap">${m}</span>`)}</td><td>${f2(i.H)}</td><td>${f2(i.WT)}</td><td>${[...i.cc].map(f2).join(", ") || "-"}</td><td>${fmt(i.qty)}</td><td>${fmt(i.P.wt)}</td><td>${i.P.vol.toFixed(3)}</td><td>${i.P.kg.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="9">ใส่ระยะเสาและความสูงกำแพงเพื่อดูรายการแผ่น</td></tr>`;
   fillSelect("sel3", r.groups.map((gr, i) => [String(i), gr.stk ? `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • หนา ${f2(r.G.T)} ม. • ${stkTxt(gr)} • ${stackCountTxt(gr)}` : `กลาง/กลางเสา ${f2(gr.cc)} ม. • กว้างแผ่น ${f2(gr.F.WT)} ม. • ${fmt(gr.n)} ช่วง`]));
   const optItem = list.map((i) => [i.code, `${i.code} • สูง ${(i.H / 1000).toFixed(2)} × กว้าง ${f2(i.WT)}`]);
   fillSelect("selD", optItem); fillSelect("selT", optItem);
