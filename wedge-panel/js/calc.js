@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261120084111";
+} from "./standards.js?v=20261120084232";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -196,8 +196,9 @@ export function mkCode(WT, H, T, S, P) {
 
 export function mkName(WT, H, T, S, P) {
   let n = `แผ่นกันดิน ${(WT / 1000).toFixed(2)} x ${H % 10 ? (H / 1000).toFixed(3) : (H / 1000).toFixed(2)} x ${(T / 1000).toFixed(2)} ม.`;
-  if (S.sp && S.cbd > 0) n += ` เหล็กกันแตกมุม ${barName(S.cbd)}`;
-  if (S.sp) n += ` เสริมเหล็ก ${P.nv}+${P.nh}${S.dv === S.dh ? barName(S.dv) : barName(S.dv) + "/" + barName(S.dh)} มม.`;
+  // สั่งพิเศษ: บอกเหล็กแนวตั้ง/แนวนอนก่อน (จำนวนเส้น-ขนาด) เหล็กกันแตกมุมไว้ท้ายสุด
+  if (S.sp) n += ` • เหล็กตั้ง ${P.nv}-${barName(S.dv)} • เหล็กนอน ${P.nh}-${barName(S.dh)}`;
+  if (S.sp && P.cb && P.cb.n) n += ` • กันแตกมุม 4 จุด ${barName(P.cb.d)} ขา ${(P.cb.leg / 1000).toFixed(2)} ม.`;
   return n;
 }
 
