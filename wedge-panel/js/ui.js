@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261118094031";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261120081025";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261118094031";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261118094031";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261118094031";
-import { createViews } from "./view3d.js?v=20261118094031";
-import { initPile } from "./pile-ui.js?v=20261118094031";
-import { makePdf } from "./pdf.js?v=20261118094031";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261118094031";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261118094031";
+} from "./calc.js?v=20261120081025";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120081025";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120081025";
+import { createViews } from "./view3d.js?v=20261120081025";
+import { initPile } from "./pile-ui.js?v=20261120081025";
+import { makePdf } from "./pdf.js?v=20261120081025";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120081025";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120081025";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -18,7 +18,7 @@ const toInt = (v) => Math.floor(Number(String(v).replace(/,/g, "")) || 0);
 document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input.thou")) t.value = t.value.replace(/,/g, ""); });
 document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches("input.thou") && t.value !== "") t.value = toInt(t.value).toLocaleString("th-TH"); });
 let STATE = null, spans = [{ cc: 0, n: 0 }], stackSel = 0, curId = null, user = null, editable = false;
-let orderRows = [{ WT: 0, H: 0, qty: 0 }];
+let orderRows = [{ WT: 0, wall: 0, ss: 0, qty: 0 }];
 let listRows = []; // รายการโครงการที่โหลดมา
 let orderAllowance = 20; // มม. ค่าเผื่อทำงานข้างละ (มาตรฐาน 20) ไม่มีช่องให้แก้ ใช้คำนวณระยะกลาง/กลางเสาในหมายเหตุ
 let views = null, cur = "view3d";
@@ -37,21 +37,27 @@ function renderSpans() {
     box.appendChild(d);
   });
 }
+// แถวรายการสั่ง: { WT, wall (ความสูงกำแพง มม.), ss (ลำดับตัวเลือกการแบ่งแผ่น), qty }
+// ความสูงกำแพง > แผ่นเดียว → ระบบแบ่งแผ่นซ้อนให้ (qty = จำนวนช่วง) • แผ่นเดียว → qty = จำนวนแผ่น
+const WALLH = STDH.filter((h) => h <= 3000);
+const stackOfRow = (r) => { const o = r.wall ? stackOptions(r.wall) : []; return o.length ? o[Math.min(r.ss || 0, o.length - 1)] : null; };
+const rowSum = (r) => { const sk = stackOfRow(r); return sk && sk.length > 1 && r.qty ? `ซ้อน ${sk.length} แผ่น/ช่วง • รวม ${fmt(r.qty * sk.length)} แผ่น` : ""; };
 function renderRows() {
   const box = $("orows"); box.innerHTML = "";
   orderRows.forEach((r, i) => {
     const d = document.createElement("div"); d.className = "oitem";
-    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูง (ม.)</label><select><option value="" ${r.H ? "" : "selected"}>เลือก</option>${HS.map((h) => `<option value="${h}" ${h === r.H ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>จำนวน (แผ่น)</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div><div class="orow2"><label>ซ้อนกันกี่แผ่น (1 = ไม่ซ้อน)</label><input type="number" class="stk" min="1" max="${MAX_STACK}" step="1" value="${r.st || 1}"></div>`;
-    const [w, q, sk] = d.querySelectorAll("input"), h = d.querySelector("select");
-    sk.oninput = () => { r.st = Math.min(MAX_STACK, Math.max(1, Math.floor(+sk.value) || 1)); sched(); };
+    const op = r.wall ? stackOptions(r.wall) : [], sk = stackOfRow(r), multi = !!sk && sk.length > 1;
+    d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>ความสูงกำแพง (ม.)</label><select><option value="" ${r.wall ? "" : "selected"}>เลือก</option>${WALLH.map((h) => `<option value="${h}" ${h === r.wall ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>${multi ? "จำนวน (ช่วง)" : "จำนวน (แผ่น)"}</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>${sk ? `<div class="orow2"><label>แบ่งแผ่น${multi ? "ซ้อน" : ""}</label>${op.length > 1 ? `<select class="ss">${op.map((o, k) => `<option value="${k}" ${o === sk ? "selected" : ""}>${o.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม. (${o.length} แผ่น/ช่วง)</option>`).join("")}</select>` : `<b>${sk.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม.</b>`}</div>` : ""}<p class="hint osum" style="margin:2px 0 0">${rowSum(r)}</p>`;
+    const [w, q] = d.querySelectorAll("input"), h = d.querySelector(".orow select"), ss = d.querySelector("select.ss");
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
-    h.onchange = () => { r.H = +h.value || 0; run(); };
-    q.oninput = () => { r.qty = toInt(q.value); sched(); };
+    h.onchange = () => { r.wall = +h.value || 0; r.ss = 0; renderRows(); run(); };
+    if (ss) ss.onchange = () => { r.ss = +ss.value; renderRows(); run(); };
+    q.oninput = () => { r.qty = toInt(q.value); d.querySelector(".osum").textContent = rowSum(r); sched(); };
     d.querySelector("button").onclick = () => { if (orderRows.length > 1) { orderRows.splice(i, 1); renderRows(); run(); } };
     box.appendChild(d);
   });
 }
-$("addRow").onclick = () => { const l = orderRows[orderRows.length - 1] || { H: 0 }; orderRows.push({ WT: 0, H: l.H, qty: 0 }); renderRows(); run(); };
+$("addRow").onclick = () => { const l = orderRows[orderRows.length - 1] || { wall: 0 }; orderRows.push({ WT: 0, wall: l.wall, ss: l.ss || 0, qty: 0 }); renderRows(); run(); };
 // แสดง/ซ่อนส่วนของแต่ละโหมด
 function applyModeUi(direct) {
   $("wallBox").hidden = direct; $("spanFs").hidden = direct; $("rowsFs").hidden = !direct;
@@ -135,8 +141,8 @@ function run() {
   const truck = toInt($("tk").value) || DEFAULT_TRUCK_KG;
   let r;
   if (direct) {
-    if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1 && HS.includes(x.H))) return showEmpty();
-    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, H: r.H, qty: r.qty, st: r.st || 1 })), spec: S, truckKg: truck, div: "ch" });
+    if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1 && stackOfRow(x))) return showEmpty();
+    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, stack: stackOfRow(r) ? [...stackOfRow(r)] : [], qty: r.qty })), spec: S, truckKg: truck, div: "ch" });
     r.ref = $("rf").value.trim();
   } else {
     const op = renderStack();
@@ -278,7 +284,11 @@ function apply(d) {
   (d.sm === "man" ? $("smM") : $("smL")).checked = true;
   (d.om === "direct" ? $("omD") : $("omW")).checked = true;
   $("shOn").checked = !!d.shOn; if (d.shMode) $("shMode").value = d.shMode; if (d.shDrop !== undefined) $("shDrop").value = (+d.shDrop / 1000).toFixed(2);
-  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => ({ WT: +r.WT || 0, H: HS.includes(+r.H) ? +r.H : 0, qty: +r.qty || 0, st: Math.min(MAX_STACK, Math.max(1, Math.floor(+r.st) || 1)) }));
+  if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => { // แถวเก่า {H, qty, st}: qty = จำนวนแผ่นรวม ซ้อน st แผ่น → แปลงเป็น ความสูงกำแพง + จำนวนช่วง
+    if (+r.wall > 0) return { WT: +r.WT || 0, wall: +r.wall, ss: +r.ss || 0, qty: +r.qty || 0 };
+    const H = HS.includes(+r.H) ? +r.H : 0, st = Math.min(MAX_STACK, Math.max(1, Math.floor(+r.st) || 1)), wall = H * st, o = H ? stackOptions(wall) : [], k = o.findIndex((x) => x.every((v) => v === H));
+    return { WT: +r.WT || 0, wall: H ? wall : 0, ss: Math.max(0, k), qty: st > 1 ? Math.round((+r.qty || 0) / st) : +r.qty || 0 };
+  });
   orderAllowance = +d.ga > 0 ? +d.ga : 20;
   tableAlloc = d.ta && typeof d.ta === "object" ? { ...d.ta } : null;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
@@ -365,7 +375,7 @@ const isDirty = () => ($("pj").value.trim() || $("pt").value) && snapshot() !== 
 function resetAll() {
   const seller = $("sa").value;
   $("f").reset(); $("sa").value = seller;
-  spans = [{ cc: 0, n: 0 }]; orderRows = [{ WT: 0, H: 0, qty: 0 }];
+  spans = [{ cc: 0, n: 0 }]; orderRows = [{ WT: 0, wall: 0, ss: 0, qty: 0 }];
   stackSel = 0; curId = null; orderAllowance = 20;
   try { localStorage.removeItem("wp-draft"); } catch (e) {}
   try { history.replaceState(null, "", "#view3d"); } catch (e) {}
@@ -412,7 +422,7 @@ $("bAdd").onclick = () => {
   if (!STATE || !STATE.list.length) { msg("ยังไม่มีรายการแผ่นให้คัดลอก"); return; }
   const base = $("pj").value.trim() || "โครงการ";
   // เอารายการแผ่นของโครงการเดิมมาเป็นแถวตั้งต้น ให้แก้จำนวนที่ต้องสั่งเพิ่ม
-  orderRows = STATE.list.map((i) => ({ WT: i.WT, H: i.H, qty: i.qty }));
+  orderRows = STATE.list.map((i) => ({ WT: i.WT, wall: i.H, ss: 0, qty: i.qty }));
   orderAllowance = STATE.direct ? STATE.g : Math.round(+$("gp").value * 1000); // ใช้ค่าเผื่อเดียวกับโครงการเดิม
   $("omD").checked = true; $("rf").value = "สั่งเพิ่มจากโครงการ " + base;
   $("pj").value = base.replace(/ (สั่งเพิ่ม)$/, "") + " (สั่งเพิ่ม)";

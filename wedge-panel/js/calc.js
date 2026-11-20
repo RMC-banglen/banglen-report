@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261118094031";
+} from "./standards.js?v=20261120081025";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -289,10 +289,10 @@ export function calcDirect(input) {
   const al = [], items = new Map(), groups = new Map(), rowInfo = [];
   if (!(g >= 5 && g <= 40)) al.push(["d", "ค่าเผื่อควรอยู่ระหว่าง 0.005 ถึง 0.040 ม."]);
   (input.rows || []).forEach((r, i) => {
-    const n = i + 1, WT = Math.round(r.WT), H = Math.round(r.H), qty = Math.floor(r.qty);
+    const n = i + 1, WT = Math.round(r.WT), qty = Math.floor(r.qty), stack = Array.isArray(r.stack) && r.stack.length ? r.stack.map((h) => Math.round(h)) : null, H = stack ? stack[0] : Math.round(r.H); // stack = แบ่งแผ่นซ้อนตามความสูงกำแพง (qty = จำนวนช่วง) • ไม่มี stack = แบบเดิม (qty = จำนวนแผ่น)
     if (!(WT > 0) || !(qty >= 1)) { al.push(["d", `รายการที่ ${n}: ใส่ความกว้างและจำนวนแผ่น (อย่างน้อย 1 แผ่น)`]); return; }
-    if (!HS.includes(H)) { al.push(["d", `รายการที่ ${n}: ความสูงต้องเป็นขนาดมาตรฐาน 0.50 / 0.75 / 1.00 / 1.20 ม.`]); return; }
-    const WTr = Math.floor(WT / 10) * 10, sk = Math.min(MAX_STACK, Math.max(1, Math.floor(r.st) || 1));
+    if (stack ? !stack.every((h) => HS.includes(h)) || stack.length > MAX_STACK : !HS.includes(H)) { al.push(["d", `รายการที่ ${n}: ความสูงต้องเป็นขนาดมาตรฐาน 0.50 / 0.75 / 1.00 / 1.20 ม.`]); return; }
+    const WTr = Math.floor(WT / 10) * 10, sk = stack ? 1 : Math.min(MAX_STACK, Math.max(1, Math.floor(r.st) || 1));
     if (qty % sk) al.push(["w", `รายการที่ ${n}: ซ้อนกัน ${sk} แผ่น แต่จำนวน ${fmt(qty)} แผ่นหารไม่ลงตัว`]);
     if (WT % 10) al.push(["w", `รายการที่ ${n}: ความกว้าง ${f2(WT)} ม. ไม่ลงทุก 0.01 ม. ปัดลงเป็น ${f2(WTr)} ม.`]);
     // กลาง/กลางเสา: ถ้าใส่ค่าหน้างานมาใช้ค่านั้น ไม่ใส่ = แนะนำจากกว้างรวม + เอวเสา + 2×ค่าเผื่อ
@@ -305,12 +305,10 @@ export function calcDirect(input) {
     if (rowInfo[i].over) al.push(["d", `รายการที่ ${n}: กลาง/กลางเสาหน้างาน ${f2(cc)} ม. ใช้แผ่นกว้าง ${f2(WTr)} ม. ไม่ได้ (เหลือค่าเผื่อข้างละ ${f3(Math.max(0, F.gr))} ม. น้อยกว่ามาตรฐาน ${f3(g)} ม.) แนะนำลดความกว้างเป็น ${f2(maxW)} ม.`]);
     else if (F.ze < 20) al.push(["d", `รายการที่ ${n}: ค่าเผื่อมากเกินไป แผ่นเสียบร่องได้น้อยกว่า 0.020 ม.${actual != null ? ` แนะนำเพิ่มความกว้างเป็น ${f2(maxW)} ม.` : ""}`]);
     if (F.mn < 3) al.push(["d", `รายการที่ ${n}: ลิ่มหนากว่าร่อง แผ่นจะติด`]);
-    const it = getItem(items, G, S, WTr, H, al);
-    it.qty += qty;
-    it.cc.add(cc);
-    const key = cc + "|" + WTr + "|" + H + "|" + sk;
-    const gr = groups.get(key) || { cc, n: 0, F, stk: Array(sk).fill(H), WT: WTr };
-    gr.n += qty; groups.set(key, gr);
+    (stack || [H]).forEach((h) => { const it = getItem(items, G, S, WTr, h, al); it.qty += qty; it.cc.add(cc); });
+    const stk = stack || Array(sk).fill(H), key = cc + "|" + WTr + "|" + stk.join("+");
+    const gr = groups.get(key) || { cc, n: 0, F, stk, WT: WTr };
+    gr.n += qty * (stack ? stack.length : 1); groups.set(key, gr);
   });
   if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
   return { p, G, g, S, stk: [], groups: [...groups.values()], rowInfo, nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg, S), al };
