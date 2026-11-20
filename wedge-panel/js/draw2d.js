@@ -1,8 +1,8 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261120090529";
-import { fmt, f2, f3 } from "./calc.js?v=20261120090529";
+import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261120090658";
+import { fmt, f2, f3 } from "./calc.js?v=20261120090658";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -39,8 +39,8 @@ export function svgSection(G,P,S,R){o="";const W=P.W,WT=P.WT,T=G.T,TP=G.TP,s=Mat
 poly(sec(G,W),X,Y,"var(--ink)","none",1.2);const yt=Y(T),yb=Y(0);
 chainH([[X(-TP),Y(G.et)],[X(0),yt],[X(W),yt],[X(W+TP),Y(G.et)]],yt-18,[f3(TP),f3(W),f3(TP)]);chainH([[X(-TP),yt-18],[X(W+TP),yt-18]],yt-40,[f3(WT)]);chainV([[X(0),yt],[X(0),yb]],X(-TP)-30,[f3(T)]);chainV([[X(W),yt],[X(W+TP),Y(G.et)],[X(W+TP),Y(G.eb)],[X(W),yb]],X(W+TP)+22,[f3(T-G.et),f3(G.E),f3(G.eb)]);
 if(R){const yH=30+S.dh/2,ym=30+S.dh+S.dv/2;L(X(P.x0),Y(yH),X(P.x1),Y(yH),"var(--rebar-2)",Math.max(1,S.dh*sy*.9));P.vx.forEach(x=>A(`<circle cx="${X(x).toFixed(1)}" cy="${Y(ym).toFixed(1)}" r="${Math.max(1.8,S.dv/2*sy)}" style="fill:var(--rebar)"/>`));
-const ty=yb+22,i0=near(P.vx,W/2),mx=P.vx[i0];A(`<polyline points="${X(mx)},${Y(ym)} ${X(mx)},${ty+14} ${X(mx)+16},${ty+14}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(X(mx)+20,ty+18,`V-bar ${P.nv}-${NM(S.dv)} @${f3(P.am).slice(1)} ม.`,"start");
-const hx=X((P.vx[Math.max(0,i0-2)]+P.vx[Math.max(1,i0-1)])/2);A(`<polyline points="${hx},${Y(yH)} ${hx},${ty+40} ${hx+16},${ty+40}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(hx+20,ty+44,`H-bar ${P.nh}-${NM(S.dh)} @${f3(P.ah).slice(1)} ม.`,"start");TX(X(-TP),ty+68,`เหล็กสูงจากท้องแบบ 0.030 ม. • ปลายเหล็กทุกเส้นระยะหุ้ม ${f3(S.cv)} ม. • เหล็กเส้นริมเลยจุดผูก ${f3(S.oh)} ม.`,"start")}
+const ty=yb+22,i0=near(P.vx,W/2),mx=P.vx[i0];A(`<polyline points="${X(mx)},${Y(ym)} ${X(mx)},${ty+14} ${X(mx)+16},${ty+14}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(X(mx)+20,ty+18,`เหล็กแกนตั้ง ${P.nv}-${NM(S.dv)} @${f3(P.am).slice(1)} ม.`,"start");
+const hx=X((P.vx[Math.max(0,i0-2)]+P.vx[Math.max(1,i0-1)])/2);A(`<polyline points="${hx},${Y(yH)} ${hx},${ty+40} ${hx+16},${ty+40}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(hx+20,ty+44,`เหล็กแกนนอน ${P.nh}-${NM(S.dh)} @${f3(P.ah).slice(1)} ม.`,"start");TX(X(-TP),ty+68,`เหล็กสูงจากท้องแบบ 0.030 ม. • ปลายเหล็กทุกเส้นระยะหุ้ม ${f3(S.cv)} ม. • เหล็กเส้นริมเลยจุดผูก ${f3(S.oh)} ม.`,"start")}
 return `<svg viewBox="0 0 680 ${Math.ceil(yb+(R?96:20))}" role="img" aria-label="รูปตัดแผ่น">${o}</svg>`}
 export function svgElev(G,P,S,R,dimP){o="";const W=P.W,WT=P.WT,H=P.H,TP=G.TP,s=Math.min(430/WT,400/H),X2=v=>95+(v+TP)*s,Y2=v=>60+(H-v)*s,top=Y2(H),bot=Y2(0),cv=S.cv;
 A(`<rect x="${X2(-TP)}" y="${top}" width="${WT*s}" height="${H*s}" style="fill:none;stroke:var(--ink);stroke-width:1.2"/>`);L(X2(0),top,X2(0),bot,"var(--ink)",.9);L(X2(W),top,X2(W),bot,"var(--ink)",.9);
@@ -53,8 +53,8 @@ const x=X2(PP.xs[0]),ly=vb+(dimP?26:30);L(x,dimP?bot+23:Y2(y0)+pr,x,ly);L(x,ly,x
 const labs=[];if(R&&P.cb&&P.cb.n){const c=P.cb,r=40,a=35,ang=[30,60].map(d=>d*Math.PI/180);[[1,1],[-1,1],[1,-1],[-1,-1]].forEach(([sx,sy])=>{const ax=sx>0?P.x0+a:P.x1-a,ay=sy>0?cv+a:H-cv-a,d1=[sx*Math.cos(ang[0]),sy*Math.sin(ang[0])],d2=[sx*Math.cos(ang[1]),sy*Math.sin(ang[1])],pt=(d,t)=>X2(ax+d[0]*t).toFixed(1)+","+Y2(ay+d[1]*t).toFixed(1),cx=X2(ax-(d1[0]+d2[0])*10).toFixed(1)+","+Y2(ay-(d1[1]+d2[1])*10).toFixed(1);A(`<path d="M${pt(d1,c.leg)} L${pt(d1,r)} Q${cx} ${pt(d2,r)} L${pt(d2,c.leg)}" style="fill:none;stroke:var(--rebar);stroke-width:1.4;stroke-linejoin:round"/>`)});}
 if(R&&P.cb&&P.cb.n){const c=P.cb;labs.push([`มุม 4 จุด ${NM(c.d)} ขา ${f2(c.leg)}`,X2(P.x1-35-Math.cos(30*Math.PI/180)*c.leg*.5),Y2(cv+35+Math.sin(30*Math.PI/180)*c.leg*.5)])}
 if(R){P.hy.forEach(y=>L(X2(P.x0),Y2(y),X2(P.x1),Y2(y),"var(--rebar-2)",1));P.vx.forEach(x=>L(X2(x),Y2(cv),X2(x),Y2(H-cv),"var(--rebar)",1.1));
-const jc=near(P.hy,H/2),ic=near(P.vx,W/2),hxp=(P.vx[Math.min(ic+1,P.vx.length-2)]+P.vx[Math.min(ic+2,P.vx.length-1)])/2;labs.push([`H-bar ${P.nh}-${NM(S.dh)} @${f3(P.ah).slice(1)} ม.`,X2(hxp),Y2(P.hy[jc])]);
-const j2=jc>0?jc-1:jc+1;labs.push([`V-bar ${P.nv}-${NM(S.dv)} @${f3(P.am).slice(1)} ม.`,X2(P.vx[ic]),Y2((P.hy[jc]+P.hy[j2])/2)])}
+const jc=near(P.hy,H/2),ic=near(P.vx,W/2),hxp=(P.vx[Math.min(ic+1,P.vx.length-2)]+P.vx[Math.min(ic+2,P.vx.length-1)])/2;labs.push([`เหล็กแกนนอน ${P.nh}-${NM(S.dh)} @${f3(P.ah).slice(1)} ม.`,X2(hxp),Y2(P.hy[jc])]);
+const j2=jc>0?jc-1:jc+1;labs.push([`เหล็กแกนตั้ง ${P.nv}-${NM(S.dv)} @${f3(P.am).slice(1)} ม.`,X2(P.vx[ic]),Y2((P.hy[jc]+P.hy[j2])/2)])}
 const rx=X2(W+TP)+22;labs.sort((a,b)=>a[2]-b[2]);let last=-1e9;labs.forEach(l=>{l[3]=Math.max(l[2],last+22);last=l[3]});
 labs.forEach(([t,x,y,ly])=>{A(`<polyline points="${x.toFixed(1)},${y.toFixed(1)} ${(rx-14).toFixed(1)},${y.toFixed(1)} ${(rx-4).toFixed(1)},${ly.toFixed(1)} ${rx.toFixed(1)},${ly.toFixed(1)}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);A(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.2" style="fill:var(--muted)"/>`);TX(rx+4,ly+4,t,"start")});
 vb=Math.max(vb,last+10);return `<svg viewBox="0 0 680 ${Math.ceil(vb+10)}" role="img" aria-label="รูปด้านแผ่น">${o}</svg>`}

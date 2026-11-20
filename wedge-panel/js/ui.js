@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK } from "./standards.js?v=20261120090529";
+import { STD, HS, MAX_STACK } from "./standards.js?v=20261120090658";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, stackCountTxt, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261120090529";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120090529";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120090529";
-import { createViews } from "./view3d.js?v=20261120090529";
-import { initPile } from "./pile-ui.js?v=20261120090529";
-import { makePdf } from "./pdf.js?v=20261120090529";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120090529";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120090529";
+} from "./calc.js?v=20261120090658";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261120090658";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261120090658";
+import { createViews } from "./view3d.js?v=20261120090658";
+import { initPile } from "./pile-ui.js?v=20261120090658";
+import { makePdf } from "./pdf.js?v=20261120090658";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261120090658";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261120090658";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -216,9 +216,13 @@ function renderProd() {
     renderProd(); saveDraft();
   }));
   $("bAuto").onclick = () => { tableAlloc = null; renderProd(); saveDraft(); };
+  // ตารางวัสดุต่อแผ่น (ให้ผู้ตีราคาอ่านง่าย): แต่ละช่อง = จำนวน ขนาด ความยาว และน้ำหนักในช่องเดียว
+  const nw = (s) => `<span style="white-space:nowrap">${s}</span>`;
   $("mat").querySelector("tbody").innerHTML = st.list.map((i) => {
-    const P = i.P, S = st.S;
-    return `<tr><td class="code">${i.code}</td><td>${P.nv}-${NM(S.dv)} ยาว ${f2(P.lv)}</td><td>${P.kv.toFixed(2)}</td><td>${P.nh}-${NM(S.dh)} ยาว ${f2(P.lh)}</td><td>${P.kh.toFixed(2)}</td><td>${P.kg.toFixed(2)}</td><td>${P.vol.toFixed(3)}</td><td>${S.pd && P.pipe.P.length ? P.pipe.P.length + " ท่อน Ø" + PN[S.pd] + " ยาว " + f2(P.T) : "-"}${P.cb && P.cb.n ? `<br>เหล็กมุม ${P.cb.n}-${NM(P.cb.d)} ขาละ ${f2(P.cb.leg)} (${P.cb.kg.toFixed(2)} กก.)` : ""}</td></tr>`;
+    const P = i.P, S = st.S, bar = (n, d, len, kg) => `${nw(n + " เส้น " + NM(d))}<br>ยาว ${f2(len)} ม. • ${kg.toFixed(2)} กก.`;
+    const cb = P.cb && P.cb.n ? `${nw(P.cb.n + " ตัว " + NM(P.cb.d))}<br>ขาละ ${f2(P.cb.leg)} ม. • ${P.cb.kg.toFixed(2)} กก.` : "-";
+    const pv = S.pd && P.pipe.P.length ? `${nw(P.pipe.P.length + " ท่อน Ø" + PN[S.pd])}<br>ยาว ${f2(P.T)} ม.` : "-";
+    return `<tr><td class="code">${i.code}</td><td style="text-align:left">${bar(P.nv, S.dv, P.lv, P.kv)}</td><td style="text-align:left">${bar(P.nh, S.dh, P.lh, P.kh)}</td><td style="text-align:left">${cb}</td><td style="text-align:left">${pv}</td><td><b>${P.kg.toFixed(2)}</b></td><td>${P.vol.toFixed(3)}</td></tr>`;
   }).join("");
   // สรุปวัสดุทั้งโครงการ แยกชนิดเหล็ก (ใช้ภายใน คิดราคา)
   const m = st.mat, S2 = st.S;
