@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK, PILES } from "./standards.js?v=20261123055015";
+import { STD, HS, MAX_STACK, PILES } from "./standards.js?v=20261123055250";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, stackCountTxt, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261123055015";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261123055015";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261123055015";
-import { createViews } from "./view3d.js?v=20261123055015";
-import { initPile } from "./pile-ui.js?v=20261123055015";
-import { makePdf } from "./pdf.js?v=20261123055015";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261123055015";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261123055015";
+} from "./calc.js?v=20261123055250";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261123055250";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261123055250";
+import { createViews } from "./view3d.js?v=20261123055250";
+import { initPile } from "./pile-ui.js?v=20261123055250";
+import { makePdf } from "./pdf.js?v=20261123055250";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261123055250";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261123055250";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -158,8 +158,8 @@ function renderSets() {
     const mode = (k) => `<select data-k="${k}m"><option value="at" ${v[k + "m"] !== "n" ? "selected" : ""}>ระยะ @</option><option value="n" ${v[k + "m"] === "n" ? "selected" : ""}>จำนวนเส้น</option></select>`;
     const lab = (k) => (v[k + "m"] === "n" ? "จำนวนเส้น" : "@ (ม.)");
     d.innerHTML = `<div class="bsh"><b>ชุดเหล็ก ${L}</b><button type="button" class="iconbtn" aria-label="ลบชุดเหล็ก ${L}">✕</button></div>
-<div class="row3"><div><label>เหล็กแกนตั้ง</label><select data-k="dv">${barOpt(v.dv)}</select></div><div><label>ระบุเป็น</label>${mode("sv")}</div><div><label>${lab("sv")}</label><input data-k="sv" type="number" step="${v.svm === "n" ? 1 : 0.01}" value="${v.sv}"></div></div>
-<div class="row3"><div><label>เหล็กแกนนอน</label><select data-k="dh">${barOpt(v.dh)}</select></div><div><label>ระบุเป็น</label>${mode("sh")}</div><div><label>${lab("sh")}</label><input data-k="sh" type="number" step="${v.shm === "n" ? 1 : 0.01}" value="${v.sh}"></div></div>
+<div class="row3"><div><label>เหล็กแกนตั้ง</label><select data-k="dv">${barOpt(v.dv)}</select></div><div><label>ระบุเป็น</label>${mode("sv")}</div><div><label>${lab("sv")}</label><input data-k="sv" type="number" step="${v.svm === "n" ? 1 : 0.001}" value="${v.sv}"></div></div>
+<div class="row3"><div><label>เหล็กแกนนอน</label><select data-k="dh">${barOpt(v.dh)}</select></div><div><label>ระบุเป็น</label>${mode("sh")}</div><div><label>${lab("sh")}</label><input data-k="sh" type="number" step="${v.shm === "n" ? 1 : 0.001}" value="${v.sh}"></div></div>
 <div class="row3"><div><label>ท่อ PVC</label><select data-k="pd">${pipeOpt(v.pd)}</select></div><div><label>แถว</label><input data-k="pr" type="number" min="1" max="6" value="${v.pr}"></div><div><label>คอลัมน์</label><input data-k="pc" type="number" min="0" max="10" value="${v.pc}"></div></div>
 <div class="row2"><div><label>เหล็กกันแตกมุม</label><select data-k="cbd"><option value="0" ${+v.cbd ? "" : "selected"}>ไม่มี</option>${barOpt(v.cbd, true)}</select></div><div><label>ขาละ (ม.)</label><input data-k="cbl" type="number" step="0.05" min="0.1" value="${v.cbl}"></div></div>`;
     d.querySelectorAll("[data-k]").forEach((el) => {
@@ -195,7 +195,7 @@ function syncBarMode() {
   [["sv", "แนวตั้ง"], ["sh", "แนวนอน"]].forEach(([id, nm]) => {
     const n = $(id + "m").value === "n", el = $(id);
     $(id + "l").textContent = n ? "จำนวนเส้น (" + nm + ")" : "@ " + nm + " (ม.)";
-    el.step = n ? "1" : "0.010"; el.min = n ? "2" : "0.075";
+    el.step = n ? "1" : "0.001"; el.min = n ? "2" : "0.03";
   });
 }
 function run() {
