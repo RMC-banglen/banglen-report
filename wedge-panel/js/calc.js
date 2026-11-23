@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName, PIPE_NAME,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261123055250";
+} from "./standards.js?v=20261123055412";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -105,7 +105,7 @@ export function standardSpec() { return { sp: false, ...STD, pr: null, pc: 0 }; 
 
 function placePipes(vx, hy, dv, dh, pd, nr, nc, WT, TP, H) {
   if (!pd) return { P: [], xs: [], ys: [], warn: "" };
-  const rad = pd / 2, st = 50;
+  const rad = pd / 2; let st = 50; // ระยะค้นหาตำแหน่งท่อ: ปกติทีละ 50 มม. ถ้าเหล็กถี่จนไม่ลงตัว ลองละเอียดทีละ 5 มม.
   const ax = (bars, n, Lt, lo, hi, bd) => {
     const ok = (c) => c - rad >= lo && c + rad <= hi && bars.every((b) => Math.abs(b - c) - bd / 2 - rad >= 10);
     const out = [];
@@ -114,7 +114,9 @@ function placePipes(vx, hy, dv, dh, pd, nr, nc, WT, TP, H) {
       for (let d = 0; d <= 900 && got === null; d += st)
         for (const sg of [1, -1]) {
           const c = Math.round((Lt * (i + 0.5)) / n / st) * st + sg * d;
-          if (ok(c) && ok(Lt - c) && !out.includes(c)) { got = c; break; }
+          // ท่อแต่ละต้นต้องไม่ทับกัน (ห่างกันอย่างน้อยเส้นผ่านศูนย์กลาง + 10 มม.) รวมทั้งคู่ซ้าย-ขวาไม่ทับที่กลางแผ่น
+          const far = (v) => out.every((o) => Math.abs(o - v) >= 2 * rad + 10);
+          if (ok(c) && ok(Lt - c) && far(c) && far(Lt - c) && Math.abs(Lt - 2 * c) >= 2 * rad + 10) { got = c; break; }
         }
       if (got === null) return null;
       out.push(got, Lt - got);
@@ -134,8 +136,9 @@ function placePipes(vx, hy, dv, dh, pd, nr, nc, WT, TP, H) {
     }
     return out.sort((a, b) => a - b);
   };
-  const xsT = ax(vx.map((x) => x + TP), nc, WT, TP, WT - TP, dv);
-  const ys = ax(hy, nr, H, 0, H, dh);
+  let xsT = ax(vx.map((x) => x + TP), nc, WT, TP, WT - TP, dv);
+  let ys = ax(hy, nr, H, 0, H, dh);
+  if (!xsT || !ys) { st = 5; xsT = ax(vx.map((x) => x + TP), nc, WT, TP, WT - TP, dv); ys = ax(hy, nr, H, 0, H, dh); }
   if (!xsT || !ys) return { P: [], xs: [], ys: [], warn: `เหล็กถี่เกินไป วางท่อ PVC ${PIPE_NAME[pd] || pd + " มม."} ไม่ได้ แผ่นนี้จึงไม่มีท่อ` };
   const xs = xsT.map((x) => x - TP), P = [];
   ys.forEach((y) => xs.forEach((x) => P.push([x, y])));
