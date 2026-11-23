@@ -2,8 +2,8 @@
 // ส่งออก PDF / ใบสรุป HTML — สร้างในเครื่องผู้ใช้ตอนกดดาวน์โหลด ไม่เก็บไฟล์ลง Storage
 // โครงตามต้นแบบ: หน้า 1 สรุปโครงการ • 1 หน้าต่อ c/c (3D + รูปขยายรอยต่อ) • 1 หน้าต่อรหัส (รูปตัด 2 + รูปด้าน 2)
 // ชิ้นเนื้อหาที่ยาวเกินหน้าจะถูกย่อให้พอดี ไม่ตัดกลางชิ้น
-import { fmt, f2, f3, stackCountTxt } from "./calc.js?v=20261123021513";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261123021513";
+import { fmt, f2, f3, stackCountTxt } from "./calc.js?v=20261123055015";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261123055015";
 
 export const PRINT = {"--bg":"#FFFFFF","--surface":"#FFFFFF","--surface-2":"#F5F6F4","--ink":"#1D2725","--muted":"#5B6964","--faint":"#8A9691","--line":"#CDD3CF","--accent":"#0F6E56","--accent-soft":"#E1F2EB","--rebar":"#C2522B","--rebar-2":"#B07316","--pipe":"#1E5FA0","--warn":"#9A5B05","--warn-soft":"#FBF0DC","--danger":"#A32D2D","--danger-soft":"#FBE8E8","--concrete":"rgba(93,202,165,.20)"};
 export const unvar = (s) => s.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => PRINT[k] || "#1D2725");
@@ -49,13 +49,13 @@ function schedForPdf($) {
 }
 // ตารางที่ต้องมีตัวระบุแถว (การผลิต/วัสดุ): เปลี่ยนรหัสสินค้าเป็นขนาด กว้าง × สูง (ม.)
 function noCodeTable(el, st) {
-  const t = el.cloneNode(true), by = new Map(st.list.map((i) => [i.code, `${f2(i.WT)} × ${f2(i.H)}`]));
+  const t = el.cloneNode(true), by = new Map(st.list.map((i) => [i.code, `${f2(i.WT)} × ${f2(i.H)}${i.letter ? " ชุด " + i.letter : ""}`]));
   const th0 = t.querySelector("thead th"); if (th0 && th0.textContent.includes("รหัส")) th0.textContent = "กว้าง × สูง (ม.)";
   t.querySelectorAll("tbody td").forEach((c) => { const k = c.textContent.trim(); if (by.has(k)) { c.textContent = by.get(k); c.classList.remove("code"); } });
   return t.outerHTML;
 }
 // ข้อความแจ้งเตือนที่อ้างรหัสสินค้า → แสดงเป็นขนาดแผ่นแทน
-const noCodeText = (html, st) => st.list.reduce((s, i) => s.split(i.code).join(`แผ่น ${f2(i.WT)} × ${f2(i.H)} ม.`), html);
+const noCodeText = (html, st) => st.list.reduce((s, i) => s.split(i.code).join(`แผ่น ${f2(i.WT)} × ${f2(i.H)} ม.${i.letter ? " ชุด " + i.letter : ""}`), html);
 function pdfSummary(st, d, $) {
   return `<h2 style="font-size:20px;margin:0 0 2px">ใบสรุปแผ่นกันดินหัวลิ่ม</h2><p style="margin:0 0 12px;color:#5B6964">บริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด • ${new Date().toLocaleDateString("th-TH")}</p>
 <table class="tbl" style="margin-bottom:12px"><tr><th>โครงการ</th><td>${esc(d.pj || "-")}</td><th>ลูกค้า</th><td>${esc(d.cu || "-")}</td></tr><tr><th>ผู้ขาย</th><td>${esc(d.sa || "-")}</td><th>รูปแบบงาน</th><td>${st.S.sp ? "สั่งพิเศษ" : "มาตรฐานบริษัท"}</td></tr><tr><th>เสาเข็ม</th><td>${st.p.n}</td><th>หัวลิ่ม</th><td>แบบ ${st.p.ty} • ${st.G.d}</td></tr>${st.direct ? `<tr><th>วิธีสั่ง</th><td>สั่งตามจำนวนแผ่น</td><th>หมายเหตุ</th><td>ระยะกลาง/กลางเสาในตารางเผื่อค่าการทำงานแล้วข้างละ ${f3(st.g)} ม.</td></tr><tr><th>อ้างอิง</th><td colspan="3">${esc(d.rf || "-")}</td></tr>` : `<tr><th>ความสูงกำแพง</th><td>${(+d.wh).toFixed(2)} ม. (${stackTxt(st)} ม.)</td><th>ค่าเผื่อ</th><td>ข้างละ ${f3(st.g)} ม.</td></tr>`}</table>

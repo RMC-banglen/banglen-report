@@ -3,7 +3,7 @@
 import {
   PILES, WG, HS, MAX_STACK, KG, STD, TABLE, barName, PIPE_NAME,
   CONCRETE_DENSITY, DEFAULT_ALLOWANCE, DEFAULT_TRUCK_KG, SPECIAL_ORDER_WARNING,
-} from "./standards.js?v=20261123021513";
+} from "./standards.js?v=20261123055015";
 
 // ---------- รูปแบบตัวเลข ----------
 export const fmt = (n) => Math.round(n).toLocaleString("th-TH");
@@ -243,12 +243,12 @@ export function calcProject(input) {
 }
 
 // รายการแผ่นหนึ่งรหัส (กว้างรวม WT, สูง H) สร้างครั้งเดียวต่อคู่ แล้วสะสมจำนวนเข้าไป
-function getItem(items, G, S, WT, H, al) {
-  const key = WT + "|" + H;
+function getItem(items, G, S, WT, H, al, letter = "") {
+  const key = WT + "|" + H + "|" + letter; // letter = ชุดเหล็ก (A/B/C…) ไม่มี = ชุดเดียว
   let it = items.get(key);
   if (!it) {
-    const P = panelCalc(G, WT, H, S), code = mkCode(WT, H, G.T, S, P);
-    it = { code, name: mkName(WT, H, G.T, S, P), H, WT, P, qty: 0, cc: new Set() };
+    const P = panelCalc(G, WT, H, S), code = mkCode(WT, H, G.T, S, P) + (letter ? "-" + letter : "");
+    it = { code, name: mkName(WT, H, G.T, S, P) + (letter ? " • ชุด " + letter : ""), H, WT, P, qty: 0, cc: new Set(), S, letter };
     items.set(key, it);
     if (P.pipe.warn) al.push(["w", `${code}: ${P.pipe.warn}`]);
     if (S.sp && (S.nvc > 0 || S.nhc > 0)) [[S.nvc > 0, P.am, "แกนตั้ง"], [S.nhc > 0, P.ah, "แกนนอน"]].forEach(([on, s, nm]) => { if (on && (s < 75 || s > 300)) al.push(["w", `แผ่น ${f2(WT)} × ${f2(H)} ม.: เหล็ก${nm} จัดระยะได้ @${f3(s)} ม. ${s < 75 ? "ชิดเกินไป" : "ห่างเกินไป"}`]); });
@@ -271,22 +271,24 @@ function totals(items, truckKg, S) {
   const addBar = (d, n, len, kg) => { const b = bars.get(d) || { d, n: 0, len: 0, kg: 0 }; b.n += n; b.len += len; b.kg += kg; bars.set(d, b); };
   list.forEach((i) => {
     if (i.P.cb && i.P.cb.n) addBar(i.P.cb.d, i.qty * 4, (i.qty * i.P.cb.n * i.P.cb.each) / 1000, i.qty * i.P.cb.kg);
-    addBar(S.dv, i.qty * i.P.nv, (i.qty * i.P.nv * i.P.lv) / 1000, i.qty * i.P.kv);
-    addBar(S.dh, i.qty * i.P.nh, (i.qty * i.P.nh * i.P.lh) / 1000, i.qty * i.P.kh);
+    const SI = i.S || S;
+    addBar(SI.dv, i.qty * i.P.nv, (i.qty * i.P.nv * i.P.lv) / 1000, i.qty * i.P.kv);
+    addBar(SI.dh, i.qty * i.P.nh, (i.qty * i.P.nh * i.P.lh) / 1000, i.qty * i.P.kh);
   });
-  const pipeCount = S.pd ? list.reduce((s, i) => s + i.qty * i.P.pipe.P.length, 0) : 0;
-  const pipeLen = S.pd ? list.reduce((s, i) => s + (i.qty * i.P.pipe.P.length * i.P.T) / 1000, 0) : 0;
+  const pipeBy = new Map(); // ท่อแยกตามขนาด (ชุดเหล็กต่างกันอาจใช้ท่อต่างขนาด)
+  list.forEach((i) => { const pd = (i.S || S).pd, k = pd && i.P.pipe.P.length ? i.qty * i.P.pipe.P.length : 0; if (!k) return; const e = pipeBy.get(pd) || { pd, count: 0, len: 0, each: i.P.T }; e.count += k; e.len += (k * i.P.T) / 1000; pipeBy.set(pd, e); });
+  const pipes = [...pipeBy.values()].sort((a, b) => a.pd - b.pd), pipeCount = pipes.reduce((s, e) => s + e.count, 0), pipeLen = pipes.reduce((s, e) => s + e.len, 0);
   // แตกตามขนาดเหล็ก + ความยาวต่อเส้น (มม.) เช่น RB6 ยาว 0.95 ม. กี่เส้น (ความยาวต่อเส้นต่างกันตามความสูงแผ่น)
   const lines = new Map();
   const addLine = (d, each, n, cb) => {
     const key = d + "|" + each + (cb ? "|cb" : ""), l = lines.get(key) || { d, each, n: 0, len: 0, kg: 0, cb: !!cb };
     l.n += n; l.len += (n * each) / 1000; l.kg += ((n * each) / 1000) * KG[d]; lines.set(key, l);
   };
-  list.forEach((i) => { if (i.P.cb && i.P.cb.n) addLine(i.P.cb.d, i.P.cb.each, i.qty * i.P.cb.n, true); addLine(S.dv, i.P.lv, i.qty * i.P.nv); addLine(S.dh, i.P.lh, i.qty * i.P.nh); });
+  list.forEach((i) => { const SI = i.S || S; if (i.P.cb && i.P.cb.n) addLine(i.P.cb.d, i.P.cb.each, i.qty * i.P.cb.n, true); addLine(SI.dv, i.P.lv, i.qty * i.P.nv); addLine(SI.dh, i.P.lh, i.qty * i.P.nh); });
   const mat = {
     bars: [...bars.values()].sort((a, b) => a.d - b.d),
     lines: [...lines.values()].sort((a, b) => a.d - b.d || b.each - a.each),
-    pipeCount, pipeLen, pipeEach: list.length ? list[0].P.T : 0, // ท่อยาวเท่าความหนาแผ่น (มม.)
+    pipes, pipeCount, pipeLen, pipeEach: list.length ? list[0].P.T : 0, // ท่อยาวเท่าความหนาแผ่น (มม.)
   };
   return { list, totQ, totW, totV, totS, truck, trips: Math.ceil(totW / truck), mat };
 }
@@ -309,7 +311,7 @@ export function calcDirect(input) {
   const al = [], items = new Map(), groups = new Map(), rowInfo = [];
   if (!(g >= 5 && g <= 40)) al.push(["d", "ค่าเผื่อควรอยู่ระหว่าง 0.005 ถึง 0.040 ม."]);
   (input.rows || []).forEach((r, i) => {
-    const n = i + 1, WT = Math.round(r.WT), qty = Math.floor(r.qty), stack = Array.isArray(r.stack) && r.stack.length ? r.stack.map((h) => Math.round(h)) : null, H = stack ? stack[0] : Math.round(r.H); // stack = แบ่งแผ่นซ้อนตามความสูงกำแพง (qty = จำนวนช่วง) • ไม่มี stack = แบบเดิม (qty = จำนวนแผ่น)
+    const SR = r.spec || S, LT = r.letter || "", n = i + 1, WT = Math.round(r.WT), qty = Math.floor(r.qty), stack = Array.isArray(r.stack) && r.stack.length ? r.stack.map((h) => Math.round(h)) : null, H = stack ? stack[0] : Math.round(r.H); // stack = แบ่งแผ่นซ้อนตามความสูงกำแพง (qty = จำนวนช่วง) • ไม่มี stack = แบบเดิม (qty = จำนวนแผ่น)
     if (!(WT > 0) || !(qty >= 1)) { al.push(["d", `รายการที่ ${n}: ใส่ความกว้างและจำนวนแผ่น (อย่างน้อย 1 แผ่น)`]); return; }
     if (stack ? !stack.every((h) => HS.includes(h)) || stack.length > MAX_STACK : !HS.includes(H)) { al.push(["d", `รายการที่ ${n}: ความสูงต้องเป็นขนาดมาตรฐาน 0.50 / 0.75 / 1.00 / 1.20 ม.`]); return; }
     const WTr = Math.floor(WT / 10) * 10, sk = stack ? 1 : Math.min(MAX_STACK, Math.max(1, Math.floor(r.st) || 1));
@@ -325,12 +327,12 @@ export function calcDirect(input) {
     if (rowInfo[i].over) al.push(["d", `รายการที่ ${n}: กลาง/กลางเสาหน้างาน ${f2(cc)} ม. ใช้แผ่นกว้าง ${f2(WTr)} ม. ไม่ได้ (เหลือค่าเผื่อข้างละ ${f3(Math.max(0, F.gr))} ม. น้อยกว่ามาตรฐาน ${f3(g)} ม.) แนะนำลดความกว้างเป็น ${f2(maxW)} ม.`]);
     else if (F.ze < 20) al.push(["d", `รายการที่ ${n}: ค่าเผื่อมากเกินไป แผ่นเสียบร่องได้น้อยกว่า 0.020 ม.${actual != null ? ` แนะนำเพิ่มความกว้างเป็น ${f2(maxW)} ม.` : ""}`]);
     if (F.mn < 3) al.push(["d", `รายการที่ ${n}: ลิ่มหนากว่าร่อง แผ่นจะติด`]);
-    (stack || [H]).forEach((h) => { const it = getItem(items, G, S, WTr, h, al); it.qty += qty; it.cc.add(cc); });
-    const stk = stack || Array(sk).fill(H), key = cc + "|" + WTr + "|" + stk.join("+");
-    const gr = groups.get(key) || { cc, n: 0, F, stk, WT: WTr };
+    (stack || [H]).forEach((h) => { const it = getItem(items, G, SR, WTr, h, al, LT); it.qty += qty; it.cc.add(cc); });
+    const stk = stack || Array(sk).fill(H), key = cc + "|" + WTr + "|" + stk.join("+") + "|" + LT;
+    const gr = groups.get(key) || { cc, n: 0, F, stk, WT: WTr, letter: LT };
     gr.n += qty * (stack ? stack.length : 1); groups.set(key, gr);
   });
-  if (S.sp) al.unshift(["w", SPECIAL_ORDER_WARNING]);
+  if (S.sp || (input.rows || []).some((r) => r.spec && r.spec.sp)) al.unshift(["w", SPECIAL_ORDER_WARNING]);
   return { p, G, g, S, stk: [], groups: [...groups.values()].sort((x, y) => x.stk.reduce((s, v) => s + v, 0) - y.stk.reduce((s, v) => s + v, 0) || x.WT - y.WT || x.cc - y.cc), rowInfo, nSpan: 0, nPile: 0, wLen: 0, direct: true, ...totals(items, input.truckKg, S), al };
 }
 

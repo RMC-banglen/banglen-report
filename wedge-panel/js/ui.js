@@ -1,16 +1,16 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // หน้าจอ: ฟอร์ม ผลคำนวณ แท็บ บันทึกโครงการ ส่งออก — ตรรกะคำนวณอยู่ใน calc.js ทั้งหมด
-import { STD, HS, MAX_STACK, PILES } from "./standards.js?v=20261123021513";
+import { STD, HS, MAX_STACK, PILES } from "./standards.js?v=20261123055015";
 import {
   calcProject, calcDirect, allocateTables, productionPlan, nf, splitSpans, stackOptions, stackCountTxt, suggestHeights, STDH, standardSpec, fmt, f2, f3,
-} from "./calc.js?v=20261123021513";
-import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261123021513";
-import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261123021513";
-import { createViews } from "./view3d.js?v=20261123021513";
-import { initPile } from "./pile-ui.js?v=20261123021513";
-import { makePdf } from "./pdf.js?v=20261123021513";
-import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261123021513";
-import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261123021513";
+} from "./calc.js?v=20261123055015";
+import { barName as NM, PIPE_NAME as PN, DEFAULT_TRUCK_KG } from "./standards.js?v=20261123055015";
+import { panelSheet, jointSvg, remark3d, shoulderRemark, esc } from "./draw2d.js?v=20261123055015";
+import { createViews } from "./view3d.js?v=20261123055015";
+import { initPile } from "./pile-ui.js?v=20261123055015";
+import { makePdf } from "./pdf.js?v=20261123055015";
+import { getSession, showLogin, logout, canUse, canEdit, syncSession } from "./auth.js?v=20261123055015";
+import { listProjects, getProject, saveProject, deleteProject } from "./db.js?v=20261123055015";
 
 const $ = (id) => document.getElementById(id);
 // ช่องจำนวนเต็มที่แสดงลูกน้ำคั่นหลักพัน (class "thou"): โฟกัส = ตัดลูกน้ำให้แก้ง่าย ออกจากช่อง = ใส่ลูกน้ำ
@@ -57,6 +57,11 @@ function renderRows() {
     const d = document.createElement("div"); d.className = "oitem";
     const op = r.wall ? stackOptions(r.wall) : [], sk = stackOfRow(r), multi = !!sk && sk.length > 1;
     d.innerHTML = `<div class="orow"><div><label>กว้างรวม (ม.)</label><input type="number" step="0.01" min="0.1" value="${r.WT ? (r.WT / 1000).toFixed(2) : ""}"></div><div><label>สูงกำแพง (ม.)</label><select><option value="" ${r.wall ? "" : "selected"}>เลือก</option>${WALLH.map((h) => `<option value="${h}" ${h === r.wall ? "selected" : ""}>${(h / 1000).toFixed(2)}</option>`).join("")}</select></div><div><label>${multi ? "จำนวน (ช่วง)" : "จำนวน (แผ่น)"}</label><input class="thou" type="text" inputmode="numeric" value="${r.qty ? r.qty.toLocaleString("th-TH") : ""}"></div><button type="button" class="iconbtn" aria-label="ลบรายการนี้">✕</button></div>${sk ? `<div class="orow2"><label>แบ่งแผ่น${multi ? "ซ้อน" : ""}</label>${op.length > 1 ? `<select class="ss">${op.map((o, k) => `<option value="${k}" ${o === sk ? "selected" : ""}>${o.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม. (${o.length} แผ่น/ช่วง)</option>`).join("")}</select>` : `<b>${sk.map((h) => (h / 1000).toFixed(2)).join(" + ")} ม.</b>`}</div>` : ""}<p class="hint osum" style="margin:2px 0 0">${rowSum(r)}</p>`;
+    if (barSets.length) {
+      const bs = document.createElement("div"); bs.className = "orow2 bsRow"; bs.hidden = !setsOn();
+      bs.innerHTML = `<label>ชุดเหล็ก</label><select class="bsel">${["A", ...barSets.map((_, k) => SET_LET[k + 1])].map((L, k) => `<option value="${k}" ${(r.set || 0) === k ? "selected" : ""}>ชุด ${L}</option>`).join("")}</select>`;
+      d.insertBefore(bs, d.querySelector(".osum")); bs.querySelector("select").onchange = (e) => { r.set = +e.target.value; run(); };
+    }
     const [w, q] = d.querySelectorAll("input"), h = d.querySelector(".orow select"), ss = d.querySelector("select.ss");
     w.oninput = () => { r.WT = Math.round(+w.value * 1000); sched(); };
     h.onchange = () => { r.wall = +h.value || 0; r.ss = 0; renderRows(); run(); };
@@ -121,9 +126,54 @@ function renderStack() {
 
 // ---------------- อ่านฟอร์ม ----------------
 const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+// สเปกสั่งพิเศษจากค่าที่กรอก (ชุดเหล็ก A ในฟอร์มหลัก และชุดเหล็กเพิ่ม B–D)
+function specFrom(v) {
+  return { sp: true, dv: +v.dv, sv: v.svm === "n" ? 200 : Math.round(+v.sv * 1000), nvc: v.svm === "n" ? Math.floor(+v.sv) || 0 : 0, dh: +v.dh, sh: v.shm === "n" ? 200 : Math.round(+v.sh * 1000), nhc: v.shm === "n" ? Math.floor(+v.sh) || 0 : 0, cv: STD.cv, oh: STD.oh, pd: +v.pd, pr: +v.pr, pc: +v.pc, cbd: +v.cbd || 0, cbl: Math.round((+v.cbl || 0) * 1000), note: $("nt").value.trim() };
+}
+const mainSetVals = () => ({ dv: $("dv").value, svm: $("svm").value, sv: $("sv").value, dh: $("dh").value, shm: $("shm").value, sh: $("sh").value, pd: $("pd").value, pr: $("pr").value, pc: $("pc").value, cbd: $("cbd").value, cbl: $("cbl").value });
 function spec() {
   if (radio("md") !== "sp") return standardSpec();
-  return { sp: true, dv: +$("dv").value, sv: $("svm").value === "n" ? 200 : Math.round(+$("sv").value * 1000), nvc: $("svm").value === "n" ? Math.floor(+$("sv").value) || 0 : 0, dh: +$("dh").value, sh: $("shm").value === "n" ? 200 : Math.round(+$("sh").value * 1000), nhc: $("shm").value === "n" ? Math.floor(+$("sh").value) || 0 : 0, cv: STD.cv, oh: STD.oh, pd: +$("pd").value, pr: +$("pr").value, pc: +$("pc").value, cbd: +$("cbd").value || 0, cbl: Math.round((+$("cbl").value || 0) * 1000), note: $("nt").value.trim() };
+  return specFrom(mainSetVals());
+}
+
+// ---------------- ชุดเหล็ก (แต่ละรายการใช้เหล็กต่างกัน) ----------------
+// ชุด A = ฟอร์มหลัก • ชุด B–D = barSets[0..2] แต่ละรายการเลือกชุดได้ (r.set: 0 = A, 1 = B …)
+const SET_LET = "ABCD";
+let barSets = [];
+const BAR_LIST = [[6, "RB6"], [9, "RB9"], [10, "DB10"], [12, "DB12"], [16, "DB16"]];
+const barOpt = (sel, skip6) => BAR_LIST.filter(([v]) => !(skip6 && v === 6)).map(([v, t]) => `<option value="${v}" ${+sel === v ? "selected" : ""}>${t}</option>`).join("");
+const pipeOpt = (sel) => [[0, "ไม่มี"], [34, '1"'], [42, '1¼"'], [48, '1½"'], [60, '2"'], [76, '2½"'], [89, '3"']].map(([v, t]) => `<option value="${v}" ${+sel === v ? "selected" : ""}>${t}</option>`).join("");
+const setDefaults = () => ({ dv: "9", svm: "at", sv: "0.200", dh: "12", shm: "at", sh: "0.200", pd: "48", pr: "2", pc: "0", cbd: "0", cbl: "0.30" });
+const setsOn = () => radio("md") === "sp" && barSets.length > 0 && radio("om") === "direct";
+function syncSets() {
+  const direct = radio("om") === "direct", sp = radio("md") === "sp";
+  $("barSets").hidden = !(direct && sp);
+  $("addSet").hidden = !(direct && sp) || barSets.length >= 3;
+  document.querySelectorAll(".bsRow").forEach((e) => { e.hidden = !setsOn(); });
+}
+function renderSets() {
+  const box = $("barSets"); box.innerHTML = "";
+  barSets.forEach((v, i) => {
+    const L = SET_LET[i + 1], d = document.createElement("div"); d.className = "bset";
+    const mode = (k) => `<select data-k="${k}m"><option value="at" ${v[k + "m"] !== "n" ? "selected" : ""}>ระยะ @</option><option value="n" ${v[k + "m"] === "n" ? "selected" : ""}>จำนวนเส้น</option></select>`;
+    const lab = (k) => (v[k + "m"] === "n" ? "จำนวนเส้น" : "@ (ม.)");
+    d.innerHTML = `<div class="bsh"><b>ชุดเหล็ก ${L}</b><button type="button" class="iconbtn" aria-label="ลบชุดเหล็ก ${L}">✕</button></div>
+<div class="row3"><div><label>เหล็กแกนตั้ง</label><select data-k="dv">${barOpt(v.dv)}</select></div><div><label>ระบุเป็น</label>${mode("sv")}</div><div><label>${lab("sv")}</label><input data-k="sv" type="number" step="${v.svm === "n" ? 1 : 0.01}" value="${v.sv}"></div></div>
+<div class="row3"><div><label>เหล็กแกนนอน</label><select data-k="dh">${barOpt(v.dh)}</select></div><div><label>ระบุเป็น</label>${mode("sh")}</div><div><label>${lab("sh")}</label><input data-k="sh" type="number" step="${v.shm === "n" ? 1 : 0.01}" value="${v.sh}"></div></div>
+<div class="row3"><div><label>ท่อ PVC</label><select data-k="pd">${pipeOpt(v.pd)}</select></div><div><label>แถว</label><input data-k="pr" type="number" min="1" max="6" value="${v.pr}"></div><div><label>คอลัมน์</label><input data-k="pc" type="number" min="0" max="10" value="${v.pc}"></div></div>
+<div class="row2"><div><label>เหล็กกันแตกมุม</label><select data-k="cbd"><option value="0" ${+v.cbd ? "" : "selected"}>ไม่มี</option>${barOpt(v.cbd, true)}</select></div><div><label>ขาละ (ม.)</label><input data-k="cbl" type="number" step="0.05" min="0.1" value="${v.cbl}"></div></div>`;
+    d.querySelectorAll("[data-k]").forEach((el) => {
+      el.addEventListener("input", () => { v[el.dataset.k] = el.value; sched(); });
+      el.addEventListener("change", () => {
+        v[el.dataset.k] = el.value;
+        if (el.dataset.k === "svm" || el.dataset.k === "shm") { const k = el.dataset.k.slice(0, 2); v[k] = el.value === "n" ? "8" : "0.200"; renderSets(); }
+        run();
+      });
+    });
+    d.querySelector(".bsh button").onclick = () => { barSets.splice(i, 1); orderRows.forEach((r) => { if ((r.set || 0) === i + 1) r.set = 0; else if ((r.set || 0) > i + 1) r.set--; }); renderSets(); renderRows(); run(); };
+    box.appendChild(d);
+  });
+  syncSets();
 }
 function currentSpans(al) {
   if (radio("sm") !== "len") return spans.filter((s) => s.cc && s.n); // แถวที่ยังกรอกไม่ครบไม่นำไปคำนวณ (ไม่ขึ้นเตือนแดง)
@@ -150,6 +200,7 @@ function syncBarMode() {
 }
 function run() {
   syncBarMode();
+  syncSets();
   const direct = radio("om") === "direct";
   applyModeUi(direct);
   syncShoulder();
@@ -159,7 +210,7 @@ function run() {
   let r;
   if (direct) {
     if (!$("pt").value || !orderRows.some((x) => x.WT > 0 && x.qty >= 1 && stackOfRow(x))) return showEmpty();
-    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => ({ WT: r.WT, stack: stackOfRow(r) ? [...stackOfRow(r)] : [], qty: r.qty })), spec: S, truckKg: truck, div: "ch" });
+    r = calcDirect({ pile: $("pt").value, allowance: orderAllowance, rows: orderRows.filter((r) => r.WT || r.qty).map((r) => { const o = { WT: r.WT, stack: stackOfRow(r) ? [...stackOfRow(r)] : [], qty: r.qty }; if (setsOn()) { const k = Math.min(r.set || 0, barSets.length); o.letter = SET_LET[k]; o.spec = k === 0 ? S : specFrom(barSets[k - 1]); } return o; }), spec: S, truckKg: truck, div: "ch" });
     r.ref = $("rf").value.trim();
   } else {
     const op = renderStack();
@@ -236,7 +287,7 @@ function renderProd() {
   // ตารางวัสดุต่อแผ่น (ให้ผู้ตีราคาอ่านง่าย): แต่ละช่อง = จำนวน ขนาด ความยาว และน้ำหนักในช่องเดียว
   const nw = (s) => `<span style="white-space:nowrap">${s}</span>`;
   $("mat").querySelector("tbody").innerHTML = st.list.map((i) => {
-    const P = i.P, S = st.S, bar = (n, d, len, kg) => `${nw(n + " เส้น " + NM(d))}<br>ยาว ${f2(len)} ม. • ${kg.toFixed(2)} กก.`;
+    const P = i.P, S = i.S || st.S, bar = (n, d, len, kg) => `${nw(n + " เส้น " + NM(d))}<br>ยาว ${f2(len)} ม. • ${kg.toFixed(2)} กก.`;
     const cb = P.cb && P.cb.n ? `${nw(P.cb.n + " ตัว " + NM(P.cb.d))}<br>ขาละ ${f2(P.cb.leg)} ม. • ${P.cb.kg.toFixed(2)} กก.` : "-";
     const pv = S.pd && P.pipe.P.length ? `${nw(P.pipe.P.length + " ท่อน Ø" + PN[S.pd])}<br>ยาว ${f2(P.T)} ม.` : "-";
     return `<tr><td class="code">${i.code}</td><td style="text-align:left">${bar(P.nv, S.dv, P.lv, P.kv)}</td><td style="text-align:left">${bar(P.nh, S.dh, P.lh, P.kh)}</td><td style="text-align:left">${cb}</td><td style="text-align:left">${pv}</td><td><b>${P.kg.toFixed(2)}</b></td><td>${P.vol.toFixed(3)}</td></tr>`;
@@ -251,7 +302,7 @@ function renderProd() {
   });
   rows.push(`<tr><td style="text-align:left"><b>เหล็กรวม</b></td><td>-</td><td>-</td><td>-</td><td><b>${nf(st.totS, 1)} กก.</b></td></tr>`);
   rows.push(`<tr><td style="text-align:left">คอนกรีต</td><td>-</td><td>-</td><td>-</td><td>${nf(st.totV, 2)} ลบ.ม.</td></tr>`);
-  if (S2.pd && m.pipeCount) rows.push(`<tr><td style="text-align:left">ท่อ PVC Ø${PN[S2.pd]}</td><td>${f2(m.pipeEach)}</td><td>${fmt(m.pipeCount)} ท่อน</td><td>${nf(m.pipeLen, 2)}</td><td>-</td></tr>`);
+  (m.pipes || []).forEach((e) => rows.push(`<tr><td style="text-align:left">ท่อ PVC Ø${PN[e.pd]}</td><td>${f2(e.each)}</td><td>${fmt(e.count)} ท่อน</td><td>${nf(e.len, 2)}</td><td>-</td></tr>`));
   $("matTot").querySelector("tbody").innerHTML = st.list.length ? rows.join("") : "";
 }
 function drawJoint() {
@@ -291,7 +342,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
 // ---------------- เก็บ/โหลดข้อมูลฟอร์ม (JSON) ----------------
 const FIELDS = ["rf", "pj", "cu", "sa", "pt", "wh", "gp", "dv", "sv", "svm", "dh", "sh", "shm", "pd", "pr", "pc", "cbd", "cbl", "nt", "tn", "tk", "lm", "cmx", "lmt"];
 function collect() {
-  const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
+  const o = { stackSel, spans: spans.map((s) => ({ ...s })), md: radio("md"), sm: radio("sm"), om: radio("om"), rows: orderRows.map((r) => ({ ...r })), sets: barSets.map((v) => ({ ...v })), shOn: $("shOn").checked ? 1 : 0, shMode: $("shMode").value, shDrop: Math.round((+$("shDrop").value || 0) * 1000) };
   FIELDS.forEach((k) => { o[k] = $(k).value; });
   o.tk = toInt(o.tk);
   o.wh = +o.wh; // บันทึกค่าที่เป็นความยาวเล็กๆ เป็นมม. เสมอ (ช่องกรอกเป็นเมตร)
@@ -306,10 +357,11 @@ function apply(d) {
   (d.om === "direct" ? $("omD") : $("omW")).checked = true;
   $("shOn").checked = !!d.shOn; if (d.shMode) $("shMode").value = d.shMode; if (d.shDrop !== undefined) $("shDrop").value = (+d.shDrop / 1000).toFixed(2);
   if (Array.isArray(d.rows) && d.rows.length) orderRows = d.rows.map((r) => { // แถวเก่า {H, qty, st}: qty = จำนวนแผ่นรวม ซ้อน st แผ่น → แปลงเป็น ความสูงกำแพง + จำนวนช่วง
-    if (+r.wall > 0) return { WT: +r.WT || 0, wall: +r.wall, ss: +r.ss || 0, qty: +r.qty || 0 };
+    if (+r.wall > 0) return { WT: +r.WT || 0, wall: +r.wall, ss: +r.ss || 0, qty: +r.qty || 0, set: +r.set || 0 };
     const H = HS.includes(+r.H) ? +r.H : 0, st = Math.min(MAX_STACK, Math.max(1, Math.floor(+r.st) || 1)), wall = H * st, o = H ? stackOptions(wall) : [], k = o.findIndex((x) => x.every((v) => v === H));
     return { WT: +r.WT || 0, wall: H ? wall : 0, ss: Math.max(0, k), qty: st > 1 ? Math.round((+r.qty || 0) / st) : +r.qty || 0 };
   });
+  barSets = Array.isArray(d.sets) ? d.sets.slice(0, 3).map((v) => ({ ...setDefaults(), ...v })) : []; renderSets();
   orderAllowance = +d.ga > 0 ? +d.ga : 20;
   tableAlloc = d.ta && typeof d.ta === "object" ? { ...d.ta } : null;
   FIELDS.forEach((k) => { if (d[k] !== undefined && $(k)) $(k).value = d[k]; });
@@ -396,7 +448,7 @@ const isDirty = () => ($("pj").value.trim() || $("pt").value) && snapshot() !== 
 function resetAll() {
   const seller = $("sa").value;
   $("f").reset(); $("sa").value = seller;
-  spans = [{ cc: 0, n: 0 }]; orderRows = [{ WT: 0, wall: 0, ss: 0, qty: 0 }];
+  spans = [{ cc: 0, n: 0 }]; orderRows = [{ WT: 0, wall: 0, ss: 0, qty: 0 }]; barSets = []; renderSets();
   stackSel = 0; curId = null; orderAllowance = 20;
   try { localStorage.removeItem("wp-draft"); } catch (e) {}
   try { history.replaceState(null, "", "#view3d"); } catch (e) {}
@@ -469,6 +521,7 @@ function wire() {
   $("sel3").onchange = () => { drawJoint(); views.buildWall(+$("sel3").value || 0); };
   $("selD").onchange = drawPanel;
   ["shOn", "shMode", "shDrop"].forEach((id) => { $(id).addEventListener("input", sched); $(id).addEventListener("change", sched); });
+  $("addSet").onclick = () => { if (barSets.length < 3) { barSets.push({ ...mainSetVals() }); renderSets(); renderRows(); run(); } };
   ["sv", "sh"].forEach((id) => $(id + "m").addEventListener("change", () => { $(id).value = $(id + "m").value === "n" ? "8" : "0.200"; })); // เปลี่ยนโหมด: ตั้งค่าเริ่มต้นใหม่ (8 เส้น / @0.200)
   FIELDS.forEach((id) => { $(id).addEventListener("input", sched); $(id).addEventListener("change", sched); });
   document.querySelectorAll('input[name="md"],input[name="sm"],input[name="om"]').forEach((x) => x.addEventListener("change", run));

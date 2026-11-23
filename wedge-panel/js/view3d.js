@@ -1,9 +1,9 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // ภาพ 3 มิติ (three.js r128): เสา 2 ต้นกับแผ่นซ้อน และโต๊ะหล่อ — คัดลอกจากต้นแบบ
 // ใช้ผ่าน createViews({ $, getState }) ต้องโหลด three.js เป็น global (THREE) ก่อน
-import { SHOULDER } from "./standards.js?v=20261123021513";
-import { f2, f3, fmt } from "./calc.js?v=20261123021513";
-import { pilePoly, planPoly } from "./draw2d.js?v=20261123021513";
+import { SHOULDER } from "./standards.js?v=20261123055015";
+import { f2, f3, fmt } from "./calc.js?v=20261123055015";
+import { pilePoly, planPoly } from "./draw2d.js?v=20261123055015";
 
 export function createViews({ $, getState }) {
 const THREE = window.THREE;
@@ -35,7 +35,7 @@ label3d("กว้างแผ่น "+f3(gr.F.WT)+" ม.",0,Ht+SZ*.85/K/2+110,0
 // ระยะความสูง: เส้นซ้ายบอกความสูงแต่ละแผ่น (ซ้อนหลายแผ่น) • เส้นนอกสุดบอกสูงรวม
 {const dx=-gr.cc/2-p.B/2-170,lv=[0];stkX.slice().reverse().forEach(h=>lv.push(lv[lv.length-1]+h));const vt=(x,y0,y1)=>{line3d([[x,y0,0],[x,y1,0]]);[y0,y1].forEach(yy=>line3d([[x-40,yy-40,0],[x+40,yy+40,0]]))},tz=SZ*.8;
 if(stkX.length>1){vt(dx,0,Ht);for(let i=1;i<lv.length-1;i++)line3d([[dx-40,lv[i]-40,0],[dx+40,lv[i]+40,0]]);for(let i=0;i<lv.length-1;i++)label3d(f3(lv[i+1]-lv[i]),dx,(lv[i]+lv[i+1])/2,0,tz);const dx2=dx-SZ/K*2.4;vt(dx2,0,Ht);label3d("สูงรวม "+f3(Ht)+" ม.",dx2,Ht/2,0,tz)}else{vt(dx,0,Ht);label3d("สูง "+f3(Ht)+" ม.",dx,Ht/2,0,tz)}}
-let y=0;const shade=[0x9FE1CB,0x7FD3B6];stkX.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);const it=st.list.find(q=>q.H===h&&q.WT===gr.F.WT),pp2=it&&it.P&&it.P.pipe;if(pp2&&pp2.P.length&&st.S.pd)pp2.P.forEach(([px,py])=>holeAt(px-Wb/2,y+py,st.S.pd/2,G.T));y+=h});
+let y=0;const shade=[0x9FE1CB,0x7FD3B6];stkX.slice().reverse().forEach((h,i)=>{ext(planPoly(G,Wb),h-2,y,shade[i%2],.93);const it=st.list.find(q=>q.H===h&&q.WT===gr.F.WT&&(q.letter||"")===(gr.letter||"")),pp2=it&&it.P&&it.P.pipe;if(pp2&&pp2.P.length&&st.S.pd)pp2.P.forEach(([px,py])=>holeAt(px-Wb/2,y+py,st.S.pd/2,G.T));y+=h});
 tg.set(-300*K,(shOn?Ht+320:Ht+620)/2*K,0);R0=Math.max(gr.cc+p.B+600,shOn?Ht+1350:Ht+1250)*K*1.75;r=R0;upd()}
 $("b3p").onclick=()=>{showP=!showP;pileObjs.forEach(o=>{o.visible=showP});$("b3p").textContent=showP?"ซ่อนเสา":"แสดงเสา";upd()};
 $("b3a").onclick=()=>{th=-.6;ph=1.05;r=R0;upd()};$("b3t").onclick=()=>{th=0;ph=.06;r=R0*.9;upd()};$("b3f").onclick=()=>{th=0;ph=1.5;r=R0;upd()};
