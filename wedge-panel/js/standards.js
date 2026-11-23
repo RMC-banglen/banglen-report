@@ -5,7 +5,7 @@
 // ร่องเสาเข็มไอ: B กว้าง, f ปีก, c ก้นร่อง, dg ลึกร่อง, tw เอว, ty แบบหัวลิ่ม
 // หน้าตัดเสาเข็มไอ ดึงจากแท็บเขียนแบบเสาเข็ม (pile-data.js) เฉพาะ I-18 ขึ้นไป ไม่รวมเสาสี่เหลี่ยม
 // ty = แบบหัวลิ่ม: B (ลิ่ม 85 ปลาย 50) ใช้กับร่องแคบ I-18 โรงงาน/I-18/I-22 มอก. • นอกนั้น A (ลิ่ม 65 ปลาย 70)
-import { PILE_SECTIONS } from "./pile-data.js?v=20261120100132";
+import { PILE_SECTIONS } from "./pile-data.js?v=20261123021513";
 const WEDGE_B = ["F18", "T22"];
 const NO_WEDGE = ["T18"]; // I-18 มอก. เอาออกตามสั่ง (ก้นร่อง 30 มม. แคบกว่าปลายลิ่มทุกแบบ)
 export const PILES = Object.fromEntries(
@@ -45,7 +45,7 @@ export const MAX_STACK = 4;
 // น้ำหนักเหล็ก กก./ม.
 export const KG = { 6: 0.222, 9: 0.499, 10: 0.617, 12: 0.888, 16: 1.578 };
 export const barName = (d) => (d < 10 ? "RB" : "DB") + d;
-export const PIPE_NAME = { 34: '1"', 48: '1½"', 60: '2"', 76: '2½"', 89: '3"' };
+export const PIPE_NAME = { 34: '1"', 42: '1¼"', 48: '1½"', 60: '2"', 76: '2½"', 89: '3"' };
 
 // เหล็กและท่อมาตรฐาน: V-bar RB6 @200, H-bar RB9 @200, ระยะหุ้มปลาย 25, ท่อ PVC Ø48
 export const STD = { dv: 6, sv: 200, dh: 9, sh: 200, cv: 25, oh: 25, pd: 48 };
