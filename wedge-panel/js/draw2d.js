@@ -1,8 +1,8 @@
 // © 2569 นุกูล ยอดเทียน — สร้างเพื่อบริษัท ร่วมมิตรคอนกรีต(บางเลน) จำกัด สงวนลิขสิทธิ์ ใช้ภายในบริษัทเท่านั้น ห้ามคัดลอกหรือเผยแพร่โดยไม่ได้รับอนุญาต
 // แบบ 2 มิติ (SVG) — คัดลอกจากต้นแบบ wedge-panel-designer.html ตัวเลขบนแบบเป็นเมตร 3 ตำแหน่ง
 // ฟังก์ชันทั้งหมดคืนสตริง SVG/HTML ไม่แตะ DOM
-import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261123060041";
-import { fmt, f2, f3 } from "./calc.js?v=20261123060041";
+import { WG, SHOULDER, PIPE_NAME as PN, barName as NM } from "./standards.js?v=20261123060504";
+import { fmt, f2, f3 } from "./calc.js?v=20261123060504";
 
 let o="";const A=s=>{o+=s};
 const L=(x1,y1,x2,y2,c,w,da)=>A(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:${c||"var(--muted)"};stroke-width:${w||.6}${da?";stroke-dasharray:"+da:""}"/>`);
@@ -36,12 +36,13 @@ const note=`${p.n} • กลาง/กลางเสา ${f2(gr.cc)} ม. → 
 function sec(G,W){return G.T===WG.A.T?[[0,0],[W,0],[W,5.2],[W+65,20],[W+65,90],[W,104.8],[W,110],[0,110],[0,104.8],[-65,90],[-65,20],[0,5.2]]:[[0,0],[W,0],[W+85,25],[W+85,75],[W,100],[0,100],[-85,75],[-85,25]]}
 const near=(arr,v)=>arr.reduce((b,x,i)=>Math.abs(x-v)<Math.abs(arr[b]-v)?i:b,0);
 export function svgSection(G,P,S,R){o="";const W=P.W,WT=P.WT,T=G.T,TP=G.TP,s=Math.min(430/WT,400/P.H),X=v=>95+(v+TP)*s,sy=Math.max(s,.6),Y=v=>80+(T-v)*sy;
-poly(sec(G,W),X,Y,"var(--ink)","none",1.2);const yt=Y(T),yb=Y(0);
+poly(sec(G,W),X,Y,"var(--ink)","none",1.2);const yt=Y(T),yb=Y(0);const PP=P.pipe,pxs=S.pd&&PP&&PP.P.length?[...new Set(PP.xs)]:[],prs=Math.max(2,S.pd/2*s);
+pxs.forEach(x=>{A(`<rect x="${(X(x)-prs).toFixed(1)}" y="${yt.toFixed(1)}" width="${(2*prs).toFixed(1)}" height="${(yb-yt).toFixed(1)}" style="fill:var(--surface);stroke:var(--pipe);stroke-width:1.2"/>`);L(X(x),yt-3,X(x),yb+3,"var(--pipe)",.5,"6 3")});
 chainH([[X(-TP),Y(G.et)],[X(0),yt],[X(W),yt],[X(W+TP),Y(G.et)]],yt-18,[f3(TP),f3(W),f3(TP)]);chainH([[X(-TP),yt-18],[X(W+TP),yt-18]],yt-40,[f3(WT)]);chainV([[X(0),yt],[X(0),yb]],X(-TP)-30,[f3(T)]);chainV([[X(W),yt],[X(W+TP),Y(G.et)],[X(W+TP),Y(G.eb)],[X(W),yb]],X(W+TP)+22,[f3(T-G.et),f3(G.E),f3(G.eb)]);
 if(R){const yH=30+S.dh/2,ym=30+S.dh+S.dv/2;L(X(P.x0),Y(yH),X(P.x1),Y(yH),"var(--rebar-2)",Math.max(1,S.dh*sy*.9));P.vx.forEach(x=>A(`<circle cx="${X(x).toFixed(1)}" cy="${Y(ym).toFixed(1)}" r="${Math.max(1.8,S.dv/2*sy)}" style="fill:var(--rebar)"/>`));
 const ty=yb+22,i0=near(P.vx,W/2),mx=P.vx[i0];A(`<polyline points="${X(mx)},${Y(ym)} ${X(mx)},${ty+14} ${X(mx)+16},${ty+14}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(X(mx)+20,ty+18,`เหล็กแกนตั้ง ${P.nv}-${NM(S.dv)} @${f3(P.am).slice(1)} ม.`,"start");
-const hx=X((P.vx[Math.max(0,i0-2)]+P.vx[Math.max(1,i0-1)])/2);A(`<polyline points="${hx},${Y(yH)} ${hx},${ty+40} ${hx+16},${ty+40}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(hx+20,ty+44,`เหล็กแกนนอน ${P.nh}-${NM(S.dh)} @${f3(P.ah).slice(1)} ม.`,"start");TX(X(-TP),ty+68,`เหล็กสูงจากท้องแบบ 0.030 ม. • ปลายเหล็กทุกเส้นระยะหุ้ม ${f3(S.cv)} ม. • เหล็กเส้นริมเลยจุดผูก ${f3(S.oh)} ม.`,"start")}
-return `<svg viewBox="0 0 680 ${Math.ceil(yb+(R?96:20))}" role="img" aria-label="รูปตัดแผ่น">${o}</svg>`}
+const hx=X((P.vx[Math.max(0,i0-2)]+P.vx[Math.max(1,i0-1)])/2);A(`<polyline points="${hx},${Y(yH)} ${hx},${ty+40} ${hx+16},${ty+40}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(hx+20,ty+44,`เหล็กแกนนอน ${P.nh}-${NM(S.dh)} @${f3(P.ah).slice(1)} ม.`,"start");let ny=ty+68;if(pxs.length){const px=X(pxs[0]),py=ty+66;A(`<polyline points="${px},${yb} ${px},${py} ${px+16},${py}" style="fill:none;stroke:var(--muted);stroke-width:.6"/>`);TX(px+20,py+4,`ท่อ PVC Ø${PN[S.pd]} × ${PP.P.length} จุด`,"start");ny=ty+92}TX(X(-TP),ny,`เหล็กสูงจากท้องแบบ 0.030 ม. • ปลายเหล็กทุกเส้นระยะหุ้ม ${f3(S.cv)} ม. • เหล็กเส้นริมเลยจุดผูก ${f3(S.oh)} ม.`,"start")}
+return `<svg viewBox="0 0 680 ${Math.ceil(yb+(R?(pxs.length?120:96):20))}" role="img" aria-label="รูปตัดแผ่น">${o}</svg>`}
 export function svgElev(G,P,S,R,dimP){o="";const W=P.W,WT=P.WT,H=P.H,TP=G.TP,s=Math.min(430/WT,400/H),X2=v=>95+(v+TP)*s,Y2=v=>60+(H-v)*s,top=Y2(H),bot=Y2(0),cv=S.cv;
 A(`<rect x="${X2(-TP)}" y="${top}" width="${WT*s}" height="${H*s}" style="fill:none;stroke:var(--ink);stroke-width:1.2"/>`);L(X2(0),top,X2(0),bot,"var(--ink)",.9);L(X2(W),top,X2(W),bot,"var(--ink)",.9);
 chainH([[X2(-TP),top],[X2(0),top],[X2(W),top],[X2(W+TP),top]],top-16,[f3(TP),f3(W),f3(TP)]);chainH([[X2(-TP),top-16],[X2(W+TP),top-16]],top-38,[f3(WT)]);chainV([[X2(-TP),top],[X2(-TP),bot]],X2(-TP)-24,[f3(H)]);
