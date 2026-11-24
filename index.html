@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-24d';
+var APP_VERSION='2026-11-24e';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -747,7 +747,7 @@ function testAxisLabels(dates){
   return ds.map(d=>{let t=String(Number(d.slice(8,10)));if(cnt[d]>1){seq[d]=(seq[d]||0)+1;t+='('+seq[d]+')';}
     return t+' '+(TM[Number(d.slice(5,7))-1]||'')+(multiYear?' '+String((Number(d.slice(0,4))+543)%100):'');});
 }
-function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,dangerAbove=null,boxedLabels=false,padRight=null,keepColor=false}){
+function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,dangerAbove=null,boxedLabels=false,padRight=null,keepColor=false,endLabels=false}){
   const [ref,W]=useMeasure(); const [hover,setHover]=useState(null);
   // ป้ายเกณฑ์/เฉลี่ยข้างกราฟ: ชื่อชิดซ้าย ตัวเลขเรียงเป็นคอลัมน์เดียวกัน (วัดความกว้างชื่อจริงหลังวาด)
   const [tcw,setTcw]=useState(null);
@@ -847,10 +847,15 @@ function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,y
       {area&&series.length===1&&<path d={`${lp(series[0].data)} L${x(categories.length-1)},${pad.t+iH} L${x(0)},${pad.t+iH} Z`} fill={series[0].color} opacity="0.10"/>}
       {series.map((s,si)=><g key={si}>
         <path d={lp(s.data)} fill="none" stroke={s.color} strokeWidth={s.dashed?1.8:2.4} strokeDasharray={s.dashed?"6 4":undefined} strokeLinejoin="round" strokeLinecap="round"/>
-        {showValues&&!boxedLabels&&!s.dashed&&s.data.map((v,i)=>{if(v==null)return null;return <text key={'vl'+i} x={x(i)} y={plainLy[si+'|'+i]!=null?plainLy[si+'|'+i]:y(v)-11} textAnchor="middle" className="bar-val" fill={isBad(v,s)?PALETTE.cancel:s.color}>{fmt(v,decimals)}</text>;})}
+        {showValues&&!boxedLabels&&!s.dashed&&s.data.map((v,i)=>{if(v==null)return null;return <text key={'vl'+i} x={x(i)} y={plainLy[si+'|'+i]!=null?plainLy[si+'|'+i]:y(v)-11} textAnchor="middle" className="bar-val" fill={isBad(v,s)?PALETTE.cancel:s.color} style={series.length>1?{fill:isBad(v,s)?PALETTE.cancel:s.color,stroke:'var(--surface)',strokeWidth:3,paintOrder:'stroke',strokeLinejoin:'round'}:undefined}>{fmt(v,decimals)}</text>;})}
         {s.data.map((v,i)=>{if(v==null)return null;const bad=isBad(v,s);const r=s.dashed?3.5:(hover===i?5:(bad?4:3.5));const sc=(bad&&!keepColor)?PALETTE.cancel:s.color;const sf=s.dashed?s.color:'#fff';const sh=s.shape||'circle';const cx2=x(i),cy2=y(v);if(sh==='square')return <rect key={i} x={cx2-r} y={cy2-r} width={r*2} height={r*2} fill={sf} stroke={sc} strokeWidth="2"/>;if(sh==='triangle'){const pts=`${cx2},${cy2-r} ${cx2-r*0.9},${cy2+r*0.7} ${cx2+r*0.9},${cy2+r*0.7}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='diamond'){const pts=`${cx2},${cy2-r*1.2} ${cx2+r*0.9},${cy2} ${cx2},${cy2+r*1.2} ${cx2-r*0.9},${cy2}`;return <polygon key={i} points={pts} fill={sf} stroke={sc} strokeWidth="2"/>;}if(sh==='star'){const pts=Array.from({length:10},(_,k)=>{const a=k*Math.PI/5-Math.PI/2;const ro=k%2===0?r*1.3:r*0.5;return `${cx2+ro*Math.cos(a)},${cy2+ro*Math.sin(a)}`;}).join(' ');return <polygon key={i} points={pts} fill={sc} stroke={sc} strokeWidth="1"/>;}return <circle key={i} cx={cx2} cy={cy2} r={r} fill={sf} stroke={sc} strokeWidth="2"/>;})}
       </g>)}
       {boxEls}
+      {endLabels&&W>0&&(()=>{
+        const it=series.filter(s=>!s.dashed&&s.label).map(s=>{let li=-1;s.data.forEach((v,i)=>{if(v!=null)li=i;});return li===categories.length-1?{s,y:y(s.data[li])}:null;}).filter(Boolean).sort((a,b)=>a.y-b.y);
+        for(let n=0;n<40;n++){let ok=true;for(let i=1;i<it.length;i++){if(it[i].y-it[i-1].y<18){const m=(it[i].y+it[i-1].y)/2;it[i-1].y=m-9;it[i].y=m+9;ok=false;}}if(ok)break;}
+        return it.map((o,i)=><text key={'el'+i} x={W-pad.r+12} y={o.y+4} textAnchor="start" fill={o.s.color} style={{fontSize:'11.5px',fontWeight:700}}>{o.s.label}</text>);
+      })()}
       {hover!=null&&<line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t+iH} stroke={PALETTE.axis} strokeDasharray="3 3" opacity="0.5"/>}
       {/* จุดเยอะ ๆ ป้ายวันที่จะทับกันจนอ่านไม่ออก เว้นให้ห่างกันอย่างน้อย 46px
           โดยยังโชว์จุดแรกกับจุดสุดท้ายเสมอ จะได้รู้ช่วงเวลาของกราฟ */}
@@ -956,6 +961,23 @@ window.__dataReady.then(data => {
       </header>
       <div className="card__body" style={{overflow:'visible'}}>{children}</div>
     </section>;
+  }
+  // กราฟหลายเส้น: กดชื่อเส้นเพื่อซ่อน/แสดง · ตัวเลขบนจุดสีตรงกับเส้น · (ถ้าไม่มีเส้นเป้าหมาย) มีชื่อเส้นที่ปลายขวา
+  function MultiSeriesCard({title,subtitle,series,labels,decimals=1,height=300,yMin=null,yMax=null,targets=[],span='wide',endLabels=false}){
+    const [off,setOff]=useState([]);
+    const toggle=i=>setOff(o=>o.includes(i)?o.filter(x=>x!==i):[...o,i]);
+    const shown=series.filter((_,i)=>!off.includes(i));
+    const right=<div className="legend">{series.map((it,i)=>{const hid=off.includes(i);
+      return <button key={i} type="button" className="legend__item" onClick={()=>toggle(i)} title={hid?'กดเพื่อแสดงเส้นนี้':'กดเพื่อซ่อนเส้นนี้'}
+        style={{border:'1.5px solid '+(hid?'var(--line-strong)':it.color),background:hid?'transparent':'color-mix(in srgb, '+it.color+' 10%, transparent)',borderRadius:999,padding:'3px 11px 3px 8px',cursor:'pointer',opacity:hid?0.5:1,fontFamily:'inherit'}}>
+        <span className="legend__sw" style={{background:hid?'transparent':it.color,border:'2px solid '+it.color,width:11,height:11,borderRadius:'50%'}}/>
+        <span style={{textDecoration:hid?'line-through':'none',fontWeight:600}}>{it.label}</span>
+      </button>;})}</div>;
+    return <ChartCard title={title} subtitle={(subtitle||'')+' • กดชื่อเส้นเพื่อซ่อน/แสดง'} span={span} right={right}>
+      {shown.length
+        ?<LineChart categories={labels} unit="kg/m³" decimals={decimals} showValues series={shown} targets={targets.filter(t=>!t.sid||!off.includes(t.sid))} yMin={yMin} yMax={yMax} height={height} padRight={130} endLabels={endLabels}/>
+        :<div className="empty">ซ่อนทุกเส้นอยู่ — กดชื่อเส้นด้านบนเพื่อแสดง</div>}
+    </ChartCard>;
   }
   function Segmented({options,value,onChange}){
     return <div className="seg">{options.map(o=><button key={o.value} className={`seg__btn ${value===o.value?'is-active':''}`} onClick={()=>onChange(o.value)}>{o.label}</button>)}</div>;
@@ -1609,9 +1631,8 @@ window.__dataReady.then(data => {
       <ChartCard title="ค่าเฉลี่ย Strength ทุก 10 วัน" subtitle={`หน่วย: ksc • เส้นประแดง = ขั้นต่ำ 450 • เส้นประเขียว = ค่าเฉลี่ย ${fmt(avg(strength),0)}`} span="full" right={<Legend items={[{label:'Strength',color:PALETTE.strength},{label:'ขั้นต่ำ 450',color:PALETTE.cancel,dash:true},{label:'ค่าเฉลี่ย',color:'#3f9a4f',dash:true}]}/>}>
         <LineChart categories={labels} unit="ksc" decimals={0} showValues yMin={420} dangerBelow={450} series={[{label:'Strength',color:PALETTE.strength,data:strength}]} targets={[{value:450,color:PALETTE.cancel,label:'ขั้นต่ำ'},{value:Math.round(avg(strength)),color:'#3f9a4f',label:'เฉลี่ย'}]} height={300}/>
       </ChartCard>
-      <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide" right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
-        <LineChart categories={labels} unit="kg/m³" decimals={1} showValues series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,data:cementBig},{label:'I18',color:'#7b61c4',data:cementI18}]} height={300} padRight={130}/>
-      </ChartCard>
+      <MultiSeriesCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" labels={labels} endLabels height={300}
+        series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,data:cementBig},{label:'I18',color:'#7b61c4',data:cementI18}]}/>
       <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide" right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
         <LineChart categories={labels} unit="kg/m³" decimals={0} showValues yMin={250} yMax={1000} series={[{label:'หิน 3/4″',color:PALETTE.transport,data:rock34},{label:'หิน 1″',color:'#7b61c4',data:rock1},{label:'ทราย',color:PALETTE.stock,data:sand}]} targets={[{value:T.rock34,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1,color:'#7b61c4',label:'สูตรหิน1″'}]} height={320} padRight={130}/>
       </ChartCard>
@@ -5442,12 +5463,8 @@ window.__dataReady.then(data => {
       {matDKeys.length>0&&(()=>{
         const T=D.mixTarget||{};
         return <>
-          <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide"
-            right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
-            <LineChart categories={matLabels2} unit="kg/m³" decimals={1} showValues
-              series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:matAvg('cement_total')},{label:'เสาใหญ่',color:PALETTE.transport,data:matAvg('cement_big')},{label:'I18',color:'#7b61c4',data:matAvg('cement_i18')}]}
-              height={300} padRight={130}/>
-          </ChartCard>
+          <MultiSeriesCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" labels={matLabels2} endLabels height={300}
+            series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:matAvg('cement_total')},{label:'เสาใหญ่',color:PALETTE.transport,data:matAvg('cement_big')},{label:'I18',color:'#7b61c4',data:matAvg('cement_i18')}]}/>
           <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide"
             right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
             <LineChart categories={matLabels2} unit="kg/m³" decimals={0} yMin={250} yMax={1000} showValues
