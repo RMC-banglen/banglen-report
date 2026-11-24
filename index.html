@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-24a';
+var APP_VERSION='2026-11-24b';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -738,6 +738,15 @@ function BarChart({categories,values,color=PALETTE.produced,target=null,targetLa
   </div>;
 }
 
+// ป้ายวันที่แกน X ของกราฟผลทดสอบ: "17 ต.ค." (วัน + เดือนไทย เหมือนกราฟอื่น) · ทดสอบหลายครั้งในวันเดียวกัน → "17(1) พ.ย." "17(2) พ.ย." ไม่ซ้ำกัน · ช่วงที่แสดงข้ามปี → ใส่ปี พ.ศ. 2 หลักต่อท้าย
+function testAxisLabels(dates){
+  const TM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const ds=dates.map(d=>String(d).slice(0,10)),cnt={},seq={};
+  ds.forEach(d=>{cnt[d]=(cnt[d]||0)+1;});
+  const multiYear=new Set(ds.map(d=>d.slice(0,4))).size>1;
+  return ds.map(d=>{let t=String(Number(d.slice(8,10)));if(cnt[d]>1){seq[d]=(seq[d]||0)+1;t+='('+seq[d]+')';}
+    return t+' '+(TM[Number(d.slice(5,7))-1]||'')+(multiYear?' '+String((Number(d.slice(0,4))+543)%100):'');});
+}
 function LineChart({categories,series,targets=[],height=300,unit='',decimals=0,yMin=null,yMax=null,area=false,showValues=false,dangerBelow=null,dangerAbove=null,boxedLabels=false,padRight=null,keepColor=false}){
   const [ref,W]=useMeasure(); const [hover,setHover]=useState(null);
   // ป้ายเกณฑ์/เฉลี่ยข้างกราฟ: ชื่อชิดซ้าย ตัวเลขเรียงเป็นคอลัมน์เดียวกัน (วัดความกว้างชื่อจริงหลังวาด)
@@ -6618,6 +6627,8 @@ window.__dataReady.then(data => {
     const [showForm,setShowForm]=useState(false);
     const [saving,setSaving]=useState(false);
     const [msg,setMsg]=useState('');
+    const [showSet,setShowSet]=useState(false);   // ตั้งเกณฑ์/คำอธิบาย ซ่อนไว้ก่อน
+    const [showAll,setShowAll]=useState(false);   // ตารางแสดง 8 รายการล่าสุด กดดูทั้งหมดได้
     const blank={test_date:new Date().toISOString().slice(0,10),sand_source:'',
       sand_mm:'',silt_mm:'',w_before:'',w_after:'',note:''};
     const [form,setForm]=useState(blank);
@@ -6697,8 +6708,8 @@ window.__dataReady.then(data => {
     const inp={padding:'8px 10px',border:'1px solid #d6d8e0',borderRadius:8,fontSize:15,width:'100%',fontFamily:'inherit'};
     const lbl={fontSize:13,color:'#5f6470',marginBottom:4,fontWeight:600};
     const btn=(bg,fg)=>({padding:'9px 18px',borderRadius:8,border:'none',background:bg,color:fg,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'});
-    const th2={padding:'9px 11px',fontSize:13,fontWeight:700,color:'#5f6470',borderBottom:'1px solid #e6e8ee'};
-    const td2={padding:'9px 11px',fontSize:14,borderBottom:'1px solid #f0f1f5'};
+    const th2={padding:'6px 10px',fontSize:12.5,fontWeight:700,color:'#5f6470',borderBottom:'1px solid #e6e8ee'};
+    const td2={padding:'5px 10px',fontSize:13.5,borderBottom:'1px solid #f0f1f5'};
 
     const shown=tests.filter(t=>(t.method||'bottle')===method);
     const latest=shown[0];
@@ -6732,59 +6743,52 @@ window.__dataReady.then(data => {
         : <>
           {msg&&<div style={{marginBottom:12,fontSize:14,fontWeight:600}}>{msg}</div>}
 
-          <div style={{display:'flex',gap:8,marginBottom:16}}>{['bottle','wash'].map(tabBtn)}</div>
+          <div style={{display:'flex',gap:8,marginBottom:10}}>{['bottle','wash'].map(tabBtn)}</div>
 
-          <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:18}}>
-            <div style={{flex:'1 1 200px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px',
-              background:latestPct==null?'#fff':latestOK?'#f2fbf6':'#fdf2f2'}}>
-              <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ผลล่าสุด ({M.unit})</div>
-              <div style={{fontSize:32,fontWeight:800,lineHeight:1.1,color:latestPct==null?'#8b91a1':latestOK?'#059669':'#d13438'}}>
-                {latestPct!=null?latestPct+'%':'–'}
-              </div>
-              <div style={{fontSize:13,marginTop:4,fontWeight:600,color:latestOK?'#059669':'#d13438'}}>
-                {latestPct==null?'ยังไม่มีผลทดสอบวิธีนี้':latestOK?`✓ ไม่เกินเกณฑ์ ${maxPct}%`:`✗ เกินเกณฑ์ ${maxPct}%`}
-              </div>
-              {latest&&<div style={{fontSize:12.5,color:'#8b91a1',marginTop:6}}>
-                {thDate(String(latest.test_date).slice(0,10))}{latest.sand_source?' · '+latest.sand_source:''}
-              </div>}
-              {!isWash&&latestPct!=null&&!latestOK&&<div style={{fontSize:12,color:'#c47b00',marginTop:6,lineHeight:1.7}}>
-                ควรยืนยันด้วยวิธีล้างตะแกรง #200 ก่อนตัดสินว่าทรายใช้ไม่ได้
-              </div>}
-            </div>
-            <div style={{flex:'1 1 340px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
-              <div style={{fontSize:13,color:'#5f6470',marginBottom:6}}>
-                เกณฑ์ของวิธี <b style={{color:'#22252e'}}>{M.label}</b> — ปัจจุบัน <b style={{color:'#22252e'}}>{maxPct}%</b>
-                {isWash?` (${presetLabel(maxPct)})`:''}
-              </div>
-              {canEdit
-                ? <>
-                    {isWash&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
-                      {SILT_PRESETS.map(p=>{
-                        const on=Number(draft.wash)===p.pct;
-                        return <button key={p.pct} onClick={()=>setDraft(d=>({...d,wash:String(p.pct)}))} title={p.hint}
-                          style={{padding:'7px 13px',borderRadius:8,fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
-                            border:`1.5px solid ${on?'#0f766e':'#d6d8e0'}`,background:on?'#ecfdf5':'#fff',color:on?'#0f766e':'#42465a'}}>
-                          {p.label}
-                        </button>;
-                      })}
-                    </div>}
-                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                      <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600}}>ตั้งเอง</span>
-                      <input type="number" step="0.1" style={{...inp,width:90}}
-                        value={isWash?draft.wash:draft.bottle}
-                        onChange={e=>setDraft(d=>({...d,[isWash?'wash':'bottle']:e.target.value}))}/>
-                      <span style={{fontSize:14,color:'#5f6470'}}>%</span>
-                      <button style={btn('#0f766e','#fff')} onClick={saveSpec}>บันทึก</button>
-                    </div>
-                  </>
-                : <div style={{fontSize:28,fontWeight:800,color:'#22252e'}}>{maxPct}%</div>}
-              <div style={{fontSize:12.5,color:'#8b91a1',marginTop:10,lineHeight:1.7}}>
-                {isWash
-                  ? 'ASTM C33 กำหนดวัสดุที่ละเอียดกว่าตะแกรงเบอร์ 200 ไม่เกิน 3% สำหรับคอนกรีตที่ต้องทนการขัดสี และไม่เกิน 5% สำหรับคอนกรีตทั่วไป — เป็น % โดยน้ำหนัก ใช้เกณฑ์นี้ตัดสินได้โดยตรง'
-                  : 'วิธีเขย่าขวดวัดปริมาตรชั้นตะกอน ซึ่งฟูกว่าน้ำหนักจริง ค่าที่อ่านได้จึงสูงกว่าวิธีล้างหลายเท่า ไม่มีเกณฑ์ตามมาตรฐานรองรับ ให้ตั้งค่าตามประสบการณ์ของโรงงาน แล้วใช้เป็นสัญญาณเตือนให้ไปทดสอบวิธีล้างต่อ'}
-              </div>
-            </div>
+          {/* ผลล่าสุด + เกณฑ์ ในแถวเดียว (กะทัดรัด) · ตั้งเกณฑ์/คำอธิบายซ่อนไว้ กดเปิดเมื่อจะดู */}
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',marginBottom:10,padding:'8px 14px',border:'1px solid #e6e8ee',borderRadius:10,
+            background:latestPct==null?'#fff':latestOK?'#f2fbf6':'#fdf2f2'}}>
+            <span style={{fontSize:12.5,color:'#5f6470'}}>ผลล่าสุด</span>
+            <span style={{fontSize:24,fontWeight:800,lineHeight:1.1,color:latestPct==null?'#8b91a1':latestOK?'#059669':'#d13438'}}>{latestPct!=null?latestPct+'%':'–'}</span>
+            <span style={{fontSize:13,fontWeight:600,color:latestOK?'#059669':'#d13438'}}>
+              {latestPct==null?'ยังไม่มีผลทดสอบวิธีนี้':latestOK?`✓ ไม่เกินเกณฑ์ ${maxPct}%`:`✗ เกินเกณฑ์ ${maxPct}%`}</span>
+            {latest&&<span style={{fontSize:12.5,color:'#8b91a1'}}>{thDate(String(latest.test_date).slice(0,10))}{latest.sand_source?' · '+latest.sand_source:''}</span>}
+            {!isWash&&latestPct!=null&&!latestOK&&<span style={{fontSize:12,color:'#c47b00'}}>ควรยืนยันด้วยวิธีล้างตะแกรง #200 ก่อนตัดสินว่าทรายใช้ไม่ได้</span>}
+            <span style={{flex:1}}/>
+            <span style={{fontSize:12.5,color:'#5f6470'}}>เกณฑ์ <b style={{color:'#22252e'}}>{maxPct}%</b>{isWash?` (${presetLabel(maxPct)})`:''}</span>
+            <button onClick={()=>setShowSet(v=>!v)} style={{padding:'4px 10px',borderRadius:7,border:'1px solid #d6d8e0',background:'#fff',color:'#42465a',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showSet?'▾ ซ่อน':(canEdit?'⚙ ตั้งเกณฑ์ / ข้อมูล':'ℹ︎ ข้อมูลเกณฑ์')}</button>
           </div>
+          {showSet&&<div style={{border:'1px solid #e6e8ee',borderRadius:10,padding:'12px 16px',marginBottom:10}}>
+            <div style={{fontSize:13,color:'#5f6470',marginBottom:6}}>
+              เกณฑ์ของวิธี <b style={{color:'#22252e'}}>{M.label}</b> — ปัจจุบัน <b style={{color:'#22252e'}}>{maxPct}%</b>
+              {isWash?` (${presetLabel(maxPct)})`:''}
+            </div>
+            {canEdit&&<>
+              {isWash&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+                {SILT_PRESETS.map(p=>{
+                  const on=Number(draft.wash)===p.pct;
+                  return <button key={p.pct} onClick={()=>setDraft(d=>({...d,wash:String(p.pct)}))} title={p.hint}
+                    style={{padding:'7px 13px',borderRadius:8,fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                      border:`1.5px solid ${on?'#0f766e':'#d6d8e0'}`,background:on?'#ecfdf5':'#fff',color:on?'#0f766e':'#42465a'}}>
+                    {p.label}
+                  </button>;
+                })}
+              </div>}
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <span style={{fontSize:13.5,color:'#5f6470',fontWeight:600}}>ตั้งเอง</span>
+                <input type="number" step="0.1" style={{...inp,width:90}}
+                  value={isWash?draft.wash:draft.bottle}
+                  onChange={e=>setDraft(d=>({...d,[isWash?'wash':'bottle']:e.target.value}))}/>
+                <span style={{fontSize:14,color:'#5f6470'}}>%</span>
+                <button style={btn('#0f766e','#fff')} onClick={saveSpec}>บันทึก</button>
+              </div>
+            </>}
+            <div style={{fontSize:12.5,color:'#8b91a1',marginTop:10,lineHeight:1.7}}>
+              {isWash
+                ? 'ASTM C33 กำหนดวัสดุที่ละเอียดกว่าตะแกรงเบอร์ 200 ไม่เกิน 3% สำหรับคอนกรีตที่ต้องทนการขัดสี และไม่เกิน 5% สำหรับคอนกรีตทั่วไป — เป็น % โดยน้ำหนัก ใช้เกณฑ์นี้ตัดสินได้โดยตรง'
+                : 'วิธีเขย่าขวดวัดปริมาตรชั้นตะกอน ซึ่งฟูกว่าน้ำหนักจริง ค่าที่อ่านได้จึงสูงกว่าวิธีล้างหลายเท่า ไม่มีเกณฑ์ตามมาตรฐานรองรับ ให้ตั้งค่าตามประสบการณ์ของโรงงาน แล้วใช้เป็นสัญญาณเตือนให้ไปทดสอบวิธีล้างต่อ'}
+            </div>
+          </div>}
 
           {showForm&&canEdit&&<div style={{border:'1px solid #e6e8ee',borderRadius:12,padding:16,marginBottom:18,background:'#fafbfd'}}>
             <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
@@ -6828,7 +6832,7 @@ window.__dataReady.then(data => {
                     {canEdit&&<th style={th2}></th>}
                   </tr></thead>
                   <tbody>
-                    {shown.map(t=>{
+                    {(showAll?shown:shown.slice(0,8)).map(t=>{
                       const p=pctOf(t); const lim=maxFor(t); const ok=p!=null&&p<=lim;
                       return <tr key={t.id}>
                         <td style={td2}>{thDate(String(t.test_date).slice(0,10))}</td>
@@ -6846,6 +6850,7 @@ window.__dataReady.then(data => {
                     })}
                   </tbody>
                 </table>
+                {shown.length>8&&<div style={{textAlign:'center',padding:'8px 0 2px'}}><button onClick={()=>setShowAll(v=>!v)} style={{padding:'5px 14px',borderRadius:7,border:'1px solid #d6d8e0',background:'#fff',color:'#42465a',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showAll?'▴ แสดงเฉพาะ 8 รายการล่าสุด':'▾ ดูทั้งหมด ('+shown.length+' รายการ)'}</button></div>}
               </div>}
         </>}
     </ChartCard>
@@ -6853,11 +6858,11 @@ window.__dataReady.then(data => {
     {!missing&&chrono.length>1&&<ChartCard span="wide" title={`แนวโน้มปริมาณฝุ่นในทราย — ${M.label}`}
       subtitle={`${M.unit} • เส้นประ = เกณฑ์ไม่เกิน ${maxPct}% • จุดแดง = ครั้งที่เกินเกณฑ์`}>
       <LineChart
-        categories={chrono.map(t=>String(t.test_date).slice(5,10))}
+        categories={testAxisLabels(chrono.map(t=>t.test_date))}
         unit="%" decimals={1} showValues boxedLabels dangerAbove={maxPct}
         series={[{label:'% ฝุ่น',color:M.color,data:chrono.map(pctOf)}]}
         targets={[{value:maxPct,color:'#d13438',label:'เกณฑ์'}]}
-        height={280} padRight={130}/>
+        height={240} padRight={130}/>
     </ChartCard>}
     </>;
   }
@@ -7159,13 +7164,13 @@ window.__dataReady.then(data => {
           fontFamily:'inherit',border:'1px solid '+(String(fmN)===String(v)?'#1a56db':'#d6d8e0'),
           background:String(fmN)===String(v)?'#eff6ff':'#fff',color:String(fmN)===String(v)?'#1a56db':'#555'});
         return <ChartCard span="wide" title="แนวโน้มค่า FM"
-          subtitle={`เส้นประ = ขอบเกณฑ์ ${FM_MIN} และ ${FM_MAX} · แสดง ${shown.length} จาก ${chrono.length} ครั้ง`}
+          subtitle={`เส้นประ = ขอบเกณฑ์ ${FM_MIN} และ ${FM_MAX} · แสดง ${shown.length} จาก ${chrono.length} ครั้ง${new Set(shown.map(t=>String(t.test_date).slice(0,10))).size<shown.length?' · (1)(2) = ทดสอบหลายครั้งในวันเดียวกัน':''}`}
           right={<div style={{display:'flex',gap:6}}>
             {[['20','20 ครั้งล่าสุด'],['40','40 ครั้งล่าสุด'],['all','ทั้งหมด']].map(([v,l])=>
               <button key={v} style={btn(v)} onClick={()=>setFmN(v)}>{l}</button>)}
           </div>}>
           <LineChart
-            categories={shown.map(t=>String(t.test_date).slice(5,10))}
+            categories={testAxisLabels(shown.map(t=>t.test_date))}
             unit="" decimals={2} showValues boxedLabels
             series={[{label:'FM',color:'#1a56db',data:shown.map(t=>t.fm!=null?Number(t.fm):calcFM(t).fm)}]}
             targets={[{value:FM_MAX,color:'#d13438',label:'สูงสุด'},{value:FM_MIN,color:'#d13438',label:'ต่ำสุด'}]}
