@@ -696,7 +696,7 @@ const xlShortLabel = (sec, label) => {
   if (sec === 'plate') return s.replace(/\s*\(แผ่นใหญ่[^)]*\)\s*$/, '').replace(/\s*มม\.?$/, '');
   return s;
 };
-function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
+function buildCompareWorkbook(EJ, { rows, title: sheetTitle, partial, threshold, reconcile }) {
   const wb = new EJ.Workbook(); wb.creator = 'RMC บางเลน';
   wb.calcProperties = { fullCalcOnLoad: true };   // ให้ Excel คำนวณสูตรใหม่ทุกครั้งที่เปิด
   const ws = wb.addWorksheet('เทียบคำนวณ');
@@ -711,7 +711,7 @@ function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
   const border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
   const font = { name: 'Tahoma', size: 12 };
   ws.mergeCells(1, 1, 1, nC);
-  const t = ws.getCell(1, 1); t.value = 'เปรียบเทียบวัตถุดิบเสาเข็ม' + (period ? ' — งวด ' + period : ''); t.font = { name: 'Tahoma', size: 14, bold: true }; t.alignment = { horizontal: 'center' };
+  const t = ws.getCell(1, 1); t.value = 'เปรียบเทียบวัตถุดิบเสาเข็ม' + (sheetTitle ? ' — ' + sheetTitle : ''); t.font = { name: 'Tahoma', size: 14, bold: true }; t.alignment = { horizontal: 'center' };
   const H = 3;
   ws.getRow(H).height = 48;
   heads.forEach((h, i) => {
@@ -753,6 +753,7 @@ function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
     'ส่วนต่างจริง = ส่วนต่าง + ใช้งานอื่น-เสียหาย + เข้า-ออกสต็อกเพลทสำเร็จ (เฉพาะเพลท)' + (hasCut ? ' − ตัดรับเข้าจากความยาวอื่น' : ''),
     '%หาย = ส่วนต่างจริง ÷ คำนวณตามรายการผลิต · + = ของหาย / − = ของเกิน · ตัวเลขสีแดง = เกินเกณฑ์แจ้งเตือน ' + threshold + '%',
     'หน่วย: PC / ปลอก / หนวดกุ้ง = กก. · เพลท = แผ่นใหญ่ 5x20 ฟุต · เหล็กเสริม = เส้น · Collar = ชุด'];
+  if (partial && partial.length) notes.push('หมายเหตุ: บางงวดในไตรมาสยังไม่ได้กรอกยอดใช้จริงของ ' + partial.join(', ') + ' — ยอดคำนวณ/ส่วนต่างของรายการนั้นคิดเฉพาะงวดที่กรอกแล้ว');
   if (hasRemain) notes.push('คงเหลือ (เหล็กเสริม) = ยอดนับสต็อกปลายงวด · ตัวเอียงสีเทา = ประมาณ (ยังไม่ได้นับปลายงวด) · แถวเหล็กที่ไม่ผลิต ไม่ใช้ และไม่มีของเหลือ ไม่แสดง');
   notes.forEach((tx, i) => { const c = ws.getCell(last + 2 + i, 1); c.value = tx; c.font = { name: 'Tahoma', size: 11, color: { argb: 'FF475569' } }; });
   // กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา (ค่าอ้างอิง ไม่ใช่สูตร)
@@ -1711,6 +1712,9 @@ class App extends React.Component {
           realDiffFmt: a.nReal ? sign(a.real) : '-', realDiffColor: 'inherit',
           pctLostFmt: pct != null && isFinite(pct) ? (pct > 0 ? '+' : '') + fmt(pct, 2) + '%' : '-',
           rowBg: this.thresholdBg(pct, key),
+          // ตัวเลขจริง ไว้ส่งออก Excel มุมมองไตรมาส (คำนวณ/ส่วนต่าง นับเฉพาะงวดที่กรอกใช้จริงแล้ว เหมือนที่โชว์บนจอ)
+          calcNum: a.nActual ? a.calcWithActual : a.calc, actualNum: a.nActual ? a.actual : null, generalUseNum: a.gu, cutInNum: a.cut,
+          stockInOutNum: a.nSio ? a.sio : null, partial: a.nActual > 0 && a.nActual < a.periods.length,
           remainVal: a.remainVal, remainCounted: a.remainCounted,
           remainFmt: a.remainVal == null ? '-' : (a.remainCounted ? '' : '≈ ') + fmt(a.remainVal, dg),
           periodsNote: a.periods.length < pages.length ? 'มีใน ' + a.periods.map(shortPeriod).join(', ') : null,
@@ -1807,10 +1811,13 @@ class App extends React.Component {
     const r = this.state.result; if (!r) return;
     let EJ;
     try { EJ = await this.loadExcelJS(); } catch (e) { alert(e.message + ' — ดาวน์โหลดแบบเดิมให้แทน'); this.exportExcelLegacy(); return; }
-    const mp = this.buildMainPage(r);
-    const rows = [];
+    // ส่งออกตามมุมมองที่เปิดอยู่: ทั้งไตรมาส (รวมทุกงวดในไตรมาส) หรืองวดนี้งวดเดียว
+    const qm = this.state.resultView === 'main' && this.state.mainScope === 'quarter' ? this.buildQuarterMain() : null;
+    const mp = qm || this.buildMainPage(r);
+    const rows = []; const partial = [];   // รายการที่ไตรมาสนี้บางงวดยังไม่กรอกใช้จริง
     [['pc', mp.pcRowsM], ['stirrup', mp.stirrupRowsM], ['plate', mp.plateRowsM], ['whisker', mp.whiskerRowsM], ['collar', mp.collarRowsM], ['rebar', mp.rebarRowsM]].forEach(([k, list]) => (list || []).forEach(row => {
-      const a = row.actual === '' || row.actual == null ? null : Number(row.actual);
+      const a = qm ? row.actualNum : (row.actual === '' || row.actual == null ? null : Number(row.actual));
+      if (qm && row.partial) partial.push(xlShortLabel(k, row.label));
       const item = { label: xlShortLabel(k, row.label), calc: Number(row.calcNum) || 0, actual: a != null && isFinite(a) ? a : null,
         other: Number(row.generalUseNum) || 0, cut: Number(row.cutInNum) || 0, isPlate: k === 'plate', sio: k === 'plate' ? row.stockInOutNum : undefined,
         remain: k === 'rebar' && row.remainVal != null ? Number(row.remainVal) : null, remainCounted: !!row.remainCounted };
@@ -1818,11 +1825,12 @@ class App extends React.Component {
       const idleRebar = k === 'rebar' && !item.calc && !item.actual && !item.other && !item.cut && !item.remain;
       if (!idleRebar && (item.calc || item.actual != null || item.other || item.cut || (item.sio != null && item.sio !== 0) || item.isPlate)) rows.push(item);
     }));
-    const wb = buildCompareWorkbook(EJ, { rows, period: this.state.periodLabel || '', threshold: Number(this.state.alertThresholdPct) || 3, reconcile: this.buildPlateReconcile(r) });
+    const title = qm ? qm.group.label + ' — รวม ' + qm.periodsUsed.join(' + ') : (this.state.periodLabel ? 'งวด ' + this.state.periodLabel : '');
+    const wb = buildCompareWorkbook(EJ, { rows, title, partial, threshold: Number(this.state.alertThresholdPct) || 3, reconcile: qm ? [] : this.buildPlateReconcile(r) });
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'วัตถุดิบเสาเข็ม' + (this.state.periodLabel ? '-' + this.state.periodLabel : '') + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const a = document.createElement('a'); a.href = url; a.download = 'วัตถุดิบเสาเข็ม' + (qm ? '-' + qm.group.label.replace(/\//g, '-') : (this.state.periodLabel ? '-' + this.state.periodLabel : '')) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
   exportExcelLegacy() {
     const r = this.state.result; if (!r) return;
