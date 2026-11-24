@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-24f';
+var APP_VERSION='2026-11-24g';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -1632,7 +1632,7 @@ window.__dataReady.then(data => {
         <LineChart categories={labels} unit="ksc" decimals={0} showValues yMin={420} dangerBelow={450} series={[{label:'Strength',color:PALETTE.strength,data:strength}]} targets={[{value:450,color:PALETTE.cancel,label:'ขั้นต่ำ'},{value:Math.round(avg(strength)),color:'#3f9a4f',label:'เฉลี่ย'}]} height={300}/>
       </ChartCard>
       <MultiSeriesCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" labels={labels} endLabels height={300}
-        series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,shape:'square',data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,shape:'circle',data:cementBig},{label:'I18',color:'#7b61c4',shape:'triangle',data:cementI18}]}/>
+        series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,shape:'square',data:cementTotal},{label:'เสาใหญ่',color:'#e8750f',shape:'circle',data:cementBig},{label:'I18',color:'#2e9e4f',shape:'triangle',data:cementI18}]}/>
       <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide" right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
         <LineChart categories={labels} unit="kg/m³" decimals={0} showValues yMin={250} yMax={1000} series={[{label:'หิน 3/4″',color:PALETTE.transport,data:rock34},{label:'หิน 1″',color:'#7b61c4',data:rock1},{label:'ทราย',color:PALETTE.stock,data:sand}]} targets={[{value:T.rock34,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1,color:'#7b61c4',label:'สูตรหิน1″'}]} height={320} padRight={130}/>
       </ChartCard>
@@ -5464,7 +5464,7 @@ window.__dataReady.then(data => {
         const T=D.mixTarget||{};
         return <>
           <MultiSeriesCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" labels={matLabels2} endLabels height={300}
-            series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,shape:'square',data:matAvg('cement_total')},{label:'เสาใหญ่',color:PALETTE.transport,shape:'circle',data:matAvg('cement_big')},{label:'I18',color:'#7b61c4',shape:'triangle',data:matAvg('cement_i18')}]}/>
+            series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,shape:'square',data:matAvg('cement_total')},{label:'เสาใหญ่',color:'#e8750f',shape:'circle',data:matAvg('cement_big')},{label:'I18',color:'#2e9e4f',shape:'triangle',data:matAvg('cement_i18')}]}/>
           <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide"
             right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
             <LineChart categories={matLabels2} unit="kg/m³" decimals={0} yMin={250} yMax={1000} showValues
