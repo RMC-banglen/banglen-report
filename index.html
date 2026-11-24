@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-18a';
+var APP_VERSION='2026-11-24a';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -1601,10 +1601,10 @@ window.__dataReady.then(data => {
         <LineChart categories={labels} unit="ksc" decimals={0} showValues yMin={420} dangerBelow={450} series={[{label:'Strength',color:PALETTE.strength,data:strength}]} targets={[{value:450,color:PALETTE.cancel,label:'ขั้นต่ำ'},{value:Math.round(avg(strength)),color:'#3f9a4f',label:'เฉลี่ย'}]} height={300}/>
       </ChartCard>
       <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide" right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
-        <LineChart categories={labels} unit="kg/m³" decimals={1} series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,data:cementBig},{label:'I18',color:'#7b61c4',data:cementI18}]} height={300} padRight={130}/>
+        <LineChart categories={labels} unit="kg/m³" decimals={1} showValues series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:cementTotal},{label:'เสาใหญ่',color:PALETTE.transport,data:cementBig},{label:'I18',color:'#7b61c4',data:cementI18}]} height={300} padRight={130}/>
       </ChartCard>
       <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide" right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
-        <LineChart categories={labels} unit="kg/m³" decimals={0} yMin={250} yMax={1000} series={[{label:'หิน 3/4″',color:PALETTE.transport,data:rock34},{label:'หิน 1″',color:'#7b61c4',data:rock1},{label:'ทราย',color:PALETTE.stock,data:sand}]} targets={[{value:T.rock34,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1,color:'#7b61c4',label:'สูตรหิน1″'}]} height={320} padRight={130}/>
+        <LineChart categories={labels} unit="kg/m³" decimals={0} showValues yMin={250} yMax={1000} series={[{label:'หิน 3/4″',color:PALETTE.transport,data:rock34},{label:'หิน 1″',color:'#7b61c4',data:rock1},{label:'ทราย',color:PALETTE.stock,data:sand}]} targets={[{value:T.rock34,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1,color:'#7b61c4',label:'สูตรหิน1″'}]} height={320} padRight={130}/>
       </ChartCard>
       <ChartCard title="ตารางค่าเฉลี่ยทุก 10 วัน" subtitle={`ปี ${year}`} span="full">
         <div className="table-wrap"><table className="dt">
@@ -5435,13 +5435,13 @@ window.__dataReady.then(data => {
         return <>
           <ChartCard title="ค่าเฉลี่ยใช้ปูนทุก 10 วัน" subtitle="หน่วย: kg/m³ • แยกตามชนิดเสา" span="wide"
             right={<Legend items={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced},{label:'เสาใหญ่',color:PALETTE.transport},{label:'I18',color:'#7b61c4'}]}/>}>
-            <LineChart categories={matLabels2} unit="kg/m³" decimals={1}
+            <LineChart categories={matLabels2} unit="kg/m³" decimals={1} showValues
               series={[{label:'ใช้ปูนทั้งหมด',color:PALETTE.produced,data:matAvg('cement_total')},{label:'เสาใหญ่',color:PALETTE.transport,data:matAvg('cement_big')},{label:'I18',color:'#7b61c4',data:matAvg('cement_i18')}]}
               height={300} padRight={130}/>
           </ChartCard>
           <ChartCard title="ค่าเฉลี่ยใช้หิน-ทรายทุก 10 วัน" subtitle="หน่วย: kg/m³ • เส้นประ = ค่าสูตร (mix design)" span="wide"
             right={<Legend items={[{label:'หิน 3/4″',color:PALETTE.transport},{label:'หิน 1″',color:'#7b61c4'},{label:'ทราย',color:PALETTE.stock}]}/>}>
-            <LineChart categories={matLabels2} unit="kg/m³" decimals={0} yMin={250} yMax={1000}
+            <LineChart categories={matLabels2} unit="kg/m³" decimals={0} yMin={250} yMax={1000} showValues
               series={[{label:'หิน 3/4″',color:PALETTE.transport,data:matAvg('rock34')},{label:'หิน 1″',color:'#7b61c4',data:matAvg('rock1')},{label:'ทราย',color:PALETTE.stock,data:matAvg('sand')}]}
               targets={[{value:T.rock34||940,color:PALETTE.transport,label:'สูตรหิน3/4″'},{value:T.sand||822,color:PALETTE.stock,label:'สูตรทราย'},{value:T.rock1||330,color:'#7b61c4',label:'สูตรหิน1″'}]}
               padRight={130}
@@ -5475,6 +5475,7 @@ window.__dataReady.then(data => {
     const [specEdit,setSpecEdit]=useState(null);
     const [days,setDays]=useState(30);
     const [selF,setSelF]=useState('');
+    const [showRecent,setShowRecent]=useState(false);   // ตาราง "รอบล่าสุด" ซ่อนไว้ก่อน กดเปิดเมื่ออยากดู
     const load=()=>{
       const from=new Date();from.setDate(from.getDate()-days);
       DB.from('plant_amp_readings').select('*').gte('d',from.toISOString().slice(0,10)).order('read_at').then(({data,error})=>{if(error){setMissing(true);setRows([]);}else{setMissing(false);setRows(data||[]);}});
@@ -5530,8 +5531,11 @@ window.__dataReady.then(data => {
           series={[{label:'แอมป์เฉลี่ย',color:'#0f766e',data:dayStat.map(x=>x.avg!=null?Math.round(x.avg*10)/10:null)}]}
           targets={[...(lo!=null?[{value:lo,label:'ต่ำสุด '+lo,color:'#e74c3c'}]:[]),...(hi!=null?[{value:hi,label:'สูงสุด '+hi,color:'#e74c3c'}]:[])]}
           dangerBelow={lo} dangerAbove={hi}/>
-        <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',margin:'16px 0 6px'}}>รอบล่าสุด</div>
-        <div style={{overflowX:'auto'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,margin:'16px 0 6px'}}>
+          <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540'}}>รอบล่าสุด <span style={{fontWeight:400,color:'#94a3b8',fontSize:12.5}}>({recent.length} รอบ)</span></div>
+          <button style={btn} onClick={()=>setShowRecent(v=>!v)}>{showRecent?'▾ ซ่อน':'▸ แสดงตาราง'}</button>
+        </div>
+        {showRecent&&<div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',width:'100%',fontSize:13}}>
             <thead><tr style={{background:'#f4f6fa',color:'#475569'}}>{['วันที่','เวลา','สูตร','แอมป์','ความชื้นทราย','น้ำที่เติม','หมายเหตุ','🧱 เก็บก้อน'].map((h,i)=><th key={h} style={{padding:'6px 10px',textAlign:i>=3&&i<=5?'right':'left',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
             <tbody>{recent.map(r=><tr key={r.id} style={{borderTop:'1px solid #f1f3f7',background:out(r)?'#fef2f2':undefined}}>
@@ -5549,7 +5553,7 @@ window.__dataReady.then(data => {
               <td style={{padding:'5px 10px',textAlign:'center'}}><input type="checkbox" checked={!!r.for_cube} disabled={!canEdit} onChange={()=>toggleCube(r)} title="รอบที่ QC เก็บก้อนลูกปูน — ใช้เทียบกับกำลังอัด" style={{width:17,height:17,accentColor:'#0f766e',cursor:canEdit?'pointer':'default'}}/></td>
             </tr>)}</tbody>
           </table>
-        </div>
+        </div>}
       </>}
     </ChartCard>;
   }
