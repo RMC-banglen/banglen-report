@@ -743,7 +743,7 @@ function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
   }
   const notes = ['สูตร: ส่วนต่าง = คำนวณตามรายการผลิต − ยอดใช้จริง',
     'ส่วนต่างจริง = ส่วนต่าง + ใช้งานอื่น-เสียหาย + เข้า-ออกสต็อกเพลทสำเร็จ (เฉพาะเพลท)' + (hasCut ? ' − ตัดรับเข้าจากความยาวอื่น' : ''),
-    '%หาย = ส่วนต่างจริง ÷ คำนวณตามรายการผลิต · ตัวเลขสีแดง = เกินเกณฑ์แจ้งเตือน ' + threshold + '%',
+    '%หาย = ส่วนต่างจริง ÷ คำนวณตามรายการผลิต · + = ของหาย / − = ของเกิน · ตัวเลขสีแดง = เกินเกณฑ์แจ้งเตือน ' + threshold + '%',
     'หน่วย: PC / ปลอก / หนวดกุ้ง = กก. · เพลท = แผ่นใหญ่ 5x20 ฟุต · เหล็กเสริม = เส้น · Collar = ชุด'];
   notes.forEach((tx, i) => { const c = ws.getCell(last + 2 + i, 1); c.value = tx; c.font = { name: 'Tahoma', size: 11, color: { argb: 'FF475569' } }; });
   // กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา (ค่าอ้างอิง ไม่ใช่สูตร)
@@ -763,7 +763,7 @@ function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
       line('สรุป (A) + (B)', pr.sumABSheetsFmt + ' แผ่นใหญ่ (= ' + pr.sumABKgFmt + ' กก.)');
       (pr.generalUseEntries || []).forEach(e => line('ใช้งานอื่น-เสียหาย: ' + (e.note || ''), e.kg + ' กก.'));
       line('รวมใช้งานอื่น-เสียหาย', pr.generalUseSheetsFmt + ' แผ่นใหญ่ (= ' + pr.generalUseKgFmt + ' กก.)');
-      line('ส่วนต่างเกิน-หายที่อธิบายไม่ได้', pr.unexplainedKgFmt + ' กก.', null, true);
+      line('ส่วนต่างเกิน-หายที่อธิบายไม่ได้', pr.unexplainedKgFmt + ' กก.', null, true);   // (ไม่เกี่ยวกับสูตร % หาย)
       y++;
     });
   }
@@ -1190,9 +1190,10 @@ class App extends React.Component {
     const d = digits ?? 1;
     const actual = actualStr === '' || actualStr == null ? null : Number(actualStr);
     if (actual == null || !isFinite(actual)) return { actual: '', diffFmt: '-', pctFmt: '-', diffColor: 'inherit' };
-    const diff = actual - calc;
+    // ตามสูตรบัญชี: ส่วนต่าง = คำนวณ − ใช้จริง (ลบ = ใช้เกินที่คำนวณ · บวก = ใช้น้อยกว่าที่คำนวณ) เครื่องหมายเดียวกับ "ส่วนต่างจริง"
+    const diff = calc - actual;
     const pct = calc !== 0 ? (diff / calc) * 100 : (actual !== 0 ? Infinity : 0);
-    const color = Math.abs(pct) < 3 ? '#728' : (diff > 0 ? '#c0392b' : '#3f7d2b');
+    const color = Math.abs(pct) < 3 ? '#728' : (diff < 0 ? '#c0392b' : '#3f7d2b');
     return { actual: actualStr, diffFmt: (diff > 0 ? '+' : '') + fmt(diff, d), pctFmt: !isFinite(pct) ? 'ไม่มียอดคำนวณ' : (pct > 0 ? '+' : '') + fmt(pct, 1) + '%', diffColor: color };
   }
   thresholdBg(pctLost, key) {
@@ -1217,7 +1218,8 @@ class App extends React.Component {
     const A = actualNum != null ? calcVal - actualNum : null;
     // ตัดรับเข้าจากความยาวอื่น (cutInQty) คือของเข้าจริงที่ไม่ได้มาจากสูตร ช่วยลดส่วนต่างจริงที่ดูเหมือนขาด/เกินโดยไม่ทราบสาเหตุ
     const realDiff = A != null ? A + generalUse - cutInQty : null;
-    const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
+    // % หาย = ส่วนต่างจริง ÷ ยอดคำนวณ (ค่ามาตรฐาน) ตามสูตรบัญชี · ยอดคำนวณเป็น 0 → ไม่แสดง % (เดิมขึ้น -100% หลอกๆ)
+    const pctLost = realDiff != null && calcVal ? (realDiff / calcVal) * 100 : null;
     // คงเหลือ: นับปลายงวดแล้ว = ตัวเลขนับจริง, ยังไม่นับ = ประมาณจาก ยกมา+รับเข้า−คำนวณ−ใช้งานอื่น+ตัดรับเข้า
     const n0 = v => (v == null || v === '' ? 0 : Number(v) || 0);
     const remainCounted = stockVals.closing != null && stockVals.closing !== '';
@@ -1259,7 +1261,7 @@ class App extends React.Component {
       cutInSummaryFmt: fmt(cutInQty, dg),
       onToggleCutInOpen: () => this.toggleCutInOpen(key),
       realDiffFmt: realDiff != null ? ((realDiff > 0 ? '+' : '') + fmt(realDiff, dg)) : '-',
-      pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 1) + '%') : '-',
+      pctLostFmt: pctLost != null && isFinite(pctLost) ? ((pctLost > 0 ? '+' : '') + fmt(pctLost, 2) + '%') : '-',   // ทศนิยม 2 ตำแหน่งเท่าไฟล์บัญชี เทียบกันง่าย
       rowBg: this.thresholdBg(pctLost, key),
       ...extraFmt,
     };
@@ -1369,7 +1371,7 @@ class App extends React.Component {
       const A = actualNum != null ? bigSheets - actualNum : null;
       // เข้า-ออกสต็อกสำเร็จ = (B) สต็อกปลาย−ต้นงวด เฉยๆ (กลับไปใช้ B ตรงๆ ตามที่ยืนยัน) แล้วบวกใช้งานอื่น-เสียหายเป็นส่วนต่างจริง
       const realDiff = (A != null && stockInOut != null) ? A + stockInOut + generalUseSheets : null;
-      const pctLost = realDiff != null && actualNum ? (realDiff / actualNum) * 100 : null;
+      const pctLost = realDiff != null && bigSheets ? (realDiff / bigSheets) * 100 : null;   // ÷ ยอดคำนวณ (แผ่นใหญ่) ตามสูตรบัญชี
       const plateEntries = (this.state.plateGeneralUseEntries[t] || []).map((e, idx) => ({
         kg: e.kg, note: e.note, onKgChange: v => this.updatePlateGeneralUseEntry(t, idx, 'kg', v),
         onNoteChange: v => this.updatePlateGeneralUseEntry(t, idx, 'note', v), onRemove: () => this.removePlateGeneralUseEntry(t, idx),
@@ -1655,7 +1657,7 @@ class App extends React.Component {
     return mp;
   }
   // หน้าหลักแบบรวมทั้งไตรมาส (ไตรมาสของงวดที่เปิดอยู่) — บวกยอดของทุกงวดในไตรมาสต่อรายการ
-  // ส่วนต่าง = ใช้จริง − คำนวณ (เฉพาะงวดที่กรอกใช้จริงแล้ว) · % หาย = ส่วนต่างจริงรวม ÷ ใช้จริงรวม (สูตรเดียวกับรายงวด)
+  // ส่วนต่าง = คำนวณ − ใช้จริง (เฉพาะงวดที่กรอกใช้จริงแล้ว) · % หาย = ส่วนต่างจริงรวม ÷ คำนวณรวม (สูตรเดียวกับรายงวด/ไฟล์บัญชี)
   buildQuarterMain() {
     const s = this.state;
     const g = this.trendGroups('quarter').find(x => x.periods.includes(s.periodLabel));
@@ -1686,15 +1688,15 @@ class App extends React.Component {
       if (c.key === 'rebar') rows = sortRebarBySpec(rows, x => x.label);
       if (q) rows = rows.filter(x => String(x.label).toLowerCase().includes(q));
       out[c.key + 'RowsM'] = rows.map(a => {
-        const diff = a.nActual ? a.actual - a.calcWithActual : null;
-        const pct = a.nReal && a.actual ? (a.real / a.actual) * 100 : null;
+        const diff = a.nActual ? a.calcWithActual - a.actual : null;
+        const pct = a.nReal && a.calcWithActual ? (a.real / a.calcWithActual) * 100 : null;
         const sign = v => (v > 0 ? '+' : '') + fmt(v, dg);
         return {
           label: a.label, calcFmt: fmt(a.calc, dg), actualFmt: a.nActual ? fmt(a.actual, dg) : '-',
-          diffFmt: diff != null ? sign(diff) : '-', diffColor: diff == null ? 'inherit' : diff > 0 ? '#c0392b' : diff < 0 ? '#3f7d2b' : '#999',
+          diffFmt: diff != null ? sign(diff) : '-', diffColor: diff == null ? 'inherit' : diff < 0 ? '#c0392b' : diff > 0 ? '#3f7d2b' : '#999',
           generalUseFmt: fmt(a.gu, dg), cutInFmt: fmt(a.cut, dg), stockInOutFmt: a.nSio ? sign(a.sio) : (c.key === 'plate' ? '-' : null),
           realDiffFmt: a.nReal ? sign(a.real) : '-', realDiffColor: 'inherit',
-          pctLostFmt: pct != null && isFinite(pct) ? (pct > 0 ? '+' : '') + fmt(pct, c.key === 'plate' ? 2 : 1) + '%' : '-',
+          pctLostFmt: pct != null && isFinite(pct) ? (pct > 0 ? '+' : '') + fmt(pct, 2) + '%' : '-',
           rowBg: this.thresholdBg(pct, key),
           periodsNote: a.periods.length < pages.length ? 'มีใน ' + a.periods.map(shortPeriod).join(', ') : null,
         };
@@ -2244,6 +2246,9 @@ class App extends React.Component {
                         </div>
                       )}
                     </div>
+                    {!stockMode && <div style={{ fontSize: 12.5, color: '#78839A', lineHeight: 1.6, marginTop: -16 }}>
+                      ส่วนต่าง = คำนวณ − ใช้จริง · ส่วนต่างจริง = ส่วนต่าง + ใช้งานอื่น-เสียหาย (+ เข้า-ออกสต็อกเพลท − ตัดรับเข้า) · % หาย = ส่วนต่างจริง ÷ คำนวณ · <b>+ = ของหาย</b> / <b>− = ของเกิน</b>
+                    </div>}
 
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }} data-no-print="true">
                       <button onClick={() => this.exportExcel()} style={btnGhost()}>ดาวน์โหลด Excel</button>
