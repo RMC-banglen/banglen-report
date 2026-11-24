@@ -945,6 +945,15 @@ function notifyMaterialFail(d) {
       L.push('ต่างจากอ้างอิง: <b>' + d.diff + '%</b>');
       if (d.slump) L.push('ค่ายุบตัวชุดเดียวกัน: ' + d.slump + ' ซม.');
       L.push('<i>มักเกิดจากน้ำเยอะเกิน ฟองอากาศมาก หรือชั่งตวงเพี้ยน ควรตรวจก่อนเทต่อ</i>');
+    } else if (d.test === 'sand_fm_check') {
+      // ผลร่อนทรายผิดปกติ: ชั่งหายเกิน 0.3% (ASTM C136) / ตะแกรงหลุดเกณฑ์ / ถาดล่างสูง — ส่งมาจาก sieve.html หลังบันทึกสำเร็จ
+      var lossBad = String(d.loss_ok) === '0';
+      L.push('⚠️ <b>ผลร่อนทรายผิดปกติ' + (lossBad ? ' — ต้องทดสอบใหม่' : ' — ตรวจสอบก่อนใช้ผล') + '</b>');
+      if (lossBad) L.push('❌ ชั่งหายเกิน 0.3%: ตัวอย่าง ' + d.w_sample + ' g → ผลรวมหลังร่อน ' + d.total + ' g (ต่าง ' + d.loss_pct + '%) — ASTM C136 ถือว่าใช้ตัดสินไม่ได้');
+      if (d.bad_sieves) L.push('ตะแกรงหลุดเกณฑ์ ASTM C33: <b>' + esc(d.bad_sieves) + '</b>');
+      if (d.pan_pct && Number(d.pan_pct) > 5) L.push('ถาดล่างสูง: <b>' + d.pan_pct + '%</b> (ปกติ ≲ 3%)');
+      if (d.fm) L.push('ค่า FM: ' + d.fm + '  (เกณฑ์ ' + d.lo + '–' + d.hi + ')');
+      L.push('<i>ให้ทดสอบซ้ำ — ตรวจความแห้งของตัวอย่าง การชั่งถาดล่างจริง และตะแกรงล้น</i>');
     } else if (d.test === 'stone') {
       L.push('⚠️ <b>ขนาดคละหิน ไม่ผ่านเกณฑ์</b>');
       L.push('หิน ' + esc(d.size || '') + ' — ตะแกรงที่หลุดเกณฑ์: <b>' + esc(d.detail || '-') + '</b>');

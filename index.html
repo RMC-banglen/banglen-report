@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-24b';
+var APP_VERSION='2026-11-24c';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -6145,6 +6145,16 @@ window.__dataReady.then(data => {
     return {total,rows,fm,pan};
   }
 
+  // ตรวจการสูญหายตอนร่อน (ASTM C136 / AASHTO T27): ผลรวมหลังร่อน (ค้างทุกตะแกรง + ถาดล่าง) ต้องต่างจากน้ำหนักตัวอย่างแห้งก่อนร่อน
+  // ไม่เกิน 0.3% — เกินแล้วผลนี้ใช้ตัดสินรับ/ไม่รับทรายไม่ได้ ต้องทดสอบใหม่
+  const FM_LOSS_MAX=0.3;
+  function sampleCheck(wSample,total){
+    const ws=Number(wSample);
+    if(!(ws>0)||!(total>0))return {has:false};
+    const diff=ws-total,pct=diff/ws*100;
+    return {has:true,ws,total,diff,pct,ok:Math.abs(pct)<=FM_LOSS_MAX+1e-9,lo:ws*(1-FM_LOSS_MAX/100),hi:ws*(1+FM_LOSS_MAX/100)};
+  }
+
   // ============================================================
   // ปูนที่ใช้จริงต่อคิว + เงินที่ลดได้เทียบเกณฑ์ปีก่อน
   // กรอกข้อมูลบนหน้าเว็บโดยตรง (แยกจากกราฟปูนที่ดึงมาจาก Sheet)
@@ -6956,7 +6966,7 @@ window.__dataReady.then(data => {
     const [editId,setEditId]=useState(null);
     const [selId,setSelId]=useState(null);
     const [msg,setMsg]=useState('');
-    const blank={test_date:new Date().toISOString().slice(0,10),sand_source:'',w9_5:'',w4_75:'',w2_36:'',w1_18:'',w0_60:'',w0_30:'',w0_15:'',w_pan:'',note:''};
+    const blank={test_date:new Date().toISOString().slice(0,10),sand_source:'',w_sample:'1000',w9_5:'',w4_75:'',w2_36:'',w1_18:'',w0_60:'',w0_30:'',w0_15:'',w_pan:'',note:''};
     const [form,setForm]=useState(blank);
 
     const load=()=>{
@@ -6976,6 +6986,7 @@ window.__dataReady.then(data => {
       if(!canEdit)return;
       if(!form.test_date){setMsg('❌ กรุณาใส่วันที่ทดสอบ');return;}
       if(!live.total){setMsg('❌ กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
+      if(!editId&&!(Number(form.w_sample)>0)){setMsg('❌ กรุณาใส่น้ำหนักตัวอย่างแห้งก่อนร่อน (ใช้ตรวจว่าของหายตอนร่อนเกิน 0.3% หรือไม่)');return;}
       setSaving(true); setMsg('');
       const rec={
         test_date:form.test_date, sand_source:form.sand_source||'', note:form.note||'',
@@ -6983,11 +6994,18 @@ window.__dataReady.then(data => {
       };
       FM_SIEVES.forEach(s=>{rec[s.key]=Number(form[s.key])||0;});
       rec.w_pan=Number(form.w_pan)||0;
-      const q=editId? db.from('sand_fm_tests').update(rec).eq('id',editId)
-                    : db.from('sand_fm_tests').insert([rec]);
-      q.then(({error})=>{
+      const chk=sampleCheck(form.w_sample,live.total);
+      if(form.w_sample!=='')rec.w_sample=Number(form.w_sample)||null;
+      if(chk.has&&!chk.ok&&!window.confirm('ผลรวมหลังร่อน '+live.total.toFixed(1)+' g ต่างจากน้ำหนักตัวอย่างเดิม '+chk.ws+' g อยู่ '+Math.abs(chk.pct).toFixed(2)+'% (เกิน '+FM_LOSS_MAX+'%)\n\nตามมาตรฐาน ASTM C136 ผลนี้ใช้ตัดสินรับ/ไม่รับทรายไม่ได้ ต้องทดสอบใหม่\n\nยืนยันบันทึกไว้เป็น "ผลที่ใช้ตัดสินไม่ได้" หรือไม่?')){setSaving(false);return;}
+      const run=r=>editId? db.from('sand_fm_tests').update(r).eq('id',editId)
+                         : db.from('sand_fm_tests').insert([r]);
+      run(rec).then(async({error})=>{
+        let err=error,noCol=false;
+        // ยังไม่ได้รัน SQL คอลัมน์ w_sample → บันทึกส่วนอื่นก่อน แล้วบอกให้รัน SQL
+        if(err&&/w_sample/.test(err.message||'')){noCol=true;const r2={...rec};delete r2.w_sample;const x=await run(r2);err=x.error;}
         setSaving(false);
-        if(error){setMsg('❌ '+error.message);return;}
+        if(err){setMsg('❌ '+err.message);return;}
+        if(noCol)window.alert('บันทึกผลแล้ว แต่ยังเก็บ "น้ำหนักตัวอย่างก่อนร่อน" ไม่ได้ — ให้แอดมินรัน supabase-sand-fm-sample.sql ใน Supabase หนึ่งครั้ง แล้วกดแก้ไข→บันทึกอีกครั้ง');
         setMsg('✅ บันทึกแล้ว'); setShowForm(false); setEditId(null); setForm(blank); load();
       });
     };
@@ -6997,6 +7015,7 @@ window.__dataReady.then(data => {
       const f={...blank,test_date:String(t.test_date||'').slice(0,10),sand_source:t.sand_source||'',note:t.note||''};
       FM_SIEVES.forEach(s=>{f[s.key]=t[s.key]??'';});
       f.w_pan=t.w_pan??'';
+      f.w_sample=t.w_sample??'';
       setForm(f);setEditId(t.id);setMsg('');setShowForm(true);
     };
     const del=t=>{
@@ -7054,7 +7073,11 @@ window.__dataReady.then(data => {
               <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
                 <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>น้ำหนักตัวอย่างรวม</div>
                 <div style={{fontSize:32,fontWeight:800,color:'#1a56db',lineHeight:1.1}}>{selCalc.total.toFixed(0)}<span style={{fontSize:16,fontWeight:600,marginLeft:4}}>g</span></div>
-                <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>ค้างถาดล่าง {selCalc.pan.toFixed(0)} g</div>
+                <div style={{fontSize:13,marginTop:4,color:'#5f6470'}}>ค้างถาดล่าง {selCalc.pan.toFixed(0)} g ({selCalc.total?(selCalc.pan/selCalc.total*100).toFixed(1):'0'}%)</div>
+                {(()=>{const c=sampleCheck(sel.w_sample,selCalc.total);
+                  return c.has
+                    ?<div style={{fontSize:12.5,marginTop:6,fontWeight:600,color:c.ok?'#059669':'#d13438'}}>ตัวอย่างเดิม {c.ws} g · {c.diff>=0?'หาย':'เกิน'} {Math.abs(c.diff).toFixed(1)} g ({Math.abs(c.pct).toFixed(2)}%) {c.ok?'✓ ไม่เกิน '+FM_LOSS_MAX+'%':'✗ เกิน '+FM_LOSS_MAX+'%'}</div>
+                    :<div style={{fontSize:12,marginTop:6,color:'#a16207'}}>ไม่ได้บันทึกน้ำหนักตัวอย่างเดิม — ตรวจการสูญหายตอนร่อนไม่ได้</div>;})()}
               </div>
               <div style={{flex:'1 1 180px',border:'1px solid #e6e8ee',borderRadius:12,padding:'14px 18px'}}>
                 <div style={{fontSize:13,color:'#5f6470',marginBottom:4}}>ผ่านเกณฑ์ขนาดคละ</div>
@@ -7073,6 +7096,13 @@ window.__dataReady.then(data => {
                 <div style={{fontSize:19,fontWeight:700,color:'#333',lineHeight:1.3}}>{sel.sand_source}</div>
               </div>}
             </div>
+
+            {(()=>{const c=sampleCheck(sel.w_sample,selCalc.total);if(!c.has||c.ok)return null;
+              return <div style={{marginBottom:16,padding:'12px 16px',borderRadius:12,background:'#fef2f2',border:'1.5px solid #fca5a5',color:'#991b1b',fontSize:14,lineHeight:1.8}}>
+                <b>⚠️ ผลนี้ใช้ตัดสินรับ/ไม่รับทรายไม่ได้ — ต้องทดสอบใหม่</b><br/>
+                ผลรวมหลังร่อน {c.total.toFixed(1)} g ต่างจากตัวอย่างเดิม {c.ws} g อยู่ {Math.abs(c.diff).toFixed(1)} g ({Math.abs(c.pct).toFixed(2)}%) — มาตรฐาน ASTM C136 ให้ต่างได้ไม่เกิน {FM_LOSS_MAX}% (ผลรวมควรอยู่ {c.lo.toFixed(1)}–{c.hi.toFixed(1)} g)<br/>
+                <span style={{fontSize:13,color:'#b45309'}}>ตรวจ: ตัวอย่างแห้งสนิทหรือยัง · ชั่งถาดล่างจริง (ไม่คำนวณจากส่วนที่เหลือ) · ตะแกรงล้นหรือไม่ · มีของหกหล่นระหว่างเท</span>
+              </div>;})()}
 
             {/* กราฟขนาดคละ */}
             <GradationChart rows={selCalc.rows}/>
@@ -7191,6 +7221,12 @@ window.__dataReady.then(data => {
               <input style={inp} placeholder="เช่น ทรายแม่น้ำ นครชัยศรี" value={form.sand_source} onChange={e=>setForm({...form,sand_source:e.target.value})}/></div>
           </div>
 
+          <div style={{marginBottom:18}}>
+            <div style={lbl}>น้ำหนักตัวอย่างแห้งก่อนร่อน (g) *</div>
+            <input type="number" step="0.1" min="0" style={{...inp,maxWidth:240}} placeholder="เช่น 1000" value={form.w_sample} onChange={e=>setForm({...form,w_sample:e.target.value})}/>
+            <div style={{fontSize:12.5,color:'#8b91a1',marginTop:4}}>ชั่งทรายแห้งก่อนเทลงตะแกรง — ใช้ตรวจว่าตอนร่อนของหายเกิน {FM_LOSS_MAX}% หรือไม่ (ASTM C136) · ถาดล่างให้ชั่งจริง ไม่คำนวณจากส่วนที่เหลือ</div>
+          </div>
+
           <div style={{border:'1px solid #e6e8ee',borderRadius:12,overflow:'hidden',marginBottom:18}}>
             <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr',gap:0,background:'#f4f6fa',padding:'9px 12px',fontSize:13,fontWeight:700,color:'#42465a'}}>
               <div>ตะแกรง</div><div>น้ำหนักค้าง (g)</div><div style={{textAlign:'right'}}>% ค้างสะสม</div><div style={{textAlign:'right'}}>% ผ่าน</div><div style={{textAlign:'right'}}>เกณฑ์</div>
@@ -7236,6 +7272,28 @@ window.__dataReady.then(data => {
                 :'อยู่ในเกณฑ์ '+FM_MIN+'–'+FM_MAX+' ✓'}
             </div>
           </div>
+
+          {live.total>0&&(()=>{
+            const c=sampleCheck(form.w_sample,live.total);
+            const warns=[];
+            live.rows.forEach(r=>{if(r.pass<r.lo-0.05||r.pass>r.hi+0.05)warns.push('ตะแกรง '+r.label+' ผ่าน '+r.pass.toFixed(1)+'% (เกณฑ์ '+(r.lo===r.hi?r.lo:r.lo+'–'+r.hi)+') หลุดเกณฑ์ ASTM C33');});
+            const panPct=live.pan/live.total*100;
+            if(panPct>5)warns.push('ถาดล่าง '+panPct.toFixed(1)+'% สูงผิดปกติ (ปกติ ≲ 3%) — ตรวจว่าชั่งถาดจริง ไม่ใช่คำนวณจากส่วนที่เหลือ');
+            const ws=Number(form.w_sample);
+            if(ws>0&&ws<300)warns.push('ตัวอย่าง '+ws+' g น้อยกว่าขั้นต่ำ 300 g ตาม ASTM C136');
+            if(ws>2000)warns.push('ตัวอย่าง '+ws+' g มากกว่าปกติ (~1,000 g) ตะแกรงอาจล้น — ควรแบ่งร่อนเป็นชุด');
+            if(c.has&&Math.abs(c.diff)<0.05)warns.push('ผลรวมหลังร่อนตรงกับตัวอย่างเดิมพอดี (หาย 0.0 g) — ยืนยันว่าชั่งถาดล่างจริง ไม่ได้คำนวณจากส่วนที่เหลือ (ถ้าคำนวณ การตรวจของหายจะไม่ทำงาน)');
+            return <div style={{marginBottom:18}}>
+              {c.has?<div style={{padding:'12px 16px',borderRadius:12,fontSize:14,lineHeight:1.8,
+                background:c.ok?'#f2fbf6':'#fef2f2',border:'1.5px solid '+(c.ok?'#bfe6d2':'#fca5a5'),color:c.ok?'#166534':'#991b1b'}}>
+                <b>{c.ok?'✓ การชั่งอยู่ในเกณฑ์':'✗ ผลนี้ใช้ตัดสินไม่ได้ — ต้องทดสอบใหม่'}</b><br/>
+                ตัวอย่างเดิม {c.ws} g · ผลรวมหลังร่อน {c.total.toFixed(1)} g · {c.diff>=0?'หาย':'เกิน'} {Math.abs(c.diff).toFixed(1)} g (<b>{Math.abs(c.pct).toFixed(2)}%</b>) · เกณฑ์ไม่เกิน {FM_LOSS_MAX}% (ผลรวมควรอยู่ {c.lo.toFixed(1)}–{c.hi.toFixed(1)} g)
+              </div>:<div style={{padding:'10px 14px',borderRadius:10,fontSize:13.5,background:'#fffbeb',border:'1px solid #fde68a',color:'#92400e'}}>ใส่น้ำหนักตัวอย่างแห้งก่อนร่อน เพื่อตรวจว่าตอนร่อนของหายเกิน {FM_LOSS_MAX}% หรือไม่</div>}
+              {warns.length>0&&<div style={{marginTop:10,padding:'10px 14px',borderRadius:10,fontSize:13.5,lineHeight:1.8,background:'#fff7ed',border:'1px solid #fed7aa',color:'#9a3412'}}>
+                <b>⚠️ ตรวจสอบก่อนบันทึก</b>{warns.map((w,i)=><div key={i}>• {w}</div>)}
+              </div>}
+            </div>;
+          })()}
 
           <div style={{marginBottom:18}}>
             <div style={lbl}>หมายเหตุ</div>
