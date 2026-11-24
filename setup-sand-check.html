@@ -54,13 +54,13 @@ alter table sand_silt_spec add column if not exists sieve_tare_at timestamptz;</
     <h2>② Apps Script — แจ้งเตือน Telegram แบบรวม</h2>
     <ol>
       <li>กด <b>คัดลอกโค้ด</b></li>
-      <li>เปิดโปรเจกต์ Apps Script → กด <b>Ctrl+F</b> พิมพ์ <code>d.test === 'stone'</code> → จะเจอบรรทัด <b>ประมาณ 948</b> (ฟังก์ชัน notifyMaterialFail เริ่มประมาณบรรทัด 903) — เลขอาจเลื่อนเล็กน้อยถ้าคุณเคยแก้สคริปต์ ให้ยึดข้อความที่ค้นหาเป็นหลัก</li>
-      <li>คลิกที่ <b>ท้ายบรรทัดก่อนหน้า</b> (บรรทัด 947) → กด <b>Enter</b> → กด <b>Ctrl+V</b> วางตรงบรรทัดใหม่นั้น ตามภาพด้านล่าง (<b>ห้ามวางทับทั้งไฟล์</b> เพราะโทเคน Telegram อยู่ในไฟล์จริง) แล้วกด Save</li>
+      <li>เปิดโปรเจกต์ Apps Script → กด <b>Ctrl+F</b> พิมพ์ <code>d.test === 'stone'</code> → จะเจอบรรทัด <b>943</b> (ตรงกับภาพสคริปต์ของคุณ)</li>
+      <li>คลิกที่ <b>ท้ายบรรทัดก่อนหน้า</b> (บรรทัด 942) → กด <b>Enter</b> → กด <b>Ctrl+V</b> วางตรงบรรทัดใหม่นั้น ตามภาพด้านล่าง (<b>ห้ามวางทับทั้งไฟล์</b> เพราะโทเคน Telegram อยู่ในไฟล์จริง) แล้วกด Save</li>
       <li><b>Deploy → Manage deployments → ไอคอนดินสอ → Version: New version → Deploy</b></li>
     </ol>
-    <pre class="ctx">947       L.push('&lt;i&gt;มักเกิดจากน้ำเยอะเกิน ฟองอากาศมาก หรือชั่งตวงเพี้ยน ควรตรวจก่อนเทต่อ&lt;/i&gt;');
-<span class="here">     ⬇⬇  วางโค้ดที่คัดลอกมา "ตรงนี้" (บรรทัดใหม่ใต้บรรทัด 947)  ⬇⬇</span>
-948     } else if (d.test === 'stone') {</pre>
+    <pre class="ctx">942       L.push('&lt;i&gt;มักเกิดจากน้ำเยอะเกิน ฟองอากาศมาก หรือชั่งตวงเพี้ยน ควรตรวจก่อนเทต่อ&lt;/i&gt;');
+<span class="here">     ⬇⬇  วางโค้ดที่คัดลอกมา "ตรงนี้" (บรรทัดใหม่ใต้บรรทัด 942)  ⬇⬇</span>
+943     } else if (d.test === 'stone') {</pre>
     <pre id="gas">    } else if (d.test === 'sand_fm_check') {
       var lossBad = String(d.loss_ok) === '0';
       L.push('⚠️ &lt;b&gt;ผลร่อนทรายผิดปกติ' + (lossBad ? ' — ต้องทดสอบใหม่' : ' — ตรวจสอบก่อนใช้ผล') + '&lt;/b&gt;');
