@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ตั้งค่าครั้งเดียว — ตรวจการชั่งทราย</title>
+<style>
+  :root{--bg:#f4f6fa;--card:#fff;--ink:#1f2733;--muted:#64748b;--line:#e2e8f0;--brand:#1a56db;--ok:#059669}
+  @media (prefers-color-scheme: dark){:root{--bg:#0f172a;--card:#1e293b;--ink:#e2e8f0;--muted:#94a3b8;--line:#334155;--brand:#60a5fa;--ok:#34d399}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Sarabun','IBM Plex Sans Thai',system-ui,sans-serif;font-size:16px;line-height:1.6}
+  .wrap{max-width:720px;margin:0 auto;padding:16px}
+  h1{font-size:21px;margin:8px 0 4px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+  .card h2{font-size:17px;margin:0 0 6px}
+  ol{margin:6px 0 12px;padding-left:22px}
+  li{margin:3px 0}
+  pre{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0 12px;font-size:12.5px;line-height:1.55;overflow-x:auto;white-space:pre;max-height:190px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  button,a.btn{font-family:inherit;font-size:16px;font-weight:700;border-radius:10px;padding:12px 18px;border:0;cursor:pointer;text-decoration:none;display:inline-block}
+  .copy{background:var(--brand);color:#fff}
+  .copy.done{background:var(--ok)}
+  a.btn{background:transparent;color:var(--brand);border:1.5px solid var(--brand)}
+  .note{font-size:13.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ตั้งค่าครั้งเดียว — ตรวจการชั่งทราย</h1>
+  <div class="sub">มี 2 ขั้น: ① SQL ใน Supabase ② เติมโค้ดแจ้งเตือนใน Apps Script · กดปุ่มสีน้ำเงินเพื่อคัดลอก แล้วไปวาง</div>
+
+  <div class="card">
+    <h2>① SQL — Supabase</h2>
+    <ol>
+      <li>กด <b>คัดลอก SQL</b></li>
+      <li>กด <b>เปิด SQL Editor</b> → วางลงไป → กด <b>Run</b> (รันซ้ำได้ ไม่ซ้อน)</li>
+    </ol>
+    <pre id="sql">alter table sand_fm_tests add column if not exists w_sample numeric;
+alter table sand_fm_tests add column if not exists w_detail jsonb;
+alter table sand_silt_spec add column if not exists sieve_tare jsonb;
+alter table sand_silt_spec add column if not exists sieve_tare_at timestamptz;</pre>
+    <div class="row">
+      <button class="copy" data-src="sql">📋 คัดลอก SQL</button>
+      <a class="btn" href="https://supabase.com/dashboard/project/npxzerdirspwunuckcqr/sql/new" target="_blank" rel="noopener">เปิด SQL Editor ↗</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>② Apps Script — แจ้งเตือน Telegram แบบรวม</h2>
+    <ol>
+      <li>กด <b>คัดลอกโค้ด</b></li>
+      <li>เปิดโปรเจกต์ Apps Script → หาฟังก์ชัน <b>notifyMaterialFail</b> → หาบรรทัด <code>} else if (d.test === 'stone') {</code></li>
+      <li><b>วางโค้ดก่อนบรรทัดนั้น</b> (ห้ามวางทับทั้งไฟล์ เพราะโทเคน Telegram อยู่ในไฟล์จริง) แล้วกด Save</li>
+      <li><b>Deploy → Manage deployments → ไอคอนดินสอ → Version: New version → Deploy</b></li>
+    </ol>
+    <pre id="gas">    } else if (d.test === 'sand_fm_check') {
+      var lossBad = String(d.loss_ok) === '0';
+      L.push('⚠️ &lt;b&gt;ผลร่อนทรายผิดปกติ' + (lossBad ? ' — ต้องทดสอบใหม่' : ' — ตรวจสอบก่อนใช้ผล') + '&lt;/b&gt;');
+      if (lossBad) L.push('❌ ชั่งหายเกิน 0.3%: ตัวอย่าง ' + d.w_sample + ' g → ผลรวมหลังร่อน ' + d.total + ' g (ต่าง ' + d.loss_pct + '%) — ASTM C136 ถือว่าใช้ตัดสินไม่ได้');
+      if (d.bad_sieves) L.push('ตะแกรงหลุดเกณฑ์ ASTM C33: &lt;b&gt;' + esc(d.bad_sieves) + '&lt;/b&gt;');
+      if (d.pan_pct &amp;&amp; Number(d.pan_pct) &gt; 5) L.push('ถาดล่างสูง: &lt;b&gt;' + d.pan_pct + '%&lt;/b&gt; (ปกติ ≲ 3%)');
+      if (d.fm) L.push('ค่า FM: ' + d.fm + '  (เกณฑ์ ' + d.lo + '–' + d.hi + ')');
+      L.push('&lt;i&gt;ให้ทดสอบซ้ำ — ตรวจความแห้งของตัวอย่าง การชั่งถาดล่างจริง และตะแกรงล้น&lt;/i&gt;');</pre>
+    <div class="row"><button class="copy" data-src="gas">📋 คัดลอกโค้ด</button></div>
+    <p class="note">ถ้ายังไม่ทำข้อนี้ ไม่เสียหาย: ฟอร์มทดสอบทรายยังตรวจและเตือนบนหน้าจอตามปกติ แค่ข้อความ Telegram แบบใหม่จะยังไม่ถูกส่ง</p>
+  </div>
+</div>
+<script>
+document.querySelectorAll('button.copy').forEach(function(b){
+  b.addEventListener('click',function(){
+    var el=document.getElementById(b.getAttribute('data-src')),txt=el.textContent,label=b.textContent;
+    var ok=function(){b.textContent='✓ คัดลอกแล้ว';b.classList.add('done');setTimeout(function(){b.textContent=label;b.classList.remove('done');},2200);};
+    var fallback=function(){var t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');ok();}catch(e){alert('คัดลอกไม่สำเร็จ — กดค้างที่กล่องโค้ดเพื่อเลือกแล้วคัดลอกเอง');}document.body.removeChild(t);};
+    if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(txt).then(ok,fallback);}else fallback();
+  });
+});
+</script>
+</body>
+</html>

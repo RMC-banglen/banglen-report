@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-24a';
+var APP_VERSION='2026-11-24b';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -169,8 +169,41 @@ function SandForm(){
   const[saving,setSaving]=useState(false);
   const[done,setDone]=useState(false);
   const[err,setErr]=useState('');
-  const live=calcFM(f);
+  // น้ำหนักภาชนะเปล่าของแต่ละตะแกรง/ถาด (ชั่งครั้งเดียว เก็บไว้ใช้ซ้ำ) — กรอกแค่น้ำหนักรวม ระบบหักภาชนะให้เป็นน้ำหนักค้างสุทธิ
+  const TARE_KEYS=[...FM_SIEVES.map(s=>s.key),'w_pan'];
+  const[tare,setTare]=useState(()=>{try{return JSON.parse(localStorage.getItem('sieve_tare')||'{}')||{};}catch(e){return{};}});
+  const[tareAt,setTareAt]=useState(()=>{try{return localStorage.getItem('sieve_tare_at')||'';}catch(e){return '';}});
+  const[showTare,setShowTare]=useState(false);
+  const[tareDraft,setTareDraft]=useState({});
+  const[tareMsg,setTareMsg]=useState('');
+  useEffect(()=>{
+    SB.from('sand_silt_spec').select('sieve_tare,sieve_tare_at').eq('id',1).limit(1).then(({data,error})=>{
+      if(error||!data||!data.length||!data[0].sieve_tare)return;
+      setTare(data[0].sieve_tare);setTareAt(data[0].sieve_tare_at||'');
+      try{localStorage.setItem('sieve_tare',JSON.stringify(data[0].sieve_tare));localStorage.setItem('sieve_tare_at',data[0].sieve_tare_at||'');}catch(e){}
+    }).catch(()=>{});
+  },[]);
+  const tareOf=k=>Number(tare[k])||0;
+  const hasTare=TARE_KEYS.some(k=>tareOf(k)>0);
+  const grossOf=k=>f[k]===''||f[k]==null?null:Number(f[k]);
+  const netOf=k=>{const g=grossOf(k);return g==null?0:Math.max(0,Math.round((g-tareOf(k))*10)/10);};
+  const negKeys=TARE_KEYS.filter(k=>{const g=grossOf(k);return g!=null&&tareOf(k)>0&&g<tareOf(k);});
+  const netObj={};TARE_KEYS.forEach(k=>{netObj[k]=netOf(k);});
+  const live=calcFM(netObj);
   const fm=live.fm;
+  const keyLabel=k=>k==='w_pan'?'ถาดล่าง':(FM_SIEVES.find(s=>s.key===k)||{}).label;
+  const tareAgeDays=tareAt?Math.floor((Date.now()-new Date(tareAt).getTime())/864e5):null;
+  const saveTare=async()=>{
+    const t={};TARE_KEYS.forEach(k=>{const v=Number(tareDraft[k]);if(v>0)t[k]=v;});
+    const at=new Date().toISOString();
+    setTare(t);setTareAt(at);
+    try{localStorage.setItem('sieve_tare',JSON.stringify(t));localStorage.setItem('sieve_tare_at',at);}catch(e){}
+    const{error}=await SB.from('sand_silt_spec').update({sieve_tare:t,sieve_tare_at:at}).eq('id',1);
+    setTareMsg(error?'บันทึกในเครื่องนี้แล้ว แต่ยังเก็บส่วนกลางไม่ได้ (ให้แอดมินรัน supabase-sand-fm-sample.sql) — เครื่องอื่นจะยังไม่เห็นค่านี้':'✓ บันทึกแล้ว ใช้ได้ทุกเครื่อง');
+  };
+  // ใต้ช่องกรอก: ภาชนะ → น้ำหนักค้างสุทธิ
+  const cap=k=>hasTare&&tareOf(k)>0&&grossOf(k)!=null
+    ?<div style={{fontSize:11.5,color:grossOf(k)<tareOf(k)?'#d13438':'#8b91a1',marginTop:3,textAlign:'right'}}>ภาชนะ {tareOf(k)} → ค้าง <b>{netOf(k)}</b> g</div>:null;
   const fmClass=fm==null?'null':fm>=FM_MIN&&fm<=FM_MAX?'ok':'bad';
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   // ตรวจการชั่ง: การสูญหายตอนร่อน ≤ 0.3% + คำเตือนผิดปกติอื่น ๆ ขณะกรอก
@@ -183,22 +216,26 @@ function SandForm(){
   if(panPct>5)warns.push('ถาดล่าง '+panPct.toFixed(1)+'% สูงผิดปกติ (ปกติ ≲ 3%) — ตรวจว่าชั่งถาดจริง ไม่ใช่คำนวณจากส่วนที่เหลือ');
   if(wsNum>0&&wsNum<300)warns.push('ตัวอย่าง '+wsNum+' g น้อยกว่าขั้นต่ำ 300 g ตาม ASTM C136');
   if(wsNum>2000)warns.push('ตัวอย่าง '+wsNum+' g มากกว่าปกติ (~1,000 g) ตะแกรงอาจล้น — ควรแบ่งร่อนเป็นชุด');
+  if(negKeys.length)warns.push('น้ำหนักรวมน้อยกว่าภาชนะเปล่า: '+negKeys.map(keyLabel).join(', ')+' — ตรวจการชั่ง หรือน้ำหนักภาชนะเปล่าที่ตั้งไว้');
+  if(hasTare&&tareAgeDays!=null&&tareAgeDays>30)warns.push('น้ำหนักภาชนะเปล่าตั้งไว้เมื่อ '+tareAgeDays+' วันก่อน — ควรชั่งภาชนะเปล่าซ้ำ (เม็ดทรายติดตาตะแกรงทำให้หนักขึ้น)');
   if(chk.has&&Math.abs(chk.diff)<0.05)warns.push('ผลรวมหลังร่อนตรงกับตัวอย่างเดิมพอดี (หาย 0.0 g) — ยืนยันว่าชั่งถาดล่างจริง ไม่ได้คำนวณจากส่วนที่เหลือ (ถ้าคำนวณ การตรวจของหายจะไม่ทำงาน)');
 
   const save=async()=>{
     if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
     if(!live.total){setErr('กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
+    if(negKeys.length){setErr('น้ำหนักรวมน้อยกว่าภาชนะเปล่า: '+negKeys.map(keyLabel).join(', ')+' — ชั่งใหม่หรือตรวจน้ำหนักภาชนะที่ตั้งไว้');return;}
     if(!(wsNum>0)){setErr('กรุณาใส่น้ำหนักตัวอย่างแห้งก่อนร่อน (ใช้ตรวจว่าของหายตอนร่อนเกิน '+FM_LOSS_MAX+'% หรือไม่)');return;}
-    if(chk.has&&!chk.ok&&!window.confirm('ผลรวมหลังร่อน '+live.total.toFixed(1)+' g ต่างจากน้ำหนักตัวอย่างเดิม '+chk.ws+' g อยู่ '+Math.abs(chk.pct).toFixed(2)+'% (เกิน '+FM_LOSS_MAX+'%)\n\nตามมาตรฐาน ASTM C136 ผลนี้ใช้ตัดสินไม่ได้ ต้องร่อนใหม่\n\nยืนยันบันทึกไว้เป็น "ผลที่ใช้ตัดสินไม่ได้" หรือไม่?'))return;
+    if(chk.has&&!chk.ok&&!window.confirm('ผลรวมหลังร่อน '+live.total.toFixed(1)+' g ต่างจากน้ำหนักตัวอย่างเดิม '+chk.ws+' g อยู่ '+Math.abs(chk.pct).toFixed(2)+'% (เกิน '+FM_LOSS_MAX+'%)\n\nตามมาตรฐาน ASTM C136 ผลนี้ใช้ตัดสินไม่ได้ ต้องไปชั่งตะแกรง/ถาดและร่อนใหม่\n\nยืนยันบันทึกไว้เป็น "ผลที่ใช้ตัดสินไม่ได้" หรือไม่?'))return;
     setErr('');setSaving(true);
     const rec={test_date:f.test_date,sand_source:f.sand_source||'',note:f.note||'',w_sample:wsNum,
       fm:fm!=null?Math.round(fm*100)/100:null};
-    FM_SIEVES.forEach(s=>{rec[s.key]=Number(f[s.key])||0;});
-    rec.w_pan=Number(f.w_pan)||0;
+    FM_SIEVES.forEach(s=>{rec[s.key]=netOf(s.key);});
+    rec.w_pan=netOf('w_pan');
+    if(hasTare)rec.w_detail={gross:Object.fromEntries(TARE_KEYS.map(k=>[k,grossOf(k)==null?0:grossOf(k)])),tare:Object.fromEntries(TARE_KEYS.map(k=>[k,tareOf(k)]))};   // น้ำหนักรวม/ภาชนะ เก็บไว้ย้อนดู (ตัวเลขสุทธิอยู่ในคอลัมน์เดิม)
     let{error}=await SB.from('sand_fm_tests').insert([rec]);
     let noCol=false;
     // ยังไม่ได้รัน SQL คอลัมน์ w_sample → บันทึกส่วนอื่นก่อน
-    if(error&&/w_sample/.test(error.message||'')){noCol=true;const r2={...rec};delete r2.w_sample;({error}=await SB.from('sand_fm_tests').insert([r2]));}
+    if(error&&/w_sample|w_detail/.test(error.message||'')){noCol=true;const r2={...rec};delete r2.w_sample;delete r2.w_detail;({error}=await SB.from('sand_fm_tests').insert([r2]));}
     setSaving(false);
     if(error){setErr('บันทึกไม่สำเร็จ: '+error.message);return;}
     if(noCol)window.alert('บันทึกผลแล้ว แต่ระบบยังเก็บน้ำหนักตัวอย่างไม่ได้ — แจ้งแอดมินให้รัน supabase-sand-fm-sample.sql');
@@ -242,18 +279,38 @@ function SandForm(){
           <input type="number" inputMode="decimal" min="0" value={f.w_sample} onChange={e=>set('w_sample',e.target.value)} placeholder="เช่น 1000"/>
           <div style={{fontSize:12,color:'#8b91a1',marginTop:4,lineHeight:1.7}}>ชั่งทรายแห้งก่อนเทลงตะแกรง — ใช้ตรวจว่าตอนร่อนของหายเกิน {FM_LOSS_MAX}% หรือไม่ · ถาดล่างให้ <b>ชั่งจริง</b> ไม่คำนวณจากส่วนที่เหลือ</div>
         </div>
-        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:14}}>น้ำหนักค้างตะแกรง (กรัม)</div>
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>{hasTare?'น้ำหนักรวม ภาชนะ + ทรายที่ค้าง (กรัม)':'น้ำหนักค้างตะแกรง (กรัม)'}</div>
+        <div style={{fontSize:12,color:'#8b91a1',marginBottom:12,lineHeight:1.7}}>{hasTare?'ชั่งทั้งภาชนะ (ตะแกรง/ถาด) รวมทรายที่ค้าง — ระบบหักน้ำหนักภาชนะเปล่าให้เอง':'ยังไม่ได้ตั้งน้ำหนักภาชนะเปล่า — กรอกน้ำหนักค้างสุทธิได้เลย หรือตั้งน้ำหนักภาชนะไว้ด้านล่างเพื่อให้ระบบหักให้'}</div>
         <div className="sieve-grid">
           {FM_SIEVES.map(s=>(
             <div className="sieve-item" key={s.key}>
               <label>{s.label} <span className="sub">{s.sub}</span></label>
               <input type="number" inputMode="decimal" min="0" value={f[s.key]} onChange={e=>set(s.key,e.target.value)} placeholder="0"/>
+              {cap(s.key)}
             </div>
           ))}
           <div className="sieve-item">
             <label>ถาดล่าง <span className="sub">Pan</span></label>
             <input type="number" inputMode="decimal" min="0" value={f.w_pan} onChange={e=>set('w_pan',e.target.value)} placeholder="0"/>
+            {cap('w_pan')}
           </div>
+        </div>
+
+        <div style={{margin:'-4px 0 14px'}}>
+          <button className="ghost" style={{marginTop:0,padding:'9px 12px',fontSize:14}} onClick={()=>{setShowTare(v=>!v);setTareDraft({...tare});setTareMsg('');}}>
+            {showTare?'▲ ปิด':'⚙️ ตั้งน้ำหนักภาชนะเปล่า (ตะแกรง/ถาด) — ทำครั้งเดียว'}{!showTare&&hasTare&&tareAgeDays!=null?` · ตั้งไว้ ${tareAgeDays} วันก่อน`:''}
+          </button>
+          {showTare&&<div style={{marginTop:12,padding:'14px 14px 6px',border:'1.5px solid #e6e8ee',borderRadius:12,background:'#fafbfd'}}>
+            <div style={{fontSize:12.5,color:'#5f6470',lineHeight:1.8,marginBottom:10}}>ชั่ง<b>ภาชนะเปล่า</b>ที่ใช้รองทรายแต่ละช่อง (ตะแกรงทั้งอัน หรือถาดที่เทใส่ ตามที่ชั่งจริง) แล้วบันทึกไว้ ครั้งต่อไปกรอกแค่น้ำหนักรวม · ควรชั่งใหม่ทุกเดือน เพราะเม็ดทรายติดตาตะแกรงทำให้หนักขึ้น</div>
+            <div className="sieve-grid">
+              {TARE_KEYS.map(k=><div className="sieve-item" key={k}>
+                <label>{keyLabel(k)}</label>
+                <input type="number" inputMode="decimal" min="0" value={tareDraft[k]??''} onChange={e=>setTareDraft(d=>({...d,[k]:e.target.value}))} placeholder="0"/>
+              </div>)}
+            </div>
+            <button className="bigbtn green" style={{marginTop:0,marginBottom:10,padding:12,fontSize:16}} onClick={saveTare}>บันทึกน้ำหนักภาชนะเปล่า</button>
+            {tareMsg&&<div style={{fontSize:13,fontWeight:700,margin:'0 0 10px',color:/ไม่/.test(tareMsg)?'#d13438':'#0f766e'}}>{tareMsg}</div>}
+          </div>}
         </div>
 
         <div className={`fm-card ${fmClass}`}>
@@ -278,6 +335,7 @@ function SandForm(){
               <b>{chk.ok?'✓ การชั่งอยู่ในเกณฑ์':'✗ ผลนี้ใช้ตัดสินไม่ได้ — ต้องทดสอบใหม่'}</b><br/>
               ตัวอย่างเดิม {chk.ws} g · ผลรวมหลังร่อน {live.total.toFixed(1)} g<br/>
               {chk.diff>=0?'หาย':'เกิน'} {Math.abs(chk.diff).toFixed(1)} g (<b>{Math.abs(chk.pct).toFixed(2)}%</b>) · เกณฑ์ไม่เกิน {FM_LOSS_MAX}% (ผลรวมควรอยู่ {chk.lo.toFixed(1)}–{chk.hi.toFixed(1)} g)
+              {!chk.ok&&<div style={{marginTop:6}}>👉 <b>ให้ชั่งตะแกรง/ถาดใหม่</b> {chk.diff>0?'— ของหาย: ตรวจของหก ทรายติดตะแกรง/มือ หรือภาชนะเปล่าที่ตั้งไว้หนักเกินจริง':'— ผลรวมเกิน: ตรวจทรายยังชื้น ภาชนะเปล่าที่ตั้งไว้เบากว่าจริง หรือชั่งซ้ำ'}</div>}
             </div>
           :<div style={{padding:'10px 14px',borderRadius:10,fontSize:13.5,background:'#fffbeb',border:'1px solid #fde68a',color:'#92400e'}}>ใส่น้ำหนักตัวอย่างแห้งก่อนร่อน เพื่อตรวจว่าของหายตอนร่อนเกิน {FM_LOSS_MAX}% หรือไม่</div>}
         {warns.length>0&&<div style={{marginTop:10,padding:'10px 14px',borderRadius:10,fontSize:13.5,lineHeight:1.8,background:'#fff7ed',border:'1px solid #fed7aa',color:'#9a3412'}}>
