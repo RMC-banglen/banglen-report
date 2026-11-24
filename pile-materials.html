@@ -428,14 +428,14 @@ function QuarterMainView({ q }) {
         const rows = q[c.key + 'RowsM'] || [];
         if (!rows.length) return null;
         const unit = c.key === 'plate' ? 'แผ่นใหญ่' : c.unit;
-        const showCut = c.key === 'rebar', showSio = c.key === 'plate';
+        const showCut = c.key === 'rebar', showSio = c.key === 'plate', showRemain = c.key === 'rebar';
         return (
           <div key={c.key} className={'mt-block' + (rows.length <= 12 && c.key !== 'collar' && c.key !== 'rebar' ? ' mt-small' : '')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="mt-title" style={{ fontSize: 18, fontWeight: 700 }}>{QUARTER_TITLES[c.key] || c.label}</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden', tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: '#f4f6f9', textAlign: 'left' }}>
-                  <th style={th(22)}>รายการ</th>
+                  <th style={th(showRemain ? 17 : 22)}>รายการ</th>
                   <th style={th(12, true)}>คำนวณ ({unit})</th>
                   <th style={th(12, true)}>ใช้จริง ({unit})</th>
                   <th style={th(10, true)}>ส่วนต่าง</th>
@@ -444,6 +444,7 @@ function QuarterMainView({ q }) {
                   {showSio && <th style={th(10, true)}>เข้า-ออกสต็อกสำเร็จ</th>}
                   <th style={th(10, true)}>ส่วนต่างจริง</th>
                   <th style={th(8, true)}>% หาย</th>
+                  {showRemain && <th style={th(10, true)}>คงเหลือ ({unit})</th>}
                 </tr>
               </thead>
               <tbody>
@@ -458,6 +459,7 @@ function QuarterMainView({ q }) {
                     {showSio && <td style={td(true)}>{row.stockInOutFmt}</td>}
                     <td style={{ ...td(true), fontWeight: 700, color: row.realDiffColor }}>{row.realDiffFmt}</td>
                     <td style={{ ...td(true), fontWeight: 700, background: row.rowBg, borderRadius: 6 }}>{row.pctLostFmt}</td>
+                    {showRemain && <td style={{ ...td(true), fontWeight: row.remainCounted ? 700 : 400, color: row.remainVal < 0 ? '#c0392b' : row.remainCounted ? '#1f2a3d' : '#8a93a6' }} title={row.remainVal == null ? 'ไม่มีข้อมูลสต็อก' : row.remainCounted ? 'นับปลายงวดแล้ว (งวดล่าสุดในไตรมาส)' : 'ยังไม่ได้นับปลายงวด — ประมาณจาก ยกมา+รับเข้า−คำนวณ−ใช้งานอื่น+ตัดรับเข้า'}>{row.remainFmt}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -702,6 +704,8 @@ function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
   const heads = ['บางเลน', 'คำนวณตามรายการผลิต', 'ยอดใช้จริง', 'ส่วนต่าง', 'ใช้งานอื่น-เสียหาย', 'เข้า-ออกสต็อกเพลทสำเร็จ'];
   if (hasCut) heads.push('ตัดรับเข้าจากความยาวอื่น');
   heads.push('ส่วนต่างจริง', '%หาย');
+  const hasRemain = rows.some(x => x.remain != null);
+  if (hasRemain) heads.push('คงเหลือ (เส้น)');   // เหล็กเสริม: ยอดนับปลายงวด ให้เห็นว่าแถวที่ไม่เคลื่อนไหวยังมีของค้างเท่าไร
   const nC = heads.length, L = i => String.fromCharCode(64 + i);
   const cB = 'B', cC = 'C', cD = 'D', cE = 'E', cF = 'F', cCut = hasCut ? 'G' : null, cReal = L(hasCut ? 8 : 7), cPct = L(hasCut ? 9 : 8);
   const border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
@@ -733,6 +737,10 @@ function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
     if (hasCut) put(cCut, x.cut || null, NUM);
     put(cReal, { formula: 'IF(OR(' + cD + r + '="",ISTEXT(' + cF + r + ')),"",' + cD + r + '+N(' + cE + r + ')+N(' + cF + r + ')' + (hasCut ? '-N(' + cCut + r + ')' : '') + ')', result: real == null ? '' : real }, NUM);
     put(cPct, { formula: 'IF(OR(' + cReal + r + '="",N(' + cB + r + ')=0),"",' + cReal + r + '/' + cB + r + ')', result: pct == null ? '' : pct }, '0.00%');
+    if (hasRemain) {
+      const rc = put(L(nC), x.remain == null ? null : x.remain, '#,##0');
+      if (x.remain != null && !x.remainCounted) rc.font = { ...font, italic: true, color: { argb: 'FF8A93A6' } };   // ตัวเอียงสีเทา = ประมาณ ยังไม่ได้นับปลายงวด
+    }
   });
   const last = H + rows.length;
   ws.getColumn(1).width = 30; for (let i = 2; i <= nC; i++) ws.getColumn(i).width = 18;
@@ -745,6 +753,7 @@ function buildCompareWorkbook(EJ, { rows, period, threshold, reconcile }) {
     'ส่วนต่างจริง = ส่วนต่าง + ใช้งานอื่น-เสียหาย + เข้า-ออกสต็อกเพลทสำเร็จ (เฉพาะเพลท)' + (hasCut ? ' − ตัดรับเข้าจากความยาวอื่น' : ''),
     '%หาย = ส่วนต่างจริง ÷ คำนวณตามรายการผลิต · + = ของหาย / − = ของเกิน · ตัวเลขสีแดง = เกินเกณฑ์แจ้งเตือน ' + threshold + '%',
     'หน่วย: PC / ปลอก / หนวดกุ้ง = กก. · เพลท = แผ่นใหญ่ 5x20 ฟุต · เหล็กเสริม = เส้น · Collar = ชุด'];
+  if (hasRemain) notes.push('คงเหลือ (เหล็กเสริม) = ยอดนับสต็อกปลายงวด · ตัวเอียงสีเทา = ประมาณ (ยังไม่ได้นับปลายงวด) · แถวเหล็กที่ไม่ผลิต ไม่ใช้ และไม่มีของเหลือ ไม่แสดง');
   notes.forEach((tx, i) => { const c = ws.getCell(last + 2 + i, 1); c.value = tx; c.font = { name: 'Tahoma', size: 11, color: { argb: 'FF475569' } }; });
   // กระทบยอดเพลทสำเร็จรูปต่อขนาดเสา (ค่าอ้างอิง ไม่ใช่สูตร)
   if (reconcile && reconcile.length) {
@@ -1670,13 +1679,15 @@ class App extends React.Component {
       const key = 'main:' + c.key, dg = digitsForKey(key);
       const map = new Map();
       pages.forEach(({ pl, mp }) => (mp[c.key + 'RowsM'] || []).forEach(row => {
-        const a = map.get(row.label) || { label: row.label, calc: 0, actual: 0, calcWithActual: 0, nActual: 0, gu: 0, cut: 0, sio: 0, nSio: 0, real: 0, nReal: 0, periods: [] };
+        const a = map.get(row.label) || { label: row.label, calc: 0, actual: 0, calcWithActual: 0, nActual: 0, gu: 0, cut: 0, sio: 0, nSio: 0, real: 0, nReal: 0, remainVal: null, remainCounted: false, periods: [] };
         const calc = num(row.calcFmt) || 0;
         const act = row.actual === '' || row.actual == null || isNaN(Number(row.actual)) ? null : Number(row.actual);
         a.calc += calc;
         if (act != null) { a.actual += act; a.calcWithActual += calc; a.nActual++; }
         a.gu += num(row.generalUseSummaryFmt) || 0;
         a.cut += row.cutInQty || 0;
+        // คงเหลือ = ยอดของงวดล่าสุดในไตรมาสที่มีรายการนี้ (ไม่บวกข้ามงวด — ของคงเหลือคือยอดสะสม ไม่ใช่ยอดที่ใช้ในงวด)
+        if (row.remainVal != null) { a.remainVal = row.remainVal; a.remainCounted = !!row.remainCounted; }
         const sio = row.stockInOutFmt != null ? num(row.stockInOutFmt) : null;
         if (sio != null) { a.sio += sio; a.nSio++; }
         const rd = num(row.realDiffFmt);
@@ -1685,6 +1696,8 @@ class App extends React.Component {
         map.set(row.label, a);
       }));
       let rows = [...map.values()];
+      // เหล็กเสริม: ซ่อนแถวที่ไม่เคลื่อนไหวและไม่มีของเหลือ (คำนวณ 0 · ใช้ 0 · ไม่มีใช้งานอื่น/ตัดรับเข้า · คงเหลือ 0) — แถวที่ไม่เคลื่อนไหวแต่มีของค้างยังโชว์ พร้อมยอดคงเหลือ
+      if (c.key === 'rebar') rows = rows.filter(a => a.calc || a.actual || a.gu || a.cut || a.real || (a.remainVal != null && a.remainVal !== 0));
       if (c.key === 'rebar') rows = sortRebarBySpec(rows, x => x.label);
       if (q) rows = rows.filter(x => String(x.label).toLowerCase().includes(q));
       out[c.key + 'RowsM'] = rows.map(a => {
@@ -1698,6 +1711,8 @@ class App extends React.Component {
           realDiffFmt: a.nReal ? sign(a.real) : '-', realDiffColor: 'inherit',
           pctLostFmt: pct != null && isFinite(pct) ? (pct > 0 ? '+' : '') + fmt(pct, 2) + '%' : '-',
           rowBg: this.thresholdBg(pct, key),
+          remainVal: a.remainVal, remainCounted: a.remainCounted,
+          remainFmt: a.remainVal == null ? '-' : (a.remainCounted ? '' : '≈ ') + fmt(a.remainVal, dg),
           periodsNote: a.periods.length < pages.length ? 'มีใน ' + a.periods.map(shortPeriod).join(', ') : null,
         };
       });
@@ -1797,9 +1812,11 @@ class App extends React.Component {
     [['pc', mp.pcRowsM], ['stirrup', mp.stirrupRowsM], ['plate', mp.plateRowsM], ['whisker', mp.whiskerRowsM], ['collar', mp.collarRowsM], ['rebar', mp.rebarRowsM]].forEach(([k, list]) => (list || []).forEach(row => {
       const a = row.actual === '' || row.actual == null ? null : Number(row.actual);
       const item = { label: xlShortLabel(k, row.label), calc: Number(row.calcNum) || 0, actual: a != null && isFinite(a) ? a : null,
-        other: Number(row.generalUseNum) || 0, cut: Number(row.cutInNum) || 0, isPlate: k === 'plate', sio: k === 'plate' ? row.stockInOutNum : undefined };
-      // ข้ามแถวที่ว่างหมด (ไม่ผลิต ไม่มีข้อมูล) ไม่ให้ตารางรก
-      if (item.calc || item.actual != null || item.other || item.cut || (item.sio != null && item.sio !== 0) || item.isPlate) rows.push(item);
+        other: Number(row.generalUseNum) || 0, cut: Number(row.cutInNum) || 0, isPlate: k === 'plate', sio: k === 'plate' ? row.stockInOutNum : undefined,
+        remain: k === 'rebar' && row.remainVal != null ? Number(row.remainVal) : null, remainCounted: !!row.remainCounted };
+      // ข้ามแถวที่ว่างหมด (ไม่ผลิต ไม่มีข้อมูล) ไม่ให้ตารางรก · เหล็กเสริมที่ไม่เคลื่อนไหวและไม่มีของเหลือก็ซ่อน (ที่มีของค้างยังโชว์พร้อมคงเหลือ)
+      const idleRebar = k === 'rebar' && !item.calc && !item.actual && !item.other && !item.cut && !item.remain;
+      if (!idleRebar && (item.calc || item.actual != null || item.other || item.cut || (item.sio != null && item.sio !== 0) || item.isPlate)) rows.push(item);
     }));
     const wb = buildCompareWorkbook(EJ, { rows, period: this.state.periodLabel || '', threshold: Number(this.state.alertThresholdPct) || 3, reconcile: this.buildPlateReconcile(r) });
     const buf = await wb.xlsx.writeBuffer();
