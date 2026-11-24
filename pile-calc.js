@@ -237,11 +237,10 @@ export function parsePileRow(code, name, qty, config) {
   // stirrup wire
   const stirrupTableAll = (config && config.stirrupTable) || STIRRUP_TABLE;
   const stirrupTable = stirrupTableAll[diam];
-  // หาค่าตามความยาวจริงก่อน (เช่น 1.5 ม. ที่เพิ่มไว้ในตาราง) ถ้าไม่มีค่อยใช้ความยาวปัดลงเป็นเมตรเต็ม
-  const perPile = stirrupTable ? (stirrupTable[length] != null ? stirrupTable[length] : stirrupTable[roundedLen]) : undefined;
+  const perPile = stirrupTable ? stirrupTable[roundedLen] : undefined;   // ตารางลวดปลอกใช้ความยาวปัดลงเป็นเมตรเต็ม
   let stirrup = null;
   if (perPile == null) {
-    warnings.push('ไม่พบสูตรลวดปลอกสำหรับขนาดเสา ' + diam + ' ยาว ' + length + ' ม.' + (roundedLen !== length ? ' (ตารางใช้ความยาวปัดลง ' + roundedLen + ' ม. ถ้าไม่มีค่าของความยาวนี้)' : '') + ' (รหัส ' + code + ') — ข้ามส่วนลวดปลอกของแถวนี้');
+    warnings.push('ไม่พบสูตรลวดปลอกสำหรับขนาดเสา ' + diam + ' ยาว ' + length + ' ม.' + (roundedLen !== length ? ' (ตารางลวดปลอกใช้ความยาวปัดลง = ' + roundedLen + ' ม. — เพิ่มค่าของ ' + roundedLen + ' ม. ในตั้งค่าคงที่)' : '') + ' (รหัส ' + code + ') — ข้ามส่วนลวดปลอกของแถวนี้');
   } else {
     stirrup = { diam, weightKg: perPile * qty };
   }
