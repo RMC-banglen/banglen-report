@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-24b';
+var APP_VERSION='2026-11-24c';
 (function(){
   var check=function(){
     fetch(location.pathname+'?_ck='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-2047'}})
@@ -203,7 +203,7 @@ function SandForm(){
   };
   // ใต้ช่องกรอก: ภาชนะ → น้ำหนักค้างสุทธิ
   const cap=k=>hasTare&&tareOf(k)>0&&grossOf(k)!=null
-    ?<div style={{fontSize:11.5,color:grossOf(k)<tareOf(k)?'#d13438':'#8b91a1',marginTop:3,textAlign:'right'}}>ภาชนะ {tareOf(k)} → ค้าง <b>{netOf(k)}</b> g</div>:null;
+    ?<div style={{fontSize:11.5,color:grossOf(k)<tareOf(k)?'#d13438':'#8b91a1',marginTop:3,textAlign:'right'}}>ภาชนะเปล่า {tareOf(k)} → ทรายจริง <b>{netOf(k)}</b> g</div>:null;
   const fmClass=fm==null?'null':fm>=FM_MIN&&fm<=FM_MAX?'ok':'bad';
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   // ตรวจการชั่ง: การสูญหายตอนร่อน ≤ 0.3% + คำเตือนผิดปกติอื่น ๆ ขณะกรอก
@@ -222,7 +222,7 @@ function SandForm(){
 
   const save=async()=>{
     if(!f.test_date){setErr('กรุณาเลือกวันที่ทดสอบ');return;}
-    if(!live.total){setErr('กรุณาใส่น้ำหนักค้างตะแกรงอย่างน้อย 1 ช่อง');return;}
+    if(!live.total){setErr('กรุณากรอกน้ำหนักที่ชั่งได้อย่างน้อย 1 ช่อง');return;}
     if(negKeys.length){setErr('น้ำหนักรวมน้อยกว่าภาชนะเปล่า: '+negKeys.map(keyLabel).join(', ')+' — ชั่งใหม่หรือตรวจน้ำหนักภาชนะที่ตั้งไว้');return;}
     if(!(wsNum>0)){setErr('กรุณาใส่น้ำหนักตัวอย่างแห้งก่อนร่อน (ใช้ตรวจว่าของหายตอนร่อนเกิน '+FM_LOSS_MAX+'% หรือไม่)');return;}
     if(chk.has&&!chk.ok&&!window.confirm('ผลรวมหลังร่อน '+live.total.toFixed(1)+' g ต่างจากน้ำหนักตัวอย่างเดิม '+chk.ws+' g อยู่ '+Math.abs(chk.pct).toFixed(2)+'% (เกิน '+FM_LOSS_MAX+'%)\n\nตามมาตรฐาน ASTM C136 ผลนี้ใช้ตัดสินไม่ได้ ต้องไปชั่งตะแกรง/ถาดและร่อนใหม่\n\nยืนยันบันทึกไว้เป็น "ผลที่ใช้ตัดสินไม่ได้" หรือไม่?'))return;
@@ -279,8 +279,8 @@ function SandForm(){
           <input type="number" inputMode="decimal" min="0" value={f.w_sample} onChange={e=>set('w_sample',e.target.value)} placeholder="เช่น 1000"/>
           <div style={{fontSize:12,color:'#8b91a1',marginTop:4,lineHeight:1.7}}>ชั่งทรายแห้งก่อนเทลงตะแกรง — ใช้ตรวจว่าตอนร่อนของหายเกิน {FM_LOSS_MAX}% หรือไม่ · ถาดล่างให้ <b>ชั่งจริง</b> ไม่คำนวณจากส่วนที่เหลือ</div>
         </div>
-        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>{hasTare?'น้ำหนักรวม ภาชนะ + ทรายที่ค้าง (กรัม)':'น้ำหนักค้างตะแกรง (กรัม)'}</div>
-        <div style={{fontSize:12,color:'#8b91a1',marginBottom:12,lineHeight:1.7}}>{hasTare?'ชั่งทั้งภาชนะ (ตะแกรง/ถาด) รวมทรายที่ค้าง — ระบบหักน้ำหนักภาชนะเปล่าให้เอง':'ยังไม่ได้ตั้งน้ำหนักภาชนะเปล่า — กรอกน้ำหนักค้างสุทธิได้เลย หรือตั้งน้ำหนักภาชนะไว้ด้านล่างเพื่อให้ระบบหักให้'}</div>
+        <div style={{fontSize:15,fontWeight:700,color:'#42465a',marginBottom:6}}>{hasTare?'กรอกเลขที่ตาชั่งอ่านได้ (กรัม)':'กรอกน้ำหนักทรายที่ชั่งได้ (กรัม)'}</div>
+        <div style={{fontSize:12,color:'#8b91a1',marginBottom:12,lineHeight:1.7}}>{hasTare?'ชั่งทั้งตะแกรง/ถาดพร้อมทรายที่ค้างอยู่ แล้วกรอกเลขบนตาชั่งตามที่เห็น ไม่ต้องลบอะไรเอง — ระบบหักน้ำหนักภาชนะเปล่าให้ แล้วโชว์ "ทรายจริง" ใต้ช่อง':'ยังไม่ได้ตั้งน้ำหนักภาชนะเปล่า — กรอกเฉพาะน้ำหนักทรายที่ค้างอยู่ (ลบภาชนะแล้ว) หรือตั้งน้ำหนักภาชนะไว้ด้านล่างเพื่อให้ระบบหักให้'}</div>
         <div className="sieve-grid">
           {FM_SIEVES.map(s=>(
             <div className="sieve-item" key={s.key}>
