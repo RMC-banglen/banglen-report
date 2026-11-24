@@ -29,15 +29,17 @@
     [data-no-print] { display: none !important; }
     html, body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .topbar { padding: 6px 4px !important; }
-    #root > div { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 8px 0 0 !important; gap: 14px !important; }
+    #root > div { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 4px 0 0 !important; gap: 8px !important; }
     table { table-layout: auto !important; width: 100% !important; overflow: visible !important; }
-    th, td { padding: 6px 8px !important; font-size: 12px !important; }
+    th, td { padding: 3px 8px !important; font-size: 11.5px !important; line-height: 1.35 !important; }
     thead { display: table-header-group; }
     tr { break-inside: avoid; page-break-inside: avoid; }
-    /* หัวข้อวัตถุดิบ + ตาราง อยู่หน้าเดียวกัน (ไม่ให้หัวข้อค้างท้ายหน้า ตารางไปขึ้นหน้าถัดไป) */
-    .mt-block { display: block !important; break-inside: avoid; page-break-inside: avoid; margin-bottom: 14px; }
-    .mt-block > * + * { margin-top: 8px; }
-    .mt-title { break-after: avoid; page-break-after: avoid; }
+    .pm-h1 { font-size: 16px !important; }
+    /* หัวข้อวัตถุดิบ + ตาราง อยู่หน้าเดียวกัน · ตารางสั้น (.mt-small) ไม่ถูกตัดครึ่งหน้า · ตารางยาว (เหล็กเสริม) ไหลต่อหน้าถัดไปได้ โดยหัวข้อไม่ค้างท้ายหน้า */
+    .mt-block { display: block !important; margin-bottom: 6px; }
+    .mt-small { break-inside: avoid; page-break-inside: avoid; }
+    .mt-block > * + * { margin-top: 4px; }
+    .mt-title { font-size: 15px !important; break-after: avoid; page-break-after: avoid; }
     .mt-block table { break-before: avoid; page-break-before: avoid; }
   }
 </style>
@@ -420,7 +422,7 @@ function QuarterMainView({ q }) {
       <div style={{ background: '#eef3fc', border: '1px solid #b9cdf0', borderRadius: 10, padding: '10px 16px', fontSize: 13, color: '#244c9b' }}>
         <b>{g.label}</b> — รวม {q.periodsUsed.map(periodName).join(' + ')} ({q.periodsUsed.length} งวด{g.months && g.months < 3 ? ' · มีข้อมูล ' + g.months + '/3 เดือน' : ''})
         {q.missing.length > 0 && <span style={{ color: '#c0392b' }}> · ยังไม่มีไฟล์รายการเสา: {q.missing.join(', ')}</span>}
-        <div style={{ fontSize: 12, color: '#78839A', marginTop: 4 }}>ตัวเลขรวมจากทุกงวดในไตรมาส · หน้านี้ดูอย่างเดียว ถ้าจะแก้ตัวเลข ให้กลับไป "งวดนี้" แล้วเลือกงวดที่ต้องการ</div>
+        <div data-no-print="true" style={{ fontSize: 12, color: '#78839A', marginTop: 4 }}>ตัวเลขรวมจากทุกงวดในไตรมาส · หน้านี้ดูอย่างเดียว ถ้าจะแก้ตัวเลข ให้กลับไป "งวดนี้" แล้วเลือกงวดที่ต้องการ</div>
       </div>
       {CATS.map(c => {
         const rows = q[c.key + 'RowsM'] || [];
@@ -428,7 +430,7 @@ function QuarterMainView({ q }) {
         const unit = c.key === 'plate' ? 'แผ่นใหญ่' : c.unit;
         const showCut = c.key === 'rebar', showSio = c.key === 'plate';
         return (
-          <div key={c.key} className="mt-block" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div key={c.key} className={'mt-block' + (rows.length <= 12 && c.key !== 'collar' && c.key !== 'rebar' ? ' mt-small' : '')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="mt-title" style={{ fontSize: 18, fontWeight: 700 }}>{QUARTER_TITLES[c.key] || c.label}</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden', tableLayout: 'fixed' }}>
               <thead>
@@ -611,8 +613,10 @@ function MaterialTable({ title, subtitle, rows, unitLabel, stockMode, onOpenGene
   if (!rows || !rows.length) return null;
   // คอลัมน์ "เข้า-ออกสต็อก" มีเฉพาะเพลท (สต็อกปลาย−ต้นงวด หน่วยแผ่นใหญ่ เหมือนคอลัมน์คำนวณ) — วัตถุดิบอื่นไม่มีข้อมูลนี้ ซ่อนคอลัมน์ไปเลย
   const hasStockInOut = rows.some(r => r.stockInOutFmt != null);
+  // เหล็ก Collar กับเหล็กเสริมหลักต่อกันไปได้ ไม่บังคับตารางไม่ให้ถูกตัดข้ามหน้า (ลดจำนวนหน้าตอนพิมพ์) — ตารางสั้นอื่นยังอยู่หน้าเดียวกันทั้งตาราง
+  const flowsOn = /Collar|เหล็กเสริม/.test(String(title));
   return (
-    <div className="mt-block" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className={'mt-block' + (rows.length <= 12 && !flowsOn ? ' mt-small' : '')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="mt-title" style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
       {subtitle && <div style={{ fontSize: 13, color: '#78839A' }}>{subtitle}</div>}
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden', tableLayout: 'fixed' }}>
@@ -2215,7 +2219,7 @@ class App extends React.Component {
                     )}
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
+                      <div className="pm-h1" style={{ fontSize: 22, fontWeight: 700 }}>{stockMode ? 'นับสต็อก — บันทึกยอดยกมา / รับเข้า / ปิดสต็อก' : 'หน้าหลัก — สรุปรวมวัตถุดิบทั้งหมด'}</div>
                       {!stockMode && (() => {
                         const qg = this.trendGroups('quarter').find(x => x.periods.includes(s.periodLabel));
                         const setScope = v => { this.setState({ mainScope: v }); try { localStorage.setItem('pile_main_scope', v); } catch (e) {} };
@@ -2379,7 +2383,7 @@ function PlateReconcileCard({ pr }) {
 function DetailTable({ title, subtitle, rows, columns }) {
   if (!rows || !rows.length) return null;
   return (
-    <div className="mt-block" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className={'mt-block' + (rows.length <= 12 ? ' mt-small' : '')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="mt-title" style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
       {subtitle && <div style={{ fontSize: 13, color: '#78839A' }}>{subtitle}</div>}
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e3e7ee', borderRadius: 10, overflow: 'hidden' }}>
