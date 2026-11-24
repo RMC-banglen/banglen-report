@@ -23,7 +23,18 @@
   .topbar__mark { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(150deg, #3a6ad8, #244c9b); display: grid; place-items: center; color: white; font-weight: 800; font-size: 18px; }
   .topbar__title { font-size: 18px; font-weight: 700; margin: 0; }
   .topbar__sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted-text); }
-  @media print { [data-no-print] { display: none !important; } body { background: white; } }
+  /* พิมพ์ / บันทึกเป็น PDF: A4 แนวนอน เต็มหน้า — ตารางหลายคอลัมน์ไม่ถูกตัดขอบขวา */
+  @page { size: A4 landscape; margin: 8mm; }
+  @media print {
+    [data-no-print] { display: none !important; }
+    html, body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .topbar { padding: 6px 4px !important; }
+    #root > div { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 8px 0 0 !important; gap: 14px !important; }
+    table { table-layout: auto !important; width: 100% !important; overflow: visible !important; }
+    th, td { padding: 6px 8px !important; font-size: 12px !important; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
@@ -2006,7 +2017,7 @@ class App extends React.Component {
 
             {r && (
               <React.Fragment>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }} data-no-print="true">
                   <div style={kpi()}><div style={kpiLbl()}>แถวข้อมูลที่ใช้ได้</div><div style={kpiVal()}>{r.usedRows} / {r.totalRows}</div></div>
                   <div style={kpi()}><div style={kpiLbl()}>จำนวนเสาเข็มรวม</div><div style={kpiVal()}>{fmt(r.totalPiles, 0)} ต้น</div></div>
                   <div style={kpi()}><div style={kpiLbl()}>รายการที่ข้าม</div><div style={{ ...kpiVal(), color: r.skippedRows.length ? '#b87412' : 'inherit' }}>{r.skippedRows.length}</div></div>
@@ -2049,7 +2060,7 @@ class App extends React.Component {
                 {mp && (
                   <React.Fragment>
                     {s.resultView === 'main' && (
-                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }} data-no-print="true">
                         <div style={kpi()}><div style={kpiLbl()}>วัตถุดิบปกติ</div><div style={{ ...kpiVal(), color: '#3f7d2b' }}>{status.normal}</div></div>
                         <div style={{ ...kpi(), cursor: 'pointer', position: 'relative' }} onClick={() => this.toggleAlertList()}>
                           <div style={kpiLbl()}>เกินเกณฑ์แจ้งเตือน ({s.alertThresholdPct}%)</div>
