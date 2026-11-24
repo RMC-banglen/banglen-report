@@ -17,6 +17,10 @@
   ol{margin:6px 0 12px;padding-left:22px}
   li{margin:3px 0}
   pre{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0 12px;font-size:12.5px;line-height:1.55;overflow-x:auto;white-space:pre;max-height:190px}
+  pre.ctx{max-height:none;white-space:pre-wrap}
+  pre.ctx .here{display:block;background:#fef3c7;color:#92400e;font-weight:700;border-radius:6px;padding:4px 6px;margin:3px 0}
+  @media (prefers-color-scheme: dark){pre.ctx .here{background:#78350f;color:#fde68a}}
+  code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:13px}
   .row{display:flex;gap:10px;flex-wrap:wrap}
   button,a.btn{font-family:inherit;font-size:16px;font-weight:700;border-radius:10px;padding:12px 18px;border:0;cursor:pointer;text-decoration:none;display:inline-block}
   .copy{background:var(--brand);color:#fff}
@@ -50,10 +54,13 @@ alter table sand_silt_spec add column if not exists sieve_tare_at timestamptz;</
     <h2>② Apps Script — แจ้งเตือน Telegram แบบรวม</h2>
     <ol>
       <li>กด <b>คัดลอกโค้ด</b></li>
-      <li>เปิดโปรเจกต์ Apps Script → หาฟังก์ชัน <b>notifyMaterialFail</b> → หาบรรทัด <code>} else if (d.test === 'stone') {</code></li>
-      <li><b>วางโค้ดก่อนบรรทัดนั้น</b> (ห้ามวางทับทั้งไฟล์ เพราะโทเคน Telegram อยู่ในไฟล์จริง) แล้วกด Save</li>
+      <li>เปิดโปรเจกต์ Apps Script → กด <b>Ctrl+F</b> พิมพ์ <code>d.test === 'stone'</code> → จะเจอบรรทัด <b>ประมาณ 948</b> (ฟังก์ชัน notifyMaterialFail เริ่มประมาณบรรทัด 903) — เลขอาจเลื่อนเล็กน้อยถ้าคุณเคยแก้สคริปต์ ให้ยึดข้อความที่ค้นหาเป็นหลัก</li>
+      <li>คลิกที่ <b>ท้ายบรรทัดก่อนหน้า</b> (บรรทัด 947) → กด <b>Enter</b> → กด <b>Ctrl+V</b> วางตรงบรรทัดใหม่นั้น ตามภาพด้านล่าง (<b>ห้ามวางทับทั้งไฟล์</b> เพราะโทเคน Telegram อยู่ในไฟล์จริง) แล้วกด Save</li>
       <li><b>Deploy → Manage deployments → ไอคอนดินสอ → Version: New version → Deploy</b></li>
     </ol>
+    <pre class="ctx">947       L.push('&lt;i&gt;มักเกิดจากน้ำเยอะเกิน ฟองอากาศมาก หรือชั่งตวงเพี้ยน ควรตรวจก่อนเทต่อ&lt;/i&gt;');
+<span class="here">     ⬇⬇  วางโค้ดที่คัดลอกมา "ตรงนี้" (บรรทัดใหม่ใต้บรรทัด 947)  ⬇⬇</span>
+948     } else if (d.test === 'stone') {</pre>
     <pre id="gas">    } else if (d.test === 'sand_fm_check') {
       var lossBad = String(d.loss_ok) === '0';
       L.push('⚠️ &lt;b&gt;ผลร่อนทรายผิดปกติ' + (lossBad ? ' — ต้องทดสอบใหม่' : ' — ตรวจสอบก่อนใช้ผล') + '&lt;/b&gt;');
