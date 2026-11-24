@@ -7,7 +7,7 @@
 <script>
 // iOS เก็บหน้าเว็บไว้ใน cache พอขึ้นโค้ดใหม่เครื่องเดิมจะยังเปิดของเก่า
 // จึงโหลดแค่ 2KB แรกของไฟล์ตัวเองมาเทียบเลขเวอร์ชัน ถ้าไม่ตรงก็โหลดใหม่ให้เอง
-var APP_VERSION='2026-11-24g';
+var APP_VERSION='2026-11-24h';
 (function(){
   // เพิ่งเปิดหน้า: ถ้าเจอเวอร์ชันใหม่ โหลดใหม่ให้ทันที (ยังไม่มีงานค้างอยู่)
   // เปิดค้างไว้แล้วสลับกลับมา: ไม่รีเฟรชเอง (กันงานที่กำลังทำอยู่หาย เช่น กรอกฟอร์ม/กำลังตรวจ PDF) แต่ขึ้นแถบให้กดรีเฟรชเอง
@@ -5595,6 +5595,7 @@ window.__dataReady.then(data => {
     const [amps,setAmps]=useState(null);
     const [selF,setSelF]=useState('');
     const [age,setAge]=useState(1);
+    const [showTbl,setShowTbl]=useState(false);   // ตารางรายละเอียด ซ่อนไว้ก่อน
     useEffect(()=>{DB.from('plant_amp_readings').select('d,formula,amp,for_cube').order('d').limit(5000)
       .then(({data,error})=>setAmps(error?[]:(data||[]))).catch(()=>setAmps([]));},[]);
     if(amps===null||!rows)return null;
@@ -5643,12 +5644,10 @@ window.__dataReady.then(data => {
         <Segmented options={[1,3,5,7].map(a=>({value:a,label:a+' วัน'}))} value={age} onChange={setAge}/>
       </div>}>
       {pairs.length===0?<div style={{padding:'24px 0',textAlign:'center',color:'#94a3b8',fontSize:14}}>ยังไม่มีวันที่มีทั้งแอมป์รอบเก็บก้อนและผลกำลังอัดอายุ {age} วัน — คนแพล้นท์ต้องติ๊ก "รอบนี้ QC เก็บก้อน" ตอนบันทึกแอมป์ทุกครั้งที่เก็บก้อน ข้อมูลจะสะสมเอง</div>:<>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
-          {[['สูตร '+cur+' · '+pairs.length+' วัน',null],
-            ['แอมป์เฉลี่ย '+mean(pairs.map(p=>p.amp)).toFixed(1)+' A',null],
-            ['กำลังอัดเฉลี่ย '+Math.round(mean(pairs.map(p=>p.ksc)))+' ksc (อายุ '+age+' วัน)',null],
-            target!=null?['เกณฑ์ '+target+' ksc',null]:null].filter(Boolean).map(([t],i)=>
-            <span key={i} style={{fontSize:12.5,fontWeight:700,color:'#1a2540',background:'#f4f6fa',borderRadius:999,padding:'4px 12px'}}>{t}</span>)}
+        <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1px solid #bbf7d0',fontSize:14,color:'#14532d',lineHeight:1.7,marginBottom:8}}>
+          สูตร <b>{cur}</b> · {pairs.length} วัน · แอมป์ตอนเก็บก้อนเฉลี่ย <b>{mAmp.toFixed(1)} A</b> → กำลังอัดเฉลี่ยอายุ {age} วัน <b>{Math.round(mKsc)} ksc</b>
+          {target!=null&&<> · เทียบเกณฑ์ {target}: <b style={{color:mKsc>=target?'#15803d':'#dc2626'}}>{mKsc>=target?'+':''}{Math.round(mKsc-target)} ksc</b>{mKsc-target>=40&&<span> (สูงกว่าเกณฑ์มาก — อาจลดแอมป์/ปรับสูตรลงได้ ถ้าข้อมูลพอ)</span>}{mKsc<target&&<span style={{color:'#dc2626'}}> (ต่ำกว่าเกณฑ์ — ควรเพิ่มแอมป์/ปรับสูตรขึ้น)</span>}</>}
+          {pairs.length<10&&<div style={{color:'#b45309',fontSize:12.5}}>⚠️ ข้อมูลมี {pairs.length} วัน ยังน้อย (ควรมี 10 วันขึ้นไป) ค่าเฉลี่ยอาจยังเปลี่ยนได้</div>}
         </div>
         <div style={{overflowX:'auto'}}>
         <svg viewBox={'0 0 '+W+' '+H} style={{width:'100%',minWidth:420,height:'auto',display:'block'}} role="img" aria-label="กราฟแอมป์กับกำลังอัด">
@@ -5670,11 +5669,8 @@ window.__dataReady.then(data => {
         <div style={{display:'flex',gap:14,flexWrap:'wrap',fontSize:12,color:'#64748b',margin:'4px 0 12px'}}>
           <span><b style={{color:'#0f766e'}}>●</b> แอมป์รอบเก็บก้อน (1 จุด = 1 วัน)</span><span><b style={{color:'#1a2540'}}>◆</b> ค่าเฉลี่ย (เส้นประตั้งฉากลงแกนแอมป์และแกนกำลังอัด)</span><span><b style={{color:'#dc2626'}}>- -</b> เกณฑ์</span>
         </div>
-        <div style={{padding:'10px 14px',borderRadius:10,background:'#f0fdf4',border:'1px solid #bbf7d0',fontSize:14,color:'#14532d',lineHeight:1.7,marginBottom:12}}>
-          สูตร <b>{cur}</b> · แอมป์ตอนเก็บก้อนเฉลี่ย <b>{mAmp.toFixed(1)} A</b> → กำลังอัดเฉลี่ยอายุ {age} วัน <b>{Math.round(mKsc)} ksc</b>
-          {target!=null&&<> · เทียบเกณฑ์ {target}: <b style={{color:mKsc>=target?'#15803d':'#dc2626'}}>{mKsc>=target?'+':''}{Math.round(mKsc-target)} ksc</b>{mKsc-target>=40&&<span> (สูงกว่าเกณฑ์มาก — อาจลดแอมป์/ปรับสูตรลงได้ ถ้าข้อมูลพอ)</span>}{mKsc<target&&<span style={{color:'#dc2626'}}> (ต่ำกว่าเกณฑ์ — ควรเพิ่มแอมป์/ปรับสูตรขึ้น)</span>}</>}
-          {pairs.length<10&&<div style={{color:'#b45309',fontSize:12.5}}>⚠️ ข้อมูลมี {pairs.length} วัน ยังน้อย (ควรมี 10 วันขึ้นไป) ค่าเฉลี่ยอาจยังเปลี่ยนได้</div>}
-        </div>
+        <button type="button" onClick={()=>setShowTbl(v=>!v)} style={{marginTop:4,padding:'8px 14px',borderRadius:10,border:'1.5px solid #cbd5e1',background:'#fff',color:'#475569',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{showTbl?'▲ ซ่อนตารางรายละเอียด':'📋 ดูตารางรายละเอียด (สรุปทุกสูตร · แยกตามแอมป์)'}</button>
+        {showTbl&&<div style={{marginTop:12}}>
         <div style={{fontSize:13.5,fontWeight:700,color:'#1a2540',margin:'4px 0 6px'}}>สรุปทุกสูตร (อายุ {age} วัน) — แอมป์ตอนเก็บก้อนเฉลี่ย → กำลังอัดเฉลี่ย</div>
         <div style={{overflowX:'auto',marginBottom:14}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
@@ -5702,6 +5698,7 @@ window.__dataReady.then(data => {
             </tr>;})}</tbody>
           </table>
         </div>
+        </div>}
       </>}
     </ChartCard>;
   }
